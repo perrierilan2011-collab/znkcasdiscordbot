@@ -31,6 +31,7 @@ const path = require('path');
 const PREFIX = '!';
 const COIN = '🪙';
 const DAILY_AMOUNT = 2;
+const INVITE_REWARD = 1; // pièces offertes à celui qui invite un nouveau membre
 const LEADERBOARD_REFRESH_MS = 60_000;
 const IDLE_MS = 90_000; // une partie inactive est réglée automatiquement après 90 s
 const MAX_ADMIN_AMOUNT = 100_000_000;
@@ -55,6 +56,8 @@ const client = new Client({
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent, // à activer dans le Developer Portal
+    GatewayIntentBits.GuildMembers, // arrivée des membres (système d'invitations) : à activer dans le Developer Portal
+    GatewayIntentBits.GuildInvites, // suivi des invitations
   ],
   allowedMentions: { parse: [], repliedUser: false },
 });
@@ -1143,6 +1146,7 @@ function buildHelpEmbed() {
         `🎡 **Roulette** : couleur, pair, impair (${fx(2 * coef('roulette'))}) ou numéro, vert (${fx(36 * coef('roulette'))})`,
         '🪙 **Pile ou Face** · 🎲 **Dés** · 🎰 **Machine à sous** · 🎡 **Roue de la fortune**',
         `🎁 **Daily** : ${DAILY_AMOUNT} pièces gratuites par jour`,
+        `📨 **Invitations** : +${INVITE_REWARD} 🪙 à chaque nouveau membre que tu invites (**${PREFIX}invites** pour ton total)`,
         '📜 **Historique** : tes 15 dernières parties',
         '🔁 À la fin d’une partie, le bouton **Rejouer** relance la même mise.',
         '',
@@ -1876,7 +1880,7 @@ async function updateLeaderboards() {
 // ============================================================
 //  MESSAGES (commandes écrites)
 // ============================================================
-const PLAYER_CMDS = new Set(['balance', 'bal', 'solde', 'daily', 'aide', 'help', 'casino', 'jeux']);
+const PLAYER_CMDS = new Set(['invites', 'invitations', 'balance', 'bal', 'solde', 'daily', 'aide', 'help', 'casino', 'jeux']);
 const OWNER_CMDS = new Set(['add', 'ajouter', 'remove', 'retirer', 'classement', 'setup', 'salon', 'wins', 'win', 'admin']);
 
 client.on(Events.MessageCreate, async (msg) => {
@@ -1921,6 +1925,9 @@ client.on(Events.MessageCreate, async (msg) => {
         return await cmdBalance(msg, args);
       case 'daily':
         return await cmdDaily(msg);
+      case 'invites':
+      case 'invitations':
+        return await cmdInvites(msg, args);
       case 'aide':
       case 'help':
         return await msg.reply({ embeds: [buildHelpEmbed()] });
@@ -2008,6 +2015,105 @@ client.on(Events.InteractionCreate, async (i) => {
   }
 });
 
+// ============================================================
+//  INVITATIONS : +1 pièce pour celui qui invite quelqu'un qui rejoint
+// ============================================================
+const inviteCache = new Map(); // guildId -> Map(code -> { uses, max, inviterId })
+const rewardedLocal = new Set(); // secours si la table invite_rewards est absente
+
+async function cacheInvites(guild) {
+  try {
+    const invites = await guild.invites.fetch();
+    inviteCache.set(
+      guild.id,
+      new Map(invites.map((inv) => [inv.code, { uses: inv.uses ?? 0, max: inv.maxUses ?? 0, inviterId: inv.inviter?.id ?? null }]))
+    );
+    return true;
+  } catch (e) {
+    console.error(`[invitations] ${guild.name} : impossible de lire les invitations (permission "Gérer le serveur" requise) :`, e?.message || e);
+    return false;
+  }
+}
+
+// true si la récompense doit être donnée (une seule fois par membre invité, même s'il quitte puis revient)
+async function claimInviteReward(guildId, invitedId, inviterId) {
+  const key = `${guildId}:${invitedId}`;
+  if (rewardedLocal.has(key)) return false;
+  const { error } = await supabase
+    .from('invite_rewards')
+    .insert({ guild_id: guildId, invited_id: invitedId, inviter_id: inviterId });
+  if (error) {
+    if (error.code === '23505') return false; // déjà récompensé
+    console.error('[invitations] table invite_rewards inaccessible (lance schema_v3.sql) :', error.message);
+  }
+  rewardedLocal.add(key);
+  return true;
+}
+
+client.on(Events.GuildMemberAdd, async (member) => {
+  try {
+    if (member.user.bot) return;
+    const guild = member.guild;
+    const old = inviteCache.get(guild.id);
+    let fresh;
+    try {
+      fresh = await guild.invites.fetch();
+    } catch {
+      return;
+    }
+
+    let inviterId = null;
+    if (old) {
+      const used = fresh.find((inv) => (inv.uses ?? 0) > (old.get(inv.code)?.uses ?? 0));
+      if (used) inviterId = used.inviter?.id ?? null;
+      else {
+        // invitation à usage limité, supprimée après le dernier usage
+        for (const [code, o] of old) {
+          if (!fresh.has(code) && o.max > 0 && o.uses + 1 >= o.max) {
+            inviterId = o.inviterId;
+            break;
+          }
+        }
+      }
+    }
+    inviteCache.set(
+      guild.id,
+      new Map(fresh.map((inv) => [inv.code, { uses: inv.uses ?? 0, max: inv.maxUses ?? 0, inviterId: inv.inviter?.id ?? null }]))
+    );
+
+    if (!inviterId || inviterId === member.id) return;
+    if (!(await claimInviteReward(guild.id, member.id, inviterId))) return;
+
+    await credit(inviterId, INVITE_REWARD);
+    const chId = casinoChannels.get(guild.id);
+    const ch = chId ? await client.channels.fetch(chId).catch(() => null) : null;
+    ch?.send(`🎉 <@${inviterId}> a invité <@${member.id}> et reçoit **${fmt(INVITE_REWARD)}** !`).catch(() => {});
+  } catch (e) {
+    console.error('[invitations] arrivée', e?.message || e);
+  }
+});
+
+client.on(Events.InviteCreate, (inv) => {
+  if (!inv.guild) return;
+  const m = inviteCache.get(inv.guild.id) || new Map();
+  m.set(inv.code, { uses: inv.uses ?? 0, max: inv.maxUses ?? 0, inviterId: inv.inviter?.id ?? null });
+  inviteCache.set(inv.guild.id, m);
+});
+client.on(Events.InviteDelete, () => {}); // on garde l'entrée : elle sert à repérer une invitation épuisée
+client.on(Events.GuildCreate, (guild) => cacheInvites(guild));
+
+async function cmdInvites(msg, args) {
+  const targetId = parseUserId(args[0]) || msg.author.id;
+  const { count, error } = await supabase
+    .from('invite_rewards')
+    .select('invited_id', { count: 'exact', head: true })
+    .eq('guild_id', msg.guild.id)
+    .eq('inviter_id', targetId);
+  if (error) throw error;
+  const who = targetId === msg.author.id ? 'Tu as' : `<@${targetId}> a`;
+  return msg.reply(`📨 ${who} invité **${count ?? 0}** membre(s) (${fmt((count ?? 0) * INVITE_REWARD)} gagnés).`);
+}
+
 // Si un salon enregistré est supprimé à la main, on le "désenregistre"
 client.on(Events.ChannelDelete, async (channel) => {
   if (!channel.guild) return;
@@ -2027,6 +2133,7 @@ client.on(Events.ChannelDelete, async (channel) => {
 client.once(Events.ClientReady, (c) => {
   console.log(`✅ Connecté en tant que ${c.user.tag}`);
   loadMultipliers();
+  for (const g of c.guilds.cache.values()) cacheInvites(g);
   loadChannels().then(restoreChannelsByName);
   setInterval(updateLeaderboards, LEADERBOARD_REFRESH_MS);
   updateLeaderboards();
