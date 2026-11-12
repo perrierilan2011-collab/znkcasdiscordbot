@@ -14,6 +14,9 @@ const {
   MessageFlags,
   ChannelType,
   PermissionFlagsBits,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle,
   escapeMarkdown,
 } = require('discord.js');
 const { createClient } = require('@supabase/supabase-js');
@@ -21,7 +24,7 @@ const { createClient } = require('@supabase/supabase-js');
 // ============================================================
 //  CONFIG
 // ============================================================
-const PREFIX = '!';
+const PREFIX = '.';
 const COIN = '🪙';
 const DAILY_AMOUNT = 2;
 const LEADERBOARD_REFRESH_MS = 60_000;
@@ -575,7 +578,9 @@ async function cmdRoulette(msg, args) {
   const payout = won ? floor2(bet * choice.mult) : 0;
   const balance = payout > 0 ? await credit(id, payout) : await getBalance(id);
 
-  const spinning = await msg.reply(`🎡 La roulette tourne... (mise **${fmt(bet)}** sur **${choice.label}**)`);
+  const spinning = await msg.reply({
+    content: `${msg.mention || ''} 🎡 La roulette tourne... (mise **${fmt(bet)}** sur **${choice.label}**)`.trim(),
+  });
   await sleep(2500);
 
   const embed = new EmbedBuilder()
@@ -591,7 +596,7 @@ async function cmdRoulette(msg, args) {
       { name: 'Ton pari', value: choice.label, inline: true },
       { name: 'Solde', value: fmt(balance), inline: true }
     );
-  await spinning.edit({ content: '', embeds: [embed] });
+  await spinning.edit({ content: msg.mention || '', embeds: [embed] });
 }
 
 // ============================================================
@@ -716,6 +721,7 @@ function buildHelpEmbed() {
     .setColor(COLORS.blue)
     .setDescription(
       [
+        `**${p}casino** : afficher le panneau de jeu (boutons + pop-up de mise)`,
         `**${p}balance** [@membre] : voir ton solde`,
         `**${p}daily** : ${DAILY_AMOUNT} pièces gratuites par jour`,
         `**${p}mines** <mise|all> [1-5 mines] : jeu des mines`,
@@ -726,7 +732,7 @@ function buildHelpEmbed() {
         `**${p}add** @membre <montant> : ajouter de l’argent`,
         `**${p}remove** @membre <montant> : retirer de l’argent`,
         `**${p}classement** : afficher le classement (mis à jour chaque minute)`,
-        `**${p}setup** : créer le salon casino (les commandes de jeu ne marchent que là)`,
+        `**${p}setup** (ou **${p}salon**) : créer le salon casino avec le panneau de boutons`,
       ].join('\n')
     );
 }
@@ -739,6 +745,147 @@ function cmdHelp(msg) {
 //  SALON CASINO (les commandes de jeu ne marchent que là)
 // ============================================================
 const casinoChannels = new Map(); // guildId -> channelId
+
+// ---------- Panneau de jeu (boutons) + pop-ups de mise ----------
+function buildPanelPayload() {
+  const panel = new EmbedBuilder()
+    .setTitle('🎰 Casino')
+    .setColor(COLORS.gold)
+    .setDescription(
+      'Clique sur un bouton pour jouer : une fenêtre s’ouvre pour régler ta mise.\n\n' +
+        '💣 **Mines** : évite les bombes et encaisse quand tu veux\n' +
+        '🃏 **Blackjack** : bats le croupier\n' +
+        '🎡 **Roulette** : parie sur une couleur ou un numéro\n' +
+        `🎁 **Daily** : ${DAILY_AMOUNT} pièces gratuites par jour\n` +
+        '💰 **Mon solde** · 🏆 **Classement** · ❓ **Aide**\n\n' +
+        '🔒 Tes parties et ton solde ne sont visibles que par toi.'
+    );
+
+  const games = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('panel_mines').setLabel('Mines').setEmoji('💣').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId('panel_bj').setLabel('Blackjack').setEmoji('🃏').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId('panel_roulette').setLabel('Roulette').setEmoji('🎡').setStyle(ButtonStyle.Primary)
+  );
+  const extra = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('panel_balance').setLabel('Mon solde').setEmoji('💰').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('panel_daily').setLabel('Daily').setEmoji('🎁').setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId('panel_top').setLabel('Classement').setEmoji('🏆').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('panel_help').setLabel('Aide').setEmoji('❓').setStyle(ButtonStyle.Secondary)
+  );
+  return { embeds: [panel], components: [games, extra] };
+}
+
+function modalInput(id, label, { placeholder, value, required = true, max = 30 } = {}) {
+  const t = new TextInputBuilder()
+    .setCustomId(id)
+    .setLabel(label)
+    .setStyle(TextInputStyle.Short)
+    .setRequired(required)
+    .setMaxLength(max);
+  if (placeholder) t.setPlaceholder(placeholder);
+  if (value) t.setValue(value);
+  return new ActionRowBuilder().addComponents(t);
+}
+
+const minesModal = () =>
+  new ModalBuilder()
+    .setCustomId('modal_mines')
+    .setTitle('💣 Mines')
+    .addComponents(
+      modalInput('bet', 'Ta mise (ou "all" pour tout miser)', { placeholder: 'ex : 1' }),
+      modalInput('mines', 'Nombre de mines (1 à 5)', { value: '3', required: false, max: 1 })
+    );
+
+const blackjackModal = () =>
+  new ModalBuilder()
+    .setCustomId('modal_bj')
+    .setTitle('🃏 Blackjack')
+    .addComponents(modalInput('bet', 'Ta mise (ou "all" pour tout miser)', { placeholder: 'ex : 2' }));
+
+const rouletteModal = () =>
+  new ModalBuilder()
+    .setCustomId('modal_roulette')
+    .setTitle('🎡 Roulette')
+    .addComponents(
+      modalInput('bet', 'Ta mise (ou "all" pour tout miser)', { placeholder: 'ex : 1' }),
+      modalInput('choice', 'Ton pari', { placeholder: 'rouge, noir, pair, impair, vert ou 0 à 36' })
+    );
+
+// Permet de réutiliser les jeux (écrits pour des messages) avec une interaction de pop-up.
+// Tout est PRIVÉ (éphémère) : seul le joueur voit ses parties, ses erreurs et ses résultats.
+function interactionAsMsg(i) {
+  return {
+    author: i.user,
+    mention: '',
+    async reply(payload) {
+      if (typeof payload === 'string') {
+        await i.reply({ content: payload, flags: MessageFlags.Ephemeral });
+        return null;
+      }
+      await i.reply({ ...payload, flags: MessageFlags.Ephemeral });
+      const sent = await i.fetchReply();
+      return {
+        id: sent.id,
+        createMessageComponentCollector: (opts) => sent.createMessageComponentCollector(opts),
+        edit: (p) => i.editReply(p), // un message privé se modifie via l'interaction
+      };
+    },
+  };
+}
+
+async function handlePanelInteraction(i) {
+  const isPanelBtn = i.isButton() && i.customId.startsWith('panel_');
+  const isModal = i.isModalSubmit() && i.customId.startsWith('modal_');
+  if (!i.guild || (!isPanelBtn && !isModal)) return;
+
+  const casinoId = casinoChannels.get(i.guild.id);
+  if (casinoId && i.channelId !== casinoId) {
+    return i.reply({ content: `🎰 Les jeux ne marchent que dans <#${casinoId}>.`, flags: MessageFlags.Ephemeral });
+  }
+
+  if (isPanelBtn) {
+    switch (i.customId) {
+      case 'panel_mines':
+        return i.showModal(minesModal());
+      case 'panel_bj':
+        return i.showModal(blackjackModal());
+      case 'panel_roulette':
+        return i.showModal(rouletteModal());
+      case 'panel_balance': {
+        const bal = await getBalance(i.user.id);
+        return i.reply({ content: `💰 Ton solde : **${fmt(bal)}**`, flags: MessageFlags.Ephemeral });
+      }
+      case 'panel_daily': {
+        const res = await rpc('claim_daily', { p_user_id: i.user.id, p_amount: DAILY_AMOUNT });
+        const content = res.claimed
+          ? `🎁 Tu as reçu **${fmt(DAILY_AMOUNT)}** ! Nouveau solde : **${fmt(res.balance)}**`
+          : `⏰ Tu as déjà récupéré ta récompense aujourd’hui. Reviens après minuit (heure de Paris) !\nSolde : **${fmt(res.balance)}**`;
+        return i.reply({ content, flags: MessageFlags.Ephemeral });
+      }
+      case 'panel_top': {
+        await i.deferReply({ flags: MessageFlags.Ephemeral });
+        return i.editReply({ embeds: [await buildLeaderboardEmbed()] });
+      }
+      case 'panel_help':
+        return i.reply({ embeds: [buildHelpEmbed()], flags: MessageFlags.Ephemeral });
+      default:
+        return;
+    }
+  }
+
+  const get = (k) => i.fields.getTextInputValue(k).trim();
+  const m = interactionAsMsg(i);
+  switch (i.customId) {
+    case 'modal_mines':
+      return cmdMines(m, [get('bet'), get('mines') || undefined]);
+    case 'modal_bj':
+      return cmdBlackjack(m, [get('bet')]);
+    case 'modal_roulette':
+      return cmdRoulette(m, [get('bet'), get('choice')]);
+    default:
+      return;
+  }
+}
 
 async function loadCasinoChannels() {
   const { data, error } = await supabase.from('casino_channels').select('guild_id, channel_id');
@@ -756,7 +903,15 @@ async function cmdSetup(msg) {
   const existingId = casinoChannels.get(guild.id);
   if (existingId) {
     const existing = await guild.channels.fetch(existingId).catch(() => null);
-    if (existing) return msg.reply(`Le salon casino existe déjà : <#${existingId}>`);
+    if (existing) {
+      // Personne (sauf le propriétaire) n'écrit dans le salon : on joue avec les boutons
+      await existing.permissionOverwrites
+        .edit(guild.roles.everyone, { SendMessages: false })
+        .catch(() => {});
+      const panelMsg = await existing.send(buildPanelPayload());
+      await panelMsg.pin().catch(() => {});
+      return msg.reply(`✅ Le salon <#${existingId}> existe déjà : j’y ai posté un nouveau panneau de jeu (épinglé).`);
+    }
     casinoChannels.delete(guild.id);
   }
 
@@ -776,13 +931,13 @@ async function cmdSetup(msg) {
     type: ChannelType.GuildText,
     topic: `Casino 🪙 : tape ${PREFIX}aide pour voir les commandes`,
     permissionOverwrites: [
-      { id: guild.roles.everyone.id, allow: [P.ViewChannel, P.SendMessages, P.ReadMessageHistory] },
+      { id: guild.roles.everyone.id, allow: [P.ViewChannel, P.ReadMessageHistory], deny: [P.SendMessages] },
       { id: me.id, allow: botAllow },
     ],
   });
 
   try {
-    const helpMsg = await channel.send({ embeds: [buildHelpEmbed()] });
+    const helpMsg = await channel.send(buildPanelPayload());
     await helpMsg.pin().catch(() => {});
     const { error } = await supabase.from('casino_channels').upsert({
       guild_id: guild.id,
@@ -801,15 +956,17 @@ async function cmdSetup(msg) {
     ? ''
     : '\n⚠️ Il me manque **Gérer les messages** : je ne pourrai pas épingler l’aide ni nettoyer le salon.';
   return msg.reply(
-    `✅ Salon <#${channel.id}> créé. Les commandes de jeu ne marchent plus que là, et seules les commandes y restent visibles.${warn}`
+    `✅ Salon <#${channel.id}> créé avec le panneau de boutons (épinglé). Chacun joue en cliquant, et ses parties ne sont visibles que par lui.${warn}`
   );
 }
 
 // ============================================================
 //  ROUTEUR DE COMMANDES
 // ============================================================
-const PLAYER_CMDS = new Set(['balance', 'bal', 'solde', 'daily', 'mines', 'blackjack', 'bj', 'roulette', 'aide', 'help']);
-const OWNER_CMDS = new Set(['add', 'ajouter', 'remove', 'retirer', 'classement', 'setup']);
+const PLAYER_CMDS = new Set([
+  'balance', 'bal', 'solde', 'daily', 'mines', 'blackjack', 'bj', 'roulette', 'aide', 'help', 'casino', 'jeux',
+]);
+const OWNER_CMDS = new Set(['add', 'ajouter', 'remove', 'retirer', 'classement', 'setup', 'salon']);
 
 client.on(Events.MessageCreate, async (msg) => {
   if (msg.author.bot || !msg.guild) return;
@@ -824,9 +981,14 @@ client.on(Events.MessageCreate, async (msg) => {
   const isPlayerCmd = PLAYER_CMDS.has(cmd);
   const isOwnerCmd = OWNER_CMDS.has(cmd);
 
-  // Dans le salon casino, on ne garde que les commandes (le propriétaire peut y écrire librement)
-  if (inCasino && !isPlayerCmd && !isOwnerCmd && !isCrown(msg)) {
+  // Dans le salon casino, on joue avec les boutons (privés) : les messages des joueurs sont supprimés.
+  // Le propriétaire peut y écrire librement (.setup, .classement, .add, .remove...).
+  if (inCasino && !isCrown(msg)) {
     msg.delete().catch(() => {});
+    const hint = await msg.channel
+      .send(`<@${msg.author.id}> Utilise les boutons du panneau épinglé 👆 (tes parties sont privées).`)
+      .catch(() => null);
+    if (hint) setTimeout(() => hint.delete().catch(() => {}), 5000);
     return;
   }
   if (!isPlayerCmd && !isOwnerCmd) return;
@@ -865,7 +1027,11 @@ client.on(Events.MessageCreate, async (msg) => {
       case 'classement':
         return await cmdLeaderboard(msg);
       case 'setup':
+      case 'salon':
         return await cmdSetup(msg);
+      case 'casino':
+      case 'jeux':
+        return await msg.reply(buildPanelPayload());
       case 'aide':
       case 'help':
         return await cmdHelp(msg);
@@ -883,6 +1049,18 @@ client.once(Events.ClientReady, (c) => {
   loadCasinoChannels();
   setInterval(updateLeaderboards, LEADERBOARD_REFRESH_MS);
   updateLeaderboards();
+});
+
+// Boutons du panneau et pop-ups de mise
+client.on(Events.InteractionCreate, async (i) => {
+  try {
+    await handlePanelInteraction(i);
+  } catch (e) {
+    console.error('[interaction]', e);
+    if (i.isRepliable?.() && !i.replied && !i.deferred) {
+      i.reply({ content: '⚠️ Une erreur est survenue, réessaie dans un instant.', flags: MessageFlags.Ephemeral }).catch(() => {});
+    }
+  }
 });
 
 // Si le salon casino est supprimé à la main, on libère les commandes
