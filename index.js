@@ -34,6 +34,8 @@ if (!DISCORD_TOKEN || !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
+  // Node < 22 n'a pas de WebSocket natif : on fournit "ws" (sinon crash au démarrage)
+  realtime: { transport: require('ws') },
 });
 
 const client = new Client({
