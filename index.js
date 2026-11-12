@@ -21,7 +21,7 @@ const { createClient } = require('@supabase/supabase-js');
 // ============================================================
 //  CONFIG
 // ============================================================
-const PREFIX = '/';
+const PREFIX = '!';
 const COIN = '🪙';
 const DAILY_AMOUNT = 2;
 const LEADERBOARD_REFRESH_MS = 60_000;
