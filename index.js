@@ -12,6 +12,8 @@ const {
   ButtonStyle,
   ComponentType,
   MessageFlags,
+  ChannelType,
+  PermissionFlagsBits,
   escapeMarkdown,
 } = require('discord.js');
 const { createClient } = require('@supabase/supabase-js');
@@ -707,9 +709,9 @@ async function updateLeaderboards() {
 // ============================================================
 //  AIDE
 // ============================================================
-function cmdHelp(msg) {
+function buildHelpEmbed() {
   const p = PREFIX;
-  const embed = new EmbedBuilder()
+  return new EmbedBuilder()
     .setTitle(`${COIN} Commandes`)
     .setColor(COLORS.blue)
     .setDescription(
@@ -724,19 +726,120 @@ function cmdHelp(msg) {
         `**${p}add** @membre <montant> : ajouter de l’argent`,
         `**${p}remove** @membre <montant> : retirer de l’argent`,
         `**${p}classement** : afficher le classement (mis à jour chaque minute)`,
+        `**${p}setup** : créer le salon casino (les commandes de jeu ne marchent que là)`,
       ].join('\n')
     );
-  return msg.reply({ embeds: [embed] });
+}
+
+function cmdHelp(msg) {
+  return msg.reply({ embeds: [buildHelpEmbed()] });
+}
+
+// ============================================================
+//  SALON CASINO (les commandes de jeu ne marchent que là)
+// ============================================================
+const casinoChannels = new Map(); // guildId -> channelId
+
+async function loadCasinoChannels() {
+  const { data, error } = await supabase.from('casino_channels').select('guild_id, channel_id');
+  if (error) {
+    console.error('[casino] chargement des salons :', error.message);
+    return;
+  }
+  for (const r of data) casinoChannels.set(r.guild_id, r.channel_id);
+}
+
+async function cmdSetup(msg) {
+  if (!isCrown(msg)) return msg.reply(CROWN_ONLY);
+  const guild = msg.guild;
+
+  const existingId = casinoChannels.get(guild.id);
+  if (existingId) {
+    const existing = await guild.channels.fetch(existingId).catch(() => null);
+    if (existing) return msg.reply(`Le salon casino existe déjà : <#${existingId}>`);
+    casinoChannels.delete(guild.id);
+  }
+
+  const me = guild.members.me;
+  const P = PermissionFlagsBits;
+  if (!me.permissions.has(P.ManageChannels)) {
+    return msg.reply(
+      '⚠️ Il me faut la permission **Gérer les salons** pour créer le salon (Paramètres du serveur → Rôles → rôle du bot).'
+    );
+  }
+  const botAllow = [P.ViewChannel, P.SendMessages, P.EmbedLinks, P.ReadMessageHistory, P.ManageMessages].filter(
+    (p) => me.permissions.has(p)
+  );
+
+  const channel = await guild.channels.create({
+    name: 'casino',
+    type: ChannelType.GuildText,
+    topic: `Casino 🪙 : tape ${PREFIX}aide pour voir les commandes`,
+    permissionOverwrites: [
+      { id: guild.roles.everyone.id, allow: [P.ViewChannel, P.SendMessages, P.ReadMessageHistory] },
+      { id: me.id, allow: botAllow },
+    ],
+  });
+
+  try {
+    const helpMsg = await channel.send({ embeds: [buildHelpEmbed()] });
+    await helpMsg.pin().catch(() => {});
+    const { error } = await supabase.from('casino_channels').upsert({
+      guild_id: guild.id,
+      channel_id: channel.id,
+      help_message_id: helpMsg.id,
+      updated_at: new Date().toISOString(),
+    });
+    if (error) throw error;
+  } catch (e) {
+    await channel.delete().catch(() => {});
+    throw e;
+  }
+  casinoChannels.set(guild.id, channel.id);
+
+  const warn = me.permissions.has(P.ManageMessages)
+    ? ''
+    : '\n⚠️ Il me manque **Gérer les messages** : je ne pourrai pas épingler l’aide ni nettoyer le salon.';
+  return msg.reply(
+    `✅ Salon <#${channel.id}> créé. Les commandes de jeu ne marchent plus que là, et seules les commandes y restent visibles.${warn}`
+  );
 }
 
 // ============================================================
 //  ROUTEUR DE COMMANDES
 // ============================================================
-client.on(Events.MessageCreate, async (msg) => {
-  if (msg.author.bot || !msg.guild || !msg.content.startsWith(PREFIX)) return;
+const PLAYER_CMDS = new Set(['balance', 'bal', 'solde', 'daily', 'mines', 'blackjack', 'bj', 'roulette', 'aide', 'help']);
+const OWNER_CMDS = new Set(['add', 'ajouter', 'remove', 'retirer', 'classement', 'setup']);
 
-  const [cmdRaw, ...args] = msg.content.slice(PREFIX.length).trim().split(/\s+/);
+client.on(Events.MessageCreate, async (msg) => {
+  if (msg.author.bot || !msg.guild) return;
+
+  const casinoId = casinoChannels.get(msg.guild.id);
+  const inCasino = casinoId && msg.channel.id === casinoId;
+
+  const [cmdRaw, ...args] = msg.content.startsWith(PREFIX)
+    ? msg.content.slice(PREFIX.length).trim().split(/\s+/)
+    : [''];
   const cmd = (cmdRaw || '').toLowerCase();
+  const isPlayerCmd = PLAYER_CMDS.has(cmd);
+  const isOwnerCmd = OWNER_CMDS.has(cmd);
+
+  // Dans le salon casino, on ne garde que les commandes (le propriétaire peut y écrire librement)
+  if (inCasino && !isPlayerCmd && !isOwnerCmd && !isCrown(msg)) {
+    msg.delete().catch(() => {});
+    return;
+  }
+  if (!isPlayerCmd && !isOwnerCmd) return;
+
+  // Les commandes de jeu ne marchent que dans le salon casino
+  if (isPlayerCmd && casinoId && !inCasino) {
+    const warn = await msg.reply(`🎰 Les commandes casino ne marchent que dans <#${casinoId}>.`).catch(() => null);
+    setTimeout(() => {
+      msg.delete().catch(() => {});
+      if (warn) warn.delete().catch(() => {});
+    }, 6000);
+    return;
+  }
 
   try {
     switch (cmd) {
@@ -761,6 +864,8 @@ client.on(Events.MessageCreate, async (msg) => {
         return await cmdAdjust(msg, args, -1);
       case 'classement':
         return await cmdLeaderboard(msg);
+      case 'setup':
+        return await cmdSetup(msg);
       case 'aide':
       case 'help':
         return await cmdHelp(msg);
@@ -775,8 +880,16 @@ client.on(Events.MessageCreate, async (msg) => {
 
 client.once(Events.ClientReady, (c) => {
   console.log(`✅ Connecté en tant que ${c.user.tag}`);
+  loadCasinoChannels();
   setInterval(updateLeaderboards, LEADERBOARD_REFRESH_MS);
   updateLeaderboards();
+});
+
+// Si le salon casino est supprimé à la main, on libère les commandes
+client.on(Events.ChannelDelete, async (channel) => {
+  if (!channel.guild || casinoChannels.get(channel.guild.id) !== channel.id) return;
+  casinoChannels.delete(channel.guild.id);
+  await supabase.from('casino_channels').delete().eq('guild_id', channel.guild.id);
 });
 
 client.on(Events.Error, (e) => console.error('[client]', e));
