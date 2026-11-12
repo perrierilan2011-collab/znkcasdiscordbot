@@ -191,6 +191,16 @@ const GAME_NAMES = {
   dice: '🎲 Dés',
   slots: '🎰 Machine à sous',
   wheel: '🎡 Roue de la fortune',
+  duel: '⚔️ Duel de cartes',
+  suit: '🃏 Enseigne',
+  zone: '🎯 Zone',
+  plinko: '🎱 Plinko',
+  crash: '🚀 Crash',
+  scratch: '🎟️ Ticket à gratter',
+  die: '🎲 Dé exact',
+  chest: '📦 Coffre mystère',
+  russian: '🔫 Roulette russe',
+  horses: '🏇 Course de chevaux',
 };
 
 // ============================================================
@@ -1040,6 +1050,237 @@ const INSTANT = {
   },
 };
 
+// ---------- 10 jeux de plus ----------
+const chunk = (arr, n) => Array.from({ length: Math.ceil(arr.length / n) }, (_, k) => arr.slice(k * n, k * n + n));
+
+// Écran de choix générique : un bouton par pari possible
+function choicePicker(key, title, desc, choices) {
+  const buttons = choices.map(([id, label, emoji, style]) => igButton(key, id, label, emoji, style || ButtonStyle.Primary));
+  return {
+    embeds: [new EmbedBuilder().setTitle(title).setColor(COLORS.blue).setDescription(desc)],
+    components: chunk(buttons, 5).map((r) => new ActionRowBuilder().addComponents(...r)),
+  };
+}
+
+const DUEL_MULT = 2.1;
+const SUIT_MULT = 3.8;
+const SUIT_CHOICES = { s: '♠️', h: '♥️', d: '♦️', c: '♣️' };
+const ZONES = { low: { label: 'Bas (1-3)', mult: 3.2, win: (n) => n <= 3 }, mid: { label: 'Milieu (4-7)', mult: 2.4, win: (n) => n >= 4 && n <= 7 }, high: { label: 'Haut (8-10)', mult: 3.2, win: (n) => n >= 8 } };
+const PLINKO_BINS = [1, 8, 28, 56, 70, 56, 28, 8, 1]; // répartition binomiale (8 rangées)
+const PLINKO = {
+  low: { label: 'Faible', emoji: '🟢', mults: [2, 1.4, 1.1, 0.95, 0.8, 0.95, 1.1, 1.4, 2] },
+  med: { label: 'Moyen', emoji: '🟡', mults: [6, 3, 1.4, 0.7, 0.4, 0.7, 1.4, 3, 6] },
+  high: { label: 'Élevé', emoji: '🔴', mults: [18, 4, 1.5, 0.4, 0.2, 0.4, 1.5, 4, 18] },
+};
+const CRASH_TARGETS = { x15: 1.5, x2: 2, x5: 5, x10: 10 };
+const SCRATCH = [[1.5, 1900, '🍀'], [2, 900, '⭐'], [5, 400, '🔔'], [20, 80, '💎'], [100, 12, '👑']]; // [mult, poids sur 10000, symbole]
+const SCRATCH_JUNK = ['🍀', '⭐', '🔔', '💎', '👑', '🍒', '🍋'];
+const DIE_MULT = 5.7;
+const CHEST_MULT = 2.85;
+const russianMult = (k) => round2((0.96 * 6) / (6 - k));
+const HORSES = [
+  { p: 0.4, mult: 2.4 },
+  { p: 0.25, mult: 3.8 },
+  { p: 0.18, mult: 5.3 },
+  { p: 0.11, mult: 8.6 },
+  { p: 0.06, mult: 15.8 },
+];
+
+const randCard = () => ({ v: randomInt(0, 13), s: SUITS[randomInt(0, 4)] });
+const cardOf = (c) => cardStr({ r: RANKS[c.v], s: c.s });
+
+Object.assign(INSTANT, {
+  duel: {
+    title: '⚔️ Duel de cartes',
+    choices: ['go'],
+    spinText: 'Les cartes sont distribuées...',
+    info: (c) => `victoire ${fx(DUEL_MULT * c)}`,
+    picker: (c) =>
+      choicePicker('duel', '⚔️ Duel de cartes', `Tu tires une carte contre le croupier : la plus haute gagne (l’As est la plus faible, égalité = perdu).\nVictoire : **${fx(DUEL_MULT * c)}**`, [
+        ['go', 'Tirer ma carte', '⚔️', ButtonStyle.Success],
+      ]),
+    resolve() {
+      const me = randCard();
+      const dealer = randCard();
+      return {
+        base: me.v > dealer.v ? DUEL_MULT : 0,
+        pick: 'Duel',
+        headline: `Toi : ${cardOf(me)}  ·  Croupier : ${cardOf(dealer)}`,
+        detail: `${RANKS[me.v]} vs ${RANKS[dealer.v]}`,
+      };
+    },
+  },
+
+  suit: {
+    title: '🃏 Enseigne',
+    choices: Object.keys(SUIT_CHOICES),
+    spinText: 'Le croupier tire une carte...',
+    info: (c) => `victoire ${fx(SUIT_MULT * c)}`,
+    picker: (c) =>
+      choicePicker('suit', '🃏 Enseigne : devine la couleur de la carte', `Choisis ♠️ ♥️ ♦️ ou ♣️ : si la carte tirée a cette enseigne, tu gagnes **${fx(SUIT_MULT * c)}** (1 chance sur 4).`,
+        Object.entries(SUIT_CHOICES).map(([id, e]) => [id, id === 's' ? 'Pique' : id === 'h' ? 'Cœur' : id === 'd' ? 'Carreau' : 'Trèfle', e])),
+    resolve(choice) {
+      const card = randCard();
+      return {
+        base: card.s === SUIT_CHOICES[choice] ? SUIT_MULT : 0,
+        pick: SUIT_CHOICES[choice],
+        headline: `La carte tirée : ${cardOf(card)}`,
+        detail: `${SUIT_CHOICES[choice]} → ${card.s}`,
+      };
+    },
+  },
+
+  zone: {
+    title: '🎯 Zone',
+    choices: Object.keys(ZONES),
+    spinText: 'Tirage d’un nombre de 1 à 10...',
+    info: (c) => `zones ${fx(ZONES.low.mult * c)} / ${fx(ZONES.mid.mult * c)}`,
+    picker: (c) =>
+      choicePicker('zone', '🎯 Zone : où tombera le nombre (1 à 10) ?', Object.values(ZONES).map((z) => `**${z.label}** : ${fx(z.mult * c)}`).join('\n'),
+        Object.entries(ZONES).map(([id, z]) => [id, z.label, '🎯'])),
+    resolve(choice) {
+      const n = randomInt(1, 11);
+      return { base: ZONES[choice].win(n) ? ZONES[choice].mult : 0, pick: ZONES[choice].label, headline: `Le nombre tiré est **${n}**`, detail: `${n}` };
+    },
+  },
+
+  plinko: {
+    title: '🎱 Plinko',
+    choices: Object.keys(PLINKO),
+    spinText: 'La bille descend...',
+    info: (c) => `de ${fx(0.2 * c)} à ${fx(18 * c)}`,
+    picker: (c) =>
+      choicePicker('plinko', '🎱 Plinko : choisis le risque', Object.values(PLINKO).map((r) => `${r.emoji} **${r.label}** : ${r.mults.map((m) => fx(m * c).replace('x', '')).join(' · ')}`).join('\n'),
+        Object.entries(PLINKO).map(([id, r]) => [id, r.label, r.emoji])),
+    resolve(choice, c) {
+      let bin = 0;
+      for (let k = 0; k < 8; k++) bin += randomInt(0, 2);
+      const mults = PLINKO[choice].mults;
+      const board = mults.map((m, k) => (k === bin ? `**[${fx(m * c).replace('x', '')}]**` : fx(m * c).replace('x', ''))).join(' ');
+      return { base: mults[bin], pick: PLINKO[choice].label, headline: `La bille tombe dans la case **${bin + 1}** :\n${board}`, detail: `case ${bin + 1}` };
+    },
+  },
+
+  crash: {
+    title: '🚀 Crash',
+    choices: Object.keys(CRASH_TARGETS),
+    spinText: 'La fusée décolle...',
+    info: (c) => `cibles de ${fx(1.5 * c)} à ${fx(10 * c)}`,
+    picker: (c) =>
+      choicePicker('crash', '🚀 Crash : choisis ton multiplicateur cible', 'La fusée monte puis explose à un moment aléatoire. Si elle atteint ta cible, tu gagnes ! Plus la cible est haute, plus c’est risqué.',
+        Object.entries(CRASH_TARGETS).map(([id, t]) => [id, `x${t}`, '🚀'])),
+    resolve(choice) {
+      const u = randomInt(1, 1_000_001) / 1_000_000;
+      const crash = Math.max(1, Math.floor((0.96 / u) * 100) / 100);
+      const target = CRASH_TARGETS[choice];
+      return {
+        base: crash >= target ? target : 0,
+        pick: `Cible x${target}`,
+        headline: `🚀 La fusée explose à **${fx(Math.min(crash, 1000))}**${crash >= target ? ' : cible atteinte !' : ' : trop tôt !'}`,
+        detail: `cible x${target} / crash x${Math.min(crash, 1000)}`,
+      };
+    },
+  },
+
+  scratch: {
+    title: '🎟️ Ticket à gratter',
+    choices: ['go'],
+    spinText: 'Tu grattes le ticket...',
+    info: (c) => `de ${fx(1.5 * c)} à ${fx(100 * c)}`,
+    picker: (c) =>
+      choicePicker('scratch', '🎟️ Ticket à gratter', `Trois symboles identiques = gagné !\n${SCRATCH.map(([m, , e]) => `${e}${e}${e} → **${fx(m * c)}**`).join('\n')}`, [
+        ['go', 'Gratter', '🎟️', ButtonStyle.Success],
+      ]),
+    resolve() {
+      let r = randomInt(0, 10000);
+      let win = null;
+      for (const row of SCRATCH) {
+        if (r < row[1]) {
+          win = row;
+          break;
+        }
+        r -= row[1];
+      }
+      let cells;
+      if (win) cells = [win[2], win[2], win[2]];
+      else {
+        do cells = [0, 1, 2].map(() => SCRATCH_JUNK[randomInt(0, SCRATCH_JUNK.length)]);
+        while (cells[0] === cells[1] && cells[1] === cells[2]);
+      }
+      return { base: win ? win[0] : 0, pick: 'Ticket', headline: `**[ ${cells.join(' | ')} ]**`, detail: cells.join('') };
+    },
+  },
+
+  die: {
+    title: '🎲 Dé exact',
+    choices: ['n1', 'n2', 'n3', 'n4', 'n5', 'n6'],
+    spinText: 'Le dé roule...',
+    info: (c) => `victoire ${fx(DIE_MULT * c)}`,
+    picker: (c) =>
+      choicePicker('die', '🎲 Dé exact : devine le chiffre', `Un dé à 6 faces : trouve le bon chiffre et gagne **${fx(DIE_MULT * c)}** (1 chance sur 6).`,
+        ['n1', 'n2', 'n3', 'n4', 'n5', 'n6'].map((id) => [id, id.slice(1), '🎲'])),
+    resolve(choice) {
+      const n = randomInt(1, 7);
+      const want = Number(choice.slice(1));
+      return { base: n === want ? DIE_MULT : 0, pick: `Chiffre ${want}`, headline: `Le dé s'arrête sur **🎲 ${n}**`, detail: `${want} → ${n}` };
+    },
+  },
+
+  chest: {
+    title: '📦 Coffre mystère',
+    choices: ['c1', 'c2', 'c3'],
+    spinText: 'Tu ouvres le coffre...',
+    info: (c) => `victoire ${fx(CHEST_MULT * c)}`,
+    picker: (c) =>
+      choicePicker('chest', '📦 Coffre mystère : 1 trésor, 3 coffres', `Un seul coffre contient le trésor : trouve-le et gagne **${fx(CHEST_MULT * c)}**.`,
+        ['c1', 'c2', 'c3'].map((id) => [id, `Coffre ${id.slice(1)}`, '📦'])),
+    resolve(choice) {
+      const win = randomInt(1, 4);
+      const want = Number(choice.slice(1));
+      const view = [1, 2, 3].map((k) => (k === win ? '💎' : '💨')).join('  ');
+      return { base: win === want ? CHEST_MULT : 0, pick: `Coffre ${want}`, headline: `Contenu des coffres : ${view}`, detail: `${want} → ${win}` };
+    },
+  },
+
+  russian: {
+    title: '🔫 Roulette russe',
+    choices: ['b1', 'b2', 'b3', 'b4', 'b5'],
+    spinText: 'Le barillet tourne...',
+    info: (c) => `de ${fx(russianMult(1) * c)} à ${fx(russianMult(5) * c)}`,
+    picker: (c) =>
+      choicePicker('russian', '🔫 Roulette russe : combien de balles ?', `Barillet de 6 chambres. Survis et gagne ! Plus il y a de balles, plus le gain est gros.\n${[1, 2, 3, 4, 5].map((k) => `**${k}** balle${k > 1 ? 's' : ''} : ${fx(russianMult(k) * c)}`).join(' · ')}`,
+        [1, 2, 3, 4, 5].map((k) => [`b${k}`, `${k} balle${k > 1 ? 's' : ''}`, '🔫'])),
+    resolve(choice) {
+      const k = Number(choice.slice(1));
+      const dead = randomInt(0, 6) < k;
+      return { base: dead ? 0 : russianMult(k), pick: `${k} balle${k > 1 ? 's' : ''}`, headline: dead ? '💥 **BANG !** Tu as perdu.' : '😮‍💨 *clic*… Tu survis !', detail: dead ? 'bang' : 'clic' };
+    },
+  },
+
+  horses: {
+    title: '🏇 Course de chevaux',
+    choices: ['h1', 'h2', 'h3', 'h4', 'h5'],
+    spinText: 'Les chevaux s’élancent...',
+    info: (c) => `de ${fx(HORSES[0].mult * c)} à ${fx(HORSES[4].mult * c)}`,
+    picker: (c) =>
+      choicePicker('horses', '🏇 Course de chevaux : mise sur ton cheval', HORSES.map((h, k) => `🐎 **n°${k + 1}** : ${fx(h.mult * c)} (${Math.round(h.p * 100)} % de chances)`).join('\n'),
+        HORSES.map((h, k) => [`h${k + 1}`, `Cheval ${k + 1}`, '🐎'])),
+    resolve(choice) {
+      let r = Math.random();
+      let winner = HORSES.length - 1;
+      for (let k = 0; k < HORSES.length; k++) {
+        if (r < HORSES[k].p) {
+          winner = k;
+          break;
+        }
+        r -= HORSES[k].p;
+      }
+      const want = Number(choice.slice(1)) - 1;
+      return { base: winner === want ? HORSES[want].mult : 0, pick: `Cheval ${want + 1}`, headline: `🏁 Le cheval **n°${winner + 1}** remporte la course !`, detail: `${want + 1} → ${winner + 1}` };
+    },
+  },
+});
+
 async function playInstant(i, key, bet, choice) {
   const G = INSTANT[key];
   if (!G || !G.choices.includes(choice)) return respondText(i, 'Pari invalide.');
@@ -1144,7 +1385,7 @@ function buildHelpEmbed() {
         `💣 **Mines** : 4 niveaux (Easy 3 💣 · Medium 6 · Hard 10 · Impossible 15). Plus il y a de bombes, plus le multiplicateur monte.`,
         '🃏 **Blackjack** : Tirer / Rester / Doubler',
         `🎡 **Roulette** : couleur, pair, impair (${fx(2 * coef('roulette'))}) ou numéro, vert (${fx(36 * coef('roulette'))})`,
-        '🪙 **Pile ou Face** · 🎲 **Dés** · 🎰 **Machine à sous** · 🎡 **Roue de la fortune**',
+        '🪙 Pile ou Face · 🎲 Dés · 🎰 Machine à sous · 🎡 Roue · ⚔️ Duel · 🃏 Enseigne · 🎯 Zone · 🎱 Plinko · 🚀 Crash · 🎟️ Ticket · 🎲 Dé exact · 📦 Coffre · 🔫 Roulette russe · 🏇 Chevaux (utilise **Suivant ▶** dans le menu)',
         `🎁 **Daily** : ${DAILY_AMOUNT} pièces gratuites par jour`,
         `📨 **Invitations** : +${INVITE_REWARD} 🪙 à chaque nouveau membre que tu invites (**${PREFIX}invites** pour ton total)`,
         '📜 **Historique** : tes 15 dernières parties',
@@ -1166,7 +1407,7 @@ function buildPanelPayload() {
     .setColor(COLORS.gold)
     .setDescription(
       'Clique sur **🎮 Jouer** pour ouvrir le menu des jeux, puis choisis ton jeu. Une fenêtre s’ouvre pour régler ta mise.\n\n' +
-        '💣 Mines · 🃏 Blackjack · 🎡 Roulette · 🪙 Pile ou Face · 🎲 Dés · 🎰 Machine à sous · 🎡 Roue de la fortune\n' +
+        `17 jeux : Mines, Blackjack, Roulette, Pile ou Face, Dés, Machine à sous, Roue, Duel, Enseigne, Zone, Plinko, Crash, Ticket, Dé exact, Coffre, Roulette russe, Chevaux\n` +
         `🎁 **Daily** : ${DAILY_AMOUNT} pièces gratuites par jour\n` +
         '💰 **Solde** · 🏆 **Classement** · 📜 **Historique** · ❓ **Aide**\n\n' +
         '🔒 Tes parties, ton solde et ton historique ne sont visibles que par toi.'
@@ -1184,34 +1425,49 @@ function buildPanelPayload() {
   return { embeds: [panel], components: [main, extra] };
 }
 
-// Menu ouvert par le bouton "Jouer" (message privé) : un bouton par jeu
-function buildGameMenuPayload() {
+// Menu ouvert par le bouton "Jouer" (message privé) : un bouton par jeu, 10 par page, bouton Suivant
+const GAME_MENU = [
+  ['mines', 'Mines', '💣', 'évite les bombes, encaisse quand tu veux'],
+  ['bj', 'Blackjack', '🃏', 'bats le croupier'],
+  ['roulette', 'Roulette', '🎡', 'couleur, parité ou numéro'],
+  ['coinflip', 'Pile ou Face', '🪙', '1 chance sur 2'],
+  ['dice', 'Dés', '🎲', 'devine la somme de 2 dés'],
+  ['slots', 'Machine à sous', '🎰', '3 rouleaux, gros jackpot'],
+  ['wheel', 'Roue', '🎡', 'roue de la fortune'],
+  ['duel', 'Duel', '⚔️', 'ta carte contre celle du croupier'],
+  ['suit', 'Enseigne', '🃏', 'devine la couleur de la carte'],
+  ['zone', 'Zone', '🎯', 'bas, milieu ou haut'],
+  ['plinko', 'Plinko', '🎱', 'la bille tombe, choisis le risque'],
+  ['crash', 'Crash', '🚀', 'atteins ta cible avant l’explosion'],
+  ['scratch', 'Ticket', '🎟️', 'ticket à gratter'],
+  ['die', 'Dé exact', '🎲', 'trouve le bon chiffre'],
+  ['chest', 'Coffre', '📦', 'trouve le trésor'],
+  ['russian', 'Roulette russe', '🔫', 'survis au barillet'],
+  ['horses', 'Chevaux', '🏇', 'parie sur le gagnant'],
+];
+const MENU_PAGE_SIZE = 10;
+const MENU_PAGES = Math.ceil(GAME_MENU.length / MENU_PAGE_SIZE);
+
+function buildGameMenuPayload(page = 0) {
+  page = Math.min(Math.max(0, page), MENU_PAGES - 1);
+  const items = GAME_MENU.slice(page * MENU_PAGE_SIZE, (page + 1) * MENU_PAGE_SIZE);
   const embed = new EmbedBuilder()
-    .setTitle('🎮 Choisis ton jeu')
+    .setTitle(`🎮 Choisis ton jeu (page ${page + 1}/${MENU_PAGES})`)
     .setColor(COLORS.gold)
-    .setDescription(
-      [
-        '💣 **Mines** : évite les bombes, encaisse quand tu veux',
-        '🃏 **Blackjack** : bats le croupier',
-        '🎡 **Roulette** : couleur, parité ou numéro',
-        '🪙 **Pile ou Face** : 1 chance sur 2',
-        '🎲 **Dés** : devine la somme de 2 dés',
-        '🎰 **Machine à sous** : 3 rouleaux, jusqu’à ' + fx(250 * coef('slots')),
-        '🎡 **Roue de la fortune** : jusqu’à ' + fx(10 * coef('wheel')),
-      ].join('\n')
-    );
-  const row1 = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('panel_mines').setLabel('Mines').setEmoji('💣').setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId('panel_bj').setLabel('Blackjack').setEmoji('🃏').setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId('panel_roulette').setLabel('Roulette').setEmoji('🎡').setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId('panel_coinflip').setLabel('Pile ou Face').setEmoji('🪙').setStyle(ButtonStyle.Primary)
+    .setDescription(items.map(([, name, emoji, desc]) => `${emoji} **${name}** : ${desc}`).join('\n'))
+    .setFooter({ text: `${GAME_MENU.length} jeux au total · utilise Suivant ▶ pour voir les autres` });
+  const rows = chunk(
+    items.map(([key, name, emoji]) => new ButtonBuilder().setCustomId(`panel_${key}`).setLabel(name).setEmoji(emoji).setStyle(ButtonStyle.Primary)),
+    5
+  ).map((r) => new ActionRowBuilder().addComponents(...r));
+  rows.push(
+    new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId(`panel_page_${page - 1}`).setLabel('Précédent').setEmoji('◀️').setStyle(ButtonStyle.Secondary).setDisabled(page === 0),
+      new ButtonBuilder().setCustomId('panel_pageinfo').setLabel(`Page ${page + 1}/${MENU_PAGES}`).setStyle(ButtonStyle.Secondary).setDisabled(true),
+      new ButtonBuilder().setCustomId(`panel_page_${page + 1}`).setLabel('Suivant').setEmoji('▶️').setStyle(ButtonStyle.Primary).setDisabled(page >= MENU_PAGES - 1)
+    )
   );
-  const row2 = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('panel_dice').setLabel('Dés').setEmoji('🎲').setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId('panel_slots').setLabel('Machine à sous').setEmoji('🎰').setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId('panel_wheel').setLabel('Roue').setEmoji('🎡').setStyle(ButtonStyle.Primary)
-  );
-  return { embeds: [embed], components: [row1, row2] };
+  return { embeds: [embed], components: rows };
 }
 
 function modalInput(id, label, { placeholder, value, required = true, max = 30 } = {}) {
@@ -1245,16 +1501,17 @@ function rouletteModal(key) {
 }
 
 async function handlePanelButton(i) {
+  if (i.customId.startsWith('panel_page_')) {
+    const page = Number(i.customId.slice('panel_page_'.length));
+    if (!Number.isInteger(page)) return;
+    return i.update(buildGameMenuPayload(page));
+  }
+  const instantKey = i.customId.slice('panel_'.length);
+  if (INSTANT[instantKey]) return i.reply({ ...INSTANT[instantKey].picker(coef(instantKey)), flags: EPH });
+
   switch (i.customId) {
     case 'panel_play':
-      return i.reply({ ...buildGameMenuPayload(), flags: EPH });
-    case 'panel_coinflip':
-    case 'panel_dice':
-    case 'panel_slots':
-    case 'panel_wheel': {
-      const key = i.customId.slice('panel_'.length);
-      return i.reply({ ...INSTANT[key].picker(coef(key)), flags: EPH });
-    }
+      return i.reply({ ...buildGameMenuPayload(0), flags: EPH });
     case 'panel_mines':
       return i.reply({ ...minesPickerPayload(), flags: EPH });
     case 'panel_bj':
@@ -1373,7 +1630,7 @@ const MULT_INFO = {
 function multAdminPayload(note) {
   const lines = Object.keys(GAME_NAMES).map((g) => {
     const c = coef(g);
-    return `${GAME_NAMES[g]} : coefficient **${fx(c)}**\n└ ${MULT_INFO[g](c)}`;
+    return `${GAME_NAMES[g]} : coefficient **${fx(c)}**\n└ ${(MULT_INFO[g] || INSTANT[g].info)(c)}`;
   });
   const embed = new EmbedBuilder()
     .setTitle('🎚️ Multiplicateurs des jeux')
@@ -2142,4 +2399,36 @@ client.once(Events.ClientReady, (c) => {
 client.on(Events.Error, (e) => console.error('[client]', e));
 process.on('unhandledRejection', (e) => console.error('[unhandledRejection]', e));
 
-client.login(DISCORD_TOKEN);
+// Démarrage : on vérifie quels intents "privilégiés" sont activés dans le Developer Portal.
+// Si "Server Members Intent" manque, le bot démarre quand même (sans le système d'invitations) au lieu de planter.
+async function start() {
+  try {
+    const res = await fetch('https://discord.com/api/v10/applications/@me', {
+      headers: { Authorization: `Bot ${DISCORD_TOKEN}` },
+    });
+    if (res.ok) {
+      const { flags = 0 } = await res.json();
+      const GUILD_MEMBERS = (1 << 14) | (1 << 15);
+      const MESSAGE_CONTENT = (1 << 18) | (1 << 19);
+      if (!(flags & GUILD_MEMBERS)) {
+        client.options.intents.remove(GatewayIntentBits.GuildMembers);
+        console.warn(
+          '⚠️ "Server Members Intent" n’est pas activé : le bot démarre SANS le système d’invitations.\n' +
+            '   Pour l’activer : Developer Portal → ton application → Bot → Privileged Gateway Intents → Server Members Intent → Save, puis redémarre.'
+        );
+      }
+      if (!(flags & MESSAGE_CONTENT)) {
+        console.warn('⚠️ "Message Content Intent" n’est pas activé : les commandes écrites (!setup, !admin…) ne marcheront pas.');
+      }
+    }
+  } catch (e) {
+    console.warn('[démarrage] vérification des intents impossible :', e?.message || e);
+  }
+  try {
+    await client.login(DISCORD_TOKEN);
+  } catch (e) {
+    console.error('[connexion]', e?.message || e);
+    process.exit(1);
+  }
+}
+start();
