@@ -18,9 +18,12 @@ const {
   TextInputBuilder,
   TextInputStyle,
   UserSelectMenuBuilder,
+  StringSelectMenuBuilder,
   escapeMarkdown,
 } = require('discord.js');
 const { createClient } = require('@supabase/supabase-js');
+const fs = require('fs');
+const path = require('path');
 
 // ============================================================
 //  CONFIG
@@ -177,7 +180,62 @@ function armTimer(game) {
 // ============================================================
 //  HISTORIQUE + SALON DES VICTOIRES
 // ============================================================
-const GAME_NAMES = { mines: '💣 Mines', bj: '🃏 Blackjack', roulette: '🎡 Roulette' };
+const GAME_NAMES = {
+  mines: '💣 Mines',
+  bj: '🃏 Blackjack',
+  roulette: '🎡 Roulette',
+  coinflip: '🪙 Pile ou Face',
+  dice: '🎲 Dés',
+  slots: '🎰 Machine à sous',
+  wheel: '🎡 Roue de la fortune',
+};
+
+// ============================================================
+//  MULTIPLICATEURS RÉGLABLES (un coefficient par jeu, modifiable par le propriétaire)
+//  Tous les gains d'un jeu sont multipliés par ce coefficient (1.00 = valeurs normales).
+// ============================================================
+const MULT_MIN = 0.5;
+const MULT_MAX = 10;
+const MULT_FILE = path.join(__dirname, 'data', 'multipliers.json');
+const multipliers = new Map(); // jeu -> coefficient
+const coef = (game) => multipliers.get(game) ?? 1;
+
+async function loadMultipliers() {
+  try {
+    const raw = JSON.parse(fs.readFileSync(MULT_FILE, 'utf8'));
+    for (const [g, v] of Object.entries(raw)) if (GAME_NAMES[g] && Number(v) > 0) multipliers.set(g, Number(v));
+  } catch {
+    /* pas de fichier local : normal au premier lancement */
+  }
+  try {
+    const { data, error } = await supabase.from('game_settings').select('game, multiplier');
+    if (error) throw error;
+    for (const r of data) if (GAME_NAMES[r.game] && Number(r.multiplier) > 0) multipliers.set(r.game, Number(r.multiplier));
+  } catch (e) {
+    console.error('[multiplicateurs] table game_settings introuvable ou illisible (lance schema_v3.sql) :', e?.message || e);
+  }
+}
+
+// Renvoie { db: true/false } : db = false si seule la sauvegarde locale a marché
+async function saveMultiplier(game, value) {
+  multipliers.set(game, value);
+  try {
+    fs.mkdirSync(path.dirname(MULT_FILE), { recursive: true });
+    fs.writeFileSync(MULT_FILE, JSON.stringify(Object.fromEntries(multipliers), null, 2));
+  } catch (e) {
+    console.error('[multiplicateurs] fichier :', e?.message || e);
+  }
+  try {
+    const { error } = await supabase
+      .from('game_settings')
+      .upsert({ game, multiplier: value, updated_at: new Date().toISOString() });
+    if (error) throw error;
+    return { db: true };
+  } catch (e) {
+    console.error('[multiplicateurs] sauvegarde Supabase :', e?.message || e);
+    return { db: false };
+  }
+}
 
 async function recordResult({ guildId, user, game, bet, mult, payout, detail }) {
   const profit = round2(payout - bet);
@@ -261,7 +319,7 @@ function minesMultiplier(picks, mines) {
   if (picks <= 0) return 1;
   let m = 1;
   for (let k = 0; k < picks; k++) m *= (MINES_CELLS - k) / (MINES_CELLS - mines - k);
-  return Math.min(MINES_MAX_MULT, Math.max(1, Math.floor(m * MINES_EDGE * 100) / 100));
+  return Math.min(MINES_MAX_MULT, Math.max(0.01, Math.floor(m * MINES_EDGE * coef('mines') * 100) / 100));
 }
 
 function minesPickerPayload() {
@@ -556,18 +614,20 @@ function bjOutcome(g, kind) {
     const dBJ = dv === 21;
     if (pBJ && dBJ) return { payout: bet, text: '🤝 Double blackjack : égalité, mise remboursée.', color: COLORS.grey };
     if (pBJ) {
-      const payout = floor2(bet * 2.5);
+      const payout = floor2(bet * 2.5 * coef('bj'));
       return {
         payout,
-        text: `🎉 **Blackjack !** Tu gagnes **${fmt(round2(payout - bet))}** (paiement 3:2).`,
+        text: `🎉 **Blackjack !** Tu gagnes **${fmt(round2(payout - bet))}** (${fx(2.5 * coef('bj'))}).`,
         color: COLORS.green,
       };
     }
     return { payout: 0, text: '😬 Le croupier a un blackjack, mise perdue.', color: COLORS.red };
   }
   if (kind === 'bust') return { payout: 0, text: `💥 Tu dépasses 21 (${pv}), mise perdue.`, color: COLORS.red };
-  if (dv > 21) return { payout: bet * 2, text: `🎉 Le croupier dépasse 21 ! Tu gagnes **${fmt(bet)}**.`, color: COLORS.green };
-  if (pv > dv) return { payout: bet * 2, text: `🎉 ${pv} contre ${dv} : tu gagnes **${fmt(bet)}**.`, color: COLORS.green };
+  const winPayout = floor2(bet * 2 * coef('bj'));
+  const winProfit = fmt(round2(winPayout - bet));
+  if (dv > 21) return { payout: winPayout, text: `🎉 Le croupier dépasse 21 ! Tu gagnes **${winProfit}**.`, color: COLORS.green };
+  if (pv > dv) return { payout: winPayout, text: `🎉 ${pv} contre ${dv} : tu gagnes **${winProfit}**.`, color: COLORS.green };
   if (pv === dv) return { payout: bet, text: `🤝 Égalité à ${pv}, mise remboursée.`, color: COLORS.grey };
   return { payout: 0, text: `😬 ${pv} contre ${dv} : tu perds ta mise.`, color: COLORS.red };
 }
@@ -728,8 +788,8 @@ function roulettePickerPayload() {
     .setTitle('🎡 Roulette : choisis ton pari')
     .setColor(COLORS.blue)
     .setDescription(
-      '🔴 Rouge · ⚫ Noir · Pair · Impair : paient **x2**\n' +
-        '🟢 Vert (0) ou un **numéro** précis (0 à 36) : paient **x36**'
+      `🔴 Rouge · ⚫ Noir · Pair · Impair : paient **${fx(2 * coef('roulette'))}**\n` +
+        `🟢 Vert (0) ou un **numéro** précis (0 à 36) : paient **${fx(36 * coef('roulette'))}**`
     );
   const row1 = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('rl_rouge').setLabel('Rouge').setEmoji('🔴').setStyle(ButtonStyle.Danger),
@@ -756,7 +816,8 @@ async function playRoulette(i, bet, choiceStr) {
 
     const result = randomInt(0, 37);
     const won = choice.win(result);
-    const payout = won ? floor2(bet * choice.mult) : 0;
+    const rlMult = round2(choice.mult * coef('roulette'));
+    const payout = won ? floor2(bet * rlMult) : 0;
 
     try {
       await respond(i, {
@@ -782,7 +843,7 @@ async function playRoulette(i, bet, choiceStr) {
       .setDescription(
         `La bille tombe sur **${colorEmoji[colorOf(result)]} ${result}** (${colorOf(result)}).\n\n` +
           (won
-            ? `🎉 Gagné ! Tu empoches **${fmt(payout)}** (${fx(choice.mult)}), profit : **${signed(round2(payout - bet))}**.`
+            ? `🎉 Gagné ! Tu empoches **${fmt(payout)}** (${fx(rlMult)}), profit : **${signed(round2(payout - bet))}**.`
             : `😬 Perdu, tu laisses **${fmt(bet)}**.`)
       )
       .addFields(
@@ -804,7 +865,7 @@ async function playRoulette(i, bet, choiceStr) {
       user: i.user,
       game: 'roulette',
       bet,
-      mult: won ? choice.mult : 0,
+      mult: won ? rlMult : 0,
       payout,
       detail: `${choice.label} → ${result}`,
     });
@@ -812,6 +873,257 @@ async function playRoulette(i, bet, choiceStr) {
     unlock(uid);
   }
 }
+
+// ============================================================
+//  NOUVEAUX JEUX INSTANTANÉS : Pile ou Face, Dés, Machine à sous, Roue
+//  (le coefficient réglé par le propriétaire s'applique à tous les gains)
+// ============================================================
+const COIN_MULT = 1.95;
+const DICE_MULT = { under: 2.3, over: 2.3, seven: 5.8 };
+
+const SLOT_SYMBOLS = [
+  { s: '🍒', w: 8, pay: 5 },
+  { s: '🍋', w: 7, pay: 10 },
+  { s: '🍇', w: 6, pay: 18 },
+  { s: '🔔', w: 4, pay: 35 },
+  { s: '💎', w: 2, pay: 90 },
+  { s: '7️⃣', w: 1, pay: 250 },
+];
+const SLOT_TOTAL = SLOT_SYMBOLS.reduce((a, x) => a + x.w, 0);
+const SLOT_TWO_CHERRIES = 2;
+function spinReel() {
+  let r = randomInt(0, SLOT_TOTAL);
+  for (const x of SLOT_SYMBOLS) {
+    if (r < x.w) return x;
+    r -= x.w;
+  }
+  return SLOT_SYMBOLS[0];
+}
+
+// 24 cases : multiplicateur de base de chaque case de la roue
+const WHEEL = [...Array(13).fill(0), ...Array(4).fill(0.5), ...Array(4).fill(1.5), 2, 3, 10];
+const wheelSummary = (c) => {
+  const counts = new Map();
+  for (const v of WHEEL) counts.set(v, (counts.get(v) || 0) + 1);
+  return [...counts.entries()]
+    .map(([v, n]) => `${v === 0 ? '💀 x0' : fx(v * c)}${n > 1 ? ` ×${n}` : ''}`)
+    .join(' · ');
+};
+
+const igButton = (key, choice, label, emoji, style) =>
+  new ButtonBuilder().setCustomId(`ig_${key}_${choice}`).setLabel(label).setEmoji(emoji).setStyle(style);
+
+const INSTANT = {
+  coinflip: {
+    title: '🪙 Pile ou Face',
+    choices: ['pile', 'face'],
+    spinText: 'La pièce tourne...',
+    picker(c) {
+      return {
+        embeds: [
+          new EmbedBuilder()
+            .setTitle('🪙 Pile ou Face : choisis ton côté')
+            .setColor(COLORS.blue)
+            .setDescription(`Devine le bon côté : tu gagnes **${fx(COIN_MULT * c)}** ta mise. 1 chance sur 2 !`),
+        ],
+        components: [
+          new ActionRowBuilder().addComponents(
+            igButton('coinflip', 'pile', 'Pile', '🪙', ButtonStyle.Primary),
+            igButton('coinflip', 'face', 'Face', '🪙', ButtonStyle.Secondary)
+          ),
+        ],
+      };
+    },
+    resolve(choice, c) {
+      const side = randomInt(0, 2) === 0 ? 'pile' : 'face';
+      return {
+        base: side === choice ? COIN_MULT : 0,
+        pick: choice === 'pile' ? 'Pile' : 'Face',
+        headline: `La pièce retombe sur **🪙 ${side === 'pile' ? 'Pile' : 'Face'}**.`,
+        detail: `${choice} → ${side}`,
+      };
+    },
+  },
+
+  dice: {
+    title: '🎲 Dés',
+    choices: ['under', 'over', 'seven'],
+    spinText: 'Les dés roulent...',
+    picker(c) {
+      return {
+        embeds: [
+          new EmbedBuilder()
+            .setTitle('🎲 Dés : parie sur la somme de 2 dés')
+            .setColor(COLORS.blue)
+            .setDescription(
+              `⬇️ **Moins de 7** (2 à 6) : **${fx(DICE_MULT.under * c)}**\n` +
+                `⬆️ **Plus de 7** (8 à 12) : **${fx(DICE_MULT.over * c)}**\n` +
+                `🎯 **Exactement 7** : **${fx(DICE_MULT.seven * c)}**`
+            ),
+        ],
+        components: [
+          new ActionRowBuilder().addComponents(
+            igButton('dice', 'under', 'Moins de 7', '⬇️', ButtonStyle.Primary),
+            igButton('dice', 'seven', 'Exactement 7', '🎯', ButtonStyle.Success),
+            igButton('dice', 'over', 'Plus de 7', '⬆️', ButtonStyle.Primary)
+          ),
+        ],
+      };
+    },
+    resolve(choice, c) {
+      const a = randomInt(1, 7);
+      const b = randomInt(1, 7);
+      const sum = a + b;
+      const outcome = sum < 7 ? 'under' : sum > 7 ? 'over' : 'seven';
+      return {
+        base: outcome === choice ? DICE_MULT[choice] : 0,
+        pick: { under: 'Moins de 7', over: 'Plus de 7', seven: 'Exactement 7' }[choice],
+        headline: `🎲 **${a}** + 🎲 **${b}** = **${sum}**`,
+        detail: `${a}+${b}=${sum}`,
+      };
+    },
+  },
+
+  slots: {
+    title: '🎰 Machine à sous',
+    choices: ['go'],
+    spinText: 'Les rouleaux tournent...',
+    picker(c) {
+      const table = SLOT_SYMBOLS.map((x) => `${x.s}${x.s}${x.s} → **${fx(x.pay * c)}**`).join('\n');
+      return {
+        embeds: [
+          new EmbedBuilder()
+            .setTitle('🎰 Machine à sous')
+            .setColor(COLORS.blue)
+            .setDescription(`${table}\n🍒🍒 (2 cerises) → **${fx(SLOT_TWO_CHERRIES * c)}**`),
+        ],
+        components: [new ActionRowBuilder().addComponents(igButton('slots', 'go', 'Lancer', '🎰', ButtonStyle.Success))],
+      };
+    },
+    resolve(choice, c) {
+      const reels = [spinReel(), spinReel(), spinReel()];
+      let base = 0;
+      if (reels[0].s === reels[1].s && reels[1].s === reels[2].s) base = reels[0].pay;
+      else if (reels.filter((r) => r.s === '🍒').length === 2) base = SLOT_TWO_CHERRIES;
+      const line = reels.map((r) => r.s).join(' | ');
+      return { base, pick: 'Spin', headline: `**[ ${line} ]**`, detail: reels.map((r) => r.s).join('') };
+    },
+  },
+
+  wheel: {
+    title: '🎡 Roue de la fortune',
+    choices: ['go'],
+    spinText: 'La roue tourne...',
+    picker(c) {
+      return {
+        embeds: [
+          new EmbedBuilder()
+            .setTitle('🎡 Roue de la fortune')
+            .setColor(COLORS.blue)
+            .setDescription(`24 cases : ${wheelSummary(c)}\n\nLance la roue et vois où elle s'arrête !`),
+        ],
+        components: [new ActionRowBuilder().addComponents(igButton('wheel', 'go', 'Lancer la roue', '🎡', ButtonStyle.Success))],
+      };
+    },
+    resolve(choice, c) {
+      const base = WHEEL[randomInt(0, WHEEL.length)];
+      return {
+        base,
+        pick: 'Roue',
+        headline: `La roue s'arrête sur **${base === 0 ? '💀 x0' : fx(base * c)}**`,
+        detail: base === 0 ? 'x0' : fx(base * c),
+      };
+    },
+  },
+};
+
+async function playInstant(i, key, bet, choice) {
+  const G = INSTANT[key];
+  if (!G || !G.choices.includes(choice)) return respondText(i, 'Pari invalide.');
+  const uid = i.user.id;
+  if (!tryLock(uid)) return respondText(i, MSG.busy);
+
+  try {
+    const err = await takeBet(uid, bet);
+    if (err) return respondText(i, err);
+
+    const c = coef(key);
+    const res = G.resolve(choice, c);
+    const mult = res.base > 0 ? round2(res.base * c) : 0;
+    const payout = mult > 0 ? floor2(bet * mult) : 0;
+    const profit = round2(payout - bet);
+
+    try {
+      await respond(i, {
+        embeds: [
+          new EmbedBuilder()
+            .setTitle(G.title)
+            .setColor(COLORS.blue)
+            .setDescription(`${G.spinText} (mise **${fmt(bet)}** · ${res.pick})`),
+        ],
+        components: [],
+      });
+    } catch (e) {
+      await credit(uid, bet).catch(() => {});
+      throw e;
+    }
+
+    const balance = payout > 0 ? await credit(uid, payout) : await getBalance(uid);
+    await sleep(2000);
+
+    let text;
+    let color;
+    if (payout === 0) {
+      text = `😬 Perdu, tu laisses **${fmt(bet)}**.`;
+      color = COLORS.red;
+    } else if (profit > 0) {
+      text = `🎉 Gagné ! Tu empoches **${fmt(payout)}** (${fx(mult)}), profit : **${signed(profit)}**.`;
+      color = COLORS.green;
+    } else if (profit === 0) {
+      text = `🤝 Mise remboursée (${fx(mult)}).`;
+      color = COLORS.grey;
+    } else {
+      text = `😐 Tu récupères **${fmt(payout)}** (${fx(mult)}), perte : **${signed(profit)}**.`;
+      color = COLORS.grey;
+    }
+
+    const embed = new EmbedBuilder()
+      .setTitle(G.title)
+      .setColor(color)
+      .setDescription(`${res.headline}\n\n${text}`)
+      .addFields(
+        { name: 'Ton pari', value: res.pick, inline: true },
+        { name: 'Mise', value: fmt(bet), inline: true },
+        { name: 'Solde', value: fmt(balance), inline: true }
+      );
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`replay|${key}|${bet}|${choice}`)
+        .setLabel('Rejouer')
+        .setEmoji('🔁')
+        .setStyle(ButtonStyle.Success)
+    );
+    await i.editReply({ embeds: [embed], components: [row] });
+
+    recordResult({
+      guildId: i.guildId,
+      user: i.user,
+      game: key,
+      bet,
+      mult,
+      payout,
+      detail: `${res.pick} → ${res.detail}`,
+    });
+  } finally {
+    unlock(uid);
+  }
+}
+
+const instantBetModal = (key, choice) =>
+  new ModalBuilder()
+    .setCustomId(`modal_ig_${key}_${choice}`)
+    .setTitle(INSTANT[key].title)
+    .addComponents(modalInput('bet', BET_LABEL, { placeholder: 'ex : 1' }));
 
 // ============================================================
 //  PANNEAU DE JEU (boutons) + POP-UPS
@@ -825,9 +1137,11 @@ function buildHelpEmbed() {
       [
         'Tout se joue avec les **boutons** du panneau, et tes parties sont **privées**.',
         '',
+        '🎮 Clique sur **Jouer** dans le panneau pour ouvrir le menu des jeux :',
         `💣 **Mines** : 4 niveaux (Easy 3 💣 · Medium 6 · Hard 10 · Impossible 15). Plus il y a de bombes, plus le multiplicateur monte.`,
-        '🃏 **Blackjack** : Tirer / Rester / Doubler, blackjack payé 3:2',
-        '🎡 **Roulette** : x2 (couleur, pair, impair) ou x36 (numéro, vert)',
+        '🃏 **Blackjack** : Tirer / Rester / Doubler',
+        `🎡 **Roulette** : couleur, pair, impair (${fx(2 * coef('roulette'))}) ou numéro, vert (${fx(36 * coef('roulette'))})`,
+        '🪙 **Pile ou Face** · 🎲 **Dés** · 🎰 **Machine à sous** · 🎡 **Roue de la fortune**',
         `🎁 **Daily** : ${DAILY_AMOUNT} pièces gratuites par jour`,
         '📜 **Historique** : tes 15 dernières parties',
         '🔁 À la fin d’une partie, le bouton **Rejouer** relance la même mise.',
@@ -835,7 +1149,7 @@ function buildHelpEmbed() {
         '👑 **Propriétaire du serveur**',
         `**${p}setup** : créer le salon casino avec le panneau`,
         `**${p}wins** : créer le salon où s’affichent les victoires de tout le monde`,
-        `**${p}admin** : créer le salon privé avec le panneau admin (ajouter, retirer, offrir à tous…)`,
+        `**${p}admin** : créer le salon privé avec le panneau admin (ajouter, retirer, offrir à tous, régler les multiplicateurs…)`,
         `**${p}classement** : classement auto (mis à jour chaque minute)`,
         `**${p}add** @membre <montant> · **${p}remove** @membre <montant>`,
       ].join('\n')
@@ -847,25 +1161,53 @@ function buildPanelPayload() {
     .setTitle('🎰 Casino')
     .setColor(COLORS.gold)
     .setDescription(
-      'Clique sur un bouton pour jouer. Une fenêtre s’ouvre pour régler ta mise.\n\n' +
-        '💣 **Mines** · 🃏 **Blackjack** · 🎡 **Roulette**\n' +
+      'Clique sur **🎮 Jouer** pour ouvrir le menu des jeux, puis choisis ton jeu. Une fenêtre s’ouvre pour régler ta mise.\n\n' +
+        '💣 Mines · 🃏 Blackjack · 🎡 Roulette · 🪙 Pile ou Face · 🎲 Dés · 🎰 Machine à sous · 🎡 Roue de la fortune\n' +
         `🎁 **Daily** : ${DAILY_AMOUNT} pièces gratuites par jour\n` +
-        '💰 **Mon solde** · 🏆 **Classement** · 📜 **Historique** · ❓ **Aide**\n\n' +
+        '💰 **Solde** · 🏆 **Classement** · 📜 **Historique** · ❓ **Aide**\n\n' +
         '🔒 Tes parties, ton solde et ton historique ne sont visibles que par toi.'
     );
-  const games = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('panel_mines').setLabel('Mines').setEmoji('💣').setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId('panel_bj').setLabel('Blackjack').setEmoji('🃏').setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId('panel_roulette').setLabel('Roulette').setEmoji('🎡').setStyle(ButtonStyle.Primary)
+  const main = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('panel_play').setLabel('Jouer').setEmoji('🎮').setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId('panel_daily').setLabel('Daily').setEmoji('🎁').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId('panel_balance').setLabel('Solde').setEmoji('💰').setStyle(ButtonStyle.Secondary)
   );
   const extra = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('panel_balance').setLabel('Solde').setEmoji('💰').setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId('panel_daily').setLabel('Daily').setEmoji('🎁').setStyle(ButtonStyle.Success),
     new ButtonBuilder().setCustomId('panel_top').setLabel('Classement').setEmoji('🏆').setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId('panel_history').setLabel('Historique').setEmoji('📜').setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId('panel_help').setLabel('Aide').setEmoji('❓').setStyle(ButtonStyle.Secondary)
   );
-  return { embeds: [panel], components: [games, extra] };
+  return { embeds: [panel], components: [main, extra] };
+}
+
+// Menu ouvert par le bouton "Jouer" (message privé) : un bouton par jeu
+function buildGameMenuPayload() {
+  const embed = new EmbedBuilder()
+    .setTitle('🎮 Choisis ton jeu')
+    .setColor(COLORS.gold)
+    .setDescription(
+      [
+        '💣 **Mines** : évite les bombes, encaisse quand tu veux',
+        '🃏 **Blackjack** : bats le croupier',
+        '🎡 **Roulette** : couleur, parité ou numéro',
+        '🪙 **Pile ou Face** : 1 chance sur 2',
+        '🎲 **Dés** : devine la somme de 2 dés',
+        '🎰 **Machine à sous** : 3 rouleaux, jusqu’à ' + fx(250 * coef('slots')),
+        '🎡 **Roue de la fortune** : jusqu’à ' + fx(10 * coef('wheel')),
+      ].join('\n')
+    );
+  const row1 = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('panel_mines').setLabel('Mines').setEmoji('💣').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId('panel_bj').setLabel('Blackjack').setEmoji('🃏').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId('panel_roulette').setLabel('Roulette').setEmoji('🎡').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId('panel_coinflip').setLabel('Pile ou Face').setEmoji('🪙').setStyle(ButtonStyle.Primary)
+  );
+  const row2 = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('panel_dice').setLabel('Dés').setEmoji('🎲').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId('panel_slots').setLabel('Machine à sous').setEmoji('🎰').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId('panel_wheel').setLabel('Roue').setEmoji('🎡').setStyle(ButtonStyle.Primary)
+  );
+  return { embeds: [embed], components: [row1, row2] };
 }
 
 function modalInput(id, label, { placeholder, value, required = true, max = 30 } = {}) {
@@ -900,6 +1242,15 @@ function rouletteModal(key) {
 
 async function handlePanelButton(i) {
   switch (i.customId) {
+    case 'panel_play':
+      return i.reply({ ...buildGameMenuPayload(), flags: EPH });
+    case 'panel_coinflip':
+    case 'panel_dice':
+    case 'panel_slots':
+    case 'panel_wheel': {
+      const key = i.customId.slice('panel_'.length);
+      return i.reply({ ...INSTANT[key].picker(coef(key)), flags: EPH });
+    }
     case 'panel_mines':
       return i.reply({ ...minesPickerPayload(), flags: EPH });
     case 'panel_bj':
@@ -949,6 +1300,12 @@ async function handleModalSubmit(i) {
     const bet = await readBet();
     return bet ? startBlackjack(i, bet) : badBet();
   }
+  if (id.startsWith('modal_ig_')) {
+    const [, , key, choice] = id.split('_');
+    if (!INSTANT[key] || !INSTANT[key].choices.includes(choice)) return;
+    const bet = await readBet();
+    return bet ? playInstant(i, key, bet, choice) : badBet();
+  }
   if (id.startsWith('modal_rl_')) {
     const key = id.slice('modal_rl_'.length);
     const choiceStr = key === 'num' ? get('num') : key;
@@ -966,6 +1323,7 @@ async function handleReplay(i) {
   if (type === 'mines') return startMines(i, arg, bet);
   if (type === 'bj') return startBlackjack(i, bet);
   if (type === 'rl') return playRoulette(i, bet, arg);
+  if (INSTANT[type]) return playInstant(i, type, bet, arg);
 }
 
 // ============================================================
@@ -980,7 +1338,8 @@ function buildAdminPayload() {
         '➖ **Retirer** de l’argent à un membre\n' +
         '🎯 **Définir** le solde exact d’un membre\n' +
         '👀 **Voir** le solde d’un membre\n' +
-        '🎁 **Offrir à tous** : le même montant à tous les joueurs ayant un compte\n\n' +
+        '🎁 **Offrir à tous** : le même montant à tous les joueurs ayant un compte\n' +
+        '🎚️ **Multiplicateurs** : régler le multiplicateur de gains de chaque jeu\n\n' +
         'Tu choisis le membre dans une liste, puis le montant dans une fenêtre.'
     );
   const row1 = new ActionRowBuilder().addComponents(
@@ -990,9 +1349,48 @@ function buildAdminPayload() {
   );
   const row2 = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('admin_view').setLabel('Voir un solde').setEmoji('👀').setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId('admin_all').setLabel('Offrir à tous').setEmoji('🎁').setStyle(ButtonStyle.Success)
+    new ButtonBuilder().setCustomId('admin_all').setLabel('Offrir à tous').setEmoji('🎁').setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId('admin_mult').setLabel('Multiplicateurs').setEmoji('🎚️').setStyle(ButtonStyle.Primary)
   );
   return { embeds: [embed], components: [row1, row2] };
+}
+
+// Description des gains "têtes d'affiche" de chaque jeu avec le coefficient actuel
+const MULT_INFO = {
+  mines: () => `1er 💎 : Easy ${fx(minesMultiplier(1, LEVELS.easy.mines))} · Impossible ${fx(minesMultiplier(1, LEVELS.impossible.mines))}`,
+  bj: (c) => `victoire ${fx(2 * c)} · blackjack ${fx(2.5 * c)}`,
+  roulette: (c) => `couleur/pair/impair ${fx(2 * c)} · numéro ${fx(36 * c)}`,
+  coinflip: (c) => `victoire ${fx(COIN_MULT * c)}`,
+  dice: (c) => `moins/plus de 7 ${fx(DICE_MULT.under * c)} · exactement 7 ${fx(DICE_MULT.seven * c)}`,
+  slots: (c) => `3 cerises ${fx(5 * c)} · jackpot 7️⃣ ${fx(250 * c)}`,
+  wheel: (c) => `de ${fx(0.5 * c)} à ${fx(10 * c)}`,
+};
+
+function multAdminPayload(note) {
+  const lines = Object.keys(GAME_NAMES).map((g) => {
+    const c = coef(g);
+    return `${GAME_NAMES[g]} : coefficient **${fx(c)}**\n└ ${MULT_INFO[g](c)}`;
+  });
+  const embed = new EmbedBuilder()
+    .setTitle('🎚️ Multiplicateurs des jeux')
+    .setColor(COLORS.red)
+    .setDescription(
+      `Le coefficient multiplie **tous les gains** du jeu (x1.00 = normal, ex : x1.50 = gains +50 %). ` +
+        `Valeurs autorisées : ${fx(MULT_MIN)} à ${fx(MULT_MAX)}.\n\n${lines.join('\n\n')}` +
+        (note ? `\n\n${note}` : '')
+    );
+  const select = new StringSelectMenuBuilder()
+    .setCustomId('admin_multpick')
+    .setPlaceholder('Choisis le jeu à modifier')
+    .addOptions(
+      Object.keys(GAME_NAMES).map((g) => ({
+        label: GAME_NAMES[g].replace(/^\S+\s/, ''),
+        emoji: GAME_NAMES[g].split(' ')[0],
+        value: g,
+        description: `Coefficient actuel : ${fx(coef(g))}`,
+      }))
+    );
+  return { embeds: [embed], components: [new ActionRowBuilder().addComponents(select)] };
 }
 
 const ADMIN_TITLES = {
@@ -1008,6 +1406,7 @@ async function handleAdmin(i) {
 
   if (i.isButton()) {
     const action = id.slice('admin_'.length);
+    if (action === 'mult') return i.reply({ ...multAdminPayload(), flags: EPH });
     if (ADMIN_TITLES[action]) {
       const row = new ActionRowBuilder().addComponents(
         new UserSelectMenuBuilder()
@@ -1027,6 +1426,23 @@ async function handleAdmin(i) {
       );
     }
     return;
+  }
+
+  if (i.isStringSelectMenu() && id === 'admin_multpick') {
+    const game = i.values[0];
+    if (!GAME_NAMES[game]) return;
+    return i.showModal(
+      new ModalBuilder()
+        .setCustomId(`modal_admin_mult_${game}`)
+        .setTitle(`🎚️ ${GAME_NAMES[game]}`.slice(0, 45))
+        .addComponents(
+          modalInput('amount', `Coefficient (${MULT_MIN} à ${MULT_MAX}, 1 = normal)`, {
+            placeholder: 'ex : 1.5',
+            value: String(coef(game)),
+            max: 6,
+          })
+        )
+    );
   }
 
   if (i.isUserSelectMenu() && id.startsWith('admin_pick_')) {
@@ -1068,6 +1484,21 @@ async function handleAdmin(i) {
         ch?.send(`🎁 **Cadeau !** Le propriétaire offre **${fmt(amount)}** à tous les joueurs !`).catch(() => {});
       }
       return i.reply({ content: `✅ **${fmt(amount)}** offerts à **${count}** joueur(s).`, flags: EPH });
+    }
+
+    const mm = id.match(/^modal_admin_mult_([a-z]+)$/);
+    if (mm) {
+      const game = mm[1];
+      if (!GAME_NAMES[game]) return;
+      const value = parseAmount(raw);
+      if (value === null || value < MULT_MIN || value > MULT_MAX) {
+        return respondText(i, `Valeur invalide : entre ${fx(MULT_MIN)} et ${fx(MULT_MAX)} (ex : 1.5).`);
+      }
+      const { db } = await saveMultiplier(game, value);
+      const note =
+        `✅ **${GAME_NAMES[game]}** : coefficient réglé sur **${fx(value)}**.` +
+        (db ? '' : '\n⚠️ Sauvegardé uniquement en local : lance **schema_v3.sql** dans Supabase pour que ça survive à un redéploiement.');
+      return respond(i, multAdminPayload(note));
     }
 
     const m = id.match(/^modal_admin_(add|remove|set)_(\d{15,25})$/);
@@ -1143,27 +1574,69 @@ async function loadChannels() {
   else for (const r of b.data) guildChannels.set(`${r.guild_id}:${r.kind}`, r.channel_id);
 }
 
+const CHANNEL_NAMES = { wins: 'wins', admin: 'casino-admin' };
+
+// Au démarrage : retrouve les salons wins/admin par leur nom si la base ne les connaît pas
+async function restoreChannelsByName() {
+  for (const guild of client.guilds.cache.values()) {
+    for (const kind of Object.keys(CHANNEL_NAMES)) {
+      if (guildChannels.has(`${guild.id}:${kind}`)) continue;
+      try {
+        await getSavedChannel(guild, kind);
+      } catch (e) {
+        console.error('[salons] restauration', e?.message || e);
+      }
+    }
+  }
+}
+
 async function getSavedChannel(guild, kind) {
   const key = `${guild.id}:${kind}`;
   const id = guildChannels.get(key);
-  if (!id) return null;
-  const ch = await guild.channels.fetch(id).catch(() => null);
-  if (!ch) {
+  if (id) {
+    const ch = await guild.channels.fetch(id).catch(() => null);
+    if (ch) return ch;
     guildChannels.delete(key);
-    await supabase.from('guild_channels').delete().eq('guild_id', guild.id).eq('kind', kind);
+    await supabase.from('guild_channels').delete().eq('guild_id', guild.id).eq('kind', kind).then(() => {}, () => {});
   }
-  return ch;
+  // Pas (ou plus) enregistré : on cherche un salon portant le bon nom (cas où la table n'existait pas)
+  const all = await guild.channels.fetch().catch(() => null);
+  const found = all?.find((c) => c && c.type === ChannelType.GuildText && c.name === CHANNEL_NAMES[kind]);
+  if (found) await saveChannel(guild.id, kind, found.id);
+  return found || null;
 }
 
+// Garde toujours le salon en mémoire ; la base est "au mieux" (renvoie false si la sauvegarde a échoué)
 async function saveChannel(guildId, kind, channelId) {
-  const { error } = await supabase.from('guild_channels').upsert({
-    guild_id: guildId,
-    kind,
-    channel_id: channelId,
-    updated_at: new Date().toISOString(),
-  });
-  if (error) throw error;
   guildChannels.set(`${guildId}:${kind}`, channelId);
+  try {
+    const { error } = await supabase.from('guild_channels').upsert({
+      guild_id: guildId,
+      kind,
+      channel_id: channelId,
+      updated_at: new Date().toISOString(),
+    });
+    if (error) throw error;
+    return true;
+  } catch (e) {
+    console.error(`[salons] impossible d'enregistrer "${kind}" dans guild_channels (lance schema_v3.sql) :`, e?.message || e);
+    return false;
+  }
+}
+
+const DB_WARN = '\n⚠️ Je n’ai pas pu l’enregistrer dans la base (table `guild_channels` manquante) : lance **schema_v3.sql** dans Supabase.';
+
+// Message d'aide lisible pour le propriétaire quand une commande plante
+function explainError(e) {
+  const msg = String(e?.message || e || '');
+  if (e?.code === 50013 || /Missing Permissions/i.test(msg)) {
+    return 'Il me manque une permission Discord (**Gérer les salons**, **Voir le salon**, **Envoyer des messages**, **Intégrer des liens**).';
+  }
+  if (e?.code === 50001 || /Missing Access/i.test(msg)) return 'Je n’ai pas accès à ce salon/serveur (**Missing Access**).';
+  if (/relation|does not exist|schema cache|PGRST|42P01|Could not find the table/i.test(msg)) {
+    return 'Une table Supabase est manquante : lance **schema_v3.sql** dans l’éditeur SQL de Supabase.';
+  }
+  return `Détail technique : \`${msg.slice(0, 180)}\``;
 }
 
 function botCan(guild, wanted) {
@@ -1260,13 +1733,10 @@ async function cmdWins(msg) {
       },
     ],
   });
-  try {
-    await saveChannel(guild.id, 'wins', channel.id);
-  } catch (e) {
-    await channel.delete().catch(() => {});
-    throw e;
-  }
-  return msg.reply(`✅ Salon <#${channel.id}> créé : chaque victoire (jeu, mise, multiplicateur, gain) s’y affichera automatiquement.`);
+  const saved = await saveChannel(guild.id, 'wins', channel.id);
+  return msg.reply(
+    `✅ Salon <#${channel.id}> créé : chaque victoire (jeu, mise, multiplicateur, gain) s’y affichera automatiquement.${saved ? '' : DB_WARN}`
+  );
 }
 
 // ---------- !admin : salon privé avec le panneau admin ----------
@@ -1301,15 +1771,16 @@ async function cmdAdmin(msg) {
       },
     ],
   });
+  let saved = true;
   try {
     const panelMsg = await channel.send(buildAdminPayload());
     await panelMsg.pin().catch(() => {});
-    await saveChannel(guild.id, 'admin', channel.id);
+    saved = await saveChannel(guild.id, 'admin', channel.id);
   } catch (e) {
     await channel.delete().catch(() => {});
     throw e;
   }
-  return msg.reply(`✅ Salon privé <#${channel.id}> créé avec le panneau admin (visible uniquement par toi).`);
+  return msg.reply(`✅ Salon privé <#${channel.id}> créé avec le panneau admin (visible uniquement par toi).${saved ? '' : DB_WARN}`);
 }
 
 // ============================================================
@@ -1406,7 +1877,7 @@ async function updateLeaderboards() {
 //  MESSAGES (commandes écrites)
 // ============================================================
 const PLAYER_CMDS = new Set(['balance', 'bal', 'solde', 'daily', 'aide', 'help', 'casino', 'jeux']);
-const OWNER_CMDS = new Set(['add', 'ajouter', 'remove', 'retirer', 'classement', 'setup', 'salon', 'wins', 'admin']);
+const OWNER_CMDS = new Set(['add', 'ajouter', 'remove', 'retirer', 'classement', 'setup', 'salon', 'wins', 'win', 'admin']);
 
 client.on(Events.MessageCreate, async (msg) => {
   if (msg.author.bot || !msg.guild) return;
@@ -1468,6 +1939,7 @@ client.on(Events.MessageCreate, async (msg) => {
       case 'salon':
         return await cmdSetup(msg);
       case 'wins':
+      case 'win':
         return await cmdWins(msg);
       case 'admin':
         return await cmdAdmin(msg);
@@ -1476,7 +1948,8 @@ client.on(Events.MessageCreate, async (msg) => {
     }
   } catch (e) {
     console.error(`[${cmd}]`, e);
-    msg.reply('⚠️ Une erreur est survenue, réessaie dans un instant.').catch(() => {});
+    const hint = isCrown(msg) ? `\n${explainError(e)}` : '';
+    msg.reply(`⚠️ Une erreur est survenue, réessaie dans un instant.${hint}`).catch(() => {});
   }
 });
 
@@ -1496,6 +1969,7 @@ client.on(Events.InteractionCreate, async (i) => {
       id.startsWith('mines_') ||
       id.startsWith('bj_') ||
       id.startsWith('rl_') ||
+      id.startsWith('ig_') ||
       id.startsWith('replay|') ||
       id.startsWith('modal_');
     if (!isGame) return;
@@ -1517,6 +1991,10 @@ client.on(Events.InteractionCreate, async (i) => {
     }
     if (id.startsWith('mines_')) return await handleMinesButton(i);
     if (id.startsWith('bj_')) return await handleBlackjackButton(i);
+    if (id.startsWith('ig_')) {
+      const [, key, choice] = id.split('_');
+      return INSTANT[key]?.choices.includes(choice) ? await i.showModal(instantBetModal(key, choice)) : undefined;
+    }
     if (id.startsWith('rl_')) {
       const key = id.slice('rl_'.length);
       return key === 'num' || parseRouletteBet(key) ? await i.showModal(rouletteModal(key)) : undefined;
@@ -1524,7 +2002,8 @@ client.on(Events.InteractionCreate, async (i) => {
   } catch (e) {
     console.error('[interaction]', e);
     if (i.isRepliable?.() && !i.replied && !i.deferred) {
-      i.reply({ content: '⚠️ Une erreur est survenue, réessaie dans un instant.', flags: EPH }).catch(() => {});
+      const hint = i.user.id === i.guild.ownerId ? `\n${explainError(e)}` : '';
+      i.reply({ content: `⚠️ Une erreur est survenue, réessaie dans un instant.${hint}`, flags: EPH }).catch(() => {});
     }
   }
 });
@@ -1547,7 +2026,8 @@ client.on(Events.ChannelDelete, async (channel) => {
 
 client.once(Events.ClientReady, (c) => {
   console.log(`✅ Connecté en tant que ${c.user.tag}`);
-  loadChannels();
+  loadMultipliers();
+  loadChannels().then(restoreChannelsByName);
   setInterval(updateLeaderboards, LEADERBOARD_REFRESH_MS);
   updateLeaderboards();
 });
