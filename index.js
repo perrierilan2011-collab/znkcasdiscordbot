@@ -1506,6 +1506,8 @@ function buildHelpEmbed() {
         '🪙 Pile ou Face · 🎲 Dés · 🎰 Machine à sous · 🎡 Roue · ⚔️ Duel · 🃏 Enseigne · 🎯 Zone · 🎱 Plinko · 🚀 Crash · 🎟️ Ticket · 🎲 Dé exact · 📦 Coffre · 🔫 Roulette russe · 🏇 Chevaux (utilise **Suivant ▶** dans le menu)',
         `🎁 **Daily** : ${DAILY_AMOUNT} pièces gratuites par jour`,
         `📨 **Invitations** : +${INVITE_REWARD} 🪙 à chaque nouveau membre que tu invites (**${PREFIX}invites** pour ton total)`,
+        '💸 **Envoyer** : transfère une partie de ton solde à un autre membre',
+        '🧹 **Nettoyer** (propriétaire) : efface le salon casino et reposte le panneau',
         '📜 **Historique** : tes 15 dernières parties',
         '🔁 À la fin d’une partie, le bouton **Rejouer** relance la même mise.',
         '',
@@ -1528,18 +1530,21 @@ function buildPanelPayload() {
       'Clique sur **🎮 Jouer** pour ouvrir le menu des jeux, puis choisis ton jeu. Une fenêtre s’ouvre pour régler ta mise.\n\n' +
         `17 jeux : Mines, Blackjack, Roulette, Pile ou Face, Dés, Machine à sous, Roue, Duel, Enseigne, Zone, Plinko, Crash, Ticket, Dé exact, Coffre, Roulette russe, Chevaux\n` +
         `🎁 **Daily** : ${DAILY_AMOUNT} pièces gratuites par jour\n` +
-        '💰 **Solde** · 🏆 **Classement** · 📜 **Historique** · 📨 **Invitations**\n\n' +
+        '💰 **Solde** · 💸 **Envoyer** · 🏆 **Classement** · 📜 **Historique** · 📨 **Invitations**\n' +
+        '🧹 **Nettoyer** : efface le salon et reposte ce panneau (propriétaire uniquement)\n\n' +
         '🔒 Tes parties, ton solde et ton historique ne sont visibles que par toi.'
     );
   const main = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('panel_play').setLabel('Jouer').setEmoji('🎮').setStyle(ButtonStyle.Success),
     new ButtonBuilder().setCustomId('panel_daily').setLabel('Daily').setEmoji('🎁').setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId('panel_balance').setLabel('Solde').setEmoji('💰').setStyle(ButtonStyle.Secondary)
+    new ButtonBuilder().setCustomId('panel_balance').setLabel('Solde').setEmoji('💰').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('panel_send').setLabel('Envoyer').setEmoji('💸').setStyle(ButtonStyle.Primary)
   );
   const extra = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('panel_top').setLabel('Classement').setEmoji('🏆').setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId('panel_history').setLabel('Historique').setEmoji('📜').setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId('panel_invites').setLabel('Invites').setEmoji('📨').setStyle(ButtonStyle.Secondary)
+    new ButtonBuilder().setCustomId('panel_invites').setLabel('Invites').setEmoji('📨').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('panel_clean').setLabel('Nettoyer').setEmoji('🧹').setStyle(ButtonStyle.Danger)
   );
   return { embeds: [panel], components: [main, extra] };
 }
@@ -1657,9 +1662,88 @@ async function handlePanelButton(i) {
       await i.deferReply({ flags: EPH });
       return i.editReply({ embeds: [await buildInvitesEmbed(i.guild, i.user.id)] });
     }
+    case 'panel_send': {
+      const row = new ActionRowBuilder().addComponents(
+        new UserSelectMenuBuilder()
+          .setCustomId('panel_send_pick')
+          .setPlaceholder('Choisis le membre à qui envoyer')
+          .setMinValues(1)
+          .setMaxValues(1)
+      );
+      return i.reply({
+        content: '💸 À qui veux-tu envoyer de l’argent depuis ton solde ?',
+        components: [row],
+        flags: EPH,
+      });
+    }
+    case 'panel_clean':
+      return cleanCasinoChannel(i);
     default:
       return;
   }
+}
+
+/** Nettoie le salon casino et reposte le panneau (propriétaire uniquement). */
+async function cleanCasinoChannel(i) {
+  if (i.user.id !== i.guild.ownerId) {
+    return i.reply({ content: CROWN_ONLY, flags: EPH });
+  }
+  const casinoId = casinoChannels.get(i.guild.id);
+  if (!casinoId || i.channelId !== casinoId) {
+    return i.reply({
+      content: '🧹 Ce bouton ne fonctionne que dans le salon **casino** créé avec `!setup`.',
+      flags: EPH,
+    });
+  }
+  const me = i.guild.members.me;
+  if (!me?.permissionsIn(i.channel).has(PermissionFlagsBits.ManageMessages)) {
+    return i.reply({
+      content: '⚠️ Il me faut la permission **Gérer les messages** pour nettoyer le salon.',
+      flags: EPH,
+    });
+  }
+
+  await i.deferReply({ flags: EPH });
+  const channel = i.channel;
+  let deleted = 0;
+  try {
+    // Boucle de suppression (bulkDelete = messages < 14 jours)
+    for (let n = 0; n < 20; n++) {
+      const fetched = await channel.messages.fetch({ limit: 100 }).catch(() => null);
+      if (!fetched || fetched.size === 0) break;
+      const young = fetched.filter((m) => Date.now() - m.createdTimestamp < 13 * 24 * 60 * 60 * 1000);
+      if (young.size >= 2) {
+        const res = await channel.bulkDelete(young, true).catch(() => null);
+        deleted += res?.size ?? 0;
+      } else {
+        for (const m of fetched.values()) {
+          await m.delete().catch(() => {});
+          deleted++;
+        }
+        break;
+      }
+      if (fetched.size < 100) break;
+    }
+  } catch (e) {
+    console.error('[clean]', e?.message || e);
+  }
+
+  const panelMsg = await channel.send(buildPanelPayload());
+  await panelMsg.pin().catch(() => {});
+  // Met à jour l’id du message d’aide si la table le stocke
+  await supabase
+    .from('casino_channels')
+    .upsert({
+      guild_id: i.guild.id,
+      channel_id: channel.id,
+      help_message_id: panelMsg.id,
+      updated_at: new Date().toISOString(),
+    })
+    .then(() => {}, () => {});
+
+  return i.editReply({
+    content: `✅ Salon nettoyé (**${deleted}** message(s) supprimé(s)). Le panneau a été reposté et épinglé.`,
+  });
 }
 
 async function handleModalSubmit(i) {
@@ -1694,6 +1778,24 @@ async function handleModalSubmit(i) {
     if (!parseRouletteBet(choiceStr)) return respondText(i, 'Numéro invalide : entre un nombre de 0 à 36.');
     const bet = await readBet();
     return bet ? playRoulette(i, bet, choiceStr) : badBet();
+  }
+  if (id.startsWith('modal_send_')) {
+    const toId = id.slice('modal_send_'.length);
+    if (!/^\d{15,25}$/.test(toId)) return respondText(i, 'Destinataire invalide.');
+    if (toId === i.user.id) return respondText(i, '❌ Tu ne peux pas t’envoyer de l’argent à toi-même.');
+    const bal = await getBalance(i.user.id);
+    const amount = parseAmount(get('amount'), bal);
+    if (!amount) return respondText(i, 'Montant invalide : écris un nombre (ex : 1 ou 2.5) ou "all".');
+    if (amount > bal) return respondText(i, MSG.insufficient);
+    const newBal = await debit(i.user.id, amount);
+    if (newBal === null) return respondText(i, MSG.insufficient);
+    const toBal = await credit(toId, amount);
+    return i.reply({
+      content:
+        `✅ Tu as envoyé **${fmt(amount)}** à <@${toId}>.\n` +
+        `💰 Ton solde : **${fmt(newBal)}** · Solde du destinataire : **${fmt(toBal)}**`,
+      flags: EPH,
+    });
   }
 }
 
@@ -2380,6 +2482,24 @@ client.on(Events.InteractionCreate, async (i) => {
     if (!isGame) return;
 
     if (i.isModalSubmit()) return await handleModalSubmit(i);
+
+    // Envoi d’argent : choix du destinataire
+    if (i.isUserSelectMenu() && id === 'panel_send_pick') {
+      const userId = i.values[0];
+      if (userId === i.user.id) {
+        return i.update({ content: '❌ Tu ne peux pas t’envoyer de l’argent à toi-même.', components: [] });
+      }
+      if (i.users?.get(userId)?.bot) {
+        return i.update({ content: '❌ Tu ne peux pas envoyer d’argent à un bot.', components: [] });
+      }
+      return i.showModal(
+        new ModalBuilder()
+          .setCustomId(`modal_send_${userId}`)
+          .setTitle('💸 Envoyer de l’argent')
+          .addComponents(modalInput('amount', 'Montant à envoyer (ou "all")', { placeholder: 'ex : 5' }))
+      );
+    }
+
     if (!i.isButton()) return;
 
     if (id.startsWith('panel_')) return await handlePanelButton(i);
