@@ -5534,7 +5534,7 @@ function compareScores(a, b) {
 
 function pokerLobbyEmbed(lobby) {
   const g = ONLINE_GAMES[lobby.game] || ONLINE_GAMES.poker;
-  const max = g.max || POKER_MAX;
+  const max = lobby.maxPlayers || g.max || POKER_MAX;
   const spots = lobby.players.map((p, i) => `${i + 1}. <@${p.id}>${p.choice ? ` · ${p.choice}` : ''}`).join('\n') || '_Personne pour l’instant_';
   const e = new EmbedBuilder()
     .setColor(COLORS.violet)
@@ -5564,7 +5564,7 @@ function pokerLobbyRows(lobby) {
     ];
   }
   const g = ONLINE_GAMES[lobby.game] || ONLINE_GAMES.poker;
-  const max = g.max || POKER_MAX;
+  const max = lobby.maxPlayers || g.max || POKER_MAX;
   const rows = [
     new ActionRowBuilder().addComponents(
       new ButtonBuilder()
@@ -5689,7 +5689,7 @@ async function createPokerChannel(i) {
   });
 }
 
-async function pokerCreateLobby(i, stake, gameKey = 'poker') {
+async function pokerCreateLobby(i, stake, gameKey = 'poker', maxPlayers = null) {
   const guildId = i.guild?.id;
   if (!guildId) return respondText(i, 'Utilise cette commande dans le serveur.');
   if (stake <= 0 || stake > MAX_ADMIN_AMOUNT) return respondText(i, 'Mise invalide.');
@@ -5697,6 +5697,13 @@ async function pokerCreateLobby(i, stake, gameKey = 'poker') {
   const prev = pokerLobbies.get(guildId);
   if (prev && prev.status === 'lobby') return respondText(i, 'Une table est déjà ouverte. Rejoins-la ou annule-la d’abord.');
   if (prev && prev.status === 'playing') return respondText(i, 'Une partie est déjà en cours.');
+
+  const hardMax = gdef.max || POKER_MAX;
+  let seats = Number(maxPlayers);
+  if (!Number.isFinite(seats)) seats = hardMax;
+  seats = Math.max(1, Math.min(8, Math.floor(seats)));
+  // ne pas dépasser le max du jeu (ex. pile/face = 2)
+  seats = Math.min(seats, hardMax);
 
   const bal = await getBalance(i.user.id);
   if (bal < stake) return respondText(i, `Solde insuffisant (il te faut ${fmt(stake)}).`);
@@ -5710,24 +5717,26 @@ async function pokerCreateLobby(i, stake, gameKey = 'poker') {
     hostId: i.user.id,
     hostName: i.user.globalName || i.user.username,
     stake,
-    players: [{ id: i.user.id, name: i.user.globalName || i.user.username, hole: [], choice: null }],
+    maxPlayers: seats,
+    players: [{ id: i.user.id, name: i.user.globalName || i.user.username, hole: [], choice: null, stand: false, bust: false }],
     status: 'lobby',
     community: [],
     pot: stake,
     channelId: i.channel.id,
     messageId: null,
     deck: null,
+    bjWait: null,
   };
   pokerLobbies.set(guildId, lobby);
 
   const msg = await i.channel.send({
-    content: `${gdef.emoji} **${gdef.name}** ouverte ! @everyone\nMise : **${fmt(stake)}** · max **${gdef.max}** · hôté par <@${i.user.id}>\n${gdef.desc}`,
+    content: `${gdef.emoji} **${gdef.name}** ouverte ! @everyone\nMise : **${fmt(stake)}** · max **${seats}** · hôté par <@${i.user.id}>\n${gdef.desc}`,
     embeds: [pokerLobbyEmbed(lobby)],
     components: pokerLobbyRows(lobby),
     allowedMentions: { parse: ['everyone'] },
   });
   lobby.messageId = msg.id;
-  return i.reply({ content: `✅ Table **${gdef.name}** créée (−${fmt(stake)}).`, flags: EPH });
+  return i.reply({ content: `✅ Table **${gdef.name}** créée (−${fmt(stake)}) · max **${seats}** places.`, flags: EPH });
 }
 
 async function pokerUpdateLobbyMessage(lobby) {
@@ -5767,16 +5776,38 @@ async function handlePokerButton(i) {
 
   const lobby = pokerLobbies.get(guildId);
 
+  if (id === 'online_bj_hit' || id === 'online_bj_stand') {
+    if (!lobby || lobby.status !== 'playing' || lobby.game !== 'bjtable') {
+      return respondText(i, 'Aucune table de blackjack en cours.');
+    }
+    if (!lobby.bjWait || lobby.bjWait.userId !== i.user.id) {
+      return respondText(i, 'Ce n’est pas ton tour.');
+    }
+    const action = id === 'online_bj_hit' ? 'hit' : 'stand';
+    const resolve = lobby.bjWait.resolve;
+    lobby.bjWait = null;
+    await i.deferUpdate().catch(() => {});
+    resolve(action);
+    return;
+  }
+
   if (id === 'poker_join') {
     if (!lobby || lobby.status !== 'lobby') return respondText(i, 'Aucune table ouverte.');
     if (lobby.players.some((p) => p.id === i.user.id)) return respondText(i, 'Tu es déjà à la table.');
-    const max = (ONLINE_GAMES[lobby.game] || {}).max || POKER_MAX;
+    const max = lobby.maxPlayers || (ONLINE_GAMES[lobby.game] || {}).max || POKER_MAX;
     if (lobby.players.length >= max) return respondText(i, `Table complète (${max}/${max}).`);
     const bal = await getBalance(i.user.id);
     if (bal < lobby.stake) return respondText(i, `Il te faut ${fmt(lobby.stake)}.`);
     const deb = await debit(i.user.id, lobby.stake);
     if (deb === null) return respondText(i, t(i.user.id, 'insufficient'));
-    lobby.players.push({ id: i.user.id, name: i.user.globalName || i.user.username, hole: [], choice: null });
+    lobby.players.push({
+      id: i.user.id,
+      name: i.user.globalName || i.user.username,
+      hole: [],
+      choice: null,
+      stand: false,
+      bust: false,
+    });
     lobby.pot = lobby.stake * lobby.players.length;
     await pokerUpdateLobbyMessage(lobby);
     return i.reply({ content: `✅ Tu as rejoint (−${fmt(lobby.stake)}). Pot : **${fmt(lobby.pot)}**`, flags: EPH });
@@ -5958,29 +5989,41 @@ async function openStage(lobby, ch, title, body) {
   return onlineSend(lobby, ch, { embeds: [sceneEmbed(title, body, COLORS.violet, 'La partie commence')] });
 }
 
-async function onlineFinish(lobby, ch, embed) {
-  const toDelete = [];
-  if (lobby.messageId) toDelete.push(lobby.messageId);
-  if (Array.isArray(lobby.msgIds)) toDelete.push(...lobby.msgIds);
-  for (const mid of toDelete) {
-    try {
-      const m = await ch.messages.fetch(mid).catch(() => null);
-      if (m) await m.delete().catch(() => {});
-      await sleep(180);
-    } catch {
-      /* ignore */
+async function purgeOnlineChannel(ch) {
+  try {
+    let safety = 0;
+    while (safety < 20) {
+      const fetched = await ch.messages.fetch({ limit: 100 }).catch(() => null);
+      if (!fetched || !fetched.size) break;
+      const bulk = fetched.filter((m) => Date.now() - m.createdTimestamp < 13 * 24 * 60 * 60 * 1000);
+      if (bulk.size >= 2) {
+        await ch.bulkDelete(bulk, true).catch(() => {});
+      } else {
+        for (const m of fetched.values()) {
+          await m.delete().catch(() => {});
+          await sleep(200);
+        }
+      }
+      safety++;
+      if (fetched.size < 100) break;
     }
+  } catch (e) {
+    console.error('[online] purge', e?.message || e);
   }
-  await ch.send({
-    embeds: [embed],
-    components: [
-      new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId('poker_new').setLabel('Nouvelle partie').setEmoji('🌐').setStyle(ButtonStyle.Success)
-      ),
-    ],
-  });
+}
+
+async function onlineFinish(lobby, ch, embed) {
   lobby.status = 'done';
   pokerLobbies.delete(lobby.guildId);
+  // Affiche le résultat un court instant, puis reset complet du salon
+  try {
+    await ch.send({ embeds: [embed] });
+  } catch {
+    /* ignore */
+  }
+  await sleep(3500);
+  await purgeOnlineChannel(ch);
+  await ch.send(buildPokerPanelPayload()).catch(() => {});
 }
 
 function onlineTrack(lobby, msg) {
@@ -6114,65 +6157,156 @@ async function runOnlinePoker(lobby, ch) {
 async function runOnlineBlackjack(lobby, ch) {
   const deck = newPokerDeck();
   const dealer = [];
-  for (const p of lobby.players) p.hole = [];
-  const msg = await openStage(
-    lobby,
-    ch,
-    '🃏 Blackjack — distribution',
-    `${potLine(lobby)}\n\nChacun reçoit **2 cartes**. Le croupier aussi.\nIl tire ensuite jusqu’à **17**. Ceux qui le battent sans dépasser 21 se partagent le pot.`
-  );
-
-  const frames = [];
-  const snap = (title, explain, ms = 1100) => {
-    frames.push({
-      title,
-      ms,
-      body:
-        `${potLine(lobby)}\n**Ce qui se passe :** ${explain}\n\n` +
-        handLine('Croupier', dealer, dealer.length === 1 ? '(une carte encore cachée)' : '') +
-        '\n' +
-        lobby.players.map((p) => handLine(who(p) + ' ', p.hole)).join('\n'),
-    });
-  };
-
-  for (const p of lobby.players) p.hole.push(deck.pop());
-  dealer.push(deck.pop());
-  snap('🃏 Première tournée', 'une carte pour chaque joueur, une pour le croupier.');
-  for (const p of lobby.players) p.hole.push(deck.pop());
-  snap('🃏 Deuxième tournée', 'seconde carte des joueurs. La carte cachée du croupier arrive.');
-  dealer.push(deck.pop());
-  snap('🃏 Croupier complet', `le croupier montre **${bjVal(dealer)}**. Il tire tant qu’il est sous 17.`);
-
-  let hits = 0;
-  while (bjVal(dealer) < 17 && hits < 5) {
-    dealer.push(deck.pop());
-    hits++;
-    const v = bjVal(dealer);
-    snap('🃏 Le croupier tire', v > 21 ? `il dépasse 21 (**${v}**) — bust.` : `nouvelle carte. Total **${v}**.`, 1200);
+  for (const p of lobby.players) {
+    p.hole = [];
+    p.stand = false;
+    p.bust = false;
   }
 
-  const dv = bjVal(dealer);
-  const survivors = lobby.players.filter((p) => bjVal(p.hole) <= 21 && (dv > 21 || bjVal(p.hole) > dv));
-  frames.push({
-    title: '🃏 Comparaison',
-    ms: 1500,
-    color: COLORS.green,
-    body:
+  // Distribution
+  for (const p of lobby.players) p.hole.push(deck.pop());
+  dealer.push(deck.pop());
+  for (const p of lobby.players) p.hole.push(deck.pop());
+  dealer.push(deck.pop()); // hole card
+
+  const tableBody = (extra = '') => {
+    const dealerShown = dealer.length ? [dealer[0]] : [];
+    return (
       `${potLine(lobby)}\n` +
-      `Croupier **${dv}**${dv > 21 ? ' — bust, les joueurs encore en jeu gagnent.' : '. Il faut faire mieux, sans dépasser 21.'}\n\n` +
-      handLine('Croupier', dealer) +
+      (extra ? `**${extra}**\n\n` : '\n') +
+      handLine('Croupier', dealerShown, dealer.length > 1 ? '(1 carte cachée)' : '') +
       '\n' +
       lobby.players
         .map((p) => {
-          const ok = survivors.some((s) => s.id === p.id);
           const v = bjVal(p.hole);
-          return handLine(who(p), p.hole, `${ok ? '✅ gagne' : '❌ perd'} (${v})`);
+          const tag = p.bust ? '💥 BUST' : p.stand ? '✋ RESTER' : '';
+          return handLine(who(p), p.hole, tag ? `· ${tag} (${v})` : `· ${v}`);
         })
-        .join('\n'),
-  });
-  await playScene(msg, frames);
+        .join('\n')
+    );
+  };
 
-  const share = await onlinePayWinners(lobby, survivors.map((p) => p.id));
+  let msg = await openStage(
+    lobby,
+    ch,
+    '🃏 Blackjack — distribution',
+    tableBody('Chacun a 2 cartes. À ton tour : **Tirer** ou **Rester**.')
+  );
+
+  // Tour de chaque joueur
+  for (const p of lobby.players) {
+    if (bjVal(p.hole) >= 21) {
+      p.stand = true;
+      if (bjVal(p.hole) > 21) p.bust = true;
+      continue;
+    }
+    while (!p.stand && !p.bust) {
+      const rows = [
+        new ActionRowBuilder().addComponents(
+          new ButtonBuilder().setCustomId('online_bj_hit').setLabel('Tirer').setEmoji('🃏').setStyle(ButtonStyle.Primary),
+          new ButtonBuilder().setCustomId('online_bj_stand').setLabel('Rester').setEmoji('✋').setStyle(ButtonStyle.Secondary)
+        ),
+      ];
+      await msg.edit({
+        embeds: [
+          sceneEmbed(
+            `🃏 Tour de ${who(p)}`,
+            tableBody(`À <@${p.id}> de jouer (30 s) — **Tirer** ou **Rester**.`),
+            COLORS.violet,
+            `Tour de ${who(p)}`
+          ),
+        ],
+        components: rows,
+      }).catch(() => {});
+
+      const action = await new Promise((resolve) => {
+        let done = false;
+        const finish = (a) => {
+          if (done) return;
+          done = true;
+          clearTimeout(timer);
+          resolve(a);
+        };
+        lobby.bjWait = { userId: p.id, resolve: finish };
+        const timer = setTimeout(() => {
+          if (lobby.bjWait?.userId === p.id) lobby.bjWait = null;
+          finish('stand');
+        }, 30000);
+      });
+
+      if (action === 'hit') {
+        p.hole.push(deck.pop());
+        const v = bjVal(p.hole);
+        if (v > 21) {
+          p.bust = true;
+          p.stand = true;
+        } else if (v === 21) {
+          p.stand = true;
+        }
+      } else {
+        p.stand = true;
+      }
+    }
+  }
+
+  // Croupier
+  await msg.edit({
+    embeds: [
+      sceneEmbed(
+        '🃏 Croupier',
+        `${potLine(lobby)}\n**Le croupier révèle sa carte cachée et tire jusqu’à 17.**\n\n` +
+          handLine('Croupier', dealer) +
+          '\n' +
+          lobby.players
+            .map((p) => handLine(who(p), p.hole, p.bust ? '· 💥' : `· ${bjVal(p.hole)}`))
+            .join('\n'),
+        COLORS.gold,
+        'Tour du croupier'
+      ),
+    ],
+    components: [],
+  }).catch(() => {});
+  await sleep(1200);
+
+  while (bjVal(dealer) < 17) {
+    dealer.push(deck.pop());
+    await msg.edit({
+      embeds: [
+        sceneEmbed(
+          '🃏 Croupier tire',
+          `${potLine(lobby)}\n**Nouvelle carte du croupier…**\n\n` + handLine('Croupier', dealer),
+          COLORS.gold,
+          `Croupier ${bjVal(dealer)}`
+        ),
+      ],
+    }).catch(() => {});
+    await sleep(900);
+  }
+
+  const dv = bjVal(dealer);
+  const survivors = lobby.players.filter((p) => !p.bust && bjVal(p.hole) <= 21 && (dv > 21 || bjVal(p.hole) > dv));
+  const pushes = lobby.players.filter((p) => !p.bust && bjVal(p.hole) <= 21 && dv <= 21 && bjVal(p.hole) === dv);
+  // Égalité = mise rendue ; on retire ces mises du pot avant de payer les gagnants
+  for (const p of pushes) await credit(p.id, lobby.stake).catch(() => {});
+  lobby.pot = floor2(Math.max(0, lobby.pot - lobby.stake * pushes.length));
+
+  let share = 0;
+  if (survivors.length) {
+    share = await onlinePayWinners(
+      lobby,
+      survivors.map((p) => p.id)
+    );
+  } else {
+    // Personne ne bat le croupier : on ne rembourse que ceux encore en jeu (pas les bust, déjà pushés)
+    const refundIds = new Set(pushes.map((p) => p.id));
+    for (const p of lobby.players) {
+      if (refundIds.has(p.id) || p.bust) continue;
+      // perdants nets (sous le croupier) : rien
+    }
+    // si tout le monde a bust ou perdu : le pot reste "perdu" (maison) — on ne redistribue pas
+    share = 0;
+  }
+
   await onlineFinish(
     lobby,
     ch,
@@ -6184,14 +6318,20 @@ async function runOnlineBlackjack(lobby, ch) {
           `**Croupier** ${dealer.map(pokerCardStr).join(' ')} → **${dv}**${dv > 21 ? ' (bust)' : ''}\n\n` +
           lobby.players
             .map((p) => {
-              const ok = survivors.some((s) => s.id === p.id);
-              return `${ok ? '🏆' : '•'} <@${p.id}> ${p.hole.map(pokerCardStr).join(' ')} → **${bjVal(p.hole)}**`;
+              const v = bjVal(p.hole);
+              let tag = '❌';
+              if (survivors.some((s) => s.id === p.id)) tag = '🏆';
+              else if (pushes.some((s) => s.id === p.id)) tag = '↩️ égalité';
+              else if (p.bust) tag = '💥 bust';
+              return `${tag} <@${p.id}> ${p.hole.map(pokerCardStr).join(' ')} → **${v}**`;
             })
             .join('\n') +
           '\n\n' +
           (survivors.length
             ? `Gagnant(s) : ${survivors.map((p) => `<@${p.id}>`).join(', ')} · **${fmt(share)}** chacun.`
-            : 'Personne ne bat le croupier — mises rendues.')
+            : pushes.length && !survivors.length
+              ? 'Égalités remboursées · pas de gagnant.'
+              : 'Personne ne bat le croupier.')
         ).slice(0, 4000)
       )
   );
@@ -7135,25 +7275,33 @@ client.on(Events.InteractionCreate, async (i) => {
     if (id.startsWith('event_claim_') && i.isButton()) return await handleEventClaim(i);
     if (id.startsWith('event_join_') && i.isButton()) return await handleEventJoin(i);
 
-    if ((id.startsWith('poker_') || id.startsWith('online_choice_')) && i.isButton()) return await handlePokerButton(i);
+    if ((id.startsWith('poker_') || id.startsWith('online_choice_') || id.startsWith('online_bj_')) && i.isButton()) return await handlePokerButton(i);
     if (id === 'online_pickgame' && i.isStringSelectMenu()) {
       const gameKey = i.values[0];
       const bal = await getBalance(i.user.id);
       const g = ONLINE_GAMES[gameKey] || ONLINE_GAMES.poker;
+      const hardMax = g.max || 4;
       return i.showModal(
         new ModalBuilder()
           .setCustomId(`modal_online_stake_${gameKey}`)
           .setTitle(`${g.emoji} ${g.name}`.slice(0, 45))
-          .addComponents(modalInput('stake', `Mise par joueur (solde ${num(bal)})`, { placeholder: 'ex : 10', max: 12 }))
+          .addComponents(
+            modalInput('stake', `Mise par joueur (solde ${num(bal)})`, { placeholder: 'ex : 10', max: 12 }),
+            modalInput('maxp', `Max joueurs (1-${hardMax})`, { placeholder: String(hardMax), max: 2, required: false })
+          )
       );
     }
     if (id.startsWith('modal_online_stake_') && i.isModalSubmit()) {
       const gameKey = id.slice('modal_online_stake_'.length);
       const raw = i.fields.getTextInputValue('stake')?.trim();
+      const rawMax = i.fields.getTextInputValue('maxp')?.trim();
       const bal = await getBalance(i.user.id);
       const stake = parseAmount(raw, bal);
       if (!stake) return respondText(i, 'Mise invalide : nombre ou "all".');
-      return pokerCreateLobby(i, stake, gameKey);
+      const gdef = ONLINE_GAMES[gameKey] || ONLINE_GAMES.poker;
+      let maxp = Number(rawMax);
+      if (!Number.isFinite(maxp) || maxp < 1) maxp = gdef.max || 4;
+      return pokerCreateLobby(i, stake, gameKey, maxp);
     }
     if (id === 'modal_poker_stake' && i.isModalSubmit()) {
       const raw = i.fields.getTextInputValue('stake')?.trim();
