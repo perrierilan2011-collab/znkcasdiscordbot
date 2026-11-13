@@ -731,6 +731,11 @@ const dieFace = (n) => DICE_FACES[Math.max(1, Math.min(6, n)) - 1];
 const WHEEL_FRAMES = ['◐', '◓', '◑', '◒'];
 
 function handValue(hand) {
+  return handInfo(hand).total;
+}
+
+/** Score blackjack : gère les As (ex: 7/17 si soft). */
+function handInfo(hand) {
   let total = 0;
   let aces = 0;
   for (const c of hand) {
@@ -740,32 +745,56 @@ function handValue(hand) {
     } else if (['J', 'Q', 'K'].includes(c.r)) total += 10;
     else total += Number(c.r);
   }
-  while (total > 21 && aces > 0) {
+  let softLeft = aces;
+  while (total > 21 && softLeft > 0) {
     total -= 10;
-    aces--;
+    softLeft--;
   }
-  return total;
+  const isSoft = softLeft > 0 && total <= 21;
+  const low = isSoft ? total - 10 : total;
+  // Affiche toujours les 2 lectures quand un As peut valoir 1 ou 11
+  const label = isSoft && low >= 1 ? `${low}/${total}` : String(total);
+  return { total, low, isSoft, label };
 }
 
 function bjEmbed(g, end) {
   const e = new EmbedBuilder().setTitle('🃏 Blackjack');
+  const pInfo = handInfo(g.player);
+  const showAllDealer = !!(end && (end.revealAll || end.color != null || end.balance != null || end.revealing));
+  // Pendant le jeu : une carte visible + dos. Pendant révélation / fin : toutes les cartes.
+  const dealerVisible = showAllDealer || end?.revealing ? g.dealer : [g.dealer[0]];
+  const dInfo = handInfo(showAllDealer || end?.revealing ? g.dealer : [g.dealer[0]]);
   const playerBlock = cardsArt(g.player);
-  const dealerBlock = end
-    ? cardsArt(g.dealer)
-    : cardsArt([g.dealer[0]]) + ' 🂠';
+  const dealerBlock =
+    showAllDealer || end?.revealing
+      ? cardsArt(g.dealer)
+      : cardsArt([g.dealer[0]]) + '\n🂠';
+
+  const playerTitle = pInfo.isSoft
+    ? `Ta main · **${pInfo.label}** (As = 1 ou 11)`
+    : `Ta main · **${pInfo.label}**`;
+  const dealerTitle =
+    showAllDealer || end?.revealing
+      ? dInfo.isSoft
+        ? `Croupier · **${dInfo.label}** (As = 1 ou 11)`
+        : `Croupier · **${dInfo.label}**`
+      : `Croupier · **${dInfo.label}** + 🂠`;
+
   e.addFields(
-    { name: `Ta main · ${handValue(g.player)}`, value: playerBlock },
-    {
-      name: end ? `Croupier · ${handValue(g.dealer)}` : `Croupier · ${handValue([g.dealer[0]])} + ?`,
-      value: dealerBlock,
-    },
+    { name: playerTitle, value: playerBlock },
+    { name: dealerTitle, value: dealerBlock },
     { name: 'Mise', value: fmt(g.bet), inline: true }
   );
-  if (end) {
+  if (end && end.balance != null) {
     e.setColor(end.color).setDescription(end.text);
     e.addFields({ name: 'Solde', value: fmt(end.balance), inline: true });
+  } else if (end?.revealing) {
+    e.setColor(COLORS.violet).setDescription(end.text || '🃏 Tour du croupier…');
   } else {
-    e.setColor(COLORS.violet).setDescription('À toi : **Tirer**, **Rester** ou **Doubler**.');
+    e.setColor(COLORS.violet).setDescription(
+      'À toi : **Tirer**, **Rester** ou **Doubler**.\n' +
+        (pInfo.isSoft ? `💡 Ton As te donne **${pInfo.low}** ou **${pInfo.total}**.` : '')
+    );
   }
   return e;
 }
@@ -810,7 +839,12 @@ function bjOutcome(g, kind) {
     }
     return { payout: 0, text: '😬 Le croupier a un blackjack, mise perdue.', color: COLORS.red };
   }
-  if (kind === 'bust') return { payout: 0, text: `💥 Tu dépasses 21 (${pv}), mise perdue.`, color: COLORS.red };
+  if (kind === 'bust')
+      return {
+        payout: 0,
+        text: `💥 Tu dépasses 21 (**${handInfo(g.player).label}**), mise perdue.`,
+        color: COLORS.red,
+      };
   const winPayout = floor2(bet * 2 * coef('bj'));
   const winProfit = fmt(round2(winPayout - bet));
   if (dv > 21) return { payout: winPayout, text: `🎉 Le croupier dépasse 21 ! Tu gagnes **${winProfit}**.`, color: COLORS.green };
@@ -889,10 +923,67 @@ async function settleBlackjack(game, kind, i) {
   if (game.finished) return;
   game.finished = true;
   clearTimeout(game.timer);
-  try {
-    if (kind === 'stand') {
-      while (handValue(game.dealer) < 17) game.dealer.push(game.deck.pop());
+
+  const pushBoard = async (payload, interaction) => {
+    if (interaction && !interaction.replied && !interaction.deferred) {
+      await interaction.update(payload);
+      return;
     }
+    await game.lastI.editReply(payload);
+  };
+
+  try {
+    // Révélation carte par carte du croupier (sauf si le joueur a déjà sauté)
+    if (kind === 'stand') {
+      await pushBoard(
+        {
+          embeds: [
+            bjEmbed(game, {
+              revealing: true,
+              text: '🃏 Le croupier **retourne** sa deuxième carte…',
+            }),
+          ],
+          components: [],
+        },
+        i
+      );
+      i = null;
+      await sleep(1100);
+
+      // Tire jusqu'à 17+ en montrant chaque carte
+      while (handValue(game.dealer) < 17) {
+        game.dealer.push(game.deck.pop());
+        const d = handInfo(game.dealer);
+        await game.lastI.editReply({
+          embeds: [
+            bjEmbed(game, {
+              revealing: true,
+              text: `🃏 Croupier tire une carte… total **${d.label}**${d.isSoft ? ' (As soft)' : ''}`,
+            }),
+          ],
+          components: [],
+        });
+        await sleep(1100);
+      }
+
+      const dFinal = handInfo(game.dealer);
+      await game.lastI.editReply({
+        embeds: [
+          bjEmbed(game, {
+            revealing: true,
+            text:
+              dFinal.total > 21
+                ? `💥 Croupier dépasse (**${dFinal.label}**) !`
+                : `🛑 Croupier s’arrête à **${dFinal.label}**.`,
+          }),
+        ],
+        components: [],
+      });
+      await sleep(900);
+    } else if (i) {
+      // bust / natural : on update une fois à la fin
+    }
+
     const out = bjOutcome(game, kind);
     const boost = getBoost(game.guildId);
     if (out.payout > game.bet && (boost.winMult || 1) !== 1) {
@@ -905,6 +996,8 @@ async function settleBlackjack(game, kind, i) {
       out.text += `\n⚡ Boost **${boost.label}** : perte ×${boost.loseMult}`;
     }
     const balance = out.payout > 0 ? await credit(game.userId, out.payout) : await getBalance(game.userId);
+    const pL = handInfo(game.player).label;
+    const dL = handInfo(game.dealer).label;
     recordResult({
       guildId: game.guildId,
       user: game.user,
@@ -912,13 +1005,13 @@ async function settleBlackjack(game, kind, i) {
       bet: game.bet,
       mult: round2(out.payout / game.bet),
       payout: out.payout,
-      detail: `${handValue(game.player)} vs ${handValue(game.dealer)}`,
+      detail: `${pL} vs ${dL}`,
     });
     const payload = {
-      embeds: [bjEmbed(game, { text: out.text, color: out.color, balance })],
+      embeds: [bjEmbed(game, { text: out.text, color: out.color, balance, revealAll: true })],
       components: bjRows(game, true),
     };
-    if (i) await i.update(payload);
+    if (i && !i.replied && !i.deferred) await i.update(payload);
     else await game.lastI.editReply(payload);
   } catch (e) {
     console.error('[blackjack] settle', e?.message || e);
@@ -949,7 +1042,7 @@ async function handleBlackjackButton(i) {
   if (i.customId === 'bj_double') {
     if (game.player.length !== 2) return i.deferUpdate();
     if ((await debit(game.userId, game.bet)) === null) {
-      return respondText(i, 'Pas assez de pièces pour doubler.');
+      return respondText(i, `Pas assez de ${COIN} pour doubler.`);
     }
     game.bet = round2(game.bet * 2);
     game.player.push(game.deck.pop());
@@ -1396,11 +1489,28 @@ Object.assign(INSTANT, {
       choicePicker('plinko', '🎱 Plinko : choisis le risque', Object.values(PLINKO).map((r) => `${r.emoji} **${r.label}** : ${r.mults.map((m) => fx(m * c).replace('x', '')).join(' · ')}`).join('\n'),
         Object.entries(PLINKO).map(([id, r]) => [id, r.label, r.emoji])),
     resolve(choice, c) {
+      // 8 rangées : à chaque rangée la bille va à gauche (0) ou à droite (1)
+      const path = [];
       let bin = 0;
-      for (let k = 0; k < 8; k++) bin += randomInt(0, 2);
+      for (let k = 0; k < 8; k++) {
+        const right = randomInt(0, 2);
+        path.push(right);
+        bin += right;
+      }
       const mults = PLINKO[choice].mults;
-      const board = mults.map((m, k) => (k === bin ? `**[${fx(m * c).replace('x', '')}]**` : fx(m * c).replace('x', ''))).join(' ');
-      return { base: mults[bin], pick: PLINKO[choice].label, headline: `La bille tombe dans la case **${bin + 1}** :\n${board}`, detail: `case ${bin + 1}` };
+      const board = mults
+        .map((m, k) => (k === bin ? `【${fx(m * c).replace('x', '')}】` : fx(m * c).replace('x', '')))
+        .join(' · ');
+      return {
+        base: mults[bin],
+        pick: PLINKO[choice].label,
+        headline: `🎱 La bille atterrit en case **${bin + 1}/9**\n${board}`,
+        detail: `case ${bin + 1}`,
+        path,
+        bin,
+        mults,
+        coef: c,
+      };
     },
   },
 
@@ -1621,13 +1731,56 @@ async function playInstant(i, key, bet, choice) {
             { text: '```\n  [ · ][ · ][ ★ ][ · ][ · ]\n  [ · ][ · ][ · ][ · ][ · ]\n```\n⚡ Le curseur bouge…', ms: 450 },
             { text: '```\n  [ · ][ · ][ · ][ · ][ · ]\n  [ · ][ ★ ][ · ][ · ][ · ]\n```\n🎲 Ça ralentit…', ms: 500 },
           ];
-        case 'plinko':
-          return [
-            { text: '```\n        ●\n   ·  ·  ·  ·  ·\n  ·  ·  ·  ·  ·  ·\n ·  ·  ·  ·  ·  ·  ·\n```\n🎱 Lâcher de la bille…', ms: 400 },
-            { text: '```\n\n     ●\n   ·  ·  ·  ·  ·\n  ·  ·  ·  ·  ·  ·\n ·  ·  ·  ·  ·  ·  ·\n```\n↙️ Rebond…', ms: 400 },
-            { text: '```\n\n\n       ●\n  ·  ·  ·  ·  ·  ·\n ·  ·  ·  ·  ·  ·  ·\n```\n↘️ Encore…', ms: 400 },
-            { text: '```\n\n\n\n         ●\n ·  ·  ·  ·  ·  ·  ·\n```\n⬇️ Vers les cases…', ms: 500 },
-          ];
+        case 'plinko': {
+          // Animation bille réelle suivant le path (0 = gauche, 1 = droite)
+          const path = res.path || [0, 1, 0, 1, 0, 1, 0, 1];
+          const frames = [];
+          let col = 0; // position 0..8
+          const width = 9;
+          const peg = (r, c) => {
+            // Grille de piquets + bille
+            const lines = [];
+            lines.push('     PLINKO');
+            for (let row = 0; row <= 8; row++) {
+              let line = '';
+              const slots = row + 1;
+              const pad = Math.max(0, 8 - row);
+              line += ' '.repeat(pad);
+              for (let s = 0; s < slots; s++) {
+                if (row === r && s === c) line += '●';
+                else if (row < 8) line += '·';
+                else line += '▽';
+                line += ' ';
+              }
+              lines.push(line);
+            }
+            // cases multiplicateurs en bas
+            if (res.mults) {
+              const bot = res.mults
+                .map((m, k) => (k === (res.bin ?? -1) && r >= 8 ? `[${m}]` : `${m}`))
+                .join(' ');
+              lines.push(bot);
+            }
+            return '```\n' + lines.join('\n') + '\n```';
+          };
+          frames.push({
+            text: peg(0, 0) + '\n🎱 **Lâcher** de la bille…',
+            ms: 500,
+          });
+          for (let row = 0; row < path.length; row++) {
+            if (path[row] === 1) col += 1;
+            const dir = path[row] === 1 ? '↘️' : '↙️';
+            frames.push({
+              text: peg(row + 1, col) + `\n${dir} Rebond rangée **${row + 1}/8**…`,
+              ms: 480,
+            });
+          }
+          frames.push({
+            text: peg(8, col) + `\n💥 Case **${(res.bin ?? col) + 1}** !`,
+            ms: 700,
+          });
+          return frames;
+        }
         case 'crash':
           return [
             { text: '```\n   🚀\n   ║\n   ║\n  ═╩═\n```\n3️⃣ …', ms: 350 },
