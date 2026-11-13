@@ -410,6 +410,14 @@ const openGame = (i, payload) => i.reply({ ...payload, flags: EPH });
 
 const respondText = (i, text) => i.reply({ content: text, flags: EPH });
 
+/** Boutons de fin de partie : Rejouer + retour au panneau */
+function endGameRow(replayCustomId) {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId(replayCustomId).setLabel('Rejouer').setEmoji('🔁').setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId('panel_home').setLabel('Changer de mode').setEmoji('🏠').setStyle(ButtonStyle.Primary)
+  );
+}
+
 const games = new Map();
 const tryLock = (uid) => {
   if (games.has(uid)) return false;
@@ -930,7 +938,12 @@ function minesRows(game, over) {
             .setCustomId(`replay|mines|${game.bet}|${game.level}`)
             .setLabel('Rejouer')
             .setEmoji('🔁')
-            .setStyle(ButtonStyle.Success)
+            .setStyle(ButtonStyle.Success),
+          new ButtonBuilder()
+            .setCustomId('panel_home')
+            .setLabel('Changer de mode')
+            .setEmoji('🏠')
+            .setStyle(ButtonStyle.Primary)
         );
       } else {
         const gain = floor2(game.bet * minesMultiplier(game.revealed.size, game.mines));
@@ -1194,7 +1207,8 @@ function bjRows(g, over) {
   if (over) {
     return [
       new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId(`replay|bj|${g.baseBet}`).setLabel('Rejouer').setEmoji('🔁').setStyle(ButtonStyle.Success)
+        new ButtonBuilder().setCustomId(`replay|bj|${g.baseBet}`).setLabel('Rejouer').setEmoji('🔁').setStyle(ButtonStyle.Success),
+        new ButtonBuilder().setCustomId('panel_home').setLabel('Changer de mode').setEmoji('🏠').setStyle(ButtonStyle.Primary)
       ),
     ];
   }
@@ -1604,7 +1618,8 @@ async function playRoulette(i, bet, choiceStr) {
         }
       );
     const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId(`replay|rl|${bet}|${choice.key}`).setLabel('Rejouer').setEmoji('🔁').setStyle(ButtonStyle.Success)
+      new ButtonBuilder().setCustomId(`replay|rl|${bet}|${choice.key}`).setLabel('Rejouer').setEmoji('🔁').setStyle(ButtonStyle.Success),
+      new ButtonBuilder().setCustomId('panel_home').setLabel('Changer de mode').setEmoji('🏠').setStyle(ButtonStyle.Primary)
     );
     await i.editReply({ embeds: [embed], components: [row] });
 
@@ -3600,10 +3615,7 @@ async function playInstant(i, key, bet, choice) {
           ]),
         }
       );
-    const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId(`replay|${key}|${bet}|${choice}`).setLabel('Rejouer').setEmoji('🔁').setStyle(ButtonStyle.Success)
-    );
-    await i.editReply({ embeds: [embed], components: [row] });
+    await i.editReply({ embeds: [embed], components: [endGameRow(`replay|${key}|${bet}|${choice}`)] });
 
     recordResult({
       guildId: resolveGuildId(i),
@@ -3697,7 +3709,6 @@ async function buildDmPlayPayload(userId) {
             '**Play** → choose a game',
             '**Send** → transfer coins (username of a server member)',
             '**Rules** → simple rules of every game',
-            '**Clear** → delete all messages here and resend this panel',
           ].join('\n')
         : [
             `💰 **Solde : ${fmt(bal)}**`,
@@ -3706,7 +3717,6 @@ async function buildDmPlayPayload(userId) {
             '**Jouer** → choisir un jeu',
             '**Envoyer** → transférer des coins (pseudo d’un membre du serveur)',
             '**Règles** → explications simples de chaque jeu',
-            '**Clear** → supprime tous les messages ici et renvoie ce panneau',
           ].join('\n')
     )
     .setFooter({ text: lang === 'en' ? 'Private panel' : 'Panneau privé' })
@@ -3721,8 +3731,7 @@ async function buildDmPlayPayload(userId) {
   const row2 = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('panel_history').setLabel(lang === 'en' ? 'History' : 'Historique').setEmoji('📜').setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId('panel_stats').setLabel('Stats').setEmoji('📊').setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId('panel_settings').setLabel(lang === 'en' ? 'Settings' : 'Paramètres').setEmoji('⚙️').setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId('panel_clear').setLabel('Clear').setEmoji('🧹').setStyle(ButtonStyle.Danger)
+    new ButtonBuilder().setCustomId('panel_settings').setLabel(lang === 'en' ? 'Settings' : 'Paramètres').setEmoji('⚙️').setStyle(ButtonStyle.Secondary)
   );
   return { embeds: [embed], components: [row1, row2] };
 }
@@ -4024,6 +4033,13 @@ async function handlePanelButton(i) {
     }
     case 'panel_play':
       return i.reply({ ...buildGameMenuPayload(i.user.id, 0), flags: EPH });
+    case 'panel_home': {
+      const payload = await buildDmPlayPayload(i.user.id);
+      if (fromEphemeral(i) && (i.isButton() || i.isModalSubmit())) {
+        return i.update(payload);
+      }
+      return i.reply({ ...payload, flags: EPH });
+    }
     case 'panel_settings':
       return i.reply({ ...buildSettingsPayload(i.user.id), flags: EPH });
     case 'panel_lang_fr':
@@ -4294,7 +4310,7 @@ function buildAdminPayload() {
   );
   const row4 = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('admin_notifchan').setLabel('Salon notifs').setEmoji('🔔').setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId('admin_pokerchan').setLabel('Salon poker').setEmoji('🃏').setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId('admin_pokerchan').setLabel('Salon online').setEmoji('🌐').setStyle(ButtonStyle.Success),
     new ButtonBuilder().setCustomId('admin_top').setLabel('Classement').setEmoji('🏆').setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId('admin_topall').setLabel('All-time').setEmoji('👑').setStyle(ButtonStyle.Secondary)
   );
@@ -5068,7 +5084,8 @@ const CHANNEL_NAMES = {
   invites: 'invites-notif',
   alltime: 'alltime',
   notifs: 'casino-notifs',
-  poker: 'poker',
+  online: 'online',
+  poker: 'online', // alias rétrocompat
 };
 const alltimeBoardMessages = new Map();
 
@@ -5174,19 +5191,22 @@ function compareScores(a, b) {
 }
 
 function pokerLobbyEmbed(lobby) {
-  const spots = lobby.players.map((p, i) => `${i + 1}. <@${p.id}>`).join('\n') || '_Personne pour l’instant_';
+  const g = ONLINE_GAMES[lobby.game] || ONLINE_GAMES.poker;
+  const max = g.max || POKER_MAX;
+  const spots = lobby.players.map((p, i) => `${i + 1}. <@${p.id}>${p.choice ? ` · ${p.choice}` : ''}`).join('\n') || '_Personne pour l’instant_';
   const e = new EmbedBuilder()
     .setColor(COLORS.violet)
-    .setTitle('🃏 Table de poker')
+    .setTitle(`${g.emoji} ${g.name}`)
     .setDescription(
       `**Mise** : ${fmt(lobby.stake)} par joueur\n` +
         `**Pot** : ${fmt(lobby.stake * lobby.players.length)}\n` +
-        `**Places** : ${lobby.players.length}/${POKER_MAX}\n\n` +
+        `**Places** : ${lobby.players.length}/${max}\n` +
+        `**Règle** : ${g.desc}\n\n` +
         `**Joueurs**\n${spots}\n\n` +
         (lobby.status === 'lobby'
-          ? 'Clique **Rejoindre** pour payer la mise et t’asseoir.\nL’hôte lance quand il veut (même seul).'
+          ? 'Clique **Rejoindre** pour payer la mise.\nL’hôte lance quand il veut (même seul).\nTout se joue **dans ce salon** (pas en MP).'
           : lobby.status === 'playing'
-            ? 'Partie en cours…'
+            ? 'Partie en cours — suis les messages ci-dessous.'
             : 'Partie terminée.')
     )
     .setFooter({ text: `Hôte : ${lobby.hostName}` })
@@ -5197,44 +5217,95 @@ function pokerLobbyRows(lobby) {
   if (lobby.status !== 'lobby') {
     return [
       new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId('poker_new').setLabel('Nouvelle partie').setEmoji('🃏').setStyle(ButtonStyle.Success)
+        new ButtonBuilder().setCustomId('poker_new').setLabel('Nouvelle partie').setEmoji('🌐').setStyle(ButtonStyle.Success)
       ),
     ];
   }
-  return [
+  const g = ONLINE_GAMES[lobby.game] || ONLINE_GAMES.poker;
+  const max = g.max || POKER_MAX;
+  const rows = [
     new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId('poker_join')
         .setLabel('Rejoindre')
         .setEmoji('✋')
         .setStyle(ButtonStyle.Success)
-        .setDisabled(lobby.players.length >= POKER_MAX),
+        .setDisabled(lobby.players.length >= max),
       new ButtonBuilder().setCustomId('poker_leave').setLabel('Quitter').setEmoji('🚪').setStyle(ButtonStyle.Secondary),
       new ButtonBuilder().setCustomId('poker_start').setLabel('Lancer').setEmoji('▶️').setStyle(ButtonStyle.Primary),
       new ButtonBuilder().setCustomId('poker_cancel').setLabel('Annuler').setEmoji('❌').setStyle(ButtonStyle.Danger)
     ),
   ];
+  if (lobby.game === 'roulette') {
+    rows.push(
+      new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('online_choice_rouge').setLabel('Rouge').setEmoji('🔴').setStyle(ButtonStyle.Danger),
+        new ButtonBuilder().setCustomId('online_choice_noir').setLabel('Noir').setEmoji('⚫').setStyle(ButtonStyle.Secondary)
+      )
+    );
+  } else if (lobby.game === 'coinflip') {
+    rows.push(
+      new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('online_choice_pile').setLabel('Pile').setEmoji('🪙').setStyle(ButtonStyle.Primary),
+        new ButtonBuilder().setCustomId('online_choice_face').setLabel('Face').setEmoji('🪙').setStyle(ButtonStyle.Secondary)
+      )
+    );
+  } else if (lobby.game === 'horses') {
+    rows.push(
+      new ActionRowBuilder().addComponents(
+        ...[1, 2, 3, 4].map((n) =>
+          new ButtonBuilder().setCustomId(`online_choice_h${n}`).setLabel(`Cheval ${n}`).setEmoji('🐎').setStyle(ButtonStyle.Primary)
+        )
+      )
+    );
+  } else if (lobby.game === 'crash') {
+    rows.push(
+      new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('online_choice_x15').setLabel('x1.5').setStyle(ButtonStyle.Success),
+        new ButtonBuilder().setCustomId('online_choice_x2').setLabel('x2').setStyle(ButtonStyle.Primary),
+        new ButtonBuilder().setCustomId('online_choice_x3').setLabel('x3').setStyle(ButtonStyle.Primary),
+        new ButtonBuilder().setCustomId('online_choice_x5').setLabel('x5').setStyle(ButtonStyle.Danger)
+      )
+    );
+  }
+  return rows;
 }
 
+const ONLINE_GAMES = {
+  poker: { key: 'poker', name: 'Poker Hold’em', emoji: '🃏', max: 4, desc: '2 cartes + board · meilleur jeu gagne le pot' },
+  bjtable: { key: 'bjtable', name: 'Blackjack table', emoji: '🂡', max: 4, desc: 'Tous vs le croupier · ceux qui battent le croupier se partagent le pot' },
+  roulette: { key: 'roulette', name: 'Roulette', emoji: '🎡', max: 4, desc: 'Chacun choisit rouge/noir · les bons pronostics se partagent le pot' },
+  coinflip: { key: 'coinflip', name: 'Pile ou Face', emoji: '🪙', max: 2, desc: '2 joueurs · pile vs face · le gagnant prend tout' },
+  dicewar: { key: 'dicewar', name: 'Guerre de dés', emoji: '🎲', max: 4, desc: 'Chacun lance un dé · le plus haut remporte le pot' },
+  highcard: { key: 'highcard', name: 'Carte haute', emoji: '⬆️', max: 4, desc: 'Chacun tire une carte · la plus haute gagne' },
+  war: { key: 'war', name: 'Bataille', emoji: '⚔️', max: 4, desc: 'Chacun une carte · la plus haute gagne le pot' },
+  slotsrace: { key: 'slotsrace', name: 'Course de slots', emoji: '🎰', max: 4, desc: 'Chacun un spin · le meilleur multiplicateur gagne' },
+  horses: { key: 'horses', name: 'Course hippique', emoji: '🏇', max: 4, desc: 'Chacun choisit un cheval · le bon numéro gagne' },
+  crash: { key: 'crash', name: 'Crash ensemble', emoji: '🚀', max: 4, desc: 'Multi partagé · ceux sous le crash se partagent le pot' },
+};
+
 function buildPokerPanelPayload() {
+  const list = Object.values(ONLINE_GAMES)
+    .map((g) => `${g.emoji} **${g.name}** — ${g.desc}`)
+    .join('\n');
   const embed = new EmbedBuilder()
     .setColor(0x7C3AED)
-    .setTitle('🃏 Poker · Texas Hold’em')
+    .setTitle('🌐 Jeux en ligne')
     .setDescription(
       [
-        'Poker multijoueur (max **4** joueurs).',
+        'Parties multijoueurs dans ce salon (max **4** sauf pile/face : **2**).',
         '',
-        '1. **Créer une partie** → choisis la mise',
-        '2. Les joueurs **rejoignent** (la mise est prélevée)',
+        '1. **Créer une partie** → choisis le jeu et la mise',
+        '2. Les autres **rejoignent** (mise prélevée)',
         '3. L’**hôte** lance quand il veut (même à 1)',
-        '4. Distribution animée → le meilleur jeu **remporte le pot**',
+        '4. Tout se passe **ici** (pas en MP) avec les explications',
         '',
-        'Variante : Hold’em (2 cartes privées + 5 communes).',
+        list,
       ].join('\n')
     )
-    .setFooter({ text: 'Seul le propriétaire peut créer le salon via Admin' });
+    .setFooter({ text: 'Admin → Salon online pour créer ce salon' });
   const row = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('poker_new').setLabel('Créer une partie').setEmoji('🃏').setStyle(ButtonStyle.Success)
+    new ButtonBuilder().setCustomId('poker_new').setLabel('Créer une partie').setEmoji('🌐').setStyle(ButtonStyle.Success)
   );
   return { embeds: [embed], components: [row] };
 }
@@ -5243,16 +5314,16 @@ async function createPokerChannel(i) {
   const guild = i.guild;
   const P = PermissionFlagsBits;
   const me = guild.members.me;
-  const existing = await getSavedChannel(guild, 'poker');
+  const existing = (await getSavedChannel(guild, 'online')) || (await getSavedChannel(guild, 'poker'));
   if (existing) {
     await existing.send(buildPokerPanelPayload()).catch(() => {});
-    return i.reply({ content: `✅ Salon poker déjà présent : <#${existing.id}> (panneau renvoyé).`, flags: EPH });
+    return i.reply({ content: `✅ Salon online déjà présent : <#${existing.id}> (panneau renvoyé).`, flags: EPH });
   }
   if (!me.permissions.has(P.ManageChannels)) return i.reply({ content: NEED_MANAGE_CHANNELS, flags: EPH });
   const channel = await guild.channels.create({
-    name: 'poker',
+    name: 'online',
     type: ChannelType.GuildText,
-    topic: 'Poker multijoueur 🃏 — crée une partie et invite les autres',
+    topic: 'Jeux multijoueurs 🌐 — poker, blackjack, roulette, dés…',
     permissionOverwrites: [
       {
         id: guild.roles.everyone.id,
@@ -5269,17 +5340,18 @@ async function createPokerChannel(i) {
   });
   const panelMsg = await channel.send(buildPokerPanelPayload());
   await panelMsg.pin().catch(() => {});
-  const saved = await saveChannel(guild.id, 'poker', channel.id);
+  const saved = await saveChannel(guild.id, 'online', channel.id);
   return i.reply({
-    content: `✅ Salon <#${channel.id}> créé avec le panneau poker.${saved ? '' : DB_WARN}`,
+    content: `✅ Salon <#${channel.id}> créé (jeux en ligne).${saved ? '' : DB_WARN}`,
     flags: EPH,
   });
 }
 
-async function pokerCreateLobby(i, stake) {
+async function pokerCreateLobby(i, stake, gameKey = 'poker') {
   const guildId = i.guild?.id;
   if (!guildId) return respondText(i, 'Utilise cette commande dans le serveur.');
   if (stake <= 0 || stake > MAX_ADMIN_AMOUNT) return respondText(i, 'Mise invalide.');
+  const gdef = ONLINE_GAMES[gameKey] || ONLINE_GAMES.poker;
   const prev = pokerLobbies.get(guildId);
   if (prev && prev.status === 'lobby') return respondText(i, 'Une table est déjà ouverte. Rejoins-la ou annule-la d’abord.');
   if (prev && prev.status === 'playing') return respondText(i, 'Une partie est déjà en cours.');
@@ -5292,10 +5364,11 @@ async function pokerCreateLobby(i, stake) {
 
   const lobby = {
     guildId,
+    game: gdef.key,
     hostId: i.user.id,
     hostName: i.user.globalName || i.user.username,
     stake,
-    players: [{ id: i.user.id, name: i.user.globalName || i.user.username, hole: [] }],
+    players: [{ id: i.user.id, name: i.user.globalName || i.user.username, hole: [], choice: null }],
     status: 'lobby',
     community: [],
     pot: stake,
@@ -5306,13 +5379,13 @@ async function pokerCreateLobby(i, stake) {
   pokerLobbies.set(guildId, lobby);
 
   const msg = await i.channel.send({
-    content: `🃏 **Table de poker ouverte !** @everyone\nMise : **${fmt(stake)}** · max ${POKER_MAX} joueurs · hôté par <@${i.user.id}>`,
+    content: `${gdef.emoji} **${gdef.name}** ouverte ! @everyone\nMise : **${fmt(stake)}** · max **${gdef.max}** · hôté par <@${i.user.id}>\n${gdef.desc}`,
     embeds: [pokerLobbyEmbed(lobby)],
     components: pokerLobbyRows(lobby),
     allowedMentions: { parse: ['everyone'] },
   });
   lobby.messageId = msg.id;
-  return i.reply({ content: `✅ Table créée. Tu es assis (mise prélevée : ${fmt(stake)}).`, flags: EPH });
+  return i.reply({ content: `✅ Table **${gdef.name}** créée (−${fmt(stake)}).`, flags: EPH });
 }
 
 async function pokerUpdateLobbyMessage(lobby) {
@@ -5333,13 +5406,22 @@ async function handlePokerButton(i) {
   if (!guildId) return respondText(i, 'Serveur uniquement.');
 
   if (id === 'poker_new') {
-    const bal = await getBalance(i.user.id);
-    return i.showModal(
-      new ModalBuilder()
-        .setCustomId('modal_poker_stake')
-        .setTitle('🃏 Créer une table de poker')
-        .addComponents(modalInput('stake', `Mise par joueur (solde ${num(bal)})`, { placeholder: 'ex : 10', max: 12 }))
-    );
+    const opts = Object.values(ONLINE_GAMES).map((g) => ({
+      label: g.name.slice(0, 100),
+      value: g.key,
+      emoji: g.emoji,
+      description: g.desc.slice(0, 100),
+    }));
+    // Discord max 25 options — on a 10 jeux
+    const select = new StringSelectMenuBuilder()
+      .setCustomId('online_pickgame')
+      .setPlaceholder('Choisis le jeu en ligne')
+      .addOptions(opts.slice(0, 25));
+    return i.reply({
+      content: '🌐 Quel jeu en ligne veux-tu ouvrir ?',
+      components: [new ActionRowBuilder().addComponents(select)],
+      flags: EPH,
+    });
   }
 
   const lobby = pokerLobbies.get(guildId);
@@ -5347,15 +5429,16 @@ async function handlePokerButton(i) {
   if (id === 'poker_join') {
     if (!lobby || lobby.status !== 'lobby') return respondText(i, 'Aucune table ouverte.');
     if (lobby.players.some((p) => p.id === i.user.id)) return respondText(i, 'Tu es déjà à la table.');
-    if (lobby.players.length >= POKER_MAX) return respondText(i, 'Table complète (4/4).');
+    const max = (ONLINE_GAMES[lobby.game] || {}).max || POKER_MAX;
+    if (lobby.players.length >= max) return respondText(i, `Table complète (${max}/${max}).`);
     const bal = await getBalance(i.user.id);
     if (bal < lobby.stake) return respondText(i, `Il te faut ${fmt(lobby.stake)}.`);
     const deb = await debit(i.user.id, lobby.stake);
     if (deb === null) return respondText(i, t(i.user.id, 'insufficient'));
-    lobby.players.push({ id: i.user.id, name: i.user.globalName || i.user.username, hole: [] });
+    lobby.players.push({ id: i.user.id, name: i.user.globalName || i.user.username, hole: [], choice: null });
     lobby.pot = lobby.stake * lobby.players.length;
     await pokerUpdateLobbyMessage(lobby);
-    return i.reply({ content: `✅ Tu as rejoint la table (−${fmt(lobby.stake)}). Pot : **${fmt(lobby.pot)}**`, flags: EPH });
+    return i.reply({ content: `✅ Tu as rejoint (−${fmt(lobby.stake)}). Pot : **${fmt(lobby.pot)}**`, flags: EPH });
   }
 
   if (id === 'poker_leave') {
@@ -5402,161 +5485,499 @@ async function handlePokerButton(i) {
     if (!lobby || lobby.status !== 'lobby') return respondText(i, 'Aucune table à lancer.');
     if (i.user.id !== lobby.hostId) return respondText(i, 'Seul l’hôte peut lancer.');
     if (lobby.players.length < 1) return respondText(i, 'Il faut au moins 1 joueur.');
+    // Jeux qui demandent un choix avant le start (roulette, coinflip, horses, crash)
+    if (['roulette', 'coinflip', 'horses', 'crash'].includes(lobby.game)) {
+      const missing = lobby.players.filter((p) => !p.choice);
+      if (missing.length) {
+        return i.reply({
+          content: `Certains joueurs n’ont pas choisi : ${missing.map((p) => `<@${p.id}>`).join(', ')}\nUtilisez les boutons **Choix** sous la table.`,
+          flags: EPH,
+        });
+      }
+    }
     await i.deferReply({ flags: EPH });
     try {
-      await runPokerHand(lobby, i);
-      return i.editReply({ content: '✅ Main terminée.' });
+      await runOnlineGame(lobby, i);
+      return i.editReply({ content: '✅ Partie terminée.' });
     } catch (e) {
-      console.error('[poker] start', e);
-      // remboursement si crash avant fin
+      console.error('[online] start', e);
       if (lobby.status === 'playing') {
         for (const p of lobby.players) await credit(p.id, lobby.stake).catch(() => {});
         pokerLobbies.delete(guildId);
       }
-      return i.editReply({ content: `⚠️ Erreur poker : \`${String(e?.message || e).slice(0, 200)}\`` });
+      return i.editReply({ content: `⚠️ Erreur : \`${String(e?.message || e).slice(0, 200)}\`` });
     }
+  }
+
+  // Choix en lobby (roulette / coinflip / horses / crash)
+  if (id.startsWith('online_choice_')) {
+    if (!lobby || lobby.status !== 'lobby') return respondText(i, 'Aucune table ouverte.');
+    const p = lobby.players.find((x) => x.id === i.user.id);
+    if (!p) return respondText(i, 'Rejoins d’abord la table.');
+    const choice = id.slice('online_choice_'.length);
+    p.choice = choice;
+    await pokerUpdateLobbyMessage(lobby);
+    return i.reply({ content: `✅ Choix enregistré : **${choice}**`, flags: EPH });
   }
 }
 
-async function runPokerHand(lobby, hostInteraction) {
+
+async function runOnlineGame(lobby, hostInteraction) {
   lobby.status = 'playing';
-  const deck = newPokerDeck();
-  lobby.deck = deck;
-  lobby.community = [];
-
-  // Distribue 2 cartes à chaque joueur
-  for (const p of lobby.players) {
-    p.hole = [deck.pop(), deck.pop()];
-  }
-
   const ch = await client.channels.fetch(lobby.channelId);
-  const boardMsg = await ch.send({
-    embeds: [
-      new EmbedBuilder()
-        .setColor(COLORS.violet)
-        .setTitle('🃏 Poker · Distribution')
-        .setDescription(`Pot **${fmt(lobby.pot)}** · ${lobby.players.length} joueur(s)\nLes cartes privées sont envoyées à chaque joueur…`),
-    ],
-  });
+  const game = lobby.game || 'poker';
+  if (game === 'poker') return runOnlinePoker(lobby, ch);
+  if (game === 'bjtable') return runOnlineBlackjack(lobby, ch);
+  if (game === 'roulette') return runOnlineRoulette(lobby, ch);
+  if (game === 'coinflip') return runOnlineCoinflip(lobby, ch);
+  if (game === 'dicewar') return runOnlineDicewar(lobby, ch);
+  if (game === 'highcard' || game === 'war') return runOnlineHighcard(lobby, ch);
+  if (game === 'slotsrace') return runOnlineSlots(lobby, ch);
+  if (game === 'horses') return runOnlineHorses(lobby, ch);
+  if (game === 'crash') return runOnlineCrash(lobby, ch);
+  return runOnlinePoker(lobby, ch);
+}
 
-  // Envoie les cartes privées en éphémère via followUp sur l'interaction hôte ne marche pas pour les autres.
-  // On édite le message lobby et on DM chaque joueur.
-  for (const p of lobby.players) {
-    try {
-      const user = await client.users.fetch(p.id);
-      const art = code(pokerHandArt(p.hole));
-      await user.send({
-        embeds: [
-          new EmbedBuilder()
-            .setColor(COLORS.gold)
-            .setTitle('🃏 Tes cartes privées')
-            .setDescription(`${art}\n**${pokerCardStr(p.hole[0])} ${pokerCardStr(p.hole[1])}**\nNe les montre à personne !`),
-        ],
-      });
-    } catch {
-      // MP fermés : on tentera un message éphémère impossible pour les autres ; note dans le board
-    }
-  }
-
-  await sleep(1500);
-
-  // FLOP
-  deck.pop(); // burn
-  lobby.community.push(deck.pop(), deck.pop(), deck.pop());
-  await animateBoard(boardMsg, lobby, 'Flop', 'Trois cartes communes');
-
-  await sleep(1200);
-
-  // TURN
-  deck.pop();
-  lobby.community.push(deck.pop());
-  await animateBoard(boardMsg, lobby, 'Turn', 'Quatrième carte');
-
-  await sleep(1200);
-
-  // RIVER
-  deck.pop();
-  lobby.community.push(deck.pop());
-  await animateBoard(boardMsg, lobby, 'River', 'Cinquième carte');
-
-  await sleep(1000);
-
-  // Showdown
-  const results = lobby.players.map((p) => {
-    const all = [...p.hole, ...lobby.community];
-    const ev = evaluatePokerHand(all);
-    return { player: p, ev };
-  });
-  results.sort((a, b) => compareScores(b.ev.score, a.ev.score));
-  const bestScore = results[0].ev.score;
-  const winners = results.filter((r) => compareScores(r.ev.score, bestScore) === 0);
-  const share = floor2(lobby.pot / winners.length);
-
-  for (const w of winners) {
-    await credit(w.player.id, share);
-  }
-
-  const lines = results.map((r, i) => {
-    const medal = i === 0 ? '🏆' : `${i + 1}.`;
-    return `${medal} <@${r.player.id}> · ${pokerCardStr(r.player.hole[0])} ${pokerCardStr(r.player.hole[1])} · **${r.ev.name}**`;
-  });
-
-  const winText =
-    winners.length === 1
-      ? `<@${winners[0].player.id}> remporte **${fmt(lobby.pot)}** avec **${winners[0].ev.name}** !`
-      : `Égalité : ${winners.map((w) => `<@${w.player.id}>`).join(', ')} se partagent **${fmt(lobby.pot)}** (${fmt(share)} chacun).`;
-
-  await boardMsg.edit({
-    embeds: [
-      new EmbedBuilder()
-        .setColor(COLORS.green)
-        .setTitle('🃏 Abattage')
-        .setDescription(
-          `${code(pokerHandArt(lobby.community))}\n` +
-            `**Board** : ${lobby.community.map(pokerCardStr).join(' ')}\n\n` +
-            `${lines.join('\n')}\n\n${winText}`
-        )
-        .setFooter({ text: `Pot ${fmt(lobby.pot)}` })
-        .setTimestamp(),
-    ],
+async function onlineFinish(lobby, ch, embed) {
+  await ch.send({
+    embeds: [embed],
     components: [
       new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId('poker_new').setLabel('Nouvelle partie').setEmoji('🃏').setStyle(ButtonStyle.Success)
+        new ButtonBuilder().setCustomId('poker_new').setLabel('Nouvelle partie').setEmoji('🌐').setStyle(ButtonStyle.Success)
       ),
     ],
   });
+  lobby.status = 'done';
+  pokerLobbies.delete(lobby.guildId);
+}
 
-  for (const r of results) {
-    const u = await client.users.fetch(r.player.id).catch(() => null);
+async function onlinePayWinners(lobby, winnerIds) {
+  const ids = winnerIds.length ? winnerIds : [];
+  if (!ids.length) {
+    for (const p of lobby.players) await credit(p.id, lobby.stake).catch(() => {});
+    return lobby.stake;
+  }
+  const share = floor2(lobby.pot / ids.length);
+  for (const id of ids) await credit(id, share);
+  for (const p of lobby.players) {
+    const u = await client.users.fetch(p.id).catch(() => null);
     if (!u) continue;
-    const isWin = winners.some((w) => w.player.id === r.player.id);
+    const isWin = ids.includes(p.id);
     recordResult({
       guildId: lobby.guildId,
       user: u,
-      game: 'poker',
+      game: lobby.game || 'poker',
       bet: lobby.stake,
       mult: isWin ? round2(share / lobby.stake) : 0,
       payout: isWin ? share : 0,
-      detail: r.ev.name,
+      detail: isWin ? 'win' : 'lose',
     }).catch(() => {});
   }
+  return share;
+}
 
-  lobby.status = 'done';
-  pokerLobbies.delete(lobby.guildId);
+async function runOnlinePoker(lobby, ch) {
+  const deck = newPokerDeck();
+  lobby.community = [];
+  for (const p of lobby.players) p.hole = [deck.pop(), deck.pop()];
+
+  let boardMsg = await ch.send({
+    embeds: [
+      new EmbedBuilder()
+        .setColor(COLORS.violet)
+        .setTitle('🃏 Poker — Distribution')
+        .setDescription(
+          `**Étape 1/5 — Cartes privées**\n` +
+            `Chaque joueur reçoit **2 cartes** (faces cachées pour l’instant).\n` +
+            `Pot : **${fmt(lobby.pot)}**\n\n` +
+            lobby.players.map((p) => `• <@${p.id}> : ${pokerCardStr(null)} ${pokerCardStr(null)}`).join('\n')
+        ),
+    ],
+  });
+  await sleep(1500);
+
+  // Flop
+  deck.pop();
+  lobby.community.push(deck.pop(), deck.pop(), deck.pop());
+  await animateBoard(boardMsg, lobby, 'Flop (3 cartes communes)', 'Le croupier révèle le flop.');
+  await sleep(1000);
+
+  deck.pop();
+  lobby.community.push(deck.pop());
+  await animateBoard(boardMsg, lobby, 'Turn (4e carte)', 'Le turn est révélé.');
+  await sleep(1000);
+
+  deck.pop();
+  lobby.community.push(deck.pop());
+  await animateBoard(boardMsg, lobby, 'River (5e carte)', 'La river est révélée. Abattage…');
+  await sleep(1000);
+
+  const results = lobby.players.map((p) => ({
+    player: p,
+    ev: evaluatePokerHand([...p.hole, ...lobby.community]),
+  }));
+  results.sort((a, b) => compareScores(b.ev.score, a.ev.score));
+  const best = results[0].ev.score;
+  const winners = results.filter((r) => compareScores(r.ev.score, best) === 0);
+  const share = await onlinePayWinners(
+    lobby,
+    winners.map((w) => w.player.id)
+  );
+
+  await onlineFinish(
+    lobby,
+    ch,
+    new EmbedBuilder()
+      .setColor(COLORS.green)
+      .setTitle('🃏 Poker — Résultat')
+      .setDescription(
+        `${code(pokerHandArt(lobby.community))}\n` +
+          `**Board** : ${lobby.community.map(pokerCardStr).join(' ')}\n\n` +
+          `**Mains révélées**\n${results
+            .map((r, i) => `${i === 0 ? '🏆' : `${i + 1}.`} <@${r.player.id}> · ${pokerCardStr(r.player.hole[0])} ${pokerCardStr(r.player.hole[1])} · **${r.ev.name}**`)
+            .join('\n')}\n\n` +
+          (winners.length === 1
+            ? `<@${winners[0].player.id}> gagne **${fmt(lobby.pot)}** avec **${winners[0].ev.name}**.`
+            : `Égalité : ${winners.map((w) => `<@${w.player.id}>`).join(', ')} se partagent le pot (**${fmt(share)}** chacun).`)
+      )
+  );
+}
+
+async function runOnlineBlackjack(lobby, ch) {
+  const deck = newPokerDeck();
+  const dealer = [deck.pop(), deck.pop()];
+  for (const p of lobby.players) p.hole = [deck.pop(), deck.pop()];
+
+  const val = (hand) => {
+    let t = 0, a = 0;
+    for (const c of hand) {
+      if (c.r === 'A') { a++; t += 11; }
+      else if (['J', 'Q', 'K'].includes(c.r)) t += 10;
+      else t += Number(c.r) || 10;
+    }
+    while (t > 21 && a > 0) { t -= 10; a--; }
+    return t;
+  };
+
+  let msg = await ch.send({
+    embeds: [
+      new EmbedBuilder()
+        .setColor(COLORS.violet)
+        .setTitle('🂡 Blackjack table — Distribution')
+        .setDescription(
+          `**Croupier** : ${pokerCardStr(dealer[0])} ${pokerCardStr(null)} (une carte cachée)\n\n` +
+            lobby.players.map((p) => `• <@${p.id}> : ${pokerCardStr(p.hole[0])} ${pokerCardStr(p.hole[1])} → **${val(p.hole)}**`).join('\n') +
+            `\n\nPot **${fmt(lobby.pot)}** · Le croupier tire jusqu’à 17.`
+        ),
+    ],
+  });
+  await sleep(1800);
+
+  while (val(dealer) < 17) dealer.push(deck.pop());
+  const dv = val(dealer);
+  const survivors = lobby.players.filter((p) => val(p.hole) <= 21 && (dv > 21 || val(p.hole) > dv));
+  const share = await onlinePayWinners(
+    lobby,
+    survivors.map((p) => p.id)
+  );
+
+  await onlineFinish(
+    lobby,
+    ch,
+    new EmbedBuilder()
+      .setColor(COLORS.green)
+      .setTitle('🂡 Blackjack — Résultat')
+      .setDescription(
+        `**Croupier** : ${dealer.map(pokerCardStr).join(' ')} → **${dv}**${dv > 21 ? ' (bust)' : ''}\n\n` +
+          lobby.players
+            .map((p) => {
+              const v = val(p.hole);
+              const ok = survivors.some((s) => s.id === p.id);
+              return `• <@${p.id}> : ${p.hole.map(pokerCardStr).join(' ')} → **${v}** ${ok ? '✅' : '❌'}`;
+            })
+            .join('\n') +
+          `\n\n` +
+          (survivors.length
+            ? `Gagnant(s) : ${survivors.map((p) => `<@${p.id}>`).join(', ')} · **${fmt(share)}** chacun (pot ${fmt(lobby.pot)})`
+            : `Personne ne bat le croupier — mises redistribuées.`)
+      )
+  );
+}
+
+async function runOnlineRoulette(lobby, ch) {
+  await ch.send({
+    embeds: [
+      new EmbedBuilder()
+        .setColor(COLORS.violet)
+        .setTitle('🎡 Roulette — Les jeux sont faits')
+        .setDescription(
+          lobby.players.map((p) => `• <@${p.id}> a misé sur **${p.choice || '?'}**`).join('\n') +
+            `\n\nLa bille tourne…\nPot **${fmt(lobby.pot)}**`
+        ),
+    ],
+  });
+  await sleep(2000);
+  const n = randomInt(0, 37);
+  const col = n === 0 ? 'vert' : REDS.has(n) ? 'rouge' : 'noir';
+  const winners = lobby.players.filter((p) => p.choice === col);
+  const share = await onlinePayWinners(
+    lobby,
+    winners.map((p) => p.id)
+  );
+  await onlineFinish(
+    lobby,
+    ch,
+    new EmbedBuilder()
+      .setColor(COLORS.green)
+      .setTitle('🎡 Roulette — Résultat')
+      .setDescription(
+        `Numéro **${n}** (${col}).\n\n` +
+          lobby.players.map((p) => `• <@${p.id}> : **${p.choice}** ${p.choice === col ? '✅' : '❌'}`).join('\n') +
+          `\n\n` +
+          (winners.length
+            ? `Gagnant(s) : ${winners.map((p) => `<@${p.id}>`).join(', ')} · **${fmt(share)}** chacun`
+            : n === 0
+              ? 'Zéro ! Personne ne gagne — redistribuées.'
+              : 'Personne sur la bonne couleur — redistribuées.')
+      )
+  );
+}
+
+async function runOnlineCoinflip(lobby, ch) {
+  await ch.send({
+    embeds: [
+      new EmbedBuilder()
+        .setColor(COLORS.violet)
+        .setTitle('🪙 Pile ou Face')
+        .setDescription(
+          lobby.players.map((p) => `• <@${p.id}> → **${p.choice || '?'}**`).join('\n') +
+            `\n\nLa pièce tourne…\nPot **${fmt(lobby.pot)}**`
+        ),
+    ],
+  });
+  await sleep(2000);
+  const side = randomInt(0, 2) === 0 ? 'pile' : 'face';
+  const winners = lobby.players.filter((p) => p.choice === side);
+  const share = await onlinePayWinners(
+    lobby,
+    winners.map((p) => p.id)
+  );
+  await onlineFinish(
+    lobby,
+    ch,
+    new EmbedBuilder()
+      .setColor(COLORS.green)
+      .setTitle('🪙 Résultat')
+      .setDescription(
+        `La pièce tombe sur **${side}**.\n\n` +
+          lobby.players.map((p) => `• <@${p.id}> : ${p.choice} ${p.choice === side ? '✅' : '❌'}`).join('\n') +
+          `\n\n` +
+          (winners.length ? `Gagnant(s) : ${winners.map((p) => `<@${p.id}>`).join(', ')} · **${fmt(share)}**` : 'Personne — redistribuées.')
+      )
+  );
+}
+
+async function runOnlineDicewar(lobby, ch) {
+  await ch.send({
+    embeds: [
+      new EmbedBuilder()
+        .setColor(COLORS.violet)
+        .setTitle('🎲 Guerre de dés')
+        .setDescription(`Chacun lance un dé. Le plus haut score gagne le pot (**${fmt(lobby.pot)}**).`),
+    ],
+  });
+  await sleep(1200);
+  for (const p of lobby.players) p.roll = randomInt(1, 7);
+  const best = Math.max(...lobby.players.map((p) => p.roll));
+  const winners = lobby.players.filter((p) => p.roll === best);
+  const share = await onlinePayWinners(
+    lobby,
+    winners.map((p) => p.id)
+  );
+  await onlineFinish(
+    lobby,
+    ch,
+    new EmbedBuilder()
+      .setColor(COLORS.green)
+      .setTitle('🎲 Résultat')
+      .setDescription(
+        lobby.players.map((p) => `• <@${p.id}> : **${p.roll}** ${dieFace(p.roll)} ${p.roll === best ? '🏆' : ''}`).join('\n') +
+          `\n\n` +
+          (winners.length === 1
+            ? `<@${winners[0].id}> gagne **${fmt(lobby.pot)}**`
+            : `Égalité : ${winners.map((p) => `<@${p.id}>`).join(', ')} · **${fmt(share)}** chacun`)
+      )
+  );
+}
+
+async function runOnlineHighcard(lobby, ch) {
+  const deck = newPokerDeck();
+  for (const p of lobby.players) p.hole = [deck.pop()];
+  await ch.send({
+    embeds: [
+      new EmbedBuilder()
+        .setColor(COLORS.violet)
+        .setTitle(lobby.game === 'war' ? '⚔️ Bataille' : '⬆️ Carte haute')
+        .setDescription(`Distribution d’une carte à chaque joueur…\nPot **${fmt(lobby.pot)}**`),
+    ],
+  });
+  await sleep(1200);
+  const rank = (c) => pokerRankVal(c.r);
+  const best = Math.max(...lobby.players.map((p) => rank(p.hole[0])));
+  const winners = lobby.players.filter((p) => rank(p.hole[0]) === best);
+  const share = await onlinePayWinners(
+    lobby,
+    winners.map((p) => p.id)
+  );
+  await onlineFinish(
+    lobby,
+    ch,
+    new EmbedBuilder()
+      .setColor(COLORS.green)
+      .setTitle('Résultat')
+      .setDescription(
+        lobby.players.map((p) => `• <@${p.id}> : ${pokerCardStr(p.hole[0])} ${rank(p.hole[0]) === best ? '🏆' : ''}`).join('\n') +
+          `\n\n` +
+          (winners.length === 1
+            ? `<@${winners[0].id}> gagne **${fmt(lobby.pot)}**`
+            : `Égalité · **${fmt(share)}** chacun`)
+      )
+  );
+}
+
+async function runOnlineSlots(lobby, ch) {
+  await ch.send({
+    embeds: [
+      new EmbedBuilder()
+        .setColor(COLORS.violet)
+        .setTitle('🎰 Course de slots')
+        .setDescription(`Chaque joueur fait un spin. Le meilleur multiplicateur gagne le pot (**${fmt(lobby.pot)}**).`),
+    ],
+  });
+  await sleep(1200);
+  const syms = ['🍒', '🍋', '🔔', '💎', '7️⃣'];
+  for (const p of lobby.players) {
+    const a = syms[randomInt(0, syms.length)];
+    const b = syms[randomInt(0, syms.length)];
+    const c = syms[randomInt(0, syms.length)];
+    let mult = 0;
+    if (a === b && b === c) mult = a === '7️⃣' || a === '💎' ? 20 : 8;
+    else if (a === b || b === c || a === c) mult = 2;
+    p.slot = { a, b, c, mult };
+  }
+  const best = Math.max(...lobby.players.map((p) => p.slot.mult));
+  const winners = best > 0 ? lobby.players.filter((p) => p.slot.mult === best) : [];
+  const share = await onlinePayWinners(
+    lobby,
+    winners.map((p) => p.id)
+  );
+  await onlineFinish(
+    lobby,
+    ch,
+    new EmbedBuilder()
+      .setColor(COLORS.green)
+      .setTitle('🎰 Résultat')
+      .setDescription(
+        lobby.players
+          .map((p) => `• <@${p.id}> : [ ${p.slot.a} | ${p.slot.b} | ${p.slot.c} ] ×${p.slot.mult} ${p.slot.mult === best && best > 0 ? '🏆' : ''}`)
+          .join('\n') +
+          `\n\n` +
+          (winners.length
+            ? `Gagnant(s) · **${fmt(share)}** chacun`
+            : 'Aucun symbole payant — redistribuées.')
+      )
+  );
+}
+
+async function runOnlineHorses(lobby, ch) {
+  await ch.send({
+    embeds: [
+      new EmbedBuilder()
+        .setColor(COLORS.violet)
+        .setTitle('🏇 Course hippique')
+        .setDescription(
+          lobby.players.map((p) => `• <@${p.id}> → **${p.choice || '?'}**`).join('\n') +
+            `\n\nLes chevaux s’élancent…\nPot **${fmt(lobby.pot)}**`
+        ),
+    ],
+  });
+  await sleep(2000);
+  const winH = `h${randomInt(1, 5)}`;
+  const winners = lobby.players.filter((p) => p.choice === winH);
+  const share = await onlinePayWinners(
+    lobby,
+    winners.map((p) => p.id)
+  );
+  await onlineFinish(
+    lobby,
+    ch,
+    new EmbedBuilder()
+      .setColor(COLORS.green)
+      .setTitle('🏇 Arrivée')
+      .setDescription(
+        `Vainqueur : **cheval ${winH.slice(1)}**\n\n` +
+          lobby.players.map((p) => `• <@${p.id}> : ${p.choice} ${p.choice === winH ? '🏆' : ''}`).join('\n') +
+          `\n\n` +
+          (winners.length ? `Gagnant(s) · **${fmt(share)}**` : 'Personne sur ce cheval — redistribuées.')
+      )
+  );
+}
+
+async function runOnlineCrash(lobby, ch) {
+  const u = randomInt(1, 1_000_001) / 1_000_000;
+  const crashAt = Math.max(1, Math.floor((0.96 / u) * 100) / 100);
+  await ch.send({
+    embeds: [
+      new EmbedBuilder()
+        .setColor(COLORS.violet)
+        .setTitle('🚀 Crash ensemble')
+        .setDescription(
+          lobby.players.map((p) => `• <@${p.id}> cible **${p.choice || '?'}**`).join('\n') +
+            `\n\nLa fusée décolle…\nPot **${fmt(lobby.pot)}**`
+        ),
+    ],
+  });
+  await sleep(1500);
+  const parseT = (c) => ({ x15: 1.5, x2: 2, x3: 3, x5: 5 }[c] || 2);
+  const winners = lobby.players.filter((p) => parseT(p.choice) <= crashAt);
+  const share = await onlinePayWinners(
+    lobby,
+    winners.map((p) => p.id)
+  );
+  await onlineFinish(
+    lobby,
+    ch,
+    new EmbedBuilder()
+      .setColor(COLORS.green)
+      .setTitle('🚀 Crash')
+      .setDescription(
+        `La fusée explose à **x${Math.min(crashAt, 1000)}**.\n\n` +
+          lobby.players
+            .map((p) => {
+              const t = parseT(p.choice);
+              const ok = t <= crashAt;
+              return `• <@${p.id}> cible x${t} ${ok ? '✅' : '❌'}`;
+            })
+            .join('\n') +
+          `\n\n` +
+          (winners.length ? `Survivants · **${fmt(share)}** chacun` : 'Tout le monde a crash — redistribuées.')
+      )
+  );
 }
 
 async function animateBoard(msg, lobby, title, caption) {
   const frames = 4;
   for (let k = 0; k < frames; k++) {
-    const hidden = Math.max(0, 5 - lobby.community.length);
-    const shown = lobby.community.slice();
-    const art = pokerHandArt(shown, k < frames - 1 ? Math.min(1, hidden) : 0);
+    const art = pokerHandArt(lobby.community, k < frames - 1 ? 1 : 0);
     await msg.edit({
       embeds: [
         new EmbedBuilder()
           .setColor(ANIM_PALETTE[k % ANIM_PALETTE.length])
           .setTitle(`🃏 ${title}`)
-          .setDescription(`${code(art)}\n**${caption}**\nPot **${fmt(lobby.pot)}** · ${lobby.players.map((p) => p.name).join(', ')}`)
+          .setDescription(
+            `${code(art)}\n**${caption}**\nPot **${fmt(lobby.pot)}**\n` +
+              lobby.players.map((p) => `• <@${p.id}> : cartes privées cachées`).join('\n')
+          )
           .setFooter({ text: `[${'='.repeat(k + 1)}${'-'.repeat(frames - k - 1)}]` }),
       ],
     }).catch(() => {});
@@ -5570,7 +5991,8 @@ async function animateBoard(msg, lobby, title, caption) {
         .setDescription(
           `${code(pokerHandArt(lobby.community))}\n` +
             `**Board** : ${lobby.community.map(pokerCardStr).join(' ')}\n` +
-            `Pot **${fmt(lobby.pot)}**`
+            `Pot **${fmt(lobby.pot)}**\n\n` +
+            `*Les cartes privées seront révélées à l’abattage.*`
         ),
     ],
   }).catch(() => {});
@@ -6074,13 +6496,32 @@ client.on(Events.InteractionCreate, async (i) => {
     if (id.startsWith('event_claim_') && i.isButton()) return await handleEventClaim(i);
     if (id.startsWith('event_join_') && i.isButton()) return await handleEventJoin(i);
 
-    if (id.startsWith('poker_') && i.isButton()) return await handlePokerButton(i);
+    if ((id.startsWith('poker_') || id.startsWith('online_choice_')) && i.isButton()) return await handlePokerButton(i);
+    if (id === 'online_pickgame' && i.isStringSelectMenu()) {
+      const gameKey = i.values[0];
+      const bal = await getBalance(i.user.id);
+      const g = ONLINE_GAMES[gameKey] || ONLINE_GAMES.poker;
+      return i.showModal(
+        new ModalBuilder()
+          .setCustomId(`modal_online_stake_${gameKey}`)
+          .setTitle(`${g.emoji} ${g.name}`.slice(0, 45))
+          .addComponents(modalInput('stake', `Mise par joueur (solde ${num(bal)})`, { placeholder: 'ex : 10', max: 12 }))
+      );
+    }
+    if (id.startsWith('modal_online_stake_') && i.isModalSubmit()) {
+      const gameKey = id.slice('modal_online_stake_'.length);
+      const raw = i.fields.getTextInputValue('stake')?.trim();
+      const bal = await getBalance(i.user.id);
+      const stake = parseAmount(raw, bal);
+      if (!stake) return respondText(i, 'Mise invalide : nombre ou "all".');
+      return pokerCreateLobby(i, stake, gameKey);
+    }
     if (id === 'modal_poker_stake' && i.isModalSubmit()) {
       const raw = i.fields.getTextInputValue('stake')?.trim();
       const bal = await getBalance(i.user.id);
       const stake = parseAmount(raw, bal);
       if (!stake) return respondText(i, 'Mise invalide : nombre ou "all".');
-      return pokerCreateLobby(i, stake);
+      return pokerCreateLobby(i, stake, 'poker');
     }
 
     const isGame =
@@ -6284,7 +6725,7 @@ client.on(Events.ChannelDelete, async (channel) => {
     casinoChannels.delete(gid);
     await supabase.from('casino_channels').delete().eq('guild_id', gid);
   }
-  for (const kind of ['wins', 'admin', 'invites', 'alltime', 'notifs', 'poker']) {
+  for (const kind of ['wins', 'admin', 'invites', 'alltime', 'notifs', 'poker', 'online']) {
     if (guildChannels.get(`${gid}:${kind}`) === channel.id) {
       guildChannels.delete(`${gid}:${kind}`);
       alltimeBoardMessages.delete(gid);
