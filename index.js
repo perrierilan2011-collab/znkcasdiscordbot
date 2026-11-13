@@ -394,6 +394,10 @@ async function respond(i, payload) {
   return i.reply({ ...payload, flags: EPH });
 }
 
+// Chaque partie s'ouvre dans son propre message privé (popup éphémère) : le lobby reste intact
+// et plusieurs parties successives ne s'écrasent plus entre elles.
+const openGame = (i, payload) => i.reply({ ...payload, flags: EPH });
+
 const respondText = (i, text) => i.reply({ content: text, flags: EPH });
 
 const games = new Map();
@@ -947,7 +951,7 @@ async function startMines(i, level, bet) {
     };
 
     try {
-      await respond(i, { embeds: [minesEmbed(game)], components: minesRows(game, false) });
+      await openGame(i, { embeds: [minesEmbed(game)], components: minesRows(game, false) });
       game.messageId = (await i.fetchReply()).id;
     } catch (e) {
       await credit(uid, bet).catch(() => {});
@@ -1247,7 +1251,7 @@ async function startBlackjack(i, bet) {
     }
 
     try {
-      await respond(i, {
+      await openGame(i, {
         embeds: [
           new EmbedBuilder()
             .setTitle('Blackjack')
@@ -1497,7 +1501,7 @@ async function playRoulette(i, bet, choiceStr) {
     }
 
     try {
-      await respond(i, {
+      await openGame(i, {
         embeds: [
           new EmbedBuilder()
             .setTitle('Roulette')
@@ -2427,7 +2431,7 @@ async function playInstant(i, key, bet, choice) {
     const profit = round2(payout - bet - extraLoss);
 
     try {
-      await respond(i, {
+      await openGame(i, {
         embeds: [
           new EmbedBuilder()
             .setTitle(G.title)
