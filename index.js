@@ -541,10 +541,10 @@ async function saveMultiplier(game, value, guildId = null, actorId = null) {
   }
   if (guildId) {
     try {
-      const ch = await getAnnounceChannel(guildId);
-      if (ch) {
+      const guild = await client.guilds.fetch(guildId).catch(() => null);
+      if (guild) {
         const who = actorId ? `👤 Par <@${actorId}>\n` : '';
-        await ch.send({
+        await dmGuildEveryone(guild, {
           embeds: [
             new EmbedBuilder()
               .setTitle('🎚️ Multiplicateur modifié')
@@ -586,9 +586,10 @@ async function startBoost(guildId, { winMult, loseMult, label, minutes }) {
   if (expiresAt) {
     entry.timer = setTimeout(() => {
       activeBoosts.delete(guildId);
-      getAnnounceChannel(guildId)
-        .then((ch) =>
-          ch?.send({
+      client.guilds
+        .fetch(guildId)
+        .then((guild) =>
+          dmGuildEveryone(guild, {
             embeds: [
               new EmbedBuilder()
                 .setTitle('⏰ Boost terminé')
@@ -4255,6 +4256,19 @@ async function handleModalSubmit(i) {
     const newBal = await debit(i.user.id, amount);
     if (newBal === null) return respondText(i, t(i.user.id, 'insufficient'));
     const toBal = await credit(toId, amount);
+    // Notif MP au destinataire
+    await dmUser(toId, {
+      embeds: [
+        new EmbedBuilder()
+          .setColor(COLORS.green)
+          .setTitle(`💸 Tu as reçu des ${COIN_PLAIN}`)
+          .setDescription(
+            `<@${i.user.id}> t’a envoyé **${fmt(amount)}**.\n` +
+              `Nouveau solde : **${fmt(toBal)}**`
+          )
+          .setTimestamp(),
+      ],
+    });
     return i.reply({
       content:
         `✅ **${fmt(amount)}** → <@${toId}>\n` +
@@ -4402,21 +4416,35 @@ async function finishGiveaway(eventId) {
     ev.winners.add(uid);
     try {
       await credit(uid, ev.amount);
+      await dmUser(uid, {
+        embeds: [
+          new EmbedBuilder()
+            .setColor(COLORS.green)
+            .setTitle('🎉 Giveaway — tu as gagné !')
+            .setDescription(`Tu reçois **${fmt(ev.amount)}**.`)
+            .setTimestamp(),
+        ],
+      });
     } catch (e) {
       console.error('[giveaway] credit', e?.message || e);
     }
   }
-  activeEvents.delete(eventId);
-
-  try {
-    const ch = await client.channels.fetch(ev.channelId).catch(() => null);
-    const msg = ch ? await ch.messages.fetch(ev.messageId).catch(() => null) : null;
-    if (msg) {
-      await msg.edit({ embeds: [giveawayEmbed(ev)], components: [eventActionRow(eventId, 'giveaway', true)] });
-    }
-  } catch (e) {
-    console.error('[giveaway] finish', e?.message || e);
+  // Notifie les perdants inscrits
+  for (const uid of pool) {
+    if (ev.winners.has(uid)) continue;
+    await dmUser(uid, {
+      embeds: [
+        new EmbedBuilder()
+          .setColor(COLORS.grey)
+          .setTitle('🎉 Giveaway terminé')
+          .setDescription(
+            `Tirage terminé. Gagnant(s) : ${[...ev.winners].map((id) => `<@${id}>`).join(', ') || 'personne'}.`
+          )
+          .setTimestamp(),
+      ],
+    });
   }
+  activeEvents.delete(eventId);
 }
 
 async function expireClaimEvent(eventId) {
@@ -4425,32 +4453,23 @@ async function expireClaimEvent(eventId) {
   ev.finished = true;
   clearTimeout(ev.timer);
   activeEvents.delete(eventId);
-  try {
-    const ch = await client.channels.fetch(ev.channelId).catch(() => null);
-    const msg = ch ? await ch.messages.fetch(ev.messageId).catch(() => null) : null;
-    if (msg) {
-      await msg.edit({ embeds: [claimEventEmbed(ev)], components: [eventActionRow(eventId, 'claim', true)] });
-    }
-  } catch (e) {
-    console.error('[claim] expire', e?.message || e);
-  }
 }
 
 async function handleEventClaim(i) {
   const eventId = i.customId.slice('event_claim_'.length);
   const ev = activeEvents.get(eventId);
   if (!ev || ev.finished || ev.type !== 'claim') {
-    return i.reply({ content: 'Cette récompense n’est plus disponible.', flags: EPH });
+    return i.reply({ content: 'Cette récompense n’est plus disponible.' });
   }
   if (ev.expiresAt && Date.now() > ev.expiresAt) {
     await expireClaimEvent(eventId);
-    return i.reply({ content: '⏱️ Cet événement a expiré.', flags: EPH });
+    return i.reply({ content: '⏱️ Cet événement a expiré.' });
   }
-  if (ev.winners.has(i.user.id)) return i.reply({ content: 'Tu as déjà réclamé ta part !', flags: EPH });
+  if (ev.winners.has(i.user.id)) return i.reply({ content: 'Tu as déjà réclamé ta part !' });
   if (ev.winners.size >= ev.maxWinners) {
     ev.finished = true;
     activeEvents.delete(eventId);
-    return i.reply({ content: 'Plus de places disponibles.', flags: EPH });
+    return i.reply({ content: 'Plus de places disponibles.' });
   }
 
   ev.winners.add(i.user.id);
@@ -4463,13 +4482,16 @@ async function handleEventClaim(i) {
 
   try {
     await credit(i.user.id, ev.amount);
-    await i.update({ embeds: [claimEventEmbed(ev)], components: [eventActionRow(eventId, 'claim', done)] });
-    await i.followUp({ content: `✅ Tu as reçu **${fmt(ev.amount)}** !`, flags: EPH }).catch(() => {});
+    await i.update({
+      embeds: [claimEventEmbed(ev)],
+      components: [eventActionRow(eventId, 'claim', true)],
+    }).catch(() => i.reply({ content: `✅ Tu as reçu **${fmt(ev.amount)}** !` }));
+    await i.followUp({ content: `✅ Tu as reçu **${fmt(ev.amount)}** !` }).catch(() => {});
   } catch (e) {
     ev.winners.delete(i.user.id);
     console.error('[event] claim', e?.message || e);
     if (!i.replied && !i.deferred) {
-      await i.reply({ content: '⚠️ Erreur lors du crédit.', flags: EPH }).catch(() => {});
+      await i.reply({ content: '⚠️ Erreur lors du crédit.' }).catch(() => {});
     }
   }
 }
@@ -4477,25 +4499,27 @@ async function handleEventClaim(i) {
 async function handleEventJoin(i) {
   const eventId = i.customId.slice('event_join_'.length);
   const ev = activeEvents.get(eventId);
-  if (!ev || ev.finished || ev.type !== 'giveaway') return i.reply({ content: 'Ce giveaway est terminé.', flags: EPH });
+  if (!ev || ev.finished || ev.type !== 'giveaway') return i.reply({ content: 'Ce giveaway est terminé.' });
   if (ev.expiresAt && Date.now() > ev.expiresAt) {
     await finishGiveaway(eventId);
-    return i.reply({ content: '⏱️ Le giveaway est terminé.', flags: EPH });
+    return i.reply({ content: '⏱️ Le giveaway est terminé.' });
   }
-  if (ev.entries.has(i.user.id)) return i.reply({ content: 'Tu es déjà inscrit !', flags: EPH });
+  if (ev.entries.has(i.user.id)) return i.reply({ content: 'Tu es déjà inscrit !' });
   ev.entries.add(i.user.id);
   try {
-    await i.update({ embeds: [giveawayEmbed(ev)], components: [eventActionRow(eventId, 'giveaway', false)] });
-    await i.followUp({ content: '🎟️ Tu es inscrit au giveaway ! Bonne chance.', flags: EPH }).catch(() => {});
+    await i.update({
+      embeds: [giveawayEmbed(ev)],
+      components: [eventActionRow(eventId, 'giveaway', false)],
+    }).catch(() => {});
+    await i.followUp({ content: '🎟️ Tu es inscrit au giveaway ! Bonne chance.' }).catch(() =>
+      i.reply({ content: '🎟️ Tu es inscrit au giveaway ! Bonne chance.' }).catch(() => {})
+    );
   } catch (e) {
     console.error('[giveaway] join', e?.message || e);
   }
 }
 
 async function postBoostEvent(i, kind, minutes) {
-  const ch = await getAnnounceChannel(i.guild.id);
-  if (!ch) return respondText(i, 'Aucun salon de notifs/casino : fais `!setup` ou définis **Salon notifs**.');
-
   const presets = {
     x2win: { winMult: 2, loseMult: 1, label: 'x2 Gains 🔥' },
     x2lose: { winMult: 1, loseMult: 2, label: 'x2 Pertes 💀' },
@@ -4509,7 +4533,7 @@ async function postBoostEvent(i, kind, minutes) {
 
   await startBoost(i.guild.id, { ...p, minutes });
   const ends = Math.floor((Date.now() + minutes * 60_000) / 1000);
-  await ch.send({
+  const payload = {
     embeds: [
       new EmbedBuilder()
         .setTitle(`⚡ Boost : ${p.label}`)
@@ -4523,14 +4547,13 @@ async function postBoostEvent(i, kind, minutes) {
         )
         .setTimestamp(),
     ],
-  });
-  return i.reply({ content: `✅ Boost **${p.label}** lancé pour **${minutes} min**.`, flags: EPH });
+  };
+  await i.reply({ content: `✅ Boost **${p.label}** lancé · envoi des MP en cours…`, flags: EPH });
+  const { ok, fail } = await dmGuildEveryone(i.guild, payload);
+  return i.followUp({ content: `📬 Boost notifié en MP : **${ok}** ok · **${fail}** échecs (MP fermés).`, flags: EPH }).catch(() => {});
 }
 
 async function createClaimOrGiveaway(i, type, amount, winners, minutes) {
-  const ch = await getAnnounceChannel(i.guild.id);
-  if (!ch) return respondText(i, 'Aucun salon de notifs/casino : fais `!setup` ou définis **Salon notifs**.');
-
   if (type === 'giveaway' && (!minutes || minutes < 1)) {
     return respondText(i, 'Un giveaway doit avoir une durée (minutes ≥ 1).');
   }
@@ -4546,33 +4569,35 @@ async function createClaimOrGiveaway(i, type, amount, winners, minutes) {
     winners: new Set(),
     entries: new Set(),
     guildId: i.guild.id,
-    channelId: ch.id,
+    channelId: null,
     messageId: null,
     expiresAt,
     finished: false,
     timer: null,
     hostId: i.user.id,
+    dmMode: true,
   };
-
-  const msg = await ch.send({
-    embeds: [type === 'giveaway' ? giveawayEmbed(ev) : claimEventEmbed(ev)],
-    components: [eventActionRow(eventId, type, false)],
-  });
-  ev.messageId = msg.id;
 
   if (type === 'giveaway') ev.timer = setTimeout(() => finishGiveaway(eventId), expiresAt - Date.now());
   else if (expiresAt) ev.timer = setTimeout(() => expireClaimEvent(eventId), expiresAt - Date.now());
   activeEvents.set(eventId, ev);
 
-  return i.reply({
+  const payload = {
+    embeds: [type === 'giveaway' ? giveawayEmbed(ev) : claimEventEmbed(ev)],
+    components: [eventActionRow(eventId, type, false)],
+  };
+
+  await i.reply({
     content:
       type === 'giveaway'
-        ? `✅ Giveaway posté : **${fmt(amount)}** × ${maxWinners} · tirage dans **${minutes} min**.`
-        : `✅ Claim posté : **${fmt(amount)}** × ${maxWinners} gagnant(s)` +
-          (minutes > 0 ? ` · expire dans **${minutes} min**` : ' · sans limite') +
-          '.',
+        ? `✅ Giveaway créé : **${fmt(amount)}** × ${maxWinners} · tirage dans **${minutes} min** · MP en cours…`
+        : `✅ Claim créé : **${fmt(amount)}** × ${maxWinners}` +
+          (minutes > 0 ? ` · expire dans **${minutes} min**` : '') +
+          ' · MP en cours…',
     flags: EPH,
   });
+  const { ok, fail } = await dmGuildEveryone(i.guild, payload);
+  return i.followUp({ content: `📬 Envoyé en MP : **${ok}** ok · **${fail}** échecs.`, flags: EPH }).catch(() => {});
 }
 
 const MULT_INFO = {
@@ -4836,17 +4861,17 @@ async function handleAdmin(i) {
           .select('user_id');
         if (error) throw error;
         const count = data?.length ?? 0;
-        const ch = await getAnnounceChannel(i.guild.id);
-        ch?.send({
+        await i.reply({ content: `✅ Soldes reset : **${count}** joueur(s) à 0. MP en cours…`, flags: EPH });
+        const { ok, fail } = await dmGuildEveryone(i.guild, {
           embeds: [
             new EmbedBuilder()
-              .setTitle('💥 Reset des soldes (classement actuel)')
+              .setTitle('💥 Reset des soldes')
               .setColor(COLORS.red)
               .setDescription(`👤 Par <@${i.user.id}>\nTous les soldes ont été remis à **0**.`)
               .setTimestamp(),
           ],
-        }).catch(() => {});
-        return i.reply({ content: `✅ Soldes reset : **${count}** joueur(s) à 0.`, flags: EPH });
+        });
+        return i.followUp({ content: `📬 MP : **${ok}** ok · **${fail}** échecs.`, flags: EPH }).catch(() => {});
       } catch (e) {
         console.error('[reset]', e?.message || e);
         return respondText(i, `Erreur reset : ${explainError(e)}`);
@@ -4863,8 +4888,8 @@ async function handleAdmin(i) {
       } catch (e) {
         console.error('[resetpeaks]', e?.message || e);
       }
-      const ch = await getAnnounceChannel(i.guild.id);
-      ch?.send({
+      await i.reply({ content: '✅ Classement all-time réinitialisé. MP en cours…', flags: EPH });
+      const r1 = await dmGuildEveryone(i.guild, {
         embeds: [
           new EmbedBuilder()
             .setTitle('👑 Reset classement all-time')
@@ -4872,18 +4897,18 @@ async function handleAdmin(i) {
             .setDescription(`👤 Par <@${i.user.id}>\nTous les records de solde max ont été effacés.`)
             .setTimestamp(),
         ],
-      }).catch(() => {});
-      return i.reply({ content: '✅ Classement all-time réinitialisé.', flags: EPH });
+      });
+      return i.followUp({ content: `📬 MP : **${r1.ok}** ok · **${r1.fail}** échecs.`, flags: EPH }).catch(() => {});
     }
 
     if (id === 'modal_admin_resetstats') {
       const confirm = i.fields.getTextInputValue('confirm')?.trim().toUpperCase();
       if (confirm !== 'RESET') return respondText(i, 'Annulé : tu dois taper **RESET** pour confirmer.');
       try {
-        const { error, count } = await supabase.from('game_history').delete().neq('user_id', '__impossible__');
+        const { error } = await supabase.from('game_history').delete().neq('user_id', '__impossible__');
         if (error) throw error;
-        const ch = await getAnnounceChannel(i.guild.id);
-        ch?.send({
+        await i.reply({ content: '✅ Statistiques réinitialisées. MP en cours…', flags: EPH });
+        const r2 = await dmGuildEveryone(i.guild, {
           embeds: [
             new EmbedBuilder()
               .setTitle('📊 Reset des statistiques')
@@ -4891,8 +4916,8 @@ async function handleAdmin(i) {
               .setDescription(`👤 Par <@${i.user.id}>\nTout l’historique des parties a été effacé.`)
               .setTimestamp(),
           ],
-        }).catch(() => {});
-        return i.reply({ content: `✅ Statistiques réinitialisées (historique des parties effacé).`, flags: EPH });
+        });
+        return i.followUp({ content: `📬 MP : **${r2.ok}** ok · **${r2.fail}** échecs.`, flags: EPH }).catch(() => {});
       } catch (e) {
         console.error('[resetstats]', e?.message || e);
         return respondText(i, `Erreur reset stats : ${explainError(e)}`);
@@ -4904,9 +4929,8 @@ async function handleAdmin(i) {
       const reward = i.fields.getTextInputValue('reward')?.trim();
       if (!amount) return respondText(i, 'Montant invalide.');
       if (!reward) return respondText(i, 'Indique la récompense en texte.');
-      const ch = await getAnnounceChannel(i.guild.id);
-      if (!ch) return respondText(i, 'Aucun salon de notifs/casino : fais `!setup` ou **Salon notifs**.');
-      await ch.send({
+      await i.reply({ content: `✅ Annonce **${fmt(amount)}** = **${reward}** · MP en cours…`, flags: EPH });
+      const r3 = await dmGuildEveryone(i.guild, {
         embeds: [
           new EmbedBuilder()
             .setTitle('📣 Récompense disponible')
@@ -4919,7 +4943,7 @@ async function handleAdmin(i) {
             .setTimestamp(),
         ],
       });
-      return i.reply({ content: `✅ Annonce postée : **${fmt(amount)}** = **${reward}**`, flags: EPH });
+      return i.followUp({ content: `📬 MP : **${r3.ok}** ok · **${r3.fail}** échecs.`, flags: EPH }).catch(() => {});
     }
 
     const boostM = id.match(/^modal_admin_boost_([a-z0-9]+)$/);
@@ -4974,17 +4998,19 @@ async function handleAdmin(i) {
           }
         }
       }
-      const ch = await getAnnounceChannel(i.guild.id);
-      ch?.send({
+      await i.reply({ content: `✅ **${fmt(amount)}** offerts à **${count}** compte(s). MP en cours…`, flags: EPH });
+      const rg = await dmGuildEveryone(i.guild, {
         embeds: [
           new EmbedBuilder()
             .setTitle('🎁 Cadeau pour tous')
             .setColor(COLORS.green)
-            .setDescription(`👤 Par <@${i.user.id}>\n💰 **${fmt(amount)}** offerts à **chaque** joueur (**${count}** comptes).`)
+            .setDescription(
+              `👤 Par <@${i.user.id}>\n💰 **${fmt(amount)}** offerts à **chaque** joueur.`
+            )
             .setTimestamp(),
         ],
-      }).catch(() => {});
-      return i.reply({ content: `✅ **${fmt(amount)}** offerts à **${count}** joueur(s).`, flags: EPH });
+      });
+      return i.followUp({ content: `📬 MP : **${rg.ok}** ok · **${rg.fail}** échecs.`, flags: EPH }).catch(() => {});
     }
 
     const mm = id.match(/^modal_admin_mult_([a-z]+)$/);
@@ -5019,6 +5045,21 @@ async function handleAdmin(i) {
     }
     await touchPeak(userId, balance);
     const verb = { add: `➕ **${fmt(amount)}** ajoutés à`, remove: `➖ **${fmt(amount)}** retirés à`, set: '🎯 Solde défini pour' }[action];
+    const dmText =
+      action === 'add'
+        ? `<@${i.user.id}> t’a **ajouté** **${fmt(amount)}**.\nNouveau solde : **${fmt(balance)}**`
+        : action === 'remove'
+          ? `<@${i.user.id}> t’a **retiré** **${fmt(amount)}**.\nNouveau solde : **${fmt(balance)}**`
+          : `<@${i.user.id}> a **défini** ton solde à **${fmt(balance)}**.`;
+    await dmUser(userId, {
+      embeds: [
+        new EmbedBuilder()
+          .setColor(action === 'remove' ? COLORS.red : COLORS.green)
+          .setTitle(action === 'set' ? '🎯 Solde modifié' : action === 'add' ? '➕ Coins reçus' : '➖ Coins retirés')
+          .setDescription(dmText)
+          .setTimestamp(),
+      ],
+    });
     return i.reply({ content: `✅ ${verb} <@${userId}>. Nouveau solde : **${fmt(balance)}**`, flags: EPH });
   }
 }
@@ -5057,6 +5098,19 @@ async function cmdAdjust(msg, args, sign) {
 
   const balance = Number(await rpc('admin_adjust', { p_user_id: targetId, p_amount: sign * amount }));
   await touchPeak(targetId, balance);
+  await dmUser(targetId, {
+    embeds: [
+      new EmbedBuilder()
+        .setColor(sign > 0 ? COLORS.green : COLORS.red)
+        .setTitle(sign > 0 ? '➕ Coins reçus' : '➖ Coins retirés')
+        .setDescription(
+          sign > 0
+            ? `<@${msg.author.id}> t’a **ajouté** **${fmt(amount)}**.\nNouveau solde : **${fmt(balance)}**`
+            : `<@${msg.author.id}> t’a **retiré** **${fmt(amount)}**.\nNouveau solde : **${fmt(balance)}**`
+        )
+        .setTimestamp(),
+    ],
+  });
   return msg.reply(
     sign > 0
       ? `✅ **${fmt(amount)}** ajoutés à <@${targetId}>. Nouveau solde : **${fmt(balance)}**`
@@ -5273,7 +5327,7 @@ function pokerLobbyRows(lobby) {
 
 const ONLINE_GAMES = {
   poker: { key: 'poker', name: 'Poker Hold’em', emoji: '🃏', max: 4, desc: '2 cartes + board · meilleur jeu gagne le pot' },
-  bjtable: { key: 'bjtable', name: 'Blackjack table', emoji: '🂡', max: 4, desc: 'Tous vs le croupier · ceux qui battent le croupier se partagent le pot' },
+  bjtable: { key: 'bjtable', name: 'Blackjack table', emoji: '🃏', max: 4, desc: 'Tous vs le croupier · ceux qui battent le croupier se partagent le pot' },
   roulette: { key: 'roulette', name: 'Roulette', emoji: '🎡', max: 4, desc: 'Chacun choisit rouge/noir · les bons pronostics se partagent le pot' },
   coinflip: { key: 'coinflip', name: 'Pile ou Face', emoji: '🪙', max: 2, desc: '2 joueurs · pile vs face · le gagnant prend tout' },
   dicewar: { key: 'dicewar', name: 'Guerre de dés', emoji: '🎲', max: 4, desc: 'Chacun lance un dé · le plus haut remporte le pot' },
@@ -5406,13 +5460,12 @@ async function handlePokerButton(i) {
   if (!guildId) return respondText(i, 'Serveur uniquement.');
 
   if (id === 'poker_new') {
+    // Pas d'emoji dans options.emoji : Discord rejette certains unicode (ex. 🂡)
     const opts = Object.values(ONLINE_GAMES).map((g) => ({
-      label: g.name.slice(0, 100),
+      label: `${g.emoji} ${g.name}`.slice(0, 100),
       value: g.key,
-      emoji: g.emoji,
       description: g.desc.slice(0, 100),
     }));
-    // Discord max 25 options — on a 10 jeux
     const select = new StringSelectMenuBuilder()
       .setCustomId('online_pickgame')
       .setPlaceholder('Choisis le jeu en ligne')
@@ -5999,6 +6052,7 @@ async function animateBoard(msg, lobby, title, caption) {
 }
 
 async function getAnnounceChannel(guildId) {
+  // Ancienne logique salon — conservée en secours uniquement
   const notifId = guildChannels.get(`${guildId}:notifs`);
   if (notifId) {
     const ch = await client.channels.fetch(notifId).catch(() => null);
@@ -6007,6 +6061,41 @@ async function getAnnounceChannel(guildId) {
   const casinoId = casinoChannels.get(guildId);
   if (casinoId) return client.channels.fetch(casinoId).catch(() => null);
   return null;
+}
+
+/** Envoie un MP à un utilisateur (ignore si MP fermés). */
+async function dmUser(userId, payload) {
+  try {
+    const u = await client.users.fetch(userId);
+    await u.send(typeof payload === 'string' ? { content: payload } : payload);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Diffuse un MP à tous les membres non-bot du serveur (lent, rate-limit). */
+async function dmGuildEveryone(guild, payload) {
+  if (!guild) return { ok: 0, fail: 0 };
+  let list;
+  try {
+    list = await guild.members.fetch();
+  } catch {
+    list = guild.members.cache;
+  }
+  let ok = 0;
+  let fail = 0;
+  for (const m of list.values()) {
+    if (!m || m.user.bot) continue;
+    try {
+      await m.send(typeof payload === 'string' ? { content: payload } : payload);
+      ok++;
+      await sleep(400);
+    } catch {
+      fail++;
+    }
+  }
+  return { ok, fail };
 }
 
 async function createAllTimeChannel(i) {
@@ -6485,7 +6574,7 @@ client.on(Events.InteractionCreate, async (i) => {
     if (
       !i.guild &&
       !userHomeGuild.has(i.user.id) &&
-      !['panel_', 'modal_', 'ig_', 'rl_', 'bj_', 'mines_', 'replay|'].some((p) => i.customId.startsWith(p))
+      !['panel_', 'modal_', 'ig_', 'rl_', 'bj_', 'mines_', 'replay|', 'event_'].some((p) => i.customId.startsWith(p))
     ) {
       return;
     }
