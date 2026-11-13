@@ -30,16 +30,46 @@ const path = require('path');
 //  CONFIG
 // ============================================================
 const PREFIX = '!';
-// Monnaie = pièce Z violette (emoji custom Discord)
-// Dans .env : COIN_EMOJI=<:znk:ID_DE_LEMOJI>
-// Sans ça → fallback 🟣Z
-const COIN = process.env.COIN_EMOJI || '🟣Z';
+// Monnaie = pièce Z violette
+const COIN_DEFAULT = '<:znk:1570874447475253279>';
+let COIN =
+  process.env.COIN_EMOJI && /^<a?:\w+:\d+>$/.test(String(process.env.COIN_EMOJI).trim())
+    ? String(process.env.COIN_EMOJI).trim()
+    : COIN_DEFAULT;
+const COIN_FALLBACK = COIN_DEFAULT;
 const DAILY_AMOUNT = 4;
-const INVITE_REWARD = 1; // Z offerts à celui qui invite un nouveau membre
+const INVITE_REWARD = 1;
 const LEADERBOARD_REFRESH_MS = 60_000;
-const IDLE_MS = 90_000; // une partie inactive est réglée automatiquement après 90 s
+const IDLE_MS = 90_000;
 const MAX_ADMIN_AMOUNT = 100_000_000;
 const EPH = MessageFlags.Ephemeral;
+
+function resolveCoinEmoji() {
+  const raw = String(process.env.COIN_EMOJI || '').trim();
+  if (/^<a?:\w+:\d+>$/.test(raw)) {
+    COIN = raw;
+    console.log(`[coin] ${COIN}`);
+    return;
+  }
+  if (/^<a?:\w+:\d+>$/.test(COIN)) {
+    console.log(`[coin] ${COIN}`);
+    return;
+  }
+  const name = (raw || 'znk').replace(/^:|:$/g, '');
+  for (const g of client.guilds.cache.values()) {
+    const em =
+      g.emojis.cache.find((e) => e.name === name) ||
+      g.emojis.cache.find((e) => e.name.toLowerCase() === name.toLowerCase()) ||
+      g.emojis.cache.find((e) => /^(znk|z)$/i.test(e.name));
+    if (em) {
+      COIN = em.toString();
+      console.log(`[coin] résolu ${COIN} sur ${g.name}`);
+      return;
+    }
+  }
+  COIN = COIN_FALLBACK;
+  console.log(`[coin] fallback ${COIN}`);
+}
 
 const { DISCORD_TOKEN, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } = process.env;
 if (!DISCORD_TOKEN || !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
@@ -4180,6 +4210,7 @@ client.on(Events.ChannelDelete, async (channel) => {
 
 client.once(Events.ClientReady, (c) => {
   console.log(`✅ Connecté en tant que ${c.user.tag}`);
+  resolveCoinEmoji();
   loadMultipliers();
   loadPeaks();
   for (const g of c.guilds.cache.values()) cacheInvites(g);
