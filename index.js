@@ -19,6 +19,7 @@ const {
   TextInputStyle,
   UserSelectMenuBuilder,
   StringSelectMenuBuilder,
+  ChannelSelectMenuBuilder,
   escapeMarkdown,
 } = require('discord.js');
 const { createClient } = require('@supabase/supabase-js');
@@ -328,24 +329,21 @@ async function saveMultiplier(game, value, guildId = null, actorId = null) {
   }
   if (guildId) {
     try {
-      const casinoId = casinoChannels.get(guildId);
-      if (casinoId) {
-        const ch = await client.channels.fetch(casinoId).catch(() => null);
-        if (ch) {
-          const who = actorId ? `👤 Par <@${actorId}>\n` : '';
-          await ch.send({
-            embeds: [
-              new EmbedBuilder()
-                .setTitle('🎚️ Multiplicateur modifié')
-                .setColor(COLORS.violet)
-                .setDescription(
-                  `${who}**${GAME_NAMES[game] || game}** : coefficient réglé sur **${fx(value)}**.\n` +
-                    `Tous les gains de ce jeu sont maintenant multipliés par ce coefficient.`
-                )
-                .setTimestamp(),
-            ],
-          });
-        }
+      const ch = await getAnnounceChannel(guildId);
+      if (ch) {
+        const who = actorId ? `👤 Par <@${actorId}>\n` : '';
+        await ch.send({
+          embeds: [
+            new EmbedBuilder()
+              .setTitle('🎚️ Multiplicateur modifié')
+              .setColor(COLORS.violet)
+              .setDescription(
+                `${who}**${GAME_NAMES[game] || game}** : coefficient réglé sur **${fx(value)}**.\n` +
+                  `Tous les gains de ce jeu sont maintenant multipliés par ce coefficient.`
+              )
+              .setTimestamp(),
+          ],
+        });
       }
     } catch (e) {
       console.error('[multiplicateurs] annonce', e?.message || e);
@@ -377,22 +375,18 @@ async function startBoost(guildId, { winMult, loseMult, label, minutes }) {
   if (expiresAt) {
     entry.timer = setTimeout(() => {
       activeBoosts.delete(guildId);
-      const casinoId = casinoChannels.get(guildId);
-      if (casinoId) {
-        client.channels
-          .fetch(casinoId)
-          .then((ch) =>
-            ch?.send({
-              embeds: [
-                new EmbedBuilder()
-                  .setTitle('⏰ Boost terminé')
-                  .setColor(COLORS.grey)
-                  .setDescription(`L’événement **${label}** est terminé. Retour aux gains normaux.`),
-              ],
-            })
-          )
-          .catch(() => {});
-      }
+      getAnnounceChannel(guildId)
+        .then((ch) =>
+          ch?.send({
+            embeds: [
+              new EmbedBuilder()
+                .setTitle('⏰ Boost terminé')
+                .setColor(COLORS.grey)
+                .setDescription(`L’événement **${label}** est terminé. Retour aux gains normaux.`),
+            ],
+          })
+        )
+        .catch(() => {});
     }, expiresAt - Date.now());
   }
   activeBoosts.set(guildId, entry);
@@ -2072,8 +2066,8 @@ function buildAdminPayload() {
       '➕ **Ajouter** · ➖ **Retirer** · 🎯 **Définir** · 👀 **Voir** un solde\n' +
         '🎁 **Offrir à tous** · 💥 **Reset soldes** · 👑 **Reset all-time**\n' +
         '🎚️ **Multiplicateurs** · 📢 **Événement** · 📣 **Annonce récompense**\n' +
-        '🏆 **Salon all-time** : créer le salon du classement all-time\n\n' +
-        'Les actions postées dans le casino indiquent **qui** les a faites.'
+        '🏆 **Salon all-time** · 🔔 **Salon notifs** (où partent offrir all, reset, giveaway…)\n\n' +
+        'Les actions postées indiquent **qui** les a faites.'
     );
   const row1 = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('admin_add').setLabel('Ajouter').setEmoji('➕').setStyle(ButtonStyle.Success),
@@ -2090,7 +2084,8 @@ function buildAdminPayload() {
   const row3 = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('admin_event').setLabel('Événement').setEmoji('📢').setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId('admin_annonce').setLabel('Annonce').setEmoji('📣').setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId('admin_alltimechan').setLabel('Salon all-time').setEmoji('🏆').setStyle(ButtonStyle.Secondary)
+    new ButtonBuilder().setCustomId('admin_alltimechan').setLabel('Salon all-time').setEmoji('🏆').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('admin_notifchan').setLabel('Salon notifs').setEmoji('🔔').setStyle(ButtonStyle.Secondary)
   );
   return { embeds: [embed], components: [row1, row2, row3] };
 }
@@ -2294,10 +2289,8 @@ async function handleEventJoin(i) {
 }
 
 async function postBoostEvent(i, kind, minutes) {
-  const casinoId = casinoChannels.get(i.guild.id);
-  if (!casinoId) return respondText(i, 'Aucun salon casino : utilise d’abord `!setup`.');
-  const ch = await client.channels.fetch(casinoId).catch(() => null);
-  if (!ch) return respondText(i, 'Salon casino introuvable.');
+  const ch = await getAnnounceChannel(i.guild.id);
+  if (!ch) return respondText(i, 'Aucun salon de notifs/casino : fais `!setup` ou définis **Salon notifs**.');
 
   const presets = {
     x2win: { winMult: 2, loseMult: 1, label: 'x2 Gains 🔥' },
@@ -2331,10 +2324,8 @@ async function postBoostEvent(i, kind, minutes) {
 }
 
 async function createClaimOrGiveaway(i, type, amount, winners, minutes) {
-  const casinoId = casinoChannels.get(i.guild.id);
-  if (!casinoId) return respondText(i, 'Aucun salon casino : utilise d’abord `!setup`.');
-  const ch = await client.channels.fetch(casinoId).catch(() => null);
-  if (!ch) return respondText(i, 'Salon casino introuvable.');
+  const ch = await getAnnounceChannel(i.guild.id);
+  if (!ch) return respondText(i, 'Aucun salon de notifs/casino : fais `!setup` ou définis **Salon notifs**.');
 
   if (type === 'giveaway' && (!minutes || minutes < 1)) {
     return respondText(i, 'Un giveaway doit avoir une durée (minutes ≥ 1).');
@@ -2489,6 +2480,24 @@ async function handleAdmin(i) {
     if (action === 'alltimechan') {
       return createAllTimeChannel(i);
     }
+    if (action === 'notifchan') {
+      const current = guildChannels.get(`${i.guild.id}:notifs`);
+      const row = new ActionRowBuilder().addComponents(
+        new ChannelSelectMenuBuilder()
+          .setCustomId('admin_notifpick')
+          .setPlaceholder('Choisis le salon des notifications')
+          .setMinValues(1)
+          .setMaxValues(1)
+          .addChannelTypes(ChannelType.GuildText)
+      );
+      return i.reply({
+        content:
+          `🔔 Choisis le salon où envoyer les notifs admin (offrir all, reset, giveaway, boosts, annonces…).\n` +
+          (current ? `Salon actuel : <#${current}>` : `Actuellement : salon **casino** (par défaut).`),
+        components: [row],
+        flags: EPH,
+      });
+    }
     if (ADMIN_TITLES[action]) {
       const row = new ActionRowBuilder().addComponents(
         new UserSelectMenuBuilder()
@@ -2559,6 +2568,18 @@ async function handleAdmin(i) {
     return;
   }
 
+  if (i.isChannelSelectMenu && i.isChannelSelectMenu() && id === 'admin_notifpick') {
+    const channelId = i.values[0];
+    const saved = await saveChannel(i.guild.id, 'notifs', channelId);
+    return i.update({
+      content:
+        `✅ Salon des notifications défini : <#${channelId}>\n` +
+        `Offrir all, reset, giveaway, boosts, annonces, multiplicateurs y seront postés.` +
+        (saved ? '' : DB_WARN),
+      components: [],
+    });
+  }
+
   if (i.isUserSelectMenu() && id.startsWith('admin_pick_')) {
     const action = id.slice('admin_pick_'.length);
     const userId = i.values[0];
@@ -2598,19 +2619,16 @@ async function handleAdmin(i) {
           .select('user_id');
         if (error) throw error;
         const count = data?.length ?? 0;
-        const casinoId = casinoChannels.get(i.guild.id);
-        if (casinoId) {
-          const ch = await client.channels.fetch(casinoId).catch(() => null);
-          ch?.send({
-            embeds: [
-              new EmbedBuilder()
-                .setTitle('💥 Reset des soldes (classement actuel)')
-                .setColor(COLORS.red)
-                .setDescription(`👤 Par <@${i.user.id}>\nTous les soldes ont été remis à **0**.`)
-                .setTimestamp(),
-            ],
-          }).catch(() => {});
-        }
+        const ch = await getAnnounceChannel(i.guild.id);
+        ch?.send({
+          embeds: [
+            new EmbedBuilder()
+              .setTitle('💥 Reset des soldes (classement actuel)')
+              .setColor(COLORS.red)
+              .setDescription(`👤 Par <@${i.user.id}>\nTous les soldes ont été remis à **0**.`)
+              .setTimestamp(),
+          ],
+        }).catch(() => {});
         return i.reply({
           content: `✅ Soldes reset : **${count}** joueur(s) à 0.`,
           flags: EPH,
@@ -2633,19 +2651,16 @@ async function handleAdmin(i) {
       } catch (e) {
         console.error('[resetpeaks]', e?.message || e);
       }
-      const casinoId = casinoChannels.get(i.guild.id);
-      if (casinoId) {
-        const ch = await client.channels.fetch(casinoId).catch(() => null);
-        ch?.send({
-          embeds: [
-            new EmbedBuilder()
-              .setTitle('👑 Reset classement all-time')
-              .setColor(COLORS.red)
-              .setDescription(`👤 Par <@${i.user.id}>\nTous les records de solde max ont été effacés.`)
-              .setTimestamp(),
-          ],
-        }).catch(() => {});
-      }
+      const ch = await getAnnounceChannel(i.guild.id);
+      ch?.send({
+        embeds: [
+          new EmbedBuilder()
+            .setTitle('👑 Reset classement all-time')
+            .setColor(COLORS.red)
+            .setDescription(`👤 Par <@${i.user.id}>\nTous les records de solde max ont été effacés.`)
+            .setTimestamp(),
+        ],
+      }).catch(() => {});
       return i.reply({ content: '✅ Classement all-time réinitialisé.', flags: EPH });
     }
 
@@ -2655,10 +2670,8 @@ async function handleAdmin(i) {
       const reward = i.fields.getTextInputValue('reward')?.trim();
       if (!amount) return respondText(i, 'Montant invalide.');
       if (!reward) return respondText(i, 'Indique la récompense en texte.');
-      const casinoId = casinoChannels.get(i.guild.id);
-      if (!casinoId) return respondText(i, 'Aucun salon casino : fais `!setup` d’abord.');
-      const ch = await client.channels.fetch(casinoId).catch(() => null);
-      if (!ch) return respondText(i, 'Salon casino introuvable.');
+      const ch = await getAnnounceChannel(i.guild.id);
+      if (!ch) return respondText(i, 'Aucun salon de notifs/casino : fais `!setup` ou **Salon notifs**.');
       await ch.send({
         embeds: [
           new EmbedBuilder()
@@ -2730,22 +2743,19 @@ async function handleAdmin(i) {
           }
         }
       }
-      const casinoId = casinoChannels.get(i.guild.id);
-      if (casinoId) {
-        const ch = await client.channels.fetch(casinoId).catch(() => null);
-        ch?.send({
-          embeds: [
-            new EmbedBuilder()
-              .setTitle('🎁 Cadeau pour tous')
-              .setColor(COLORS.green)
-              .setDescription(
-                `👤 Par <@${i.user.id}>\n` +
-                  `💰 **${fmt(amount)}** offerts à **chaque** joueur (**${count}** comptes).`
-              )
-              .setTimestamp(),
-          ],
-        }).catch(() => {});
-      }
+      const ch = await getAnnounceChannel(i.guild.id);
+      ch?.send({
+        embeds: [
+          new EmbedBuilder()
+            .setTitle('🎁 Cadeau pour tous')
+            .setColor(COLORS.green)
+            .setDescription(
+              `👤 Par <@${i.user.id}>\n` +
+                `💰 **${fmt(amount)}** offerts à **chaque** joueur (**${count}** comptes).`
+            )
+            .setTimestamp(),
+        ],
+      }).catch(() => {});
       return i.reply({ content: `✅ **${fmt(amount)}** offerts à **${count}** joueur(s).`, flags: EPH });
     }
 
@@ -2840,8 +2850,26 @@ async function loadChannels() {
   else for (const r of b.data) guildChannels.set(`${r.guild_id}:${r.kind}`, r.channel_id);
 }
 
-const CHANNEL_NAMES = { wins: 'wins', admin: 'casino-admin', invites: 'invites-notif', alltime: 'alltime' };
+const CHANNEL_NAMES = {
+  wins: 'wins',
+  admin: 'casino-admin',
+  invites: 'invites-notif',
+  alltime: 'alltime',
+  notifs: 'casino-notifs',
+};
 const alltimeBoardMessages = new Map(); // guildId -> { channelId, messageId }
+
+/** Salon où poster les annonces admin (offrir all, reset, giveaway, boosts…). Fallback = casino. */
+async function getAnnounceChannel(guildId) {
+  const notifId = guildChannels.get(`${guildId}:notifs`);
+  if (notifId) {
+    const ch = await client.channels.fetch(notifId).catch(() => null);
+    if (ch) return ch;
+  }
+  const casinoId = casinoChannels.get(guildId);
+  if (casinoId) return client.channels.fetch(casinoId).catch(() => null);
+  return null;
+}
 
 async function createAllTimeChannel(i) {
   const guild = i.guild;
@@ -3566,7 +3594,7 @@ client.on(Events.ChannelDelete, async (channel) => {
     casinoChannels.delete(gid);
     await supabase.from('casino_channels').delete().eq('guild_id', gid);
   }
-  for (const kind of ['wins', 'admin', 'invites', 'alltime']) {
+  for (const kind of ['wins', 'admin', 'invites', 'alltime', 'notifs']) {
     if (guildChannels.get(`${gid}:${kind}`) === channel.id) {
       guildChannels.delete(`${gid}:${kind}`);
       alltimeBoardMessages.delete(gid);
