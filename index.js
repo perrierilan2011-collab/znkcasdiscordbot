@@ -1885,100 +1885,205 @@ async function playInstant(i, key, bet, choice) {
 function buildHelpEmbed() {
   const p = PREFIX;
   return new EmbedBuilder()
-    .setTitle(`${COIN} Aide`)
-    .setColor(COLORS.blue)
+    .setColor(COLORS.violet)
+    .setAuthor({ name: 'Guide du Casino' })
+    .setTitle('✨ Comment jouer')
     .setDescription(
       [
-        'Tout se joue avec les **boutons** du panneau, et tes parties sont **privées**.',
+        '```',
+        ' ┌─────────────────────────────┐',
+        ' │   PARTIES 100 % PRIVÉES     │',
+        ' │   Clique · Mise · Résultat  │',
+        ' └─────────────────────────────┘',
+        '```',
         '',
-        '🎮 Clique sur **Jouer** dans le panneau pour ouvrir le menu des jeux :',
-        `💣 **Mines** : 4 niveaux (Easy 3 💣 · Medium 6 · Hard 10 · Impossible 15). Plus il y a de bombes, plus le multiplicateur monte.`,
-        '🃏 **Blackjack** : Tirer / Rester / Doubler',
-        `🎡 **Roulette** : couleur, pair, impair (${fx(2 * coef('roulette'))}) ou numéro, vert (${fx(36 * coef('roulette'))})`,
-        '🪙 Pile ou Face · 🎲 Dés · 🎰 Machine à sous · 🎡 Roue · ⚔️ Duel · 🃏 Enseigne · 🎯 Zone · 🎱 Plinko · 🚀 Crash · 🎟️ Ticket · 🎲 Dé exact · 📦 Coffre · 🔫 Roulette russe · 🏇 Chevaux (utilise **Suivant ▶** dans le menu)',
-        `🎁 **Daily** : ${DAILY_AMOUNT} pièces gratuites par jour`,
-        `📨 **Invitations** : +${INVITE_REWARD} 🪙 à chaque nouveau membre que tu invites (**${PREFIX}invites** pour ton total)`,
-        '💸 **Envoyer** : transfère une partie de ton solde à un autre membre',
-        '📜 **Historique** : tes 15 dernières parties',
-        '🔁 À la fin d’une partie, le bouton **Rejouer** relance la même mise.',
-        '',
-        '👑 **Propriétaire du serveur**',
-        `**${p}setup** : créer le salon casino avec le panneau`,
-        `**${p}wins** : créer le salon où s’affichent les victoires de tout le monde`,
-        `**${p}invites-notif** : créer le salon des notifications d’invitations`,
-        `**${p}admin** : créer le salon privé avec le panneau admin (ajouter, retirer, offrir à tous, régler les multiplicateurs…)`,
-        `**${p}classement** : classement auto (mis à jour chaque minute)`,
-        `**${p}add** @membre <montant> · **${p}remove** @membre <montant>`,
+        'Tout se joue avec les **boutons** — aucune commande obligatoire.',
       ].join('\n')
-    );
+    )
+    .addFields(
+      {
+        name: '🎮 Jeux',
+        value:
+          '**Mines** · **Blackjack** · **Roulette** · **Slots** · **Plinko** · **Crash** et 11 autres.\n' +
+          'Ouvre **Jouer** → choisis un jeu → entre ta mise.',
+        inline: false,
+      },
+      {
+        name: '🎁 Daily',
+        value: `**${DAILY_AMOUNT} ${COIN}** / jour (reset à minuit **Paris**).`,
+        inline: true,
+      },
+      {
+        name: '📨 Invites',
+        value: `**+${INVITE_REWARD} ${COIN}** par ami qui rejoint.`,
+        inline: true,
+      },
+      {
+        name: '💸 Transfert',
+        value: 'Envoie des coins à un membre du serveur.',
+        inline: true,
+      },
+      {
+        name: '👑 Admin',
+        value:
+          `\`${p}setup\` salon · \`${p}admin\` panneau · \`${p}wins\` · \`${p}classement\`\n` +
+          `\`${p}add\` / \`${p}remove\` · événements · boosts · notifs`,
+        inline: false,
+      }
+    )
+    .setFooter({ text: `Monnaie : ${COIN} · Rejouer dispo après chaque partie` })
+    .setTimestamp();
 }
 
 function buildPanelPayload() {
   const panel = new EmbedBuilder()
-    .setTitle('🎰 Casino')
-    .setColor(COLORS.gold)
+    .setColor(0x7C3AED)
+    .setAuthor({ name: 'VIP CASINO', iconURL: undefined })
+    .setTitle('━━━━━━━━━━━━━━━━━━━━')
     .setDescription(
-      `🎁 **Daily** — récupère **${DAILY_AMOUNT} ${COIN}** gratuits **une fois par jour** (après minuit, heure de Paris).\n` +
-        `Clique sur **Daily** ci-dessous pour les réclamer.\n\n` +
-        `🎮 **Jouer** ouvre le menu des jeux (parties privées).`
-    );
-  const main = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('panel_play').setLabel('Jouer').setEmoji('🎮').setStyle(ButtonStyle.Success),
+      [
+        '```ansi',
+        '[2;35m╔══════════════════════════╗[0m',
+        '[2;35m║[0m   [1;37m✦  SALON DE JEU  ✦[0m    [2;35m║[0m',
+        '[2;35m╚══════════════════════════╝[0m',
+        '```',
+        '',
+        `> 🎁 **Daily** — **${DAILY_AMOUNT} ${COIN}** gratuits **1× / jour**`,
+        '> Reset à **minuit (Paris)**. Bouton **Daily** ci-dessous.',
+        '',
+        '🔒 Tes parties, ton solde et ton historique sont **uniquement pour toi**.',
+      ].join('\n')
+    )
+    .addFields(
+      {
+        name: '🎮  Jouer',
+        value: '```\n 17 jeux · animations · mises libres\n```',
+        inline: true,
+      },
+      {
+        name: '💰  Compte',
+        value: '```\n Solde · Envoyer · Historique\n```',
+        inline: true,
+      },
+      {
+        name: '🏆  Rankings',
+        value: '```\n Actuel · All-time · Invites\n```',
+        inline: true,
+      },
+      {
+        name: '━━━━━━━━  Accès rapide  ━━━━━━━━',
+        value:
+          '**Jouer** ouvre le lobby complet.\n' +
+          '**Daily** réclame ta récompense du jour.\n' +
+          '**Solde** affiche ton compte en privé.',
+        inline: false,
+      }
+    )
+    .setFooter({ text: `${COIN} · Clique un bouton pour commencer` })
+    .setTimestamp();
+
+  // 5 boutons max / ligne — organisation type “site”
+  const rowPlay = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('panel_play').setLabel('JOUER').setEmoji('🎮').setStyle(ButtonStyle.Success),
     new ButtonBuilder().setCustomId('panel_daily').setLabel('Daily').setEmoji('🎁').setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId('panel_balance').setLabel('Solde').setEmoji('💰').setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId('panel_send').setLabel('Envoyer').setEmoji('💸').setStyle(ButtonStyle.Primary)
   );
-  const extra = new ActionRowBuilder().addComponents(
+  const rowSocial = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('panel_top').setLabel('Classement').setEmoji('🏆').setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId('panel_topall').setLabel('All-time').setEmoji('👑').setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId('panel_history').setLabel('Historique').setEmoji('📜').setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId('panel_invites').setLabel('Invites').setEmoji('📨').setStyle(ButtonStyle.Secondary)
   );
-  return { embeds: [panel], components: [main, extra] };
+  return { embeds: [panel], components: [rowPlay, rowSocial] };
 }
 
-// Menu ouvert par le bouton "Jouer" (message privé) : un bouton par jeu, 10 par page, bouton Suivant
+// Menu jeux : TOUS les jeux visibles (17 ≤ 5×4 boutons), + select menu en secours
 const GAME_MENU = [
-  ['mines', 'Mines', '💣', 'évite les bombes, encaisse quand tu veux'],
-  ['bj', 'Blackjack', '🃏', 'bats le croupier'],
-  ['roulette', 'Roulette', '🎡', 'couleur, parité ou numéro'],
-  ['coinflip', 'Pile ou Face', '🪙', '1 chance sur 2'],
-  ['dice', 'Dés', '🎲', 'devine la somme de 2 dés'],
-  ['slots', 'Machine à sous', '🎰', '3 rouleaux, gros jackpot'],
-  ['wheel', 'Roue', '🎡', 'roue de la fortune'],
-  ['duel', 'Duel', '⚔️', 'ta carte contre celle du croupier'],
-  ['suit', 'Enseigne', '🃏', 'devine la couleur de la carte'],
-  ['zone', 'Zone', '🎯', 'bas, milieu ou haut'],
-  ['plinko', 'Plinko', '🎱', 'la bille tombe, choisis le risque'],
-  ['crash', 'Crash', '🚀', 'atteins ta cible avant l’explosion'],
-  ['scratch', 'Ticket', '🎟️', 'ticket à gratter'],
-  ['die', 'Dé exact', '🎲', 'trouve le bon chiffre'],
-  ['chest', 'Coffre', '📦', 'trouve le trésor'],
-  ['russian', 'Roulette russe', '🔫', 'survis au barillet'],
-  ['horses', 'Chevaux', '🏇', 'parie sur le gagnant'],
+  ['mines', 'Mines', '💣', 'Bombes · multiplicateur croissant'],
+  ['bj', 'Blackjack', '🃏', 'Bats le croupier · As soft'],
+  ['roulette', 'Roulette', '🎡', 'Couleur · pair · numéro'],
+  ['coinflip', 'Pile/Face', '🪙', '50 / 50'],
+  ['dice', 'Dés', '🎲', 'Somme de 2 dés'],
+  ['slots', 'Slots', '🎰', '3 rouleaux · jackpot'],
+  ['wheel', 'Roue', '🎡', 'Roue de la fortune'],
+  ['duel', 'Duel', '⚔️', 'Carte vs croupier'],
+  ['suit', 'Enseigne', '🃏', 'Devine la couleur'],
+  ['zone', 'Zone', '🎯', 'Bas · milieu · haut'],
+  ['plinko', 'Plinko', '🎱', 'Bille · risque'],
+  ['crash', 'Crash', '🚀', 'Cash-out avant boom'],
+  ['scratch', 'Ticket', '🎟️', 'Gratte & gagne'],
+  ['die', 'Dé exact', '🎲', '1 chance sur 6'],
+  ['chest', 'Coffre', '📦', 'Trouve le trésor'],
+  ['russian', 'Russe', '🔫', 'Survis au barillet'],
+  ['horses', 'Chevaux', '🏇', 'Parie sur le gagnant'],
 ];
-const MENU_PAGE_SIZE = 10;
-const MENU_PAGES = Math.ceil(GAME_MENU.length / MENU_PAGE_SIZE);
+const MENU_PAGE_SIZE = 25; // plus de pagination nécessaire (< 25)
+const MENU_PAGES = 1;
 
 function buildGameMenuPayload(page = 0) {
-  page = Math.min(Math.max(0, page), MENU_PAGES - 1);
-  const items = GAME_MENU.slice(page * MENU_PAGE_SIZE, (page + 1) * MENU_PAGE_SIZE);
   const embed = new EmbedBuilder()
-    .setTitle(`🎮 Choisis ton jeu (page ${page + 1}/${MENU_PAGES})`)
-    .setColor(COLORS.gold)
-    .setDescription(items.map(([, name, emoji, desc]) => `${emoji} **${name}** : ${desc}`).join('\n'))
-    .setFooter({ text: `${GAME_MENU.length} jeux au total · utilise Suivant ▶ pour voir les autres` });
-  const rows = chunk(
-    items.map(([key, name, emoji]) => new ButtonBuilder().setCustomId(`panel_${key}`).setLabel(name).setEmoji(emoji).setStyle(ButtonStyle.Primary)),
-    5
-  ).map((r) => new ActionRowBuilder().addComponents(...r));
-  rows.push(
-    new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId(`panel_page_${page - 1}`).setLabel('Précédent').setEmoji('◀️').setStyle(ButtonStyle.Secondary).setDisabled(page === 0),
-      new ButtonBuilder().setCustomId('panel_pageinfo').setLabel(`Page ${page + 1}/${MENU_PAGES}`).setStyle(ButtonStyle.Secondary).setDisabled(true),
-      new ButtonBuilder().setCustomId(`panel_page_${page + 1}`).setLabel('Suivant').setEmoji('▶️').setStyle(ButtonStyle.Primary).setDisabled(page >= MENU_PAGES - 1)
+    .setColor(0xA855F7)
+    .setAuthor({ name: 'Lobby des jeux' })
+    .setTitle('✦ Choisis ta table')
+    .setDescription(
+      [
+        '```ansi',
+        '[2;35m╭──────────────────────────╮[0m',
+        '[2;35m│[0m  [1;37m17 tables · 1 clic[0m       [2;35m│[0m',
+        '[2;35m╰──────────────────────────╯[0m',
+        '```',
+        '',
+        'Clique un **jeu** ci-dessous **ou** utilise le menu déroulant.',
+        'Une fenêtre s’ouvre pour ta **mise** (ton solde est affiché).',
+      ].join('\n')
     )
+    .addFields(
+      {
+        name: '🔥 Populaires',
+        value: '💣 Mines · 🃏 Blackjack · 🎡 Roulette · 🎰 Slots · 🎱 Plinko',
+        inline: false,
+      },
+      {
+        name: '⚡ Rapides',
+        value: '🪙 Pile/Face · 🎲 Dés · 🎟️ Ticket · 📦 Coffre · 🚀 Crash',
+        inline: false,
+      },
+      {
+        name: '🎯 Skill / suspense',
+        value: '⚔️ Duel · 🃏 Enseigne · 🔫 Russe · 🏇 Chevaux · 🎡 Roue',
+        inline: false,
+      }
+    )
+    .setFooter({ text: `Visible uniquement par toi · ${COIN}` })
+    .setTimestamp();
+
+  // Tous les boutons jeux (4 rangées)
+  const gameButtons = GAME_MENU.map(([key, name, emoji]) =>
+    new ButtonBuilder()
+      .setCustomId(`panel_${key}`)
+      .setLabel(name)
+      .setEmoji(emoji)
+      .setStyle(ButtonStyle.Primary)
   );
+  const rows = chunk(gameButtons, 5).map((r) => new ActionRowBuilder().addComponents(...r));
+
+  // 5e rangée : select menu (meilleure UX mobile) — Discord max 5 rows
+  if (rows.length < 5) {
+    const select = new StringSelectMenuBuilder()
+      .setCustomId('panel_gameselect')
+      .setPlaceholder('📱 Ou choisis un jeu ici…')
+      .addOptions(
+        GAME_MENU.map(([key, name, emoji, desc]) => ({
+          label: name,
+          value: key,
+          emoji,
+          description: desc.slice(0, 100),
+        }))
+      );
+    rows.push(new ActionRowBuilder().addComponents(select));
+  }
+
   return { embeds: [embed], components: rows };
 }
 
@@ -2213,23 +2318,36 @@ async function handleReplay(i) {
 // ============================================================
 function buildAdminPayload() {
   const embed = new EmbedBuilder()
-    .setTitle('🛠️ Panneau admin')
-    .setColor(COLORS.red)
+    .setColor(0xEF4444)
+    .setAuthor({ name: 'Console administrateur' })
+    .setTitle('✦ Contrôle du casino')
     .setDescription(
-      '➕ **Ajouter** · ➖ **Retirer** · 🎯 **Définir** · 👀 **Voir** un solde\n' +
-        '🎁 **Offrir à tous** · 💥 **Reset soldes** · 👑 **Reset all-time**\n' +
-        '🎚️ **Multiplicateurs** · 📢 **Événement** · 📣 **Annonce récompense**\n' +
-        '🏆 **Salon all-time** · 🔔 **Salon notifs** (où partent offrir all, reset, giveaway…)\n\n' +
-        'Les actions postées indiquent **qui** les a faites.'
-    );
+      [
+        '```ansi',
+        '[2;31m╔══════════════════════════╗[0m',
+        '[2;31m║[0m  [1;37mOWNER ONLY · ACTIONS[0m   [2;31m║[0m',
+        '[2;31m╚══════════════════════════╝[0m',
+        '```',
+        '',
+        'Chaque action publique affiche **qui** l’a lancée.',
+      ].join('\n')
+    )
+    .addFields(
+      { name: '💰 Économie', value: 'Ajouter · Retirer · Définir · Voir · Offrir à tous', inline: false },
+      { name: '💥 Resets', value: 'Soldes (classement) · Records all-time', inline: false },
+      { name: '🎚️ Live', value: 'Multiplicateurs · Événements · Boosts · Annonces', inline: false },
+      { name: '📡 Salons', value: 'All-time · **Notifs** (cible des annonces admin)', inline: false }
+    )
+    .setFooter({ text: 'Visible uniquement par le propriétaire' })
+    .setTimestamp();
   const row1 = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('admin_add').setLabel('Ajouter').setEmoji('➕').setStyle(ButtonStyle.Success),
     new ButtonBuilder().setCustomId('admin_remove').setLabel('Retirer').setEmoji('➖').setStyle(ButtonStyle.Danger),
     new ButtonBuilder().setCustomId('admin_set').setLabel('Définir').setEmoji('🎯').setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId('admin_view').setLabel('Voir un solde').setEmoji('👀').setStyle(ButtonStyle.Secondary)
+    new ButtonBuilder().setCustomId('admin_view').setLabel('Voir').setEmoji('👀').setStyle(ButtonStyle.Secondary)
   );
   const row2 = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('admin_all').setLabel('Offrir à tous').setEmoji('🎁').setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId('admin_all').setLabel('Offrir all').setEmoji('🎁').setStyle(ButtonStyle.Success),
     new ButtonBuilder().setCustomId('admin_reset').setLabel('Reset soldes').setEmoji('💥').setStyle(ButtonStyle.Danger),
     new ButtonBuilder().setCustomId('admin_resetpeaks').setLabel('Reset all-time').setEmoji('👑').setStyle(ButtonStyle.Danger),
     new ButtonBuilder().setCustomId('admin_mult').setLabel('Multiplicateurs').setEmoji('🎚️').setStyle(ButtonStyle.Primary)
@@ -3564,6 +3682,14 @@ client.on(Events.InteractionCreate, async (i) => {
           .setTitle('💸 Envoyer de l’argent')
           .addComponents(modalInput('amount', 'Montant à envoyer (ou "all")', { placeholder: 'ex : 5' }))
       );
+    }
+
+    // Menu déroulant des jeux (lobby)
+    if (i.isStringSelectMenu() && id === 'panel_gameselect') {
+      const key = i.values[0];
+      // Simule le clic bouton panel_<key>
+      i.customId = `panel_${key}`;
+      return await handlePanelButton(i);
     }
 
     if (!i.isButton()) return;
