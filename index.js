@@ -138,7 +138,63 @@ async function rpc(name, args) {
 }
 
 const getBalance = async (id) => Number(await rpc('get_balance', { p_user_id: id }));
-const credit = async (id, amount) => Number(await rpc('change_balance', { p_user_id: id, p_amount: amount }));
+
+// ---------- Pics de solde (classement all-time) ----------
+const PEAK_FILE = path.join(__dirname, 'data', 'peaks.json');
+const peaks = new Map(); // userId -> max balance jamais atteint
+
+async function loadPeaks() {
+  try {
+    const raw = JSON.parse(fs.readFileSync(PEAK_FILE, 'utf8'));
+    for (const [id, v] of Object.entries(raw)) if (Number(v) > 0) peaks.set(id, Number(v));
+  } catch {
+    /* premier lancement */
+  }
+  try {
+    const { data, error } = await supabase.from('player_peaks').select('user_id, peak');
+    if (!error && data) {
+      for (const r of data) {
+        const p = Number(r.peak);
+        if (p > (peaks.get(r.user_id) || 0)) peaks.set(r.user_id, p);
+      }
+    }
+  } catch (e) {
+    console.error('[peaks] table player_peaks illisible (optionnelle) :', e?.message || e);
+  }
+}
+
+function savePeaksLocal() {
+  try {
+    fs.mkdirSync(path.dirname(PEAK_FILE), { recursive: true });
+    fs.writeFileSync(PEAK_FILE, JSON.stringify(Object.fromEntries(peaks), null, 2));
+  } catch (e) {
+    console.error('[peaks] fichier :', e?.message || e);
+  }
+}
+
+async function touchPeak(userId, balance) {
+  const bal = Number(balance);
+  if (!Number.isFinite(bal) || bal <= 0) return;
+  const prev = peaks.get(userId) || 0;
+  if (bal <= prev) return;
+  peaks.set(userId, bal);
+  savePeaksLocal();
+  try {
+    await supabase.from('player_peaks').upsert({
+      user_id: userId,
+      peak: bal,
+      updated_at: new Date().toISOString(),
+    });
+  } catch {
+    /* table optionnelle */
+  }
+}
+
+const credit = async (id, amount) => {
+  const bal = Number(await rpc('change_balance', { p_user_id: id, p_amount: amount }));
+  await touchPeak(id, bal);
+  return bal;
+};
 
 // Retire `amount` : renvoie le nouveau solde, ou null si solde insuffisant
 async function debit(id, amount) {
@@ -1530,7 +1586,7 @@ function buildPanelPayload() {
       'Clique sur **🎮 Jouer** pour ouvrir le menu des jeux, puis choisis ton jeu. Une fenêtre s’ouvre pour régler ta mise.\n\n' +
         `17 jeux : Mines, Blackjack, Roulette, Pile ou Face, Dés, Machine à sous, Roue, Duel, Enseigne, Zone, Plinko, Crash, Ticket, Dé exact, Coffre, Roulette russe, Chevaux\n` +
         `🎁 **Daily** : ${DAILY_AMOUNT} pièces gratuites par jour\n` +
-        '💰 **Solde** · 💸 **Envoyer** · 🏆 **Classement** · 📜 **Historique** · 📨 **Invitations**\n' +
+        '💰 **Solde** · 💸 **Envoyer** · 🏆 **Classement** · 👑 **All-time** · 📜 **Historique** · 📨 **Invites**\n' +
         '🧹 **Nettoyer** : efface le salon et reposte ce panneau (propriétaire uniquement)\n\n' +
         '🔒 Tes parties, ton solde et ton historique ne sont visibles que par toi.'
     );
@@ -1542,6 +1598,7 @@ function buildPanelPayload() {
   );
   const extra = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('panel_top').setLabel('Classement').setEmoji('🏆').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('panel_topall').setLabel('All-time').setEmoji('👑').setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId('panel_history').setLabel('Historique').setEmoji('📜').setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId('panel_invites').setLabel('Invites').setEmoji('📨').setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId('panel_clean').setLabel('Nettoyer').setEmoji('🧹').setStyle(ButtonStyle.Danger)
@@ -1648,11 +1705,16 @@ async function handlePanelButton(i) {
     }
     case 'panel_daily': {
       const res = await rpc('claim_daily', { p_user_id: i.user.id, p_amount: DAILY_AMOUNT });
+      if (res?.balance != null) await touchPeak(i.user.id, res.balance);
       return i.reply({ content: dailyText(res), flags: EPH });
     }
     case 'panel_top': {
       await i.deferReply({ flags: EPH });
       return i.editReply({ embeds: [await buildLeaderboardEmbed()] });
+    }
+    case 'panel_topall': {
+      await i.deferReply({ flags: EPH });
+      return i.editReply({ embeds: [await buildAllTimeLeaderboardEmbed()] });
     }
     case 'panel_history': {
       await i.deferReply({ flags: EPH });
@@ -1823,7 +1885,8 @@ function buildAdminPayload() {
         '🎯 **Définir** le solde exact d’un membre\n' +
         '👀 **Voir** le solde d’un membre\n' +
         '🎁 **Offrir à tous** : le même montant à tous les joueurs ayant un compte\n' +
-        '🎚️ **Multiplicateurs** : régler le multiplicateur de gains de chaque jeu\n\n' +
+        '🎚️ **Multiplicateurs** : régler le multiplicateur de gains de chaque jeu\n' +
+        '📢 **Événement** : annonce dans le casino — le **premier** qui clique gagne le montant (durée optionnelle)\n\n' +
         'Tu choisis le membre dans une liste, puis le montant dans une fenêtre.'
     );
   const row1 = new ActionRowBuilder().addComponents(
@@ -1834,9 +1897,141 @@ function buildAdminPayload() {
   const row2 = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('admin_view').setLabel('Voir un solde').setEmoji('👀').setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId('admin_all').setLabel('Offrir à tous').setEmoji('🎁').setStyle(ButtonStyle.Success),
-    new ButtonBuilder().setCustomId('admin_mult').setLabel('Multiplicateurs').setEmoji('🎚️').setStyle(ButtonStyle.Primary)
+    new ButtonBuilder().setCustomId('admin_mult').setLabel('Multiplicateurs').setEmoji('🎚️').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId('admin_event').setLabel('Événement').setEmoji('📢').setStyle(ButtonStyle.Primary)
   );
   return { embeds: [embed], components: [row1, row2] };
+}
+
+// ---------- Événements "premier arrivé" ----------
+const activeEvents = new Map(); // eventId -> { amount, guildId, channelId, messageId, expiresAt, claimed, timer }
+
+function eventEmbed(amount, expiresAt, claimedBy) {
+  const e = new EmbedBuilder()
+    .setTitle('📢 Événement casino')
+    .setColor(claimedBy ? COLORS.grey : COLORS.violet);
+  if (claimedBy) {
+    e.setDescription(
+      `🏁 **Terminé** — <@${claimedBy}> a remporté **${fmt(amount)}** !`
+    );
+  } else {
+    const timeLine = expiresAt
+      ? `\n⏱️ Expire <t:${Math.floor(expiresAt / 1000)}:R>`
+      : '\n⏱️ Sans limite de temps';
+    e.setDescription(
+      `🎁 **${fmt(amount)}** à gagner !\n` +
+        `Le **premier** qui clique sur **Réclamer** empoche la somme.${timeLine}`
+    );
+  }
+  return e;
+}
+
+function eventRow(eventId, disabled) {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`event_claim_${eventId}`)
+      .setLabel(disabled ? 'Déjà pris' : 'Réclamer')
+      .setEmoji(disabled ? '🏁' : '🎁')
+      .setStyle(disabled ? ButtonStyle.Secondary : ButtonStyle.Success)
+      .setDisabled(!!disabled)
+  );
+}
+
+async function expireEvent(eventId) {
+  const ev = activeEvents.get(eventId);
+  if (!ev || ev.claimed) {
+    activeEvents.delete(eventId);
+    return;
+  }
+  ev.claimed = true; // bloque les clics
+  clearTimeout(ev.timer);
+  activeEvents.delete(eventId);
+  try {
+    const ch = await client.channels.fetch(ev.channelId).catch(() => null);
+    const msg = ch ? await ch.messages.fetch(ev.messageId).catch(() => null) : null;
+    if (msg) {
+      await msg.edit({
+        embeds: [
+          new EmbedBuilder()
+            .setTitle('📢 Événement casino')
+            .setColor(COLORS.grey)
+            .setDescription(`⏱️ **Expiré** — personne n’a réclamé **${fmt(ev.amount)}** à temps.`),
+        ],
+        components: [eventRow(eventId, true)],
+      });
+    }
+  } catch (e) {
+    console.error('[event] expire', e?.message || e);
+  }
+}
+
+async function handleEventClaim(i) {
+  const eventId = i.customId.slice('event_claim_'.length);
+  const ev = activeEvents.get(eventId);
+  if (!ev || ev.claimed) {
+    return i.reply({ content: 'Cette récompense n’est plus disponible.', flags: EPH });
+  }
+  if (ev.expiresAt && Date.now() > ev.expiresAt) {
+    await expireEvent(eventId);
+    return i.reply({ content: '⏱️ Cet événement a expiré.', flags: EPH });
+  }
+
+  // Premier arrivé : verrou immédiat
+  ev.claimed = true;
+  clearTimeout(ev.timer);
+  activeEvents.delete(eventId);
+
+  try {
+    const balance = await credit(i.user.id, ev.amount);
+    const embed = eventEmbed(ev.amount, null, i.user.id);
+    embed.addFields({ name: 'Solde du gagnant', value: fmt(balance), inline: true });
+    await i.update({ embeds: [embed], components: [eventRow(eventId, true)] });
+  } catch (e) {
+    // en cas d'échec crédit, on pourrait rouvrir — mais rare
+    console.error('[event] claim', e?.message || e);
+    if (!i.replied && !i.deferred) {
+      await i.reply({ content: '⚠️ Erreur lors du crédit, réessaie ou contacte le proprio.', flags: EPH }).catch(() => {});
+    }
+  }
+}
+
+async function createCasinoEvent(i, amount, minutes) {
+  const casinoId = casinoChannels.get(i.guild.id);
+  if (!casinoId) {
+    return respondText(i, 'Aucun salon casino : utilise d’abord `!setup`.');
+  }
+  const ch = await client.channels.fetch(casinoId).catch(() => null);
+  if (!ch) return respondText(i, 'Salon casino introuvable. Refais `!setup`.');
+
+  const eventId = `${Date.now().toString(36)}_${randomInt(1000, 9999)}`;
+  const expiresAt = minutes > 0 ? Date.now() + minutes * 60_000 : null;
+
+  const msg = await ch.send({
+    embeds: [eventEmbed(amount, expiresAt, null)],
+    components: [eventRow(eventId, false)],
+  });
+
+  const ev = {
+    amount,
+    guildId: i.guild.id,
+    channelId: ch.id,
+    messageId: msg.id,
+    expiresAt,
+    claimed: false,
+    timer: null,
+  };
+  if (expiresAt) {
+    ev.timer = setTimeout(() => expireEvent(eventId), expiresAt - Date.now());
+  }
+  activeEvents.set(eventId, ev);
+
+  return i.reply({
+    content:
+      `✅ Événement posté dans <#${ch.id}> : **${fmt(amount)}**` +
+      (minutes > 0 ? ` · expire dans **${minutes} min**` : ' · sans limite de temps') +
+      '.',
+    flags: EPH,
+  });
 }
 
 // Description des gains "têtes d'affiche" de chaque jeu avec le coefficient actuel
@@ -1891,6 +2086,22 @@ async function handleAdmin(i) {
   if (i.isButton()) {
     const action = id.slice('admin_'.length);
     if (action === 'mult') return i.reply({ ...multAdminPayload(), flags: EPH });
+    if (action === 'event') {
+      return i.showModal(
+        new ModalBuilder()
+          .setCustomId('modal_admin_event')
+          .setTitle('📢 Événement casino')
+          .addComponents(
+            modalInput('amount', 'Montant à gagner', { placeholder: 'ex : 50' }),
+            modalInput('minutes', 'Durée max en minutes (0 = illimité)', {
+              placeholder: 'ex : 5',
+              value: '5',
+              required: false,
+              max: 6,
+            })
+          )
+      );
+    }
     if (ADMIN_TITLES[action]) {
       const row = new ActionRowBuilder().addComponents(
         new UserSelectMenuBuilder()
@@ -1956,6 +2167,21 @@ async function handleAdmin(i) {
   if (i.isModalSubmit()) {
     const raw = i.fields.getTextInputValue('amount').trim();
 
+    if (id === 'modal_admin_event') {
+      const amount = parseAmount(raw);
+      if (!amount || amount > MAX_ADMIN_AMOUNT) {
+        return respondText(i, `Montant invalide (entre 0.01 et ${num(MAX_ADMIN_AMOUNT)}).`);
+      }
+      let minutes = 0;
+      try {
+        const mRaw = i.fields.getTextInputValue('minutes')?.trim() || '0';
+        minutes = Math.max(0, Math.min(24 * 60, Math.floor(Number(String(mRaw).replace(',', '.')) || 0)));
+      } catch {
+        minutes = 0;
+      }
+      return createCasinoEvent(i, amount, minutes);
+    }
+
     if (id === 'modal_admin_all') {
       const amount = parseAmount(raw);
       if (!amount || amount > MAX_ADMIN_AMOUNT) {
@@ -2000,6 +2226,7 @@ async function handleAdmin(i) {
       const current = await getBalance(userId);
       balance = Number(await rpc('admin_adjust', { p_user_id: userId, p_amount: round2(amount - current) }));
     }
+    await touchPeak(userId, balance);
     const verb = { add: `➕ **${fmt(amount)}** ajoutés à`, remove: `➖ **${fmt(amount)}** retirés à`, set: '🎯 Solde défini pour' }[action];
     return i.reply({ content: `✅ ${verb} <@${userId}>. Nouveau solde : **${fmt(balance)}**`, flags: EPH });
   }
@@ -2022,6 +2249,7 @@ async function cmdBalance(msg, args) {
 
 async function cmdDaily(msg) {
   const res = await rpc('claim_daily', { p_user_id: msg.author.id, p_amount: DAILY_AMOUNT });
+  if (res?.balance != null) await touchPeak(msg.author.id, res.balance);
   return msg.reply(dailyText(res));
 }
 
@@ -2037,6 +2265,7 @@ async function cmdAdjust(msg, args, sign) {
   if (amount > MAX_ADMIN_AMOUNT) return msg.reply(`Montant trop grand (max ${num(MAX_ADMIN_AMOUNT)}).`);
 
   const balance = Number(await rpc('admin_adjust', { p_user_id: targetId, p_amount: sign * amount }));
+  await touchPeak(targetId, balance);
   return msg.reply(
     sign > 0
       ? `✅ **${fmt(amount)}** ajoutés à <@${targetId}>. Nouveau solde : **${fmt(balance)}**`
@@ -2330,6 +2559,43 @@ async function buildLeaderboardEmbed() {
     .setTimestamp();
 }
 
+async function buildAllTimeLeaderboardEmbed() {
+  // Seed peaks with current balances so the ranking is useful dès le démarrage
+  try {
+    const { data } = await supabase.from('players').select('user_id, balance').gt('balance', 0).limit(50);
+    if (data) {
+      for (const r of data) await touchPeak(r.user_id, Number(r.balance));
+    }
+  } catch {
+    /* ignore */
+  }
+
+  const ranked = [...peaks.entries()]
+    .filter(([, p]) => p > 0)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10);
+
+  const medals = ['🥇', '🥈', '🥉'];
+  const lines = [];
+  for (let i = 0; i < ranked.length; i++) {
+    const [uid, peak] = ranked[i];
+    const u = await client.users.fetch(uid).catch(() => null);
+    const name = u ? escapeMarkdown(u.globalName || u.username) : 'Utilisateur inconnu';
+    lines.push(`${medals[i] ?? `**${i + 1}.**`} ${name} : **${fmt(peak)}**`);
+  }
+
+  return new EmbedBuilder()
+    .setTitle('👑 Classement all-time (solde max)')
+    .setColor(COLORS.violet)
+    .setDescription(
+      lines.length
+        ? lines.join('\n')
+        : 'Aucun record encore. Les pics se mettent à jour à chaque gain.'
+    )
+    .setFooter({ text: 'Record = plus haut solde jamais atteint' })
+    .setTimestamp();
+}
+
 async function cmdLeaderboard(msg) {
   if (!isCrown(msg)) return msg.reply(CROWN_ONLY);
 
@@ -2470,6 +2736,9 @@ client.on(Events.InteractionCreate, async (i) => {
 
     // Panneau admin
     if (id.startsWith('admin_') || id.startsWith('modal_admin_')) return await handleAdmin(i);
+
+    // Événements "premier arrivé"
+    if (id.startsWith('event_claim_') && i.isButton()) return await handleEventClaim(i);
 
     const isGame =
       id.startsWith('panel_') ||
@@ -2686,6 +2955,7 @@ client.on(Events.ChannelDelete, async (channel) => {
 client.once(Events.ClientReady, (c) => {
   console.log(`✅ Connecté en tant que ${c.user.tag}`);
   loadMultipliers();
+  loadPeaks();
   for (const g of c.guilds.cache.values()) cacheInvites(g);
   loadChannels().then(restoreChannelsByName);
   setInterval(updateLeaderboards, LEADERBOARD_REFRESH_MS);
