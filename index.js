@@ -447,6 +447,16 @@ const GAME_NAMES = {
   chest: '📦 Coffre mystère',
   russian: '🔫 Roulette russe',
   horses: '🏇 Course de chevaux',
+  limbo: '📈 Limbo',
+  higher: '⬆️ Higher / Lower',
+  rps: '✊ Pierre-Papier-Ciseaux',
+  colorpick: '🎨 Couleur',
+  ladder: '🪜 Échelle',
+  keno: '🎱 Keno',
+  war: '⚔️ Guerre',
+  hilo: '🃏 Hi-Lo',
+  bingo: '🅱️ Bingo',
+  jackpot: '💎 Jackpot',
 };
 // Nom du jeu sans l'emoji (pour l'image canvas qui n'affiche pas les emojis)
 const gameNamePlain = (g) => (GAME_NAMES[g] ? GAME_NAMES[g].replace(/^\S+\s/, '') : g);
@@ -2097,6 +2107,314 @@ Object.assign(INSTANT, {
       };
     },
   },
+
+  // ---------- 10 nouveaux jeux ----------
+  limbo: {
+    title: '📈 Limbo',
+    choices: ['x15', 'x2', 'x3', 'x5', 'x10'],
+    spinText: 'Le multiplicateur monte...',
+    info: (c) => `cibles x1.5 à x10`,
+    picker: (c) =>
+      choicePicker(
+        'limbo',
+        '📈 Limbo : choisis ta cible',
+        'Le multiplicateur monte de façon aléatoire. S’il dépasse ta cible, tu gagnes x cible.',
+        [
+          ['x15', 'x1.5', '📈'],
+          ['x2', 'x2', '📈'],
+          ['x3', 'x3', '📈'],
+          ['x5', 'x5', '📈'],
+          ['x10', 'x10', '📈'],
+        ]
+      ),
+    resolve(choice) {
+      const target = { x15: 1.5, x2: 2, x3: 3, x5: 5, x10: 10 }[choice];
+      const u = randomInt(1, 1_000_001) / 1_000_000;
+      const peak = Math.max(1, Math.floor((0.97 / u) * 100) / 100);
+      return {
+        base: peak >= target ? target : 0,
+        pick: `Cible x${target}`,
+        headline: `📈 Pic atteint : **${fx(Math.min(peak, 1000))}**${peak >= target ? ' · cible validée !' : ' · trop bas'}`,
+        detail: `cible ${target} / pic ${Math.min(peak, 1000)}`,
+        peak,
+        target,
+      };
+    },
+  },
+
+  higher: {
+    title: '⬆️ Higher / Lower',
+    choices: ['higher', 'lower'],
+    spinText: 'La carte se retourne...',
+    info: (c) => `victoire ${fx(1.9 * c)}`,
+    picker: (c) =>
+      choicePicker(
+        'higher',
+        '⬆️ Higher / Lower',
+        `Une carte de référence est tirée. Devine si la suivante est **plus haute** ou **plus basse** (As = 1). Victoire : **${fx(1.9 * c)}**`,
+        [
+          ['higher', 'Plus haute', '⬆️'],
+          ['lower', 'Plus basse', '⬇️'],
+        ]
+      ),
+    resolve(choice) {
+      const a = randomInt(1, 14);
+      const b = randomInt(1, 14);
+      const ranks = ['', 'A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+      const won = choice === 'higher' ? b > a : b < a;
+      return {
+        base: won ? 1.9 : 0,
+        pick: choice === 'higher' ? 'Plus haute' : 'Plus basse',
+        headline: `Référence **${ranks[a]}** → suivante **${ranks[b]}**`,
+        detail: `${ranks[a]} -> ${ranks[b]}`,
+        a,
+        b,
+      };
+    },
+  },
+
+  rps: {
+    title: '✊ Pierre-Papier-Ciseaux',
+    choices: ['rock', 'paper', 'scissors'],
+    spinText: '1... 2... 3...',
+    info: (c) => `victoire ${fx(2.8 * c)}`,
+    picker: (c) =>
+      choicePicker(
+        'rps',
+        '✊ Pierre · Papier · Ciseaux',
+        `Bat le bot. Victoire : **${fx(2.8 * c)}** · Égalité = mise remboursée.`,
+        [
+          ['rock', 'Pierre', '✊'],
+          ['paper', 'Papier', '✋'],
+          ['scissors', 'Ciseaux', '✌️'],
+        ]
+      ),
+    resolve(choice) {
+      const opts = ['rock', 'paper', 'scissors'];
+      const bot = opts[randomInt(0, 3)];
+      const names = { rock: 'Pierre ✊', paper: 'Papier ✋', scissors: 'Ciseaux ✌️' };
+      let base = 0;
+      if (choice === bot) base = 1;
+      else if (
+        (choice === 'rock' && bot === 'scissors') ||
+        (choice === 'paper' && bot === 'rock') ||
+        (choice === 'scissors' && bot === 'paper')
+      )
+        base = 2.8;
+      return {
+        base,
+        pick: names[choice],
+        headline: `Toi : **${names[choice]}** · Bot : **${names[bot]}**`,
+        detail: `${choice} vs ${bot}`,
+        bot,
+      };
+    },
+  },
+
+  colorpick: {
+    title: '🎨 Couleur',
+    choices: ['red', 'blue', 'green', 'yellow'],
+    spinText: 'La couleur se révèle...',
+    info: (c) => `victoire ${fx(3.6 * c)}`,
+    picker: (c) =>
+      choicePicker(
+        'colorpick',
+        '🎨 Devine la couleur',
+        `4 couleurs possibles. Victoire : **${fx(3.6 * c)}** (1 chance sur 4).`,
+        [
+          ['red', 'Rouge', '🔴'],
+          ['blue', 'Bleu', '🔵'],
+          ['green', 'Vert', '🟢'],
+          ['yellow', 'Jaune', '🟡'],
+        ]
+      ),
+    resolve(choice) {
+      const cols = ['red', 'blue', 'green', 'yellow'];
+      const em = { red: '🔴', blue: '🔵', green: '🟢', yellow: '🟡' };
+      const names = { red: 'Rouge', blue: 'Bleu', green: 'Vert', yellow: 'Jaune' };
+      const out = cols[randomInt(0, 4)];
+      return {
+        base: out === choice ? 3.6 : 0,
+        pick: names[choice],
+        headline: `Couleur tirée : **${em[out]} ${names[out]}**`,
+        detail: `${choice} -> ${out}`,
+        out,
+      };
+    },
+  },
+
+  ladder: {
+    title: '🪜 Échelle',
+    choices: ['s1', 's2', 's3', 's4', 's5'],
+    spinText: 'Tu montes les échelons...',
+    info: (c) => `x1.5 à x8`,
+    picker: (c) =>
+      choicePicker(
+        'ladder',
+        '🪜 Échelle : jusqu’où montes-tu ?',
+        'Chaque échelon est plus risqué et plus rémunérateur. Tu gagnes si tu atteins ton niveau.',
+        [
+          ['s1', 'Palier 1 (x1.5)', '🪜'],
+          ['s2', 'Palier 2 (x2.2)', '🪜'],
+          ['s3', 'Palier 3 (x3.5)', '🪜'],
+          ['s4', 'Palier 4 (x5)', '🪜'],
+          ['s5', 'Palier 5 (x8)', '🪜'],
+        ]
+      ),
+    resolve(choice) {
+      const levels = [1.5, 2.2, 3.5, 5, 8];
+      const want = Number(choice.slice(1));
+      // probabilité de réussir jusqu'au palier n
+      const probs = [0.7, 0.5, 0.35, 0.22, 0.12];
+      const reached = randomInt(0, 1000) / 1000 < probs[want - 1] ? want : randomInt(0, want);
+      return {
+        base: reached >= want ? levels[want - 1] : 0,
+        pick: `Palier ${want}`,
+        headline: `Tu as atteint le **palier ${reached}**${reached >= want ? ' · objectif réussi !' : ' · trop tôt'}`,
+        detail: `cible ${want} / atteint ${reached}`,
+        reached,
+        want,
+      };
+    },
+  },
+
+  keno: {
+    title: '🎱 Keno',
+    choices: ['n1', 'n2', 'n3', 'n4', 'n5', 'n6', 'n7', 'n8', 'n9', 'n10'],
+    spinText: 'Tirage du numéro...',
+    info: (c) => `victoire ${fx(9.5 * c)}`,
+    picker: (c) =>
+      choicePicker(
+        'keno',
+        '🎱 Keno : choisis un numéro (1-10)',
+        `1 numéro tiré sur 10. Victoire : **${fx(9.5 * c)}**.`,
+        [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => [`n${n}`, String(n), '🎱'])
+      ),
+    resolve(choice) {
+      const n = randomInt(1, 11);
+      const want = Number(choice.slice(1));
+      return {
+        base: n === want ? 9.5 : 0,
+        pick: `N° ${want}`,
+        headline: `Numéro tiré : **${n}**`,
+        detail: `${want} -> ${n}`,
+        n,
+        want,
+      };
+    },
+  },
+
+  war: {
+    title: '⚔️ Guerre',
+    choices: ['go'],
+    spinText: 'Les cartes sont posées...',
+    info: (c) => `victoire ${fx(1.95 * c)}`,
+    picker: (c) =>
+      choicePicker(
+        'war',
+        '⚔️ Guerre de cartes',
+        `Toi vs le croupier : une carte chacun. La plus haute gagne (**${fx(1.95 * c)}**). Égalité = perdu.`,
+        [['go', 'Jouer', '⚔️', ButtonStyle.Success]]
+      ),
+    resolve() {
+      const me = randomInt(1, 14);
+      const dealer = randomInt(1, 14);
+      const ranks = ['', 'A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+      return {
+        base: me > dealer ? 1.95 : 0,
+        pick: 'Guerre',
+        headline: `Toi **${ranks[me]}** · Croupier **${ranks[dealer]}**`,
+        detail: `${ranks[me]} vs ${ranks[dealer]}`,
+        me,
+        dealer,
+      };
+    },
+  },
+
+  hilo: {
+    title: '🃏 Hi-Lo',
+    choices: ['go'],
+    spinText: 'Suite de 3 cartes...',
+    info: (c) => `3 hautes ou 3 basses ${fx(4 * c)}`,
+    picker: (c) =>
+      choicePicker(
+        'hilo',
+        '🃏 Hi-Lo',
+        `3 cartes tirées. Si les 3 sont hautes (8+) ou les 3 basses (7-), tu gagnes **${fx(4 * c)}**.`,
+        [['go', 'Tirer', '🃏', ButtonStyle.Success]]
+      ),
+    resolve() {
+      const cards = [randomInt(1, 14), randomInt(1, 14), randomInt(1, 14)];
+      const ranks = ['', 'A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+      const high = cards.every((c) => c >= 8);
+      const low = cards.every((c) => c <= 7);
+      return {
+        base: high || low ? 4 : 0,
+        pick: 'Hi-Lo',
+        headline: `Cartes : **${cards.map((c) => ranks[c]).join(' · ')}**${high ? ' · 3 HAUTES !' : low ? ' · 3 BASSES !' : ''}`,
+        detail: cards.map((c) => ranks[c]).join('-'),
+        cards,
+      };
+    },
+  },
+
+  bingo: {
+    title: '🅱️ Bingo',
+    choices: ['b1', 'b2', 'b3', 'b4', 'b5'],
+    spinText: 'La bille sort...',
+    info: (c) => `victoire ${fx(4.5 * c)}`,
+    picker: (c) =>
+      choicePicker(
+        'bingo',
+        '🅱️ Bingo : choisis ta case',
+        `5 cases. Une bille sort. Victoire : **${fx(4.5 * c)}**.`,
+        [1, 2, 3, 4, 5].map((n) => [`b${n}`, `Case ${n}`, '🅱️'])
+      ),
+    resolve(choice) {
+      const n = randomInt(1, 6);
+      const want = Number(choice.slice(1));
+      return {
+        base: n === want ? 4.5 : 0,
+        pick: `Case ${want}`,
+        headline: `Bille dans la **case ${n}**`,
+        detail: `${want} -> ${n}`,
+        n,
+        want,
+      };
+    },
+  },
+
+  jackpot: {
+    title: '💎 Jackpot',
+    choices: ['go'],
+    spinText: 'Les symboles tournent...',
+    info: (c) => `jackpot ${fx(50 * c)} · 2 identiques ${fx(3 * c)}`,
+    picker: (c) =>
+      choicePicker(
+        'jackpot',
+        '💎 Jackpot',
+        `3 symboles. 3 identiques = **${fx(50 * c)}**. 2 identiques = **${fx(3 * c)}**.`,
+        [['go', 'Lancer', '💎', ButtonStyle.Success]]
+      ),
+    resolve() {
+      const syms = ['🍒', '🍋', '💎', '7️⃣', '⭐'];
+      const a = syms[randomInt(0, syms.length)];
+      const b = syms[randomInt(0, syms.length)];
+      const c = syms[randomInt(0, syms.length)];
+      let base = 0;
+      if (a === b && b === c) base = a === '💎' || a === '7️⃣' ? 50 : 20;
+      else if (a === b || b === c || a === c) base = 3;
+      return {
+        base,
+        pick: 'Jackpot',
+        headline: `**[ ${a} | ${b} | ${c} ]**`,
+        detail: `${a}-${b}-${c}`,
+        a,
+        b,
+        c,
+      };
+    },
+  },
 });
 
 // ============================================================
@@ -2434,6 +2752,136 @@ ANIMS.horses = (res) => {
   return frames;
 };
 
+// Animations simples pour les nouveaux jeux
+ANIMS.limbo = (res) => {
+  const steps = 8;
+  const frames = [];
+  for (let k = 1; k <= steps; k++) {
+    const m = Math.max(1, Math.round(Math.pow(res.peak, k / steps) * 100) / 100);
+    const bar = '█'.repeat(Math.min(20, Math.floor(m * 2))) + '░'.repeat(Math.max(0, 20 - Math.floor(m * 2)));
+    frames.push({
+      art: code([`  ${bar}`, `  x${m.toFixed(2)}`, '', `  Cible : x${res.target}`]),
+      caption: m >= res.target ? 'Cible dépassée !' : 'Ça monte...',
+      ms: 700,
+    });
+  }
+  frames.push({
+    art: code([`  PIC : x${Math.min(res.peak, 1000).toFixed(2)}`, `  Cible : x${res.target}`]),
+    caption: res.peak >= res.target ? 'Cible validée !' : 'Trop bas',
+    ms: 1100,
+  });
+  return frames;
+};
+
+ANIMS.higher = (res) => {
+  const ranks = ['', 'A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+  return [
+    { art: code(['  [?]', '', '  Carte de référence...']), caption: 'Tirage de la référence', ms: 900 },
+    { art: code([`  [${ranks[res.a]}]`, '', '  Référence posée']), caption: `Référence : ${ranks[res.a]}`, ms: 1000 },
+    { art: code([`  [${ranks[res.a]}]  →  [?]`, '', '  La suivante se retourne...']), caption: 'Suspense', ms: 1000 },
+    { art: code([`  [${ranks[res.a]}]  →  [${ranks[res.b]}]`]), caption: `Suivante : ${ranks[res.b]}`, ms: 1100 },
+  ];
+};
+
+ANIMS.rps = (res) => {
+  const names = { rock: '✊', paper: '✋', scissors: '✌️' };
+  return [
+    { art: code(['  1...']), caption: 'Pierre', ms: 700 },
+    { art: code(['  2...']), caption: 'Papier', ms: 700 },
+    { art: code(['  3...']), caption: 'Ciseaux', ms: 700 },
+    { art: code([`  Toi ${names[res.detail.split(' vs ')[0]]}  ·  Bot ${names[res.bot]}`]), caption: 'Résultat', ms: 1200 },
+  ];
+};
+
+ANIMS.colorpick = (res) => {
+  const em = { red: '🔴', blue: '🔵', green: '🟢', yellow: '🟡' };
+  const order = ['red', 'blue', 'green', 'yellow'];
+  return order.map((c, k) => ({
+    art: code([`  ${em[c]}`, '', '  Les couleurs tournent...']),
+    caption: 'Mélange',
+    ms: 600 + k * 50,
+  })).concat([
+    { art: code([`  ${em[res.out]}`, '', `  Couleur tirée`]), caption: 'Résultat', ms: 1100 },
+  ]);
+};
+
+ANIMS.ladder = (res) => {
+  const frames = [];
+  for (let k = 0; k <= res.reached; k++) {
+    const steps = Array.from({ length: 5 }, (_, i) => (i < k ? '▓▓' : i === k ? '██' : '░░')).reverse();
+    frames.push({
+      art: code(['  ÉCHELLE', ...steps.map((s, i) => `  ${5 - i} ${s}`)]),
+      caption: k === 0 ? 'Départ' : `Palier ${k}`,
+      ms: 750,
+    });
+  }
+  frames.push({
+    art: code([`  Atteint : palier ${res.reached}`, `  Objectif : palier ${res.want}`]),
+    caption: res.reached >= res.want ? 'Objectif réussi !' : 'Chute',
+    ms: 1100,
+  });
+  return frames;
+};
+
+ANIMS.keno = (res) => {
+  const frames = [];
+  for (let k = 0; k < 6; k++) {
+    const n = randomInt(1, 11);
+    frames.push({ art: code([`  [ ${n} ]`]), caption: 'Les numéros défilent', ms: 600 });
+  }
+  frames.push({ art: code([`  [ ${res.n} ]`]), caption: `Numéro tiré : ${res.n}`, ms: 1100 });
+  return frames;
+};
+
+ANIMS.war = (res) => {
+  const ranks = ['', 'A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+  return [
+    { art: code(['  [?]     [?]']), caption: 'Cartes posées', ms: 900 },
+    { art: code([`  [${ranks[res.me]}]     [?]`]), caption: 'Ta carte', ms: 1000 },
+    { art: code([`  [${ranks[res.me]}]     [${ranks[res.dealer]}]`]), caption: 'Carte du croupier', ms: 1100 },
+  ];
+};
+
+ANIMS.hilo = (res) => {
+  const ranks = ['', 'A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+  const frames = [];
+  for (let k = 1; k <= 3; k++) {
+    frames.push({
+      art: code([`  ${res.cards.slice(0, k).map((c) => ranks[c]).join(' · ')}`]),
+      caption: `Carte ${k}/3`,
+      ms: 900,
+    });
+  }
+  return frames;
+};
+
+ANIMS.bingo = (res) => {
+  const frames = [];
+  for (let k = 0; k < 5; k++) {
+    frames.push({ art: code([`  Case ${randomInt(1, 6)}`]), caption: 'La bille tourne...', ms: 600 });
+  }
+  frames.push({ art: code([`  Case ${res.n}`]), caption: `Bille dans la case ${res.n}`, ms: 1100 });
+  return frames;
+};
+
+ANIMS.jackpot = (res) => {
+  const syms = ['🍒', '🍋', '💎', '7️⃣', '⭐'];
+  const frames = [];
+  for (let k = 0; k < 5; k++) {
+    frames.push({
+      art: code([`  [ ${syms[randomInt(0, 5)]} | ${syms[randomInt(0, 5)]} | ${syms[randomInt(0, 5)]} ]`]),
+      caption: 'Les rouleaux tournent',
+      ms: 700,
+    });
+  }
+  frames.push({
+    art: code([`  [ ${res.a} | ${res.b} | ${res.c} ]`]),
+    caption: 'Résultat',
+    ms: 1200,
+  });
+  return frames;
+};
+
 async function playInstant(i, key, bet, choice) {
   const G = INSTANT[key];
   if (!G || !G.choices.includes(choice)) return respondText(i, 'Pari invalide.');
@@ -2555,84 +3003,88 @@ function buildHelpEmbed() {
 function buildPanelPayload() {
   const panel = new EmbedBuilder()
     .setColor(0x7C3AED)
-    .setAuthor({ name: 'ZNK CASINO' })
     .setTitle('✦ Salon de jeu')
     .setDescription(
       [
-        'Bienvenue sur **ZNK Casino**.',
+        'Bienvenue dans le salon de jeu.',
         '',
-        `🎁 **Daily** · **${DAILY_AMOUNT}** ${COIN} · 1× / jour · minuit Paris`,
+        `🎁 **Daily** · **${DAILY_AMOUNT}** ${COIN} par jour (minuit Paris)`,
         '',
-        '▶️ **Start** : casino privé en MP',
-        '⚙️ **Paramètres** : langue FR / EN et ping des victoires',
+        '▶️ **Start** : ouvre ton casino privé en message privé',
+        '⚙️ **Paramètres** : langue et notifications de victoire',
         '📊 **Stats** : ta bannière de statistiques',
+        '📖 **Règles** : explications simples de tous les jeux',
         '📨 **Invites** : tes invitations',
         '',
-        '🔒 Parties privées · classements partagés',
+        '🔒 Toutes les parties sont privées.',
       ].join('\n')
     )
     .addFields(
       { name: 'Jouer', value: 'Start → MP', inline: true },
       { name: 'Monnaie', value: COIN, inline: true },
-      { name: 'Langues', value: 'FR · EN', inline: true }
+      { name: 'Daily', value: `${DAILY_AMOUNT} ${COIN}`, inline: true }
     )
-    .setFooter({ text: 'ZNK Casino' })
+    .setFooter({ text: 'Parties privées' })
     .setTimestamp();
 
   const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('panel_start').setLabel('Start').setEmoji('▶️').setStyle(ButtonStyle.Success),
     new ButtonBuilder().setCustomId('panel_settings').setLabel('Paramètres').setEmoji('⚙️').setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId('panel_stats').setLabel('Stats').setEmoji('📊').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('panel_rules').setLabel('Règles').setEmoji('📖').setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId('panel_invites').setLabel('Invites').setEmoji('📨').setStyle(ButtonStyle.Secondary)
   );
-  return { content: `${COIN} **ZNK Casino**`, embeds: [panel], components: [row] };
+  return { content: `${COIN} **Salon de jeu**`, embeds: [panel], components: [row] };
 }
 
-function buildDmPlayPayload(userId) {
+async function buildDmPlayPayload(userId) {
   const lang = getLang(userId);
+  let bal = 0;
+  try {
+    bal = await getBalance(userId);
+  } catch {
+    /* ignore */
+  }
   const embed = new EmbedBuilder()
     .setColor(0xA855F7)
-    .setAuthor({ name: 'ZNK CASINO' })
-    .setTitle(lang === 'en' ? '✦ Your table' : '✦ Ta table')
+    .setTitle(lang === 'en' ? '✦ Your private casino' : '✦ Ton casino privé')
     .setDescription(
       lang === 'en'
         ? [
-            'Language: **English**',
-            `Daily: **${DAILY_AMOUNT}** ${COIN} · once / day (Paris midnight)`,
+            `💰 **Balance : ${fmt(bal)}**`,
+            `🎁 Daily : **${DAILY_AMOUNT}** ${COIN} once a day (Paris midnight)`,
             '',
-            '**Play** opens the game picker.',
-            `**Send** transfers ${COIN} to another player (Discord ID).`,
-            '**Clear** closes games and cleans this chat.',
+            '**Play** → choose a game',
+            '**Send** → transfer coins (username of a server member)',
+            '**Rules** → simple rules of every game',
+            '**Clear** → delete all messages here and resend this panel',
           ].join('\n')
         : [
-            'Langue : **Français**',
-            `Daily : **${DAILY_AMOUNT}** ${COIN} · 1× / jour (minuit Paris)`,
+            `💰 **Solde : ${fmt(bal)}**`,
+            `🎁 Daily : **${DAILY_AMOUNT}** ${COIN} par jour (minuit Paris)`,
             '',
-            '**Jouer** ouvre le choix des jeux.',
-            `**Envoyer** transfère des ${COIN} (ID Discord).`,
-            '**Clear** ferme les parties et nettoie ce chat.',
+            '**Jouer** → choisir un jeu',
+            '**Envoyer** → transférer des coins (pseudo d’un membre du serveur)',
+            '**Règles** → explications simples de chaque jeu',
+            '**Clear** → supprime tous les messages ici et renvoie ce panneau',
           ].join('\n')
     )
-    .setFooter({ text: 'ZNK Casino' })
+    .setFooter({ text: lang === 'en' ? 'Private panel' : 'Panneau privé' })
     .setTimestamp();
 
   const row1 = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('panel_play').setLabel(lang === 'en' ? 'Play' : 'Jouer').setEmoji('🎮').setStyle(ButtonStyle.Success),
     new ButtonBuilder().setCustomId('panel_daily').setLabel('Daily').setEmoji('🎁').setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId('panel_balance').setLabel(lang === 'en' ? 'Balance' : 'Solde').setEmoji('💰').setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId('panel_send').setLabel(lang === 'en' ? 'Send' : 'Envoyer').setEmoji('💸').setStyle(ButtonStyle.Primary)
+    new ButtonBuilder().setCustomId('panel_send').setLabel(lang === 'en' ? 'Send' : 'Envoyer').setEmoji('💸').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId('panel_rules').setLabel(lang === 'en' ? 'Rules' : 'Règles').setEmoji('📖').setStyle(ButtonStyle.Secondary)
   );
   const row2 = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('panel_history').setLabel(lang === 'en' ? 'History' : 'Historique').setEmoji('📜').setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId('panel_top').setLabel(lang === 'en' ? 'Ranks' : 'Classement').setEmoji('🏆').setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId('panel_topall').setLabel('All-time').setEmoji('👑').setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId('panel_stats').setLabel('Stats').setEmoji('📊').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('panel_settings').setLabel(lang === 'en' ? 'Settings' : 'Paramètres').setEmoji('⚙️').setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId('panel_clear').setLabel('Clear').setEmoji('🧹').setStyle(ButtonStyle.Danger)
   );
-  const row3 = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('panel_settings').setLabel(lang === 'en' ? 'Settings' : 'Paramètres').setEmoji('⚙️').setStyle(ButtonStyle.Secondary)
-  );
-  return { embeds: [embed], components: [row1, row2, row3] };
+  return { embeds: [embed], components: [row1, row2] };
 }
 
 const GAME_MENU = [
@@ -2653,6 +3105,16 @@ const GAME_MENU = [
   ['chest', 'Coffre', '📦', 'Trouve le trésor'],
   ['russian', 'Russe', '🔫', 'Survis au barillet'],
   ['horses', 'Chevaux', '🏇', 'Parie sur le gagnant'],
+  ['limbo', 'Limbo', '📈', 'Choisis ta cible'],
+  ['higher', 'Higher/Lower', '⬆️', 'Plus haut ou plus bas'],
+  ['rps', 'PFC', '✊', 'Pierre papier ciseaux'],
+  ['colorpick', 'Couleur', '🎨', 'Devine la couleur'],
+  ['ladder', 'Échelle', '🪜', 'Monte les échelons'],
+  ['keno', 'Keno', '🎱', 'Tire 1 numéro sur 10'],
+  ['war', 'Guerre', '⚔️', 'Carte vs carte'],
+  ['hilo', 'Hi-Lo', '🃏', 'Suite de cartes'],
+  ['bingo', 'Bingo', '🅱️', 'Numéro tiré'],
+  ['jackpot', 'Jackpot', '💎', '3 symboles = jackpot'],
 ];
 
 function buildGameMenuPayload(userId = null) {
@@ -2661,6 +3123,8 @@ function buildGameMenuPayload(userId = null) {
     mines: 'Mines', bj: 'Blackjack', roulette: 'Roulette', coinflip: 'Coin Flip', dice: 'Dice', slots: 'Slots',
     wheel: 'Wheel', duel: 'Duel', suit: 'Suit', zone: 'Zone', plinko: 'Plinko', crash: 'Crash', scratch: 'Scratch',
     die: 'Exact die', chest: 'Chest', russian: 'Russian roulette', horses: 'Horses',
+    limbo: 'Limbo', higher: 'Higher/Lower', rps: 'RPS', colorpick: 'Color', ladder: 'Ladder',
+    keno: 'Keno', war: 'War', hilo: 'Hi-Lo', bingo: 'Bingo', jackpot: 'Jackpot',
   };
   const descs = {
     mines: 'Avoid bombs · rising mult', bj: 'Beat the dealer · soft aces', roulette: 'Color · parity · number',
@@ -2668,6 +3132,9 @@ function buildGameMenuPayload(userId = null) {
     duel: 'Card vs dealer', suit: 'Guess the suit', zone: 'Low · mid · high', plinko: 'Ball · risk level',
     crash: 'Cash out before boom', scratch: 'Scratch & win', die: '1 in 6', chest: 'Find the treasure',
     russian: 'Survive the cylinder', horses: 'Pick the winner',
+    limbo: 'Pick your target mult', higher: 'Higher or lower', rps: 'Rock paper scissors',
+    colorpick: 'Guess the color', ladder: 'Climb the ladder', keno: '1 number out of 10',
+    war: 'Card vs card', hilo: 'Card sequence', bingo: 'Drawn number', jackpot: '3 symbols',
   };
 
   const embed = new EmbedBuilder()
@@ -2726,6 +3193,48 @@ function buildSettingsPayload(userId) {
   return { embeds: [embed], components: [row] };
 }
 
+function buildRulesPayload(userId) {
+  const lang = getLang(userId);
+  const fr = lang !== 'en';
+  const lines = [
+    ['💣 Mines', fr ? 'Choisis une difficulté. Clique sur les cases pour trouver des diamants. Évite les mines. Encaisse quand tu veux : plus tu trouves de diamants, plus le multiplicateur monte.' : 'Pick a difficulty. Click tiles for diamonds. Avoid mines. Cash out anytime: more diamonds = higher multiplier.'],
+    ['🃏 Blackjack', fr ? 'Bats le croupier sans dépasser 21. Tirer = nouvelle carte, Rester = s’arrêter, Doubler = double la mise et tire une seule carte. Blackjack naturel paie x2.5.' : 'Beat the dealer without going over 21. Hit, Stand or Double. Natural blackjack pays x2.5.'],
+    ['🎡 Roulette', fr ? 'Mise sur rouge/noir/pair/impair (x2) ou un numéro / vert (x36). La bille tourne puis s’arrête.' : 'Bet on red/black/even/odd (x2) or a number / green (x36). The ball spins then stops.'],
+    ['🪙 Pile ou Face', fr ? 'Choisis pile ou face. 1 chance sur 2, victoire environ x1.95.' : 'Pick heads or tails. 50/50, win about x1.95.'],
+    ['🎲 Dés', fr ? '2 dés. Parie moins de 7, plus de 7 ou exactement 7. Exactement 7 paie plus.' : '2 dice. Bet under 7, over 7 or exactly 7. Exactly 7 pays more.'],
+    ['🎰 Slots', fr ? '3 rouleaux. 3 symboles identiques = gros gain. 2 cerises = petit gain.' : '3 reels. 3 matching symbols = big win. 2 cherries = small win.'],
+    ['🎡 Roue', fr ? 'La roue tourne et s’arrête sur un multiplicateur (ou x0).' : 'The wheel spins and stops on a multiplier (or x0).'],
+    ['⚔️ Duel', fr ? 'Tu tires une carte contre le croupier. La plus haute gagne (As faible).' : 'Draw a card vs the dealer. Highest wins (Ace is low).'],
+    ['🃏 Enseigne', fr ? 'Devine la couleur de la carte (pique, cœur, carreau, trèfle). 1 chance sur 4.' : 'Guess the suit of the card. 1 in 4.'],
+    ['🎯 Zone', fr ? 'Un nombre de 1 à 10. Choisis bas (1-3), milieu (4-7) ou haut (8-10).' : 'A number from 1 to 10. Pick low (1-3), mid (4-7) or high (8-10).'],
+    ['🎱 Plinko', fr ? 'La bille descend et tombe dans une case. Choisis le niveau de risque.' : 'The ball falls into a slot. Choose the risk level.'],
+    ['🚀 Crash', fr ? 'Choisis une cible (x1.5, x2…). La fusée monte puis explose. Si elle atteint ta cible, tu gagnes.' : 'Pick a target (x1.5, x2…). Rocket rises then crashes. If it reaches your target, you win.'],
+    ['🎟️ Ticket', fr ? 'Gratte 3 cases. 3 symboles identiques = gagné.' : 'Scratch 3 cells. 3 matching symbols = win.'],
+    ['🎲 Dé exact', fr ? 'Devine le chiffre du dé (1 à 6). 1 chance sur 6.' : 'Guess the die face (1-6). 1 in 6.'],
+    ['📦 Coffre', fr ? '3 coffres, 1 trésor. Choisis le bon.' : '3 chests, 1 treasure. Pick the right one.'],
+    ['🔫 Roulette russe', fr ? 'Choisis le nombre de balles. Survis pour gagner (plus de balles = plus gros gain).' : 'Pick how many bullets. Survive to win (more bullets = bigger payout).'],
+    ['🏇 Chevaux', fr ? 'Parie sur un des 5 chevaux. Chacun a ses cotes.' : 'Bet on one of 5 horses. Each has its own odds.'],
+    ['📈 Limbo', fr ? 'Choisis une cible (x1.5 à x10). Le multiplicateur monte au hasard : s’il dépasse ta cible, tu gagnes.' : 'Pick a target (x1.5 to x10). Multiplier rises randomly: if it exceeds your target, you win.'],
+    ['⬆️ Higher/Lower', fr ? 'Une carte de référence est tirée. Devine si la suivante est plus haute ou plus basse.' : 'A reference card is drawn. Guess if the next is higher or lower.'],
+    ['✊ Pierre-Papier-Ciseaux', fr ? 'Choisis pierre, papier ou ciseaux contre le bot. Victoire ≈ x2.8, égalité = remboursement.' : 'Pick rock, paper or scissors vs the bot. Win ≈ x2.8, draw = refund.'],
+    ['🎨 Couleur', fr ? 'Devine la couleur tirée parmi 4 (rouge, bleu, vert, jaune).' : 'Guess the drawn color among 4 (red, blue, green, yellow).'],
+    ['🪜 Échelle', fr ? 'Choisis jusqu’à quel palier tu montes. Plus haut = plus risqué et plus rémunérateur.' : 'Choose how high you climb. Higher = riskier and more rewarding.'],
+    ['🎱 Keno', fr ? 'Choisis un numéro de 1 à 10. Un seul est tiré.' : 'Pick a number from 1 to 10. One is drawn.'],
+    ['⚔️ Guerre', fr ? 'Une carte contre le croupier. La plus haute gagne.' : 'One card vs the dealer. Highest wins.'],
+    ['🃏 Hi-Lo', fr ? '3 cartes. Si les 3 sont hautes (8+) ou les 3 basses (7-), tu gagnes.' : '3 cards. If all high (8+) or all low (7-), you win.'],
+    ['🅱️ Bingo', fr ? 'Choisis une case parmi 5. Une bille sort.' : 'Pick one of 5 slots. A ball is drawn.'],
+    ['💎 Jackpot', fr ? '3 symboles. 3 identiques = gros jackpot, 2 identiques = petit gain.' : '3 symbols. 3 matching = big jackpot, 2 matching = small win.'],
+  ];
+  const embed = new EmbedBuilder()
+    .setColor(0x8B5CF6)
+    .setTitle(fr ? '📖 Règles des jeux' : '📖 Game rules')
+    .setDescription(
+      lines.map(([name, rule]) => `**${name}**\n${rule}`).join('\n\n').slice(0, 4000)
+    )
+    .setFooter({ text: fr ? 'Mise toujours avant de lancer · parties privées' : 'Always bet before playing · private games' });
+  return { embeds: [embed], components: [] };
+}
+
 function modalInput(id, label, { placeholder, value, required = true, max = 30 } = {}) {
   const ti = new TextInputBuilder().setCustomId(id).setLabel(label).setStyle(TextInputStyle.Short).setRequired(required).setMaxLength(max);
   if (placeholder) ti.setPlaceholder(placeholder);
@@ -2775,7 +3284,7 @@ async function handlePanelButton(i) {
   switch (i.customId) {
     case 'panel_start': {
       if (i.guild?.id) userHomeGuild.set(i.user.id, i.guild.id);
-      const payload = buildDmPlayPayload(i.user.id);
+      const payload = await buildDmPlayPayload(i.user.id);
       try {
         const dm = await i.user.createDM();
         await dm.send(payload);
@@ -2829,15 +3338,19 @@ async function handlePanelButton(i) {
           await i.deferReply({ flags: EPH });
           const channel = i.channel?.isDMBased?.() ? i.channel : await i.user.createDM().catch(() => null);
           if (channel) {
-            const fetched = await channel.messages.fetch({ limit: 40 }).catch(() => null);
-            if (fetched) {
+            // Supprime autant de messages du bot que possible
+            for (let page = 0; page < 5; page++) {
+              const fetched = await channel.messages.fetch({ limit: 100 }).catch(() => null);
+              if (!fetched || fetched.size === 0) break;
               const mine = fetched.filter((m) => m.author.id === client.user.id);
+              if (mine.size === 0) break;
               for (const m of mine.values()) await m.delete().catch(() => {});
+              if (mine.size < 100) break;
             }
-            await channel.send(buildDmPlayPayload(i.user.id));
+            await channel.send(await buildDmPlayPayload(i.user.id));
           }
           return i.editReply({
-            content: L(i.user.id, '🧹 Chat nettoyé · parties fermées · panneau renvoyé.', '🧹 Chat cleaned · games closed · fresh panel sent.'),
+            content: L(i.user.id, '🧹 Tout a été nettoyé · parties fermées · panneau renvoyé.', '🧹 Everything cleaned · games closed · fresh panel sent.'),
           });
         } catch (e) {
           console.error('[clear dm]', e?.message || e);
@@ -2857,10 +3370,6 @@ async function handlePanelButton(i) {
     }
     case 'panel_roulette':
       return i.reply({ ...roulettePickerPayload(), flags: EPH });
-    case 'panel_balance': {
-      const bal = await getBalance(i.user.id);
-      return i.reply({ content: `💰 ${t(i.user.id, 'yourBalance')} : **${fmt(bal)}**`, flags: EPH });
-    }
     case 'panel_daily': {
       const res = await rpc('claim_daily', { p_user_id: i.user.id, p_amount: DAILY_AMOUNT });
       if (res?.balance != null) await touchPeak(i.user.id, res.balance);
@@ -2875,13 +3384,8 @@ async function handlePanelButton(i) {
         flags: EPH,
       });
     }
-    case 'panel_top': {
-      await i.deferReply({ flags: EPH });
-      return i.editReply({ embeds: [await buildLeaderboardEmbed(getLang(i.user.id))] });
-    }
-    case 'panel_topall': {
-      await i.deferReply({ flags: EPH });
-      return i.editReply({ embeds: [await buildAllTimeLeaderboardEmbed(getLang(i.user.id))] });
+    case 'panel_rules': {
+      return i.reply({ ...buildRulesPayload(i.user.id), flags: EPH });
     }
     case 'panel_history': {
       await i.deferReply({ flags: EPH });
@@ -2893,25 +3397,23 @@ async function handlePanelButton(i) {
       return i.editReply({ embeds: [await buildInvitesEmbed(i.guild, i.user.id)] });
     }
     case 'panel_send': {
-      if (i.guild) {
-        const row = new ActionRowBuilder().addComponents(
-          new UserSelectMenuBuilder()
-            .setCustomId('panel_send_pick')
-            .setPlaceholder(L(i.user.id, 'Choisis un membre', 'Pick a member'))
-            .setMinValues(1)
-            .setMaxValues(1)
-        );
-        return i.reply({ content: t(i.user.id, 'sendPick'), components: [row], flags: EPH });
+      // Envoi par pseudo : uniquement un membre du serveur
+      const guildId = resolveGuildId(i);
+      if (!guildId) {
+        return i.reply({
+          content: L(i.user.id, '⚠️ Ouvre **Start** depuis le serveur pour pouvoir envoyer des coins.', '⚠️ Use **Start** from the server to send coins.'),
+          flags: EPH,
+        });
       }
       const bal = await getBalance(i.user.id);
       return i.showModal(
         new ModalBuilder()
-          .setCustomId('modal_send_dm')
+          .setCustomId('modal_send_name')
           .setTitle(L(i.user.id, `💸 Envoyer des ${COIN_PLAIN}`, `💸 Send ${COIN_PLAIN}`))
           .addComponents(
-            modalInput('to', L(i.user.id, 'ID Discord du joueur', 'User ID (Discord)'), {
-              placeholder: 'ex : 123456789012345678',
-              max: 25,
+            modalInput('to', L(i.user.id, 'Pseudo du joueur (exact)', 'Exact username'), {
+              placeholder: L(i.user.id, 'ex : JeanDupont', 'ex : JohnDoe'),
+              max: 32,
             }),
             modalInput('amount', betLabel(bal), { placeholder: 'ex : 5  ou  all' })
           )
@@ -2955,12 +3457,55 @@ async function handleModalSubmit(i) {
     const bet = await readBet();
     return bet ? playRoulette(i, bet, choiceStr) : badBet();
   }
-  if (id === 'modal_send_dm' || id.startsWith('modal_send_')) {
-    let toId;
-    if (id === 'modal_send_dm') toId = String(get('to') || '').replace(/[<@!>]/g, '').trim();
-    else toId = id.slice('modal_send_'.length);
-    if (!/^\d{15,25}$/.test(toId)) {
-      return respondText(i, L(i.user.id, 'ID invalide. Clic droit sur le joueur → Copier l’identifiant.', 'Invalid user ID. Right-click the user → Copy User ID.'));
+  if (id === 'modal_send_name' || id.startsWith('modal_send_')) {
+    let toId = null;
+    if (id === 'modal_send_name') {
+      const name = String(get('to') || '').trim().toLowerCase();
+      if (!name) return respondText(i, L(i.user.id, 'Indique un pseudo.', 'Enter a username.'));
+      const guildId = resolveGuildId(i);
+      if (!guildId) {
+        return respondText(i, L(i.user.id, 'Ouvre Start depuis le serveur pour envoyer des coins.', 'Open Start from the server to send coins.'));
+      }
+      const guild = await client.guilds.fetch(guildId).catch(() => null);
+      if (!guild) return respondText(i, L(i.user.id, 'Serveur introuvable.', 'Server not found.'));
+      // Cherche le membre par username ou globalName (doit être sur le serveur)
+      let member = guild.members.cache.find(
+        (m) =>
+          !m.user.bot &&
+          (m.user.username.toLowerCase() === name ||
+            (m.user.globalName && m.user.globalName.toLowerCase() === name) ||
+            (m.nickname && m.nickname.toLowerCase() === name))
+      );
+      if (!member) {
+        try {
+          await guild.members.fetch();
+          member = guild.members.cache.find(
+            (m) =>
+              !m.user.bot &&
+              (m.user.username.toLowerCase() === name ||
+                (m.user.globalName && m.user.globalName.toLowerCase() === name) ||
+                (m.nickname && m.nickname.toLowerCase() === name))
+          );
+        } catch {
+          /* ignore */
+        }
+      }
+      if (!member) {
+        return respondText(
+          i,
+          L(
+            i.user.id,
+            `❌ Aucun membre **${escapeMarkdown(get('to'))}** trouvé sur le serveur. Le pseudo doit être exact et la personne doit être présente.`,
+            `❌ No member **${escapeMarkdown(get('to'))}** found on the server. Username must be exact and the person must be on the server.`
+          )
+        );
+      }
+      toId = member.id;
+    } else {
+      toId = id.slice('modal_send_'.length);
+      if (!/^\d{15,25}$/.test(toId)) {
+        return respondText(i, L(i.user.id, 'Destinataire invalide.', 'Invalid recipient.'));
+      }
     }
     if (toId === i.user.id) {
       return respondText(i, L(i.user.id, `❌ Tu ne peux pas t’envoyer des ${COIN} à toi-même.`, `❌ You cannot send ${COIN} to yourself.`));
@@ -2997,16 +3542,15 @@ async function handleReplay(i) {
 function buildAdminPayload() {
   const embed = new EmbedBuilder()
     .setColor(0xEF4444)
-    .setAuthor({ name: 'ZNK CASINO' })
     .setTitle('✦ Admin')
     .setDescription(`Contrôle propriétaire · monnaie **${COIN}**\nChaque action publique indique **qui** l’a faite.`)
     .addFields(
       { name: '💰 Économie', value: 'Ajouter · Retirer · Définir · Voir · Offrir all', inline: false },
-      { name: '💥 Resets', value: 'Soldes · All-time', inline: true },
+      { name: '💥 Resets', value: 'Soldes · All-time · Stats', inline: true },
       { name: '🎚️ Live', value: 'Mult · Events · Boosts', inline: true },
-      { name: '📡 Salons', value: 'All-time · Notifs', inline: true }
+      { name: '📡 Salons', value: 'All-time · Notifs · Classement', inline: true }
     )
-    .setFooter({ text: 'Owner only · ZNK' })
+    .setFooter({ text: 'Owner only' })
     .setTimestamp();
   const row1 = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('admin_add').setLabel('Ajouter').setEmoji('➕').setStyle(ButtonStyle.Success),
@@ -3018,15 +3562,20 @@ function buildAdminPayload() {
     new ButtonBuilder().setCustomId('admin_all').setLabel('Offrir all').setEmoji('🎁').setStyle(ButtonStyle.Success),
     new ButtonBuilder().setCustomId('admin_reset').setLabel('Reset soldes').setEmoji('💥').setStyle(ButtonStyle.Danger),
     new ButtonBuilder().setCustomId('admin_resetpeaks').setLabel('Reset all-time').setEmoji('👑').setStyle(ButtonStyle.Danger),
-    new ButtonBuilder().setCustomId('admin_mult').setLabel('Multiplicateurs').setEmoji('🎚️').setStyle(ButtonStyle.Primary)
+    new ButtonBuilder().setCustomId('admin_resetstats').setLabel('Reset stats').setEmoji('📊').setStyle(ButtonStyle.Danger)
   );
   const row3 = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('admin_mult').setLabel('Multiplicateurs').setEmoji('🎚️').setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId('admin_event').setLabel('Événement').setEmoji('📢').setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId('admin_annonce').setLabel('Annonce').setEmoji('📣').setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId('admin_alltimechan').setLabel('Salon all-time').setEmoji('🏆').setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId('admin_notifchan').setLabel('Salon notifs').setEmoji('🔔').setStyle(ButtonStyle.Secondary)
+    new ButtonBuilder().setCustomId('admin_alltimechan').setLabel('Salon all-time').setEmoji('🏆').setStyle(ButtonStyle.Secondary)
   );
-  return { embeds: [embed], components: [row1, row2, row3] };
+  const row4 = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('admin_notifchan').setLabel('Salon notifs').setEmoji('🔔').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('admin_top').setLabel('Classement').setEmoji('🏆').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('admin_topall').setLabel('All-time').setEmoji('👑').setStyle(ButtonStyle.Secondary)
+  );
+  return { embeds: [embed], components: [row1, row2, row3, row4] };
 }
 
 // ---------- Événements (claim, giveaway, boosts) ----------
@@ -3362,6 +3911,22 @@ async function handleAdmin(i) {
           .addComponents(modalInput('confirm', 'Tape RESET pour confirmer', { placeholder: 'RESET', max: 10 }))
       );
     }
+    if (action === 'resetstats') {
+      return i.showModal(
+        new ModalBuilder()
+          .setCustomId('modal_admin_resetstats')
+          .setTitle('📊 Reset toutes les stats')
+          .addComponents(modalInput('confirm', 'Tape RESET pour confirmer', { placeholder: 'RESET', max: 10 }))
+      );
+    }
+    if (action === 'top') {
+      await i.deferReply({ flags: EPH });
+      return i.editReply({ embeds: [await buildLeaderboardEmbed('fr')] });
+    }
+    if (action === 'topall') {
+      await i.deferReply({ flags: EPH });
+      return i.editReply({ embeds: [await buildAllTimeLeaderboardEmbed('fr')] });
+    }
     if (action === 'annonce') {
       return i.showModal(
         new ModalBuilder()
@@ -3536,6 +4101,29 @@ async function handleAdmin(i) {
         ],
       }).catch(() => {});
       return i.reply({ content: '✅ Classement all-time réinitialisé.', flags: EPH });
+    }
+
+    if (id === 'modal_admin_resetstats') {
+      const confirm = i.fields.getTextInputValue('confirm')?.trim().toUpperCase();
+      if (confirm !== 'RESET') return respondText(i, 'Annulé : tu dois taper **RESET** pour confirmer.');
+      try {
+        const { error, count } = await supabase.from('game_history').delete().neq('user_id', '__impossible__');
+        if (error) throw error;
+        const ch = await getAnnounceChannel(i.guild.id);
+        ch?.send({
+          embeds: [
+            new EmbedBuilder()
+              .setTitle('📊 Reset des statistiques')
+              .setColor(COLORS.red)
+              .setDescription(`👤 Par <@${i.user.id}>\nTout l’historique des parties a été effacé.`)
+              .setTimestamp(),
+          ],
+        }).catch(() => {});
+        return i.reply({ content: `✅ Statistiques réinitialisées (historique des parties effacé).`, flags: EPH });
+      } catch (e) {
+        console.error('[resetstats]', e?.message || e);
+        return respondText(i, `Erreur reset stats : ${explainError(e)}`);
+      }
     }
 
     if (id === 'modal_admin_annonce') {
