@@ -29,8 +29,8 @@ const path = require('path');
 //  CONFIG
 // ============================================================
 const PREFIX = '!';
-const COIN = '🪙';
-const DAILY_AMOUNT = 2;
+const COIN = 'USDT';
+const DAILY_AMOUNT = 4;
 const INVITE_REWARD = 1; // pièces offertes à celui qui invite un nouveau membre
 const LEADERBOARD_REFRESH_MS = 60_000;
 const IDLE_MS = 90_000; // une partie inactive est réglée automatiquement après 90 s
@@ -425,7 +425,7 @@ function minesEmbed(game, end) {
   }
   return e;
 }
-
+s
 async function startMines(i, level, bet) {
   const L = LEVELS[level];
   if (!L) return respondText(i, 'Difficulté inconnue.');
