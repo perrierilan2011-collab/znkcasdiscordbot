@@ -73,6 +73,110 @@ const COLORS = {
 };
 
 // ============================================================
+//  LANGUES (FR / EN) — préférence par utilisateur
+// ============================================================
+const LANG_FILE = path.join(__dirname, 'data', 'lang.json');
+const userLang = new Map(); // userId -> 'fr' | 'en'
+
+function loadLangs() {
+  try {
+    const raw = JSON.parse(fs.readFileSync(LANG_FILE, 'utf8'));
+    for (const [id, lang] of Object.entries(raw)) {
+      if (lang === 'fr' || lang === 'en') userLang.set(id, lang);
+    }
+  } catch {
+    /* first run */
+  }
+}
+function saveLangs() {
+  try {
+    fs.mkdirSync(path.dirname(LANG_FILE), { recursive: true });
+    fs.writeFileSync(LANG_FILE, JSON.stringify(Object.fromEntries(userLang), null, 2));
+  } catch (e) {
+    console.error('[lang]', e?.message || e);
+  }
+}
+function getLang(userId) {
+  return userLang.get(userId) || 'fr';
+}
+function setLang(userId, lang) {
+  userLang.set(userId, lang === 'en' ? 'en' : 'fr');
+  saveLangs();
+}
+
+const I18N = {
+  fr: {
+    play: 'JOUER',
+    daily: 'Daily',
+    balance: 'Solde',
+    send: 'Envoyer',
+    top: 'Classement',
+    topall: 'All-time',
+    history: 'Historique',
+    invites: 'Invites',
+    settings: 'Langue',
+    lobbyTitle: '✦ Choisis ta table',
+    lobbyAuthor: 'Lobby des jeux',
+    lobbyDesc:
+      'Sélectionne un jeu dans le **menu ci-dessous**.\nUne fenêtre s’ouvre pour ta mise (ton solde est affiché).',
+    lobbyPlaceholder: '🎮 Choisir un jeu…',
+    lobbyFooter: 'Menu privé · visible uniquement par toi',
+    yourBalance: 'Ton solde',
+    dailyOk: 'Tu as reçu',
+    dailyAlready: 'Tu as déjà pris ton daily aujourd’hui. Reviens après minuit (Paris).',
+    newBalance: 'Nouveau solde',
+    langTitle: 'Paramètres · Langue',
+    langDesc: 'Choisis la langue du bot **pour toi** (menus, messages privés).',
+    langFr: 'Français',
+    langEn: 'English',
+    langSet: 'Langue définie : **Français** ✅',
+    sendPick: '💸 À qui veux-tu envoyer de l’argent depuis ton solde ?',
+    noMoney: `Tu n’as pas de ${COIN}. Clique sur **🎁 Daily** pour ta récompense du jour.`,
+    insufficient: `Tu n’as pas assez de ${COIN} pour cette mise.`,
+    betLabel: 'Mise (solde',
+    rejouer: 'Rejouer',
+  },
+  en: {
+    play: 'PLAY',
+    daily: 'Daily',
+    balance: 'Balance',
+    send: 'Send',
+    top: 'Leaderboard',
+    topall: 'All-time',
+    history: 'History',
+    invites: 'Invites',
+    settings: 'Language',
+    lobbyTitle: '✦ Pick your table',
+    lobbyAuthor: 'Games lobby',
+    lobbyDesc:
+      'Select a game in the **menu below**.\nA popup opens for your bet (your balance is shown).',
+    lobbyPlaceholder: '🎮 Choose a game…',
+    lobbyFooter: 'Private menu · only visible to you',
+    yourBalance: 'Your balance',
+    dailyOk: 'You received',
+    dailyAlready: 'You already claimed today’s daily. Come back after midnight (Paris).',
+    newBalance: 'New balance',
+    langTitle: 'Settings · Language',
+    langDesc: 'Choose the bot language **for you** (menus, private messages).',
+    langFr: 'Français',
+    langEn: 'English',
+    langSet: 'Language set to **English** ✅',
+    sendPick: '💸 Who do you want to send coins to?',
+    noMoney: `You have no ${COIN}. Click **🎁 Daily** for today’s reward.`,
+    insufficient: `Not enough ${COIN} for this bet.`,
+    betLabel: 'Bet (balance',
+    rejouer: 'Replay',
+  },
+};
+
+function t(userId, key) {
+  const lang = getLang(userId);
+  return I18N[lang][key] ?? I18N.fr[key] ?? key;
+}
+
+loadLangs();
+
+// ============================================================
 //  OUTILS
 // ============================================================
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -1938,7 +2042,7 @@ function buildHelpEmbed() {
 function buildPanelPayload() {
   const panel = new EmbedBuilder()
     .setColor(0x7C3AED)
-    .setAuthor({ name: 'VIP CASINO', iconURL: undefined })
+    .setAuthor({ name: 'VIP CASINO' })
     .setTitle('━━━━━━━━━━━━━━━━━━━━')
     .setDescription(
       [
@@ -1948,46 +2052,26 @@ function buildPanelPayload() {
         '[2;35m╚══════════════════════════╝[0m',
         '```',
         '',
-        `> 🎁 **Daily** — **${DAILY_AMOUNT} ${COIN}** gratuits **1× / jour**`,
-        '> Reset à **minuit (Paris)**. Bouton **Daily** ci-dessous.',
+        `> 🎁 **Daily** — **${DAILY_AMOUNT} ${COIN}** · 1× / day · midnight **Paris**`,
+        '> 🎮 **Jouer / Play** — menu popup privé · private game picker',
         '',
-        '🔒 Tes parties, ton solde et ton historique sont **uniquement pour toi**.',
+        '🔒 Parties privées · Private hands · 🇫🇷 / 🇬🇧 via **Langue**',
       ].join('\n')
     )
     .addFields(
-      {
-        name: '🎮  Jouer',
-        value: '```\n 17 jeux · animations · mises libres\n```',
-        inline: true,
-      },
-      {
-        name: '💰  Compte',
-        value: '```\n Solde · Envoyer · Historique\n```',
-        inline: true,
-      },
-      {
-        name: '🏆  Rankings',
-        value: '```\n Actuel · All-time · Invites\n```',
-        inline: true,
-      },
-      {
-        name: '━━━━━━━━  Accès rapide  ━━━━━━━━',
-        value:
-          '**Jouer** ouvre le lobby complet.\n' +
-          '**Daily** réclame ta récompense du jour.\n' +
-          '**Solde** affiche ton compte en privé.',
-        inline: false,
-      }
+      { name: '🎮 Play', value: '```\n17 games · animations\n```', inline: true },
+      { name: '💰 Account', value: '```\nBalance · Send · History\n```', inline: true },
+      { name: '🏆 Ranks', value: '```\nLive · All-time · Invites\n```', inline: true }
     )
-    .setFooter({ text: `${COIN} · Clique un bouton pour commencer` })
+    .setFooter({ text: `${COIN} · FR / EN in settings` })
     .setTimestamp();
 
-  // 5 boutons max / ligne — organisation type “site”
   const rowPlay = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('panel_play').setLabel('JOUER').setEmoji('🎮').setStyle(ButtonStyle.Success),
     new ButtonBuilder().setCustomId('panel_daily').setLabel('Daily').setEmoji('🎁').setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId('panel_balance').setLabel('Solde').setEmoji('💰').setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId('panel_send').setLabel('Envoyer').setEmoji('💸').setStyle(ButtonStyle.Primary)
+    new ButtonBuilder().setCustomId('panel_send').setLabel('Envoyer').setEmoji('💸').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId('panel_settings').setLabel('Langue').setEmoji('🌐').setStyle(ButtonStyle.Secondary)
   );
   const rowSocial = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('panel_top').setLabel('Classement').setEmoji('🏆').setStyle(ButtonStyle.Secondary),
@@ -2021,70 +2105,114 @@ const GAME_MENU = [
 const MENU_PAGE_SIZE = 25; // plus de pagination nécessaire (< 25)
 const MENU_PAGES = 1;
 
-function buildGameMenuPayload(page = 0) {
+/** Menu jeux = “popup” Discord : message éphémère + select natif (overlay). */
+function buildGameMenuPayload(userId = null) {
+  const lang = userId ? getLang(userId) : 'fr';
+  const names = {
+    fr: null, // labels already French in GAME_MENU
+    en: {
+      mines: 'Mines',
+      bj: 'Blackjack',
+      roulette: 'Roulette',
+      coinflip: 'Coin Flip',
+      dice: 'Dice',
+      slots: 'Slots',
+      wheel: 'Wheel',
+      duel: 'Duel',
+      suit: 'Suit',
+      zone: 'Zone',
+      plinko: 'Plinko',
+      crash: 'Crash',
+      scratch: 'Scratch',
+      die: 'Exact die',
+      chest: 'Chest',
+      russian: 'Russian roulette',
+      horses: 'Horses',
+    },
+  };
+  const descs = {
+    en: {
+      mines: 'Avoid bombs · rising mult',
+      bj: 'Beat the dealer · soft aces',
+      roulette: 'Color · parity · number',
+      coinflip: '50 / 50',
+      dice: 'Sum of 2 dice',
+      slots: '3 reels · jackpot',
+      wheel: 'Wheel of fortune',
+      duel: 'Card vs dealer',
+      suit: 'Guess the suit',
+      zone: 'Low · mid · high',
+      plinko: 'Ball · risk level',
+      crash: 'Cash out before boom',
+      scratch: 'Scratch & win',
+      die: '1 in 6',
+      chest: 'Find the treasure',
+      russian: 'Survive the cylinder',
+      horses: 'Pick the winner',
+    },
+  };
+
   const embed = new EmbedBuilder()
     .setColor(0xA855F7)
-    .setAuthor({ name: 'Lobby des jeux' })
-    .setTitle('✦ Choisis ta table')
+    .setAuthor({ name: t(userId, 'lobbyAuthor') })
+    .setTitle(t(userId, 'lobbyTitle'))
     .setDescription(
       [
         '```ansi',
         '[2;35m╭──────────────────────────╮[0m',
-        '[2;35m│[0m  [1;37m17 tables · 1 clic[0m       [2;35m│[0m',
+        '[2;35m│[0m  [1;37m▼  OPEN THE MENU  ▼[0m     [2;35m│[0m',
         '[2;35m╰──────────────────────────╯[0m',
         '```',
         '',
-        'Clique un **jeu** ci-dessous **ou** utilise le menu déroulant.',
-        'Une fenêtre s’ouvre pour ta **mise** (ton solde est affiché).',
+        t(userId, 'lobbyDesc'),
       ].join('\n')
     )
-    .addFields(
-      {
-        name: '🔥 Populaires',
-        value: '💣 Mines · 🃏 Blackjack · 🎡 Roulette · 🎰 Slots · 🎱 Plinko',
-        inline: false,
-      },
-      {
-        name: '⚡ Rapides',
-        value: '🪙 Pile/Face · 🎲 Dés · 🎟️ Ticket · 📦 Coffre · 🚀 Crash',
-        inline: false,
-      },
-      {
-        name: '🎯 Skill / suspense',
-        value: '⚔️ Duel · 🃏 Enseigne · 🔫 Russe · 🏇 Chevaux · 🎡 Roue',
-        inline: false,
-      }
-    )
-    .setFooter({ text: `Visible uniquement par toi · ${COIN}` })
+    .setFooter({ text: t(userId, 'lobbyFooter') })
     .setTimestamp();
 
-  // Tous les boutons jeux (4 rangées)
-  const gameButtons = GAME_MENU.map(([key, name, emoji]) =>
+  // Un seul select = comportement le plus proche d’une popup Discord
+  const select = new StringSelectMenuBuilder()
+    .setCustomId('panel_gameselect')
+    .setPlaceholder(t(userId, 'lobbyPlaceholder'))
+    .setMinValues(1)
+    .setMaxValues(1)
+    .addOptions(
+      GAME_MENU.map(([key, name, emoji, desc]) => ({
+        label: (lang === 'en' && names.en[key] ? names.en[key] : name).slice(0, 100),
+        value: key,
+        emoji,
+        description: (lang === 'en' && descs.en[key] ? descs.en[key] : desc).slice(0, 100),
+      }))
+    );
+
+  return {
+    embeds: [embed],
+    components: [new ActionRowBuilder().addComponents(select)],
+  };
+}
+
+function buildSettingsPayload(userId) {
+  const cur = getLang(userId);
+  const embed = new EmbedBuilder()
+    .setColor(COLORS.violet)
+    .setTitle(`🌐 ${t(userId, 'langTitle')}`)
+    .setDescription(
+      `${t(userId, 'langDesc')}\n\n` +
+        (cur === 'fr' ? '**Actuel / Current :** 🇫🇷 Français' : '**Actuel / Current :** 🇬🇧 English')
+    );
+  const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
-      .setCustomId(`panel_${key}`)
-      .setLabel(name)
-      .setEmoji(emoji)
-      .setStyle(ButtonStyle.Primary)
+      .setCustomId('panel_lang_fr')
+      .setLabel('Français')
+      .setEmoji('🇫🇷')
+      .setStyle(cur === 'fr' ? ButtonStyle.Success : ButtonStyle.Secondary),
+    new ButtonBuilder()
+      .setCustomId('panel_lang_en')
+      .setLabel('English')
+      .setEmoji('🇬🇧')
+      .setStyle(cur === 'en' ? ButtonStyle.Success : ButtonStyle.Secondary)
   );
-  const rows = chunk(gameButtons, 5).map((r) => new ActionRowBuilder().addComponents(...r));
-
-  // 5e rangée : select menu (meilleure UX mobile) — Discord max 5 rows
-  if (rows.length < 5) {
-    const select = new StringSelectMenuBuilder()
-      .setCustomId('panel_gameselect')
-      .setPlaceholder('📱 Ou choisis un jeu ici…')
-      .addOptions(
-        GAME_MENU.map(([key, name, emoji, desc]) => ({
-          label: name,
-          value: key,
-          emoji,
-          description: desc.slice(0, 100),
-        }))
-      );
-    rows.push(new ActionRowBuilder().addComponents(select));
-  }
-
-  return { embeds: [embed], components: rows };
+  return { embeds: [embed], components: [row] };
 }
 
 function modalInput(id, label, { placeholder, value, required = true, max = 30 } = {}) {
@@ -2128,17 +2256,34 @@ const instantBetModal = (key, choice, bal = 0) =>
     .addComponents(modalInput('bet', betLabel(bal), { placeholder: BET_PLACEHOLDER }));
 
 async function handlePanelButton(i) {
-  if (i.customId.startsWith('panel_page_')) {
-    const page = Number(i.customId.slice('panel_page_'.length));
-    if (!Number.isInteger(page)) return;
-    return i.update(buildGameMenuPayload(page));
-  }
   const instantKey = i.customId.slice('panel_'.length);
-  if (INSTANT[instantKey]) return i.reply({ ...INSTANT[instantKey].picker(coef(instantKey)), flags: EPH });
+  if (INSTANT[instantKey]) {
+    const payload = { ...INSTANT[instantKey].picker(coef(instantKey)), flags: EPH };
+    if (i.isStringSelectMenu?.() && i.isStringSelectMenu()) return i.reply(payload);
+    return i.reply(payload);
+  }
 
   switch (i.customId) {
     case 'panel_play':
-      return i.reply({ ...buildGameMenuPayload(0), flags: EPH });
+      return i.reply({ ...buildGameMenuPayload(i.user.id), flags: EPH });
+    case 'panel_settings':
+      return i.reply({ ...buildSettingsPayload(i.user.id), flags: EPH });
+    case 'panel_lang_fr': {
+      setLang(i.user.id, 'fr');
+      return i.update({
+        content: I18N.fr.langSet,
+        embeds: [],
+        components: [],
+      });
+    }
+    case 'panel_lang_en': {
+      setLang(i.user.id, 'en');
+      return i.update({
+        content: I18N.en.langSet,
+        embeds: [],
+        components: [],
+      });
+    }
     case 'panel_mines':
       return i.reply({ ...minesPickerPayload(), flags: EPH });
     case 'panel_bj': {
@@ -2149,12 +2294,22 @@ async function handlePanelButton(i) {
       return i.reply({ ...roulettePickerPayload(), flags: EPH });
     case 'panel_balance': {
       const bal = await getBalance(i.user.id);
-      return i.reply({ content: `💰 Ton solde : **${fmt(bal)}**`, flags: EPH });
+      return i.reply({ content: `💰 ${t(i.user.id, 'yourBalance')} : **${fmt(bal)}**`, flags: EPH });
     }
     case 'panel_daily': {
       const res = await rpc('claim_daily', { p_user_id: i.user.id, p_amount: DAILY_AMOUNT });
       if (res?.balance != null) await touchPeak(i.user.id, res.balance);
-      return i.reply({ content: dailyText(res), flags: EPH });
+      // dailyText + i18n léger
+      if (res?.claimed) {
+        return i.reply({
+          content: `🎁 ${t(i.user.id, 'dailyOk')} **${fmt(DAILY_AMOUNT)}** ! ${t(i.user.id, 'newBalance')} : **${fmt(res.balance)}**`,
+          flags: EPH,
+        });
+      }
+      return i.reply({
+        content: `🎁 ${t(i.user.id, 'dailyAlready')}\n${t(i.user.id, 'yourBalance')} : **${fmt(res?.balance ?? 0)}**`,
+        flags: EPH,
+      });
     }
     case 'panel_top': {
       await i.deferReply({ flags: EPH });
@@ -2176,12 +2331,12 @@ async function handlePanelButton(i) {
       const row = new ActionRowBuilder().addComponents(
         new UserSelectMenuBuilder()
           .setCustomId('panel_send_pick')
-          .setPlaceholder('Choisis le membre à qui envoyer')
+          .setPlaceholder(getLang(i.user.id) === 'en' ? 'Pick a member' : 'Choisis un membre')
           .setMinValues(1)
           .setMaxValues(1)
       );
       return i.reply({
-        content: '💸 À qui veux-tu envoyer de l’argent depuis ton solde ?',
+        content: t(i.user.id, 'sendPick'),
         components: [row],
         flags: EPH,
       });
