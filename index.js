@@ -39,52 +39,22 @@ try {
 //  CONFIG
 // ============================================================
 const PREFIX = '!';
-// Monnaie = pièce Z violette
-const COIN_EMOJI_ID = '1570874447475253279';
-const COIN_DEFAULT = `<:znk:${COIN_EMOJI_ID}>`;
-const COIN_IMG = `https://cdn.discordapp.com/emojis/${COIN_EMOJI_ID}.png?size=128&quality=lossless`;
-let COIN =
-  process.env.COIN_EMOJI && /^<a?:\w+:\d+>$/.test(String(process.env.COIN_EMOJI).trim())
-    ? String(process.env.COIN_EMOJI).trim()
-    : COIN_DEFAULT;
-const COIN_FALLBACK = COIN_DEFAULT;
-// Texte brut de la monnaie : pour les endroits qui n'affichent pas les emojis custom
-// (blocs de code, image canvas, titres / labels de pop-ups)
-const COIN_PLAIN = 'coin';
+
+// ---- MONNAIE (modifiable depuis Railway > Variables) ----
+//  COIN_EMOJI : ce qui s'affiche partout à côté des montants (défaut : 🪙)
+//  COIN_TEXT  : version texte pour les endroits sans emoji (image canvas, pop-ups)
+//               si absente, on réutilise COIN_EMOJI
+const COIN = String(process.env.COIN_EMOJI || '🪙').trim() || '🪙';
+const COIN_PLAIN = String(process.env.COIN_TEXT || COIN).trim() || COIN;
 const plain = (s) => String(s).split(COIN).join(COIN_PLAIN);
+console.log(`[coin] ${COIN} (texte : ${COIN_PLAIN})`);
+
 const DAILY_AMOUNT = 4;
 const INVITE_REWARD = 1;
 const LEADERBOARD_REFRESH_MS = 60_000;
 const IDLE_MS = 90_000;
 const MAX_ADMIN_AMOUNT = 100_000_000;
 const EPH = MessageFlags.Ephemeral;
-
-function resolveCoinEmoji() {
-  const raw = String(process.env.COIN_EMOJI || '').trim();
-  if (/^<a?:\w+:\d+>$/.test(raw)) {
-    COIN = raw;
-    console.log(`[coin] ${COIN}`);
-    return;
-  }
-  if (/^<a?:\w+:\d+>$/.test(COIN)) {
-    console.log(`[coin] ${COIN}`);
-    return;
-  }
-  const name = (raw || 'znk').replace(/^:|:$/g, '');
-  for (const g of client.guilds.cache.values()) {
-    const em =
-      g.emojis.cache.find((e) => e.name === name) ||
-      g.emojis.cache.find((e) => e.name.toLowerCase() === name.toLowerCase()) ||
-      g.emojis.cache.find((e) => /^(znk|z)$/i.test(e.name));
-    if (em) {
-      COIN = em.toString();
-      console.log(`[coin] résolu ${COIN} sur ${g.name}`);
-      return;
-    }
-  }
-  COIN = COIN_FALLBACK;
-  console.log(`[coin] fallback ${COIN}`);
-}
 
 const { DISCORD_TOKEN, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } = process.env;
 if (!DISCORD_TOKEN || !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
@@ -174,7 +144,7 @@ const I18N = {
       'Sélectionne un jeu dans le **menu ci-dessous**.\nUne fenêtre s’ouvre pour ta mise (ton solde est affiché).',
     lobbyPlaceholder: '🎮 Choisir un jeu...',
     lobbyFooter: 'Menu privé · visible uniquement par toi',
-    sendPick: '💸 À qui veux-tu envoyer des coin depuis ton solde ?',
+    sendPick: `💸 À qui veux-tu envoyer des ${COIN} depuis ton solde ?`,
     insufficient: `Tu n’as pas assez de ${COIN} pour cette mise.`,
   },
   en: {
@@ -187,7 +157,7 @@ const I18N = {
       'Select a game in the **menu below**.\nA popup opens for your bet (your balance is shown).',
     lobbyPlaceholder: '🎮 Choose a game...',
     lobbyFooter: 'Private menu · only visible to you',
-    sendPick: '💸 Who do you want to send coin to?',
+    sendPick: `💸 Who do you want to send ${COIN} to?`,
     insufficient: `Not enough ${COIN} for this bet.`,
   },
 };
@@ -2585,8 +2555,7 @@ function buildHelpEmbed() {
 function buildPanelPayload() {
   const panel = new EmbedBuilder()
     .setColor(0x7C3AED)
-    .setAuthor({ name: 'ZNK CASINO', iconURL: COIN_IMG })
-    .setThumbnail(COIN_IMG)
+    .setAuthor({ name: 'ZNK CASINO' })
     .setTitle('✦ Salon de jeu')
     .setDescription(
       [
@@ -2607,17 +2576,15 @@ function buildPanelPayload() {
       { name: 'Monnaie', value: COIN, inline: true },
       { name: 'Langues', value: 'FR · EN', inline: true }
     )
-    .setFooter({ text: 'ZNK Casino', iconURL: COIN_IMG })
+    .setFooter({ text: 'ZNK Casino' })
     .setTimestamp();
 
-  const znkBtn = { id: COIN_EMOJI_ID, name: 'znk' };
   const row = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('panel_start').setLabel('Start').setEmoji(znkBtn).setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId('panel_start').setLabel('Start').setEmoji('▶️').setStyle(ButtonStyle.Success),
     new ButtonBuilder().setCustomId('panel_settings').setLabel('Paramètres').setEmoji('⚙️').setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId('panel_stats').setLabel('Stats').setEmoji('📊').setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId('panel_invites').setLabel('Invites').setEmoji('📨').setStyle(ButtonStyle.Secondary)
   );
-  // Emoji custom dans le content (hors embed) = affichage fiable
   return { content: `${COIN} **ZNK Casino**`, embeds: [panel], components: [row] };
 }
 
@@ -2625,8 +2592,7 @@ function buildDmPlayPayload(userId) {
   const lang = getLang(userId);
   const embed = new EmbedBuilder()
     .setColor(0xA855F7)
-    .setAuthor({ name: 'ZNK CASINO', iconURL: COIN_IMG })
-    .setThumbnail(COIN_IMG)
+    .setAuthor({ name: 'ZNK CASINO' })
     .setTitle(lang === 'en' ? '✦ Your table' : '✦ Ta table')
     .setDescription(
       lang === 'en'
@@ -2647,7 +2613,7 @@ function buildDmPlayPayload(userId) {
             '**Clear** ferme les parties et nettoie ce chat.',
           ].join('\n')
     )
-    .setFooter({ text: 'ZNK Casino', iconURL: COIN_IMG })
+    .setFooter({ text: 'ZNK Casino' })
     .setTimestamp();
 
   const row1 = new ActionRowBuilder().addComponents(
@@ -2768,7 +2734,7 @@ function modalInput(id, label, { placeholder, value, required = true, max = 30 }
 }
 
 const betLabel = (bal) => {
-  const s = `Mise (solde: ${num(bal)} ${COIN})`;
+  const s = `Mise (solde: ${num(bal)} ${COIN_PLAIN})`;
   return s.length > 45 ? `Mise · solde ${num(bal)}` : s;
 };
 const BET_PLACEHOLDER = 'ex : 1  ou  all';
@@ -4466,7 +4432,6 @@ client.on(Events.ChannelDelete, async (channel) => {
 
 client.once(Events.ClientReady, (c) => {
   console.log(`✅ Connecté en tant que ${c.user.tag}`);
-  resolveCoinEmoji();
   loadMultipliers();
   loadPeaks();
   for (const g of c.guilds.cache.values()) cacheInvites(g);
