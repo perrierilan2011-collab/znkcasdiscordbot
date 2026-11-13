@@ -31,7 +31,9 @@ const path = require('path');
 // ============================================================
 const PREFIX = '!';
 // Monnaie = pièce Z violette
-const COIN_DEFAULT = '<:znk:1570874447475253279>';
+const COIN_EMOJI_ID = '1570874447475253279';
+const COIN_DEFAULT = `<:znk:${COIN_EMOJI_ID}>`;
+const COIN_IMG = `https://cdn.discordapp.com/emojis/${COIN_EMOJI_ID}.png?size=128&quality=lossless`;
 let COIN =
   process.env.COIN_EMOJI && /^<a?:\w+:\d+>$/.test(String(process.env.COIN_EMOJI).trim())
     ? String(process.env.COIN_EMOJI).trim()
@@ -2068,13 +2070,14 @@ function buildHelpEmbed() {
 function buildPanelPayload() {
   const panel = new EmbedBuilder()
     .setColor(0x7C3AED)
-    .setAuthor({ name: 'ZNK CASINO' })
-    .setTitle(`✦  Salon · ${COIN}`)
+    .setAuthor({ name: 'ZNK CASINO', iconURL: COIN_IMG })
+    .setThumbnail(COIN_IMG)
+    .setTitle('✦ Salon de jeu')
     .setDescription(
       [
         `Bienvenue sur **ZNK Casino**.`,
         '',
-        `🎁 Daily **${DAILY_AMOUNT} ${COIN}** · 1× / jour · minuit Paris`,
+        `🎁 **Daily** · **${DAILY_AMOUNT}** ${COIN} · 1× / jour · minuit Paris`,
         '',
         '▶️ **Start** — casino privé en MP',
         '🌐 **Langue** — Français / English',
@@ -2085,10 +2088,10 @@ function buildPanelPayload() {
     )
     .addFields(
       { name: 'Jouer', value: 'Start → MP', inline: true },
-      { name: 'Monnaie', value: COIN, inline: true },
+      { name: 'Monnaie', value: `${COIN} ZNK`, inline: true },
       { name: 'Langues', value: 'FR · EN', inline: true }
     )
-    .setFooter({ text: `ZNK Casino · ${COIN}` })
+    .setFooter({ text: 'ZNK Casino', iconURL: COIN_IMG })
     .setTimestamp();
 
   const rowMain = new ActionRowBuilder().addComponents(
@@ -2109,28 +2112,29 @@ function buildDmPlayPayload(userId) {
   const lang = getLang(userId);
   const embed = new EmbedBuilder()
     .setColor(0xA855F7)
-    .setAuthor({ name: 'ZNK CASINO' })
-    .setTitle(lang === 'en' ? `✦ Your table · ${COIN}` : `✦ Ta table · ${COIN}`)
+    .setAuthor({ name: 'ZNK CASINO', iconURL: COIN_IMG })
+    .setThumbnail(COIN_IMG)
+    .setTitle(lang === 'en' ? '✦ Your table' : '✦ Ta table')
     .setDescription(
       lang === 'en'
         ? [
             `Language: **English**`,
-            `Daily: **${DAILY_AMOUNT} ${COIN}** · once / day (Paris midnight)`,
+            `Daily: **${DAILY_AMOUNT}** ${COIN} · once / day (Paris midnight)`,
             '',
             '**Play** opens the game picker.',
-            '**Send** transfers **Z** to another player (ID or mention).',
+            `**Send** transfers ${COIN} to another player (Discord ID).`,
             '**Clear** closes games and cleans this chat.',
           ].join('\n')
         : [
             `Langue : **Français**`,
-            `Daily : **${DAILY_AMOUNT} ${COIN}** · 1× / jour (minuit Paris)`,
+            `Daily : **${DAILY_AMOUNT}** ${COIN} · 1× / jour (minuit Paris)`,
             '',
             '**Jouer** ouvre le choix des jeux.',
-            '**Envoyer** transfère des **Z** (ID Discord ou mention).',
+            `**Envoyer** transfère des ${COIN} (ID Discord).`,
             '**Clear** ferme les parties et nettoie ce chat.',
           ].join('\n')
     )
-    .setFooter({ text: `ZNK · ${COIN}` })
+    .setFooter({ text: 'ZNK Casino', iconURL: COIN_IMG })
     .setTimestamp();
 
   const row1 = new ActionRowBuilder().addComponents(
