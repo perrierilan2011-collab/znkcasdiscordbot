@@ -62,13 +62,32 @@ const client = new Client({
   allowedMentions: { parse: [], repliedUser: false },
 });
 
-const COLORS = { green: 0x2ecc71, red: 0xe74c3c, grey: 0x95a5a6, blue: 0x5865f2, gold: 0xf1c40f };
+const COLORS = {
+  green: 0x2ecc71,
+  red: 0xe74c3c,
+  grey: 0x95a5a6,
+  blue: 0x8B5CF6,   // violet principal (barre gauche des panels)
+  gold: 0xA855F7,   // violet accent
+  violet: 0x7C3AED, // violet profond
+};
 
 // ============================================================
 //  OUTILS
 // ============================================================
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const range = (n) => Array.from({ length: n }, (_, i) => i);
+
+/** Anime un message en plusieurs étapes (editReply successifs). */
+async function animateSteps(i, steps, title, baseDesc = '') {
+  for (const step of steps) {
+    const embed = new EmbedBuilder()
+      .setTitle(title)
+      .setColor(COLORS.violet)
+      .setDescription(`${baseDesc}${step.text}`);
+    await i.editReply({ embeds: [embed], components: [] }).catch(() => {});
+    if (step.ms) await sleep(step.ms);
+  }
+}
 const round2 = (n) => Math.round(n * 100) / 100;
 const floor2 = (n) => Math.floor(n * 100 + 1e-9) / 100;
 const num = (n) => Number(n).toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
@@ -836,8 +855,8 @@ async function playRoulette(i, bet, choiceStr) {
         embeds: [
           new EmbedBuilder()
             .setTitle('🎡 Roulette')
-            .setColor(COLORS.blue)
-            .setDescription(`La roulette tourne... (mise **${fmt(bet)}** sur **${choice.label}**)`),
+            .setColor(COLORS.violet)
+            .setDescription(`🎡 La roulette s’élance... (mise **${fmt(bet)}** sur **${choice.label}**)`),
         ],
         components: [],
       });
@@ -847,13 +866,25 @@ async function playRoulette(i, bet, choiceStr) {
     }
 
     const balance = payout > 0 ? await credit(uid, payout) : await getBalance(uid);
-    await sleep(2500);
+
+    // Animation progressive : la bille tourne puis ralentit
+    const fakeNums = [randomInt(0, 37), randomInt(0, 37), randomInt(0, 37), result];
+    await animateSteps(
+      i,
+      [
+        { text: `🎡 **Tourne** · · ·\n\`${fakeNums[0]}\`  ·  \`${fakeNums[1]}\`  ·  \`${fakeNums[2]}\``, ms: 700 },
+        { text: `🎡 **Ralentit** · ·\nLa bille glisse… **${fakeNums[2]}** → **?**`, ms: 800 },
+        { text: `🎡 **Dernier tour**\nPresque…`, ms: 600 },
+      ],
+      '🎡 Roulette',
+      `Mise **${fmt(bet)}** sur **${choice.label}**\n\n`
+    );
 
     const embed = new EmbedBuilder()
       .setTitle('🎡 Roulette')
       .setColor(won ? COLORS.green : COLORS.red)
       .setDescription(
-        `La bille tombe sur **${colorEmoji[colorOf(result)]} ${result}** (${colorOf(result)}).\n\n` +
+        `✨ La bille s’arrête sur **${colorEmoji[colorOf(result)]} ${result}** (${colorOf(result)}).\n\n` +
           (won
             ? `🎉 Gagné ! Tu empoches **${fmt(payout)}** (${fx(rlMult)}), profit : **${signed(round2(payout - bet))}**.`
             : `😬 Perdu, tu laisses **${fmt(bet)}**.`)
@@ -1301,8 +1332,8 @@ async function playInstant(i, key, bet, choice) {
         embeds: [
           new EmbedBuilder()
             .setTitle(G.title)
-            .setColor(COLORS.blue)
-            .setDescription(`${G.spinText} (mise **${fmt(bet)}** · ${res.pick})`),
+            .setColor(COLORS.violet)
+            .setDescription(`${G.spinText}\nMise **${fmt(bet)}** · ${res.pick}`),
         ],
         components: [],
       });
@@ -1312,7 +1343,95 @@ async function playInstant(i, key, bet, choice) {
     }
 
     const balance = payout > 0 ? await credit(uid, payout) : await getBalance(uid);
-    await sleep(2000);
+
+    // Animations par jeu (étapes intermédiaires)
+    const animFrames = (() => {
+      switch (key) {
+        case 'coinflip':
+          return [
+            { text: '🪙 La pièce vole…\n**Pile** ⟷ **Face**', ms: 600 },
+            { text: '🪙 Elle tourne dans les airs…\n✨ ✨ ✨', ms: 700 },
+            { text: '🪙 Elle redescend…', ms: 500 },
+          ];
+        case 'dice':
+          return [
+            { text: '🎲 Les dés roulent…\n⬜ ⬜', ms: 500 },
+            { text: '🎲 ⬜ ⬜ → 🎲 🎲\nÇa secoue…', ms: 600 },
+            { text: '🎲 Presque arrêtés…', ms: 500 },
+          ];
+        case 'slots':
+          return [
+            { text: '🎰 **[ ❓ | ❓ | ❓ ]**\nLes rouleaux démarrent…', ms: 500 },
+            { text: '🎰 **[ 🍒 | ❓ | ❓ ]**\nPremier rouleau…', ms: 550 },
+            { text: '🎰 **[ 🍒 | 🍋 | ❓ ]**\nDeuxième…', ms: 550 },
+            { text: '🎰 **[ 🍒 | 🍋 | 💎 ]**\nDernier tour…', ms: 450 },
+          ];
+        case 'wheel':
+          return [
+            { text: '🎡 La roue accélère…\n💫 💫 💫', ms: 600 },
+            { text: '🎡 Elle tourne à toute vitesse…', ms: 700 },
+            { text: '🎡 Elle ralentit… ✨', ms: 600 },
+          ];
+        case 'duel':
+          return [
+            { text: '⚔️ Distribution des cartes…\n🂠  🂠', ms: 600 },
+            { text: '⚔️ Les cartes sont retournées…', ms: 700 },
+          ];
+        case 'suit':
+          return [
+            { text: '🃏 Le croupier mélange…\n♠️ ♥️ ♦️ ♣️', ms: 600 },
+            { text: '🃏 Une carte est tirée…', ms: 700 },
+          ];
+        case 'zone':
+          return [
+            { text: '🎯 Tirage en cours…\n**?**', ms: 500 },
+            { text: '🎯 Le nombre se forme…', ms: 600 },
+          ];
+        case 'plinko':
+          return [
+            { text: '🎱 La bille est lâchée…\n⬇️', ms: 500 },
+            { text: '🎱 Elle rebondit…\n⬅️ ⬇️ ➡️', ms: 600 },
+            { text: '🎱 Elle descend encore…\n⬇️ ⬇️', ms: 550 },
+          ];
+        case 'crash':
+          return [
+            { text: '🚀 3… 2… 1…\nDécollage !', ms: 500 },
+            { text: '🚀 x1.2 · x1.5 · x2…\nLa fusée monte…', ms: 700 },
+            { text: '🚀 Toujours plus haut…', ms: 500 },
+          ];
+        case 'scratch':
+          return [
+            { text: '🎟️ Tu grattes…\n**[ ░ | ░ | ░ ]**', ms: 500 },
+            { text: '🎟️ **[ ⭐ | ░ | ░ ]**', ms: 450 },
+            { text: '🎟️ **[ ⭐ | 🔔 | ░ ]**', ms: 450 },
+          ];
+        case 'die':
+          return [
+            { text: '🎲 Le dé tourne…\n🔢', ms: 500 },
+            { text: '🎲 1 · 2 · 3 · 4 · 5 · 6…', ms: 600 },
+          ];
+        case 'chest':
+          return [
+            { text: '📦 Tu approches des coffres…\n📦 📦 📦', ms: 500 },
+            { text: '📦 Tu ouvres…\n✨ ✨ ✨', ms: 700 },
+          ];
+        case 'russian':
+          return [
+            { text: '🔫 Le barillet tourne…\n🔄', ms: 600 },
+            { text: '🔫 Tu appuies sur la détente…', ms: 800 },
+          ];
+        case 'horses':
+          return [
+            { text: '🏇 Sous les starters…\n🐎 🐎 🐎 🐎 🐎', ms: 500 },
+            { text: '🏇 Ils s’élancent !\n💨 💨 💨', ms: 700 },
+            { text: '🏇 Dans la dernière ligne droite…', ms: 600 },
+          ];
+        default:
+          return [{ text: G.spinText, ms: 1200 }];
+      }
+    })();
+
+    await animateSteps(i, animFrames, G.title, `Mise **${fmt(bet)}** · ${res.pick}\n\n`);
 
     let text;
     let color;
@@ -1393,6 +1512,7 @@ function buildHelpEmbed() {
         '👑 **Propriétaire du serveur**',
         `**${p}setup** : créer le salon casino avec le panneau`,
         `**${p}wins** : créer le salon où s’affichent les victoires de tout le monde`,
+        `**${p}invites-notif** : créer le salon des notifications d’invitations`,
         `**${p}admin** : créer le salon privé avec le panneau admin (ajouter, retirer, offrir à tous, régler les multiplicateurs…)`,
         `**${p}classement** : classement auto (mis à jour chaque minute)`,
         `**${p}add** @membre <montant> · **${p}remove** @membre <montant>`,
@@ -1836,7 +1956,7 @@ async function loadChannels() {
   else for (const r of b.data) guildChannels.set(`${r.guild_id}:${r.kind}`, r.channel_id);
 }
 
-const CHANNEL_NAMES = { wins: 'wins', admin: 'casino-admin' };
+const CHANNEL_NAMES = { wins: 'wins', admin: 'casino-admin', invites: 'invites-notif' };
 
 // Au démarrage : retrouve les salons wins/admin par leur nom si la base ne les connaît pas
 async function restoreChannelsByName() {
@@ -2001,6 +2121,41 @@ async function cmdWins(msg) {
   );
 }
 
+// ---------- !invites-notif : salon des notifications d'invitations ----------
+async function cmdInvitesNotif(msg) {
+  if (!isCrown(msg)) return msg.reply(CROWN_ONLY);
+  const guild = msg.guild;
+  const P = PermissionFlagsBits;
+  const me = guild.members.me;
+
+  const existing = await getSavedChannel(guild, 'invites');
+  if (existing) return msg.reply(`Le salon des notifications d’invitations existe déjà : <#${existing.id}>`);
+  if (!me.permissions.has(P.ManageChannels)) return msg.reply(NEED_MANAGE_CHANNELS);
+
+  const channel = await guild.channels.create({
+    name: 'invites-notif',
+    type: ChannelType.GuildText,
+    topic: 'Notifications quand quelqu’un invite un nouveau membre 📨',
+    permissionOverwrites: [
+      {
+        id: guild.roles.everyone.id,
+        type: OverwriteType.Role,
+        allow: [P.ViewChannel, P.ReadMessageHistory],
+        deny: [P.SendMessages],
+      },
+      {
+        id: me.id,
+        type: OverwriteType.Member,
+        allow: botCan(guild, [P.ViewChannel, P.SendMessages, P.EmbedLinks, P.ReadMessageHistory]),
+      },
+    ],
+  });
+  const saved = await saveChannel(guild.id, 'invites', channel.id);
+  return msg.reply(
+    `✅ Salon <#${channel.id}> créé : chaque invitation réussie (nouveau membre + récompense) s’y affichera automatiquement.${saved ? '' : DB_WARN}`
+  );
+}
+
 // ---------- !admin : salon privé avec le panneau admin ----------
 async function cmdAdmin(msg) {
   if (!isCrown(msg)) return msg.reply(CROWN_ONLY);
@@ -2139,7 +2294,10 @@ async function updateLeaderboards() {
 //  MESSAGES (commandes écrites)
 // ============================================================
 const PLAYER_CMDS = new Set(['invites', 'invitations', 'balance', 'bal', 'solde', 'daily', 'aide', 'help', 'casino', 'jeux']);
-const OWNER_CMDS = new Set(['add', 'ajouter', 'remove', 'retirer', 'classement', 'setup', 'salon', 'wins', 'win', 'admin']);
+const OWNER_CMDS = new Set([
+  'add', 'ajouter', 'remove', 'retirer', 'classement', 'setup', 'salon',
+  'wins', 'win', 'admin', 'invites-notif', 'invitesnotif', 'notifinvites',
+]);
 
 client.on(Events.MessageCreate, async (msg) => {
   if (msg.author.bot || !msg.guild) return;
@@ -2184,6 +2342,10 @@ client.on(Events.MessageCreate, async (msg) => {
       case 'wins':
       case 'win':
         return await cmdWins(msg);
+      case 'invites-notif':
+      case 'invitesnotif':
+      case 'notifinvites':
+        return await cmdInvitesNotif(msg);
       case 'admin':
         return await cmdAdmin(msg);
       default:
@@ -2315,9 +2477,24 @@ client.on(Events.GuildMemberAdd, async (member) => {
     if (!(await claimInviteReward(guild.id, member.id, inviterId))) return;
 
     await credit(inviterId, INVITE_REWARD);
-    const chId = casinoChannels.get(guild.id);
-    const ch = chId ? await client.channels.fetch(chId).catch(() => null) : null;
-    ch?.send(`🎉 <@${inviterId}> a invité <@${member.id}> et reçoit **${fmt(INVITE_REWARD)}** !`).catch(() => {});
+    const notifId = guildChannels.get(`${guild.id}:invites`) || casinoChannels.get(guild.id);
+    const ch = notifId ? await client.channels.fetch(notifId).catch(() => null) : null;
+    if (ch) {
+      const inviter = await client.users.fetch(inviterId).catch(() => null);
+      const embed = new EmbedBuilder()
+        .setColor(COLORS.violet)
+        .setAuthor({
+          name: inviter ? `${inviter.globalName || inviter.username} a invité quelqu’un !` : 'Nouvelle invitation',
+          iconURL: inviter?.displayAvatarURL(),
+        })
+        .setDescription(
+          `📨 <@${inviterId}> a invité <@${member.id}>\n` +
+            `🎁 Récompense : **${fmt(INVITE_REWARD)}**`
+        )
+        .setThumbnail(member.user.displayAvatarURL())
+        .setTimestamp();
+      ch.send({ embeds: [embed] }).catch(() => {});
+    }
   } catch (e) {
     console.error('[invitations] arrivée', e?.message || e);
   }
@@ -2378,7 +2555,7 @@ client.on(Events.ChannelDelete, async (channel) => {
     casinoChannels.delete(gid);
     await supabase.from('casino_channels').delete().eq('guild_id', gid);
   }
-  for (const kind of ['wins', 'admin']) {
+  for (const kind of ['wins', 'admin', 'invites']) {
     if (guildChannels.get(`${gid}:${kind}`) === channel.id) {
       guildChannels.delete(`${gid}:${kind}`);
       await supabase.from('guild_channels').delete().eq('guild_id', gid).eq('kind', kind);
