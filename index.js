@@ -305,7 +305,7 @@ async function loadMultipliers() {
 }
 
 // Renvoie { db: true/false } : db = false si seule la sauvegarde locale a marché
-async function saveMultiplier(game, value) {
+async function saveMultiplier(game, value, guildId = null) {
   multipliers.set(game, value);
   try {
     fs.mkdirSync(path.dirname(MULT_FILE), { recursive: true });
@@ -313,16 +313,87 @@ async function saveMultiplier(game, value) {
   } catch (e) {
     console.error('[multiplicateurs] fichier :', e?.message || e);
   }
+  let db = true;
   try {
     const { error } = await supabase
       .from('game_settings')
       .upsert({ game, multiplier: value, updated_at: new Date().toISOString() });
     if (error) throw error;
-    return { db: true };
   } catch (e) {
     console.error('[multiplicateurs] sauvegarde Supabase :', e?.message || e);
-    return { db: false };
+    db = false;
   }
+  // Annonce dans le salon casino
+  if (guildId) {
+    try {
+      const casinoId = casinoChannels.get(guildId);
+      if (casinoId) {
+        const ch = await client.channels.fetch(casinoId).catch(() => null);
+        if (ch) {
+          await ch.send({
+            embeds: [
+              new EmbedBuilder()
+                .setTitle('🎚️ Multiplicateur modifié')
+                .setColor(COLORS.violet)
+                .setDescription(
+                  `**${GAME_NAMES[game] || game}** : coefficient réglé sur **${fx(value)}**.\n` +
+                    `Tous les gains de ce jeu sont maintenant multipliés par ce coefficient.`
+                )
+                .setTimestamp(),
+            ],
+          });
+        }
+      }
+    } catch (e) {
+      console.error('[multiplicateurs] annonce', e?.message || e);
+    }
+  }
+  return { db };
+}
+
+// ---------- Boosts temporaires (x2 wins, x2 losses, etc.) ----------
+/** guildId -> { winMult, loseMult, label, expiresAt, timer } */
+const activeBoosts = new Map();
+
+function getBoost(guildId) {
+  const b = activeBoosts.get(guildId);
+  if (!b) return { winMult: 1, loseMult: 1, label: null };
+  if (b.expiresAt && Date.now() > b.expiresAt) {
+    clearTimeout(b.timer);
+    activeBoosts.delete(guildId);
+    return { winMult: 1, loseMult: 1, label: null };
+  }
+  return b;
+}
+
+async function startBoost(guildId, { winMult, loseMult, label, minutes }) {
+  const prev = activeBoosts.get(guildId);
+  if (prev?.timer) clearTimeout(prev.timer);
+  const expiresAt = minutes > 0 ? Date.now() + minutes * 60_000 : null;
+  const entry = { winMult, loseMult, label, expiresAt, timer: null };
+  if (expiresAt) {
+    entry.timer = setTimeout(() => {
+      activeBoosts.delete(guildId);
+      const casinoId = casinoChannels.get(guildId);
+      if (casinoId) {
+        client.channels
+          .fetch(casinoId)
+          .then((ch) =>
+            ch?.send({
+              embeds: [
+                new EmbedBuilder()
+                  .setTitle('⏰ Boost terminé')
+                  .setColor(COLORS.grey)
+                  .setDescription(`L’événement **${label}** est terminé. Retour aux gains normaux.`),
+              ],
+            })
+          )
+          .catch(() => {});
+      }
+    }, expiresAt - Date.now());
+  }
+  activeBoosts.set(guildId, entry);
+  return entry;
 }
 
 async function recordResult({ guildId, user, game, bet, mult, payout, detail }) {
@@ -567,12 +638,24 @@ async function settleMines(game, kind, i) {
       color = COLORS.grey;
     } else {
       mult = minesMultiplier(picks, game.mines);
+      const boost = getBoost(game.guildId);
+      if ((boost.winMult || 1) !== 1) mult = round2(mult * boost.winMult);
       payout = floor2(game.bet * mult);
       color = COLORS.green;
       text =
         kind === 'timeout'
           ? `⏱️ Temps écoulé, encaissement automatique : **${fmt(payout)}** (${fx(mult)})`
           : `✅ Bien joué ! Tu encaisses **${fmt(payout)}** (${fx(mult)}), profit : **${signed(round2(payout - game.bet))}**.`;
+      if (boost.label) text += `\n⚡ Boost **${boost.label}**`;
+    }
+
+    if (kind === 'lose') {
+      const boost = getBoost(game.guildId);
+      if ((boost.loseMult || 1) > 1) {
+        const extra = floor2(game.bet * ((boost.loseMult || 1) - 1));
+        if (extra > 0) await debit(game.userId, extra).catch(() => {});
+        text += `\n⚡ Boost **${boost.label}** : perte ×${boost.loseMult}`;
+      }
     }
 
     const balance = payout > 0 ? await credit(game.userId, payout) : await getBalance(game.userId);
@@ -633,7 +716,22 @@ async function handleMinesButton(i) {
 const SUITS = ['♠️', '♥️', '♦️', '♣️'];
 const RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
 const newDeck = () => shuffle(SUITS.flatMap((s) => RANKS.map((r) => ({ r, s }))));
-const cardStr = (c) => `\`${c.r}\`${c.s}`;
+const cardStr = (c) => `\`${c.r}${c.s}\``;
+/** Affiche une carte en "vrai" format visuel */
+const cardArt = (c) => {
+  const r = String(c.r).padEnd(2, ' ');
+  return `┌────┐\n│${r}  │\n│ ${c.s} │\n│  ${r.trim().padStart(2, ' ')}│\n└────┘`;
+};
+const cardsArt = (hand) => {
+  if (!hand.length) return '—';
+  // Affiche les cartes côte à côte (lignes fusionnées)
+  const arts = hand.map(cardArt).map((a) => a.split('\n'));
+  const rows = arts[0].map((_, ri) => arts.map((a) => a[ri]).join(' '));
+  return '```\n' + rows.join('\n') + '\n```';
+};
+const DICE_FACES = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
+const dieFace = (n) => DICE_FACES[Math.max(1, Math.min(6, n)) - 1];
+const WHEEL_FRAMES = ['◐', '◓', '◑', '◒'];
 
 function handValue(hand) {
   let total = 0;
@@ -654,18 +752,23 @@ function handValue(hand) {
 
 function bjEmbed(g, end) {
   const e = new EmbedBuilder().setTitle('🃏 Blackjack');
+  const playerBlock = cardsArt(g.player);
+  const dealerBlock = end
+    ? cardsArt(g.dealer)
+    : cardsArt([g.dealer[0]]) + ' 🂠';
   e.addFields(
-    { name: `Ta main (${handValue(g.player)})`, value: g.player.map(cardStr).join('  ') },
-    end
-      ? { name: `Croupier (${handValue(g.dealer)})`, value: g.dealer.map(cardStr).join('  ') }
-      : { name: `Croupier (${handValue([g.dealer[0]])})`, value: `${cardStr(g.dealer[0])}  🂠` },
+    { name: `Ta main · ${handValue(g.player)}`, value: playerBlock },
+    {
+      name: end ? `Croupier · ${handValue(g.dealer)}` : `Croupier · ${handValue([g.dealer[0]])} + ?`,
+      value: dealerBlock,
+    },
     { name: 'Mise', value: fmt(g.bet), inline: true }
   );
   if (end) {
     e.setColor(end.color).setDescription(end.text);
     e.addFields({ name: 'Solde', value: fmt(end.balance), inline: true });
   } else {
-    e.setColor(COLORS.blue).setDescription('À toi : **Tirer**, **Rester** ou **Doubler**.');
+    e.setColor(COLORS.violet).setDescription('À toi : **Tirer**, **Rester** ou **Doubler**.');
   }
   return e;
 }
@@ -794,6 +897,16 @@ async function settleBlackjack(game, kind, i) {
       while (handValue(game.dealer) < 17) game.dealer.push(game.deck.pop());
     }
     const out = bjOutcome(game, kind);
+    const boost = getBoost(game.guildId);
+    if (out.payout > game.bet && (boost.winMult || 1) !== 1) {
+      const profit = out.payout - game.bet;
+      out.payout = floor2(game.bet + profit * (boost.winMult || 1));
+      out.text += `\n⚡ Boost **${boost.label}** appliqué !`;
+    } else if (out.payout === 0 && (boost.loseMult || 1) > 1) {
+      const extra = floor2(game.bet * ((boost.loseMult || 1) - 1));
+      if (extra > 0) await debit(game.userId, extra).catch(() => {});
+      out.text += `\n⚡ Boost **${boost.label}** : perte ×${boost.loseMult}`;
+    }
     const balance = out.payout > 0 ? await credit(game.userId, out.payout) : await getBalance(game.userId);
     recordResult({
       guildId: game.guildId,
@@ -903,8 +1016,13 @@ async function playRoulette(i, bet, choiceStr) {
 
     const result = randomInt(0, 37);
     const won = choice.win(result);
-    const rlMult = round2(choice.mult * coef('roulette'));
-    const payout = won ? floor2(bet * rlMult) : 0;
+    const boost = getBoost(i.guildId);
+    const rlMult = round2(choice.mult * coef('roulette') * (won ? boost.winMult || 1 : 1));
+    let payout = won ? floor2(bet * rlMult) : 0;
+    if (!won && (boost.loseMult || 1) > 1) {
+      const extra = floor2(bet * ((boost.loseMult || 1) - 1));
+      if (extra > 0) await debit(uid, extra).catch(() => {});
+    }
 
     try {
       await respond(i, {
@@ -1077,7 +1195,7 @@ const INSTANT = {
       return {
         base: outcome === choice ? DICE_MULT[choice] : 0,
         pick: { under: 'Moins de 7', over: 'Plus de 7', seven: 'Exactement 7' }[choice],
-        headline: `🎲 **${a}** + 🎲 **${b}** = **${sum}**`,
+        headline: `${dieFace(a)} **${a}** + ${dieFace(b)} **${b}** = **${sum}**`,
         detail: `${a}+${b}=${sum}`,
       };
     },
@@ -1308,7 +1426,7 @@ Object.assign(INSTANT, {
     resolve(choice) {
       const n = randomInt(1, 7);
       const want = Number(choice.slice(1));
-      return { base: n === want ? DIE_MULT : 0, pick: `Chiffre ${want}`, headline: `Le dé s'arrête sur **🎲 ${n}**`, detail: `${want} → ${n}` };
+      return { base: n === want ? DIE_MULT : 0, pick: `Chiffre ${want}`, headline: `Le dé s'arrête sur **${dieFace(n)} ${n}**`, detail: `${want} → ${n}` };
     },
   },
 
@@ -1379,9 +1497,16 @@ async function playInstant(i, key, bet, choice) {
 
     const c = coef(key);
     const res = G.resolve(choice, c);
-    const mult = res.base > 0 ? round2(res.base * c) : 0;
-    const payout = mult > 0 ? floor2(bet * mult) : 0;
-    const profit = round2(payout - bet);
+    const boost = getBoost(i.guildId);
+    let mult = res.base > 0 ? round2(res.base * c * (boost.winMult || 1)) : 0;
+    let payout = mult > 0 ? floor2(bet * mult) : 0;
+    // x2 pertes : on retire un supplément (mise déjà débitée → débit additionnel)
+    let extraLoss = 0;
+    if (payout === 0 && (boost.loseMult || 1) > 1) {
+      extraLoss = floor2(bet * ((boost.loseMult || 1) - 1));
+      if (extraLoss > 0) await debit(uid, extraLoss).catch(() => {});
+    }
+    const profit = round2(payout - bet - extraLoss);
 
     try {
       await respond(i, {
@@ -1389,12 +1514,15 @@ async function playInstant(i, key, bet, choice) {
           new EmbedBuilder()
             .setTitle(G.title)
             .setColor(COLORS.violet)
-            .setDescription(`${G.spinText}\nMise **${fmt(bet)}** · ${res.pick}`),
+            .setDescription(
+              `${G.spinText}\nMise **${fmt(bet)}** · ${res.pick}` +
+                (boost.label ? `\n⚡ Boost actif : **${boost.label}**` : '')
+            ),
         ],
         components: [],
       });
     } catch (e) {
-      await credit(uid, bet).catch(() => {});
+      await credit(uid, bet + extraLoss).catch(() => {});
       throw e;
     }
 
@@ -1405,82 +1533,97 @@ async function playInstant(i, key, bet, choice) {
       switch (key) {
         case 'coinflip':
           return [
-            { text: '🪙 La pièce vole…\n**Pile** ⟷ **Face**', ms: 600 },
-            { text: '🪙 Elle tourne dans les airs…\n✨ ✨ ✨', ms: 700 },
-            { text: '🪙 Elle redescend…', ms: 500 },
+            { text: '🪙 **(  )**  tourne…\nPile ⟷ Face', ms: 450 },
+            { text: '🪙 **(·)**  dans les airs…', ms: 400 },
+            { text: '🪙 **(··)**  encore…', ms: 400 },
+            { text: '🪙 **(···)**  redescend…', ms: 450 },
           ];
         case 'dice':
           return [
-            { text: '🎲 Les dés roulent…\n⬜ ⬜', ms: 500 },
-            { text: '🎲 ⬜ ⬜ → 🎲 🎲\nÇa secoue…', ms: 600 },
-            { text: '🎲 Presque arrêtés…', ms: 500 },
+            { text: `${dieFace(randomInt(1, 7))} ${dieFace(randomInt(1, 7))}\nLes dés roulent…`, ms: 400 },
+            { text: `${dieFace(randomInt(1, 7))} ${dieFace(randomInt(1, 7))}\nÇa secoue…`, ms: 400 },
+            { text: `${dieFace(randomInt(1, 7))} ${dieFace(randomInt(1, 7))}\nPresque…`, ms: 450 },
+            { text: `${dieFace(randomInt(1, 7))} ${dieFace(randomInt(1, 7))}\nStabilisation…`, ms: 400 },
           ];
         case 'slots':
           return [
-            { text: '🎰 **[ ❓ | ❓ | ❓ ]**\nLes rouleaux démarrent…', ms: 500 },
-            { text: '🎰 **[ 🍒 | ❓ | ❓ ]**\nPremier rouleau…', ms: 550 },
-            { text: '🎰 **[ 🍒 | 🍋 | ❓ ]**\nDeuxième…', ms: 550 },
-            { text: '🎰 **[ 🍒 | 🍋 | 💎 ]**\nDernier tour…', ms: 450 },
+            { text: '🎰 **[ ❓ | ❓ | ❓ ]**\nRouleaux en marche…', ms: 450 },
+            { text: '🎰 **[ 🍒 | ❓ | ❓ ]**\n1er rouleau…', ms: 500 },
+            { text: '🎰 **[ 🍒 | 🍋 | ❓ ]**\n2e rouleau…', ms: 500 },
+            { text: '🎰 **[ 🍒 | 🍋 | 💎 ]**\n3e rouleau…', ms: 450 },
           ];
         case 'wheel':
           return [
-            { text: '🎡 La roue accélère…\n💫 💫 💫', ms: 600 },
-            { text: '🎡 Elle tourne à toute vitesse…', ms: 700 },
-            { text: '🎡 Elle ralentit… ✨', ms: 600 },
+            { text: `${WHEEL_FRAMES[0]}  La roue s’élance…\n╔═══🎡═══╗`, ms: 400 },
+            { text: `${WHEEL_FRAMES[1]}  Vitesse max…\n╔═══🎡═══╗`, ms: 400 },
+            { text: `${WHEEL_FRAMES[2]}  Elle tourne…\n╔═══🎡═══╗`, ms: 400 },
+            { text: `${WHEEL_FRAMES[3]}  Ralentit…\n╔═══🎡═══╗`, ms: 500 },
+            { text: `${WHEEL_FRAMES[0]}  Dernier tour…\n╔═══🎡═══╗`, ms: 450 },
           ];
         case 'duel':
           return [
-            { text: '⚔️ Distribution des cartes…\n🂠  🂠', ms: 600 },
-            { text: '⚔️ Les cartes sont retournées…', ms: 700 },
+            { text: '⚔️ Distribution…\n🂠    🂠', ms: 500 },
+            { text: '⚔️ Les cartes glissent…\n🂠 →  🂠 →', ms: 550 },
+            { text: '⚔️ Révélation…', ms: 500 },
           ];
         case 'suit':
           return [
-            { text: '🃏 Le croupier mélange…\n♠️ ♥️ ♦️ ♣️', ms: 600 },
-            { text: '🃏 Une carte est tirée…', ms: 700 },
+            { text: '🃏 Mélange\n♠️ ♥️ ♦️ ♣️', ms: 450 },
+            { text: '🃏 ♠️ → ♥️ → ♦️ → ♣️', ms: 450 },
+            { text: '🃏 Une carte est choisie…', ms: 500 },
           ];
         case 'zone':
           return [
-            { text: '🎯 Tirage en cours…\n**?**', ms: 500 },
-            { text: '🎯 Le nombre se forme…', ms: 600 },
+            { text: '🎯 Tirage 1–10…\n**?**', ms: 400 },
+            { text: '🎯 **3** · **7** · **5** · **?**', ms: 450 },
+            { text: '🎯 Le nombre tombe…', ms: 450 },
           ];
         case 'plinko':
           return [
-            { text: '🎱 La bille est lâchée…\n⬇️', ms: 500 },
-            { text: '🎱 Elle rebondit…\n⬅️ ⬇️ ➡️', ms: 600 },
-            { text: '🎱 Elle descend encore…\n⬇️ ⬇️', ms: 550 },
+            { text: '🎱 ●\n⬇️\n· · · · · · · · ·', ms: 400 },
+            { text: '🎱\n  ●\n· · · · · · · · ·', ms: 400 },
+            { text: '🎱\n    ●\n· · · · · · · · ·', ms: 400 },
+            { text: '🎱\n      ●\n· · · · · · · · ·', ms: 450 },
           ];
         case 'crash':
           return [
-            { text: '🚀 3… 2… 1…\nDécollage !', ms: 500 },
-            { text: '🚀 x1.2 · x1.5 · x2…\nLa fusée monte…', ms: 700 },
-            { text: '🚀 Toujours plus haut…', ms: 500 },
+            { text: '🚀 3…', ms: 350 },
+            { text: '🚀 2…', ms: 350 },
+            { text: '🚀 1… Décollage !', ms: 350 },
+            { text: '🚀 x1.2 · x1.5 · x2…', ms: 500 },
+            { text: '🚀 Monte encore…', ms: 450 },
           ];
         case 'scratch':
           return [
-            { text: '🎟️ Tu grattes…\n**[ ░ | ░ | ░ ]**', ms: 500 },
-            { text: '🎟️ **[ ⭐ | ░ | ░ ]**', ms: 450 },
-            { text: '🎟️ **[ ⭐ | 🔔 | ░ ]**', ms: 450 },
+            { text: '🎟️ **[ ░ | ░ | ░ ]**', ms: 400 },
+            { text: '🎟️ **[ ⭐ | ░ | ░ ]**', ms: 400 },
+            { text: '🎟️ **[ ⭐ | 🔔 | ░ ]**', ms: 400 },
+            { text: '🎟️ Dernière case…', ms: 400 },
           ];
         case 'die':
           return [
-            { text: '🎲 Le dé tourne…\n🔢', ms: 500 },
-            { text: '🎲 1 · 2 · 3 · 4 · 5 · 6…', ms: 600 },
+            { text: `${dieFace(randomInt(1, 7))}  le dé tourne…`, ms: 350 },
+            { text: `${dieFace(randomInt(1, 7))}  · · ·`, ms: 350 },
+            { text: `${dieFace(randomInt(1, 7))}  · · ·`, ms: 350 },
+            { text: `${dieFace(randomInt(1, 7))}  ralentit…`, ms: 400 },
           ];
         case 'chest':
           return [
-            { text: '📦 Tu approches des coffres…\n📦 📦 📦', ms: 500 },
-            { text: '📦 Tu ouvres…\n✨ ✨ ✨', ms: 700 },
+            { text: '📦 📦 📦\nTu hésites…', ms: 450 },
+            { text: '📦✨📦 📦\nTu ouvres…', ms: 550 },
+            { text: '✨ ✨ ✨', ms: 450 },
           ];
         case 'russian':
           return [
-            { text: '🔫 Le barillet tourne…\n🔄', ms: 600 },
-            { text: '🔫 Tu appuies sur la détente…', ms: 800 },
+            { text: '🔫 🔄 Barillet…', ms: 500 },
+            { text: '🔫 🔄🔄 Encore…', ms: 500 },
+            { text: '🔫 Détente…', ms: 700 },
           ];
         case 'horses':
           return [
-            { text: '🏇 Sous les starters…\n🐎 🐎 🐎 🐎 🐎', ms: 500 },
-            { text: '🏇 Ils s’élancent !\n💨 💨 💨', ms: 700 },
-            { text: '🏇 Dans la dernière ligne droite…', ms: 600 },
+            { text: '🏇 🏁\n🐎 🐎 🐎 🐎 🐎', ms: 400 },
+            { text: '🏇 💨💨\n🐎🐎 🐎 🐎 🐎', ms: 500 },
+            { text: '🏇 Dernière ligne…\n🐎  🐎🐎  🐎 🐎', ms: 550 },
           ];
         default:
           return [{ text: G.spinText, ms: 1200 }];
@@ -1563,7 +1706,7 @@ function buildHelpEmbed() {
         `🎁 **Daily** : ${DAILY_AMOUNT} pièces gratuites par jour`,
         `📨 **Invitations** : +${INVITE_REWARD} 🪙 à chaque nouveau membre que tu invites (**${PREFIX}invites** pour ton total)`,
         '💸 **Envoyer** : transfère une partie de ton solde à un autre membre',
-        '🧹 **Nettoyer** (propriétaire) : efface le salon casino et reposte le panneau',
+        '🧹 **Nettoyer** : efface le salon casino et reposte le panneau (tout le monde)',
         '📜 **Historique** : tes 15 dernières parties',
         '🔁 À la fin d’une partie, le bouton **Rejouer** relance la même mise.',
         '',
@@ -1587,7 +1730,7 @@ function buildPanelPayload() {
         `17 jeux : Mines, Blackjack, Roulette, Pile ou Face, Dés, Machine à sous, Roue, Duel, Enseigne, Zone, Plinko, Crash, Ticket, Dé exact, Coffre, Roulette russe, Chevaux\n` +
         `🎁 **Daily** : ${DAILY_AMOUNT} pièces gratuites par jour\n` +
         '💰 **Solde** · 💸 **Envoyer** · 🏆 **Classement** · 👑 **All-time** · 📜 **Historique** · 📨 **Invites**\n' +
-        '🧹 **Nettoyer** : efface le salon et reposte ce panneau (propriétaire uniquement)\n\n' +
+        '🧹 **Nettoyer** : efface les messages du salon et reposte ce panneau (tout le monde)\n\n' +
         '🔒 Tes parties, ton solde et ton historique ne sont visibles que par toi.'
     );
   const main = new ActionRowBuilder().addComponents(
@@ -1747,9 +1890,6 @@ async function handlePanelButton(i) {
 
 /** Nettoie le salon casino et reposte le panneau (propriétaire uniquement). */
 async function cleanCasinoChannel(i) {
-  if (i.user.id !== i.guild.ownerId) {
-    return i.reply({ content: CROWN_ONLY, flags: EPH });
-  }
   const casinoId = casinoChannels.get(i.guild.id);
   if (!casinoId || i.channelId !== casinoId) {
     return i.reply({
@@ -1769,7 +1909,6 @@ async function cleanCasinoChannel(i) {
   const channel = i.channel;
   let deleted = 0;
   try {
-    // Boucle de suppression (bulkDelete = messages < 14 jours)
     for (let n = 0; n < 20; n++) {
       const fetched = await channel.messages.fetch({ limit: 100 }).catch(() => null);
       if (!fetched || fetched.size === 0) break;
@@ -1792,7 +1931,6 @@ async function cleanCasinoChannel(i) {
 
   const panelMsg = await channel.send(buildPanelPayload());
   await panelMsg.pin().catch(() => {});
-  // Met à jour l’id du message d’aide si la table le stocke
   await supabase
     .from('casino_channels')
     .upsert({
@@ -1804,7 +1942,7 @@ async function cleanCasinoChannel(i) {
     .then(() => {}, () => {});
 
   return i.editReply({
-    content: `✅ Salon nettoyé (**${deleted}** message(s) supprimé(s)). Le panneau a été reposté et épinglé.`,
+    content: `✅ Salon nettoyé (**${deleted}** message(s) supprimé(s)). Le panneau a été reposté.`,
   });
 }
 
@@ -1880,70 +2018,139 @@ function buildAdminPayload() {
     .setTitle('🛠️ Panneau admin')
     .setColor(COLORS.red)
     .setDescription(
-      '➕ **Ajouter** de l’argent à un membre\n' +
-        '➖ **Retirer** de l’argent à un membre\n' +
-        '🎯 **Définir** le solde exact d’un membre\n' +
-        '👀 **Voir** le solde d’un membre\n' +
-        '🎁 **Offrir à tous** : le même montant à tous les joueurs ayant un compte\n' +
-        '🎚️ **Multiplicateurs** : régler le multiplicateur de gains de chaque jeu\n' +
-        '📢 **Événement** : annonce dans le casino — le **premier** qui clique gagne le montant (durée optionnelle)\n\n' +
+      '➕ **Ajouter** · ➖ **Retirer** · 🎯 **Définir** · 👀 **Voir** un solde\n' +
+        '🎁 **Offrir à tous** · 💥 **Reset soldes** (remet tout le monde à 0)\n' +
+        '🎚️ **Multiplicateurs** (annonce auto dans le casino)\n' +
+        '📢 **Événement** : claim multi-gagnants, giveaway, boosts x2 wins/losses…\n\n' +
         'Tu choisis le membre dans une liste, puis le montant dans une fenêtre.'
     );
   const row1 = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('admin_add').setLabel('Ajouter').setEmoji('➕').setStyle(ButtonStyle.Success),
     new ButtonBuilder().setCustomId('admin_remove').setLabel('Retirer').setEmoji('➖').setStyle(ButtonStyle.Danger),
-    new ButtonBuilder().setCustomId('admin_set').setLabel('Définir').setEmoji('🎯').setStyle(ButtonStyle.Primary)
+    new ButtonBuilder().setCustomId('admin_set').setLabel('Définir').setEmoji('🎯').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId('admin_view').setLabel('Voir un solde').setEmoji('👀').setStyle(ButtonStyle.Secondary)
   );
   const row2 = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('admin_view').setLabel('Voir un solde').setEmoji('👀').setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId('admin_all').setLabel('Offrir à tous').setEmoji('🎁').setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId('admin_reset').setLabel('Reset soldes').setEmoji('💥').setStyle(ButtonStyle.Danger),
     new ButtonBuilder().setCustomId('admin_mult').setLabel('Multiplicateurs').setEmoji('🎚️').setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId('admin_event').setLabel('Événement').setEmoji('📢').setStyle(ButtonStyle.Primary)
   );
   return { embeds: [embed], components: [row1, row2] };
 }
 
-// ---------- Événements "premier arrivé" ----------
-const activeEvents = new Map(); // eventId -> { amount, guildId, channelId, messageId, expiresAt, claimed, timer }
+// ---------- Événements (claim, giveaway, boosts) ----------
+const activeEvents = new Map();
+// eventId -> {
+//   type: 'claim'|'giveaway',
+//   amount, maxWinners, winners: Set, entries: Set,
+//   guildId, channelId, messageId, expiresAt, finished, timer
+// }
 
-function eventEmbed(amount, expiresAt, claimedBy) {
-  const e = new EmbedBuilder()
-    .setTitle('📢 Événement casino')
-    .setColor(claimedBy ? COLORS.grey : COLORS.violet);
-  if (claimedBy) {
-    e.setDescription(
-      `🏁 **Terminé** — <@${claimedBy}> a remporté **${fmt(amount)}** !`
-    );
+const EVENT_TYPES = [
+  { id: 'claim', label: 'Claim rapide', desc: 'Les N premiers qui cliquent gagnent' },
+  { id: 'giveaway', label: 'Giveaway', desc: 'Inscriptions, tirage à la fin du timer' },
+  { id: 'x2win', label: 'x2 Gains', desc: 'Tous les gains sont doublés pendant X min' },
+  { id: 'x2lose', label: 'x2 Pertes', desc: 'Les pertes sont doublées pendant X min' },
+  { id: 'x2both', label: 'x2 Gains & Pertes', desc: 'Gains et pertes x2 pendant X min' },
+  { id: 'lucky', label: 'Heure chanceuse', desc: 'Gains x1.5 pendant X min' },
+  { id: 'goldrush', label: 'Ruée vers l’or', desc: 'Gains x3 pendant X min' },
+];
+
+function claimEventEmbed(ev) {
+  const left = ev.maxWinners - ev.winners.size;
+  const e = new EmbedBuilder().setTitle('📢 Claim — premier arrivé').setColor(left > 0 ? COLORS.violet : COLORS.grey);
+  if (ev.finished || left <= 0) {
+    const names = [...ev.winners].map((id) => `<@${id}>`).join(', ') || 'personne';
+    e.setDescription(`🏁 **Terminé** — gagnant(s) : ${names}\nChacun a reçu **${fmt(ev.amount)}**.`);
   } else {
-    const timeLine = expiresAt
-      ? `\n⏱️ Expire <t:${Math.floor(expiresAt / 1000)}:R>`
-      : '\n⏱️ Sans limite de temps';
+    const timeLine = ev.expiresAt ? `\n⏱️ Expire <t:${Math.floor(ev.expiresAt / 1000)}:R>` : '\n⏱️ Sans limite';
     e.setDescription(
-      `🎁 **${fmt(amount)}** à gagner !\n` +
-        `Le **premier** qui clique sur **Réclamer** empoche la somme.${timeLine}`
+      `🎁 **${fmt(ev.amount)}** par gagnant\n` +
+        `Places restantes : **${left}/${ev.maxWinners}**\n` +
+        `Clique **Réclamer** pour empôcher ta part !${timeLine}`
     );
   }
   return e;
 }
 
-function eventRow(eventId, disabled) {
+function giveawayEmbed(ev) {
+  const e = new EmbedBuilder().setTitle('🎉 Giveaway').setColor(ev.finished ? COLORS.grey : COLORS.gold);
+  if (ev.finished) {
+    const names = [...ev.winners].map((id) => `<@${id}>`).join(', ') || 'personne';
+    e.setDescription(
+      `🏁 **Tirage terminé**\nGagnant(s) : ${names}\nPrix : **${fmt(ev.amount)}** chacun\n` +
+        `Participants : **${ev.entries.size}**`
+    );
+  } else {
+    e.setDescription(
+      `🎁 Prix : **${fmt(ev.amount)}** × **${ev.maxWinners}** gagnant(s)\n` +
+        `Clique **Participer** pour t’inscrire !\n` +
+        `👥 Inscrits : **${ev.entries.size}**\n` +
+        `⏱️ Tirage <t:${Math.floor(ev.expiresAt / 1000)}:R>`
+    );
+  }
+  return e;
+}
+
+function eventActionRow(eventId, type, disabled) {
+  if (type === 'giveaway') {
+    return new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`event_join_${eventId}`)
+        .setLabel(disabled ? 'Terminé' : 'Participer')
+        .setEmoji(disabled ? '🏁' : '🎟️')
+        .setStyle(disabled ? ButtonStyle.Secondary : ButtonStyle.Success)
+        .setDisabled(!!disabled)
+    );
+  }
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId(`event_claim_${eventId}`)
-      .setLabel(disabled ? 'Déjà pris' : 'Réclamer')
+      .setLabel(disabled ? 'Terminé' : 'Réclamer')
       .setEmoji(disabled ? '🏁' : '🎁')
       .setStyle(disabled ? ButtonStyle.Secondary : ButtonStyle.Success)
       .setDisabled(!!disabled)
   );
 }
 
-async function expireEvent(eventId) {
+async function finishGiveaway(eventId) {
   const ev = activeEvents.get(eventId);
-  if (!ev || ev.claimed) {
-    activeEvents.delete(eventId);
-    return;
+  if (!ev || ev.finished || ev.type !== 'giveaway') return;
+  ev.finished = true;
+  clearTimeout(ev.timer);
+
+  const pool = [...ev.entries];
+  shuffle(pool);
+  const winners = pool.slice(0, Math.min(ev.maxWinners, pool.length));
+  for (const uid of winners) {
+    ev.winners.add(uid);
+    try {
+      await credit(uid, ev.amount);
+    } catch (e) {
+      console.error('[giveaway] credit', e?.message || e);
+    }
   }
-  ev.claimed = true; // bloque les clics
+  activeEvents.delete(eventId);
+
+  try {
+    const ch = await client.channels.fetch(ev.channelId).catch(() => null);
+    const msg = ch ? await ch.messages.fetch(ev.messageId).catch(() => null) : null;
+    if (msg) {
+      await msg.edit({
+        embeds: [giveawayEmbed(ev)],
+        components: [eventActionRow(eventId, 'giveaway', true)],
+      });
+    }
+  } catch (e) {
+    console.error('[giveaway] finish', e?.message || e);
+  }
+}
+
+async function expireClaimEvent(eventId) {
+  const ev = activeEvents.get(eventId);
+  if (!ev || ev.finished || ev.type !== 'claim') return;
+  ev.finished = true;
   clearTimeout(ev.timer);
   activeEvents.delete(eventId);
   try {
@@ -1951,85 +2158,167 @@ async function expireEvent(eventId) {
     const msg = ch ? await ch.messages.fetch(ev.messageId).catch(() => null) : null;
     if (msg) {
       await msg.edit({
-        embeds: [
-          new EmbedBuilder()
-            .setTitle('📢 Événement casino')
-            .setColor(COLORS.grey)
-            .setDescription(`⏱️ **Expiré** — personne n’a réclamé **${fmt(ev.amount)}** à temps.`),
-        ],
-        components: [eventRow(eventId, true)],
+        embeds: [claimEventEmbed(ev)],
+        components: [eventActionRow(eventId, 'claim', true)],
       });
     }
   } catch (e) {
-    console.error('[event] expire', e?.message || e);
+    console.error('[claim] expire', e?.message || e);
   }
 }
 
 async function handleEventClaim(i) {
   const eventId = i.customId.slice('event_claim_'.length);
   const ev = activeEvents.get(eventId);
-  if (!ev || ev.claimed) {
+  if (!ev || ev.finished || ev.type !== 'claim') {
     return i.reply({ content: 'Cette récompense n’est plus disponible.', flags: EPH });
   }
   if (ev.expiresAt && Date.now() > ev.expiresAt) {
-    await expireEvent(eventId);
+    await expireClaimEvent(eventId);
     return i.reply({ content: '⏱️ Cet événement a expiré.', flags: EPH });
   }
+  if (ev.winners.has(i.user.id)) {
+    return i.reply({ content: 'Tu as déjà réclamé ta part !', flags: EPH });
+  }
+  if (ev.winners.size >= ev.maxWinners) {
+    ev.finished = true;
+    activeEvents.delete(eventId);
+    return i.reply({ content: 'Plus de places disponibles.', flags: EPH });
+  }
 
-  // Premier arrivé : verrou immédiat
-  ev.claimed = true;
-  clearTimeout(ev.timer);
-  activeEvents.delete(eventId);
+  ev.winners.add(i.user.id);
+  const done = ev.winners.size >= ev.maxWinners;
+  if (done) {
+    ev.finished = true;
+    clearTimeout(ev.timer);
+    activeEvents.delete(eventId);
+  }
 
   try {
-    const balance = await credit(i.user.id, ev.amount);
-    const embed = eventEmbed(ev.amount, null, i.user.id);
-    embed.addFields({ name: 'Solde du gagnant', value: fmt(balance), inline: true });
-    await i.update({ embeds: [embed], components: [eventRow(eventId, true)] });
+    await credit(i.user.id, ev.amount);
+    await i.update({
+      embeds: [claimEventEmbed(ev)],
+      components: [eventActionRow(eventId, 'claim', done)],
+    });
+    await i.followUp({ content: `✅ Tu as reçu **${fmt(ev.amount)}** !`, flags: EPH }).catch(() => {});
   } catch (e) {
-    // en cas d'échec crédit, on pourrait rouvrir — mais rare
+    ev.winners.delete(i.user.id);
     console.error('[event] claim', e?.message || e);
     if (!i.replied && !i.deferred) {
-      await i.reply({ content: '⚠️ Erreur lors du crédit, réessaie ou contacte le proprio.', flags: EPH }).catch(() => {});
+      await i.reply({ content: '⚠️ Erreur lors du crédit.', flags: EPH }).catch(() => {});
     }
   }
 }
 
-async function createCasinoEvent(i, amount, minutes) {
-  const casinoId = casinoChannels.get(i.guild.id);
-  if (!casinoId) {
-    return respondText(i, 'Aucun salon casino : utilise d’abord `!setup`.');
+async function handleEventJoin(i) {
+  const eventId = i.customId.slice('event_join_'.length);
+  const ev = activeEvents.get(eventId);
+  if (!ev || ev.finished || ev.type !== 'giveaway') {
+    return i.reply({ content: 'Ce giveaway est terminé.', flags: EPH });
   }
+  if (ev.expiresAt && Date.now() > ev.expiresAt) {
+    await finishGiveaway(eventId);
+    return i.reply({ content: '⏱️ Le giveaway est terminé.', flags: EPH });
+  }
+  if (ev.entries.has(i.user.id)) {
+    return i.reply({ content: 'Tu es déjà inscrit !', flags: EPH });
+  }
+  ev.entries.add(i.user.id);
+  try {
+    await i.update({
+      embeds: [giveawayEmbed(ev)],
+      components: [eventActionRow(eventId, 'giveaway', false)],
+    });
+    await i.followUp({ content: '🎟️ Tu es inscrit au giveaway ! Bonne chance.', flags: EPH }).catch(() => {});
+  } catch (e) {
+    console.error('[giveaway] join', e?.message || e);
+  }
+}
+
+async function postBoostEvent(i, kind, minutes) {
+  const casinoId = casinoChannels.get(i.guild.id);
+  if (!casinoId) return respondText(i, 'Aucun salon casino : utilise d’abord `!setup`.');
   const ch = await client.channels.fetch(casinoId).catch(() => null);
-  if (!ch) return respondText(i, 'Salon casino introuvable. Refais `!setup`.');
+  if (!ch) return respondText(i, 'Salon casino introuvable.');
+
+  const presets = {
+    x2win: { winMult: 2, loseMult: 1, label: 'x2 Gains 🔥' },
+    x2lose: { winMult: 1, loseMult: 2, label: 'x2 Pertes 💀' },
+    x2both: { winMult: 2, loseMult: 2, label: 'x2 Gains & Pertes ⚡' },
+    lucky: { winMult: 1.5, loseMult: 1, label: 'Heure chanceuse 🍀' },
+    goldrush: { winMult: 3, loseMult: 1, label: 'Ruée vers l’or 🏆' },
+  };
+  const p = presets[kind];
+  if (!p) return respondText(i, 'Type de boost inconnu.');
+  if (!minutes || minutes < 1) return respondText(i, 'Indique une durée en minutes (min. 1).');
+
+  await startBoost(i.guild.id, { ...p, minutes });
+  const ends = Math.floor((Date.now() + minutes * 60_000) / 1000);
+  await ch.send({
+    embeds: [
+      new EmbedBuilder()
+        .setTitle(`⚡ ${p.label}`)
+        .setColor(COLORS.gold)
+        .setDescription(
+          `Un boost est actif pendant **${minutes} min** (fin <t:${ends}:R>) !\n` +
+            (p.winMult !== 1 ? `• Gains × **${p.winMult}**\n` : '') +
+            (p.loseMult !== 1 ? `• Pertes × **${p.loseMult}** (mise perdue ×${p.loseMult})\n` : '') +
+            `\nJoue maintenant pour en profiter !`
+        )
+        .setTimestamp(),
+    ],
+  });
+  return i.reply({ content: `✅ Boost **${p.label}** lancé pour **${minutes} min**.`, flags: EPH });
+}
+
+async function createClaimOrGiveaway(i, type, amount, winners, minutes) {
+  const casinoId = casinoChannels.get(i.guild.id);
+  if (!casinoId) return respondText(i, 'Aucun salon casino : utilise d’abord `!setup`.');
+  const ch = await client.channels.fetch(casinoId).catch(() => null);
+  if (!ch) return respondText(i, 'Salon casino introuvable.');
+
+  if (type === 'giveaway' && (!minutes || minutes < 1)) {
+    return respondText(i, 'Un giveaway doit avoir une durée (minutes ≥ 1).');
+  }
 
   const eventId = `${Date.now().toString(36)}_${randomInt(1000, 9999)}`;
   const expiresAt = minutes > 0 ? Date.now() + minutes * 60_000 : null;
-
-  const msg = await ch.send({
-    embeds: [eventEmbed(amount, expiresAt, null)],
-    components: [eventRow(eventId, false)],
-  });
+  const maxWinners = Math.max(1, Math.min(50, winners || 1));
 
   const ev = {
+    type,
     amount,
+    maxWinners,
+    winners: new Set(),
+    entries: new Set(),
     guildId: i.guild.id,
     channelId: ch.id,
-    messageId: msg.id,
+    messageId: null,
     expiresAt,
-    claimed: false,
+    finished: false,
     timer: null,
   };
-  if (expiresAt) {
-    ev.timer = setTimeout(() => expireEvent(eventId), expiresAt - Date.now());
+
+  const msg = await ch.send({
+    embeds: [type === 'giveaway' ? giveawayEmbed(ev) : claimEventEmbed(ev)],
+    components: [eventActionRow(eventId, type, false)],
+  });
+  ev.messageId = msg.id;
+
+  if (type === 'giveaway') {
+    ev.timer = setTimeout(() => finishGiveaway(eventId), expiresAt - Date.now());
+  } else if (expiresAt) {
+    ev.timer = setTimeout(() => expireClaimEvent(eventId), expiresAt - Date.now());
   }
   activeEvents.set(eventId, ev);
 
   return i.reply({
     content:
-      `✅ Événement posté dans <#${ch.id}> : **${fmt(amount)}**` +
-      (minutes > 0 ? ` · expire dans **${minutes} min**` : ' · sans limite de temps') +
-      '.',
+      type === 'giveaway'
+        ? `✅ Giveaway posté : **${fmt(amount)}** × ${maxWinners} · tirage dans **${minutes} min**.`
+        : `✅ Claim posté : **${fmt(amount)}** × ${maxWinners} gagnant(s)` +
+          (minutes > 0 ? ` · expire dans **${minutes} min**` : ' · sans limite') +
+          '.',
     flags: EPH,
   });
 }
@@ -2087,18 +2376,29 @@ async function handleAdmin(i) {
     const action = id.slice('admin_'.length);
     if (action === 'mult') return i.reply({ ...multAdminPayload(), flags: EPH });
     if (action === 'event') {
+      const select = new StringSelectMenuBuilder()
+        .setCustomId('admin_eventpick')
+        .setPlaceholder('Type d’événement')
+        .addOptions(
+          EVENT_TYPES.map((t) => ({
+            label: t.label,
+            value: t.id,
+            description: t.desc.slice(0, 100),
+          }))
+        );
+      return i.reply({
+        content: '📢 Choisis le type d’événement :',
+        components: [new ActionRowBuilder().addComponents(select)],
+        flags: EPH,
+      });
+    }
+    if (action === 'reset') {
       return i.showModal(
         new ModalBuilder()
-          .setCustomId('modal_admin_event')
-          .setTitle('📢 Événement casino')
+          .setCustomId('modal_admin_reset')
+          .setTitle('💥 Reset tous les soldes')
           .addComponents(
-            modalInput('amount', 'Montant à gagner', { placeholder: 'ex : 50' }),
-            modalInput('minutes', 'Durée max en minutes (0 = illimité)', {
-              placeholder: 'ex : 5',
-              value: '5',
-              required: false,
-              max: 6,
-            })
+            modalInput('confirm', 'Tape RESET pour confirmer', { placeholder: 'RESET', max: 10 })
           )
       );
     }
@@ -2140,6 +2440,38 @@ async function handleAdmin(i) {
     );
   }
 
+  if (i.isStringSelectMenu() && id === 'admin_eventpick') {
+    const kind = i.values[0];
+    if (['x2win', 'x2lose', 'x2both', 'lucky', 'goldrush'].includes(kind)) {
+      return i.showModal(
+        new ModalBuilder()
+          .setCustomId(`modal_admin_boost_${kind}`)
+          .setTitle(`⚡ ${EVENT_TYPES.find((t) => t.id === kind)?.label || 'Boost'}`.slice(0, 45))
+          .addComponents(
+            modalInput('minutes', 'Durée en minutes', { placeholder: 'ex : 15', value: '15', max: 6 })
+          )
+      );
+    }
+    if (kind === 'claim' || kind === 'giveaway') {
+      return i.showModal(
+        new ModalBuilder()
+          .setCustomId(`modal_admin_event_${kind}`)
+          .setTitle(kind === 'giveaway' ? '🎉 Giveaway' : '📢 Claim multi-gagnants')
+          .addComponents(
+            modalInput('amount', 'Montant par gagnant', { placeholder: 'ex : 50' }),
+            modalInput('winners', 'Nombre de gagnants', { placeholder: 'ex : 3', value: '1', max: 3 }),
+            modalInput('minutes', kind === 'giveaway' ? 'Durée avant tirage (min)' : 'Durée max (0 = illimité)', {
+              placeholder: 'ex : 10',
+              value: kind === 'giveaway' ? '10' : '5',
+              required: false,
+              max: 6,
+            })
+          )
+      );
+    }
+    return;
+  }
+
   if (i.isUserSelectMenu() && id.startsWith('admin_pick_')) {
     const action = id.slice('admin_pick_'.length);
     const userId = i.values[0];
@@ -2167,19 +2499,58 @@ async function handleAdmin(i) {
   if (i.isModalSubmit()) {
     const raw = i.fields.getTextInputValue('amount').trim();
 
-    if (id === 'modal_admin_event') {
+    if (id === 'modal_admin_reset') {
+      const confirm = i.fields.getTextInputValue('confirm')?.trim().toUpperCase();
+      if (confirm !== 'RESET') {
+        return respondText(i, 'Annulé : tu dois taper **RESET** pour confirmer.');
+      }
+      try {
+        const { error, count } = await supabase.from('players').update({ balance: 0 }).neq('user_id', '').select('user_id', { count: 'exact' });
+        if (error) throw error;
+        peaks.clear();
+        savePeaksLocal();
+        const casinoId = casinoChannels.get(i.guild.id);
+        if (casinoId) {
+          const ch = await client.channels.fetch(casinoId).catch(() => null);
+          ch?.send({
+            embeds: [
+              new EmbedBuilder()
+                .setTitle('💥 Reset des soldes')
+                .setColor(COLORS.red)
+                .setDescription('Tous les soldes ont été remis à **0** par le propriétaire.'),
+            ],
+          }).catch(() => {});
+        }
+        return i.reply({
+          content: `✅ Soldes reset : **${count ?? 'tous les'}** joueur(s) à 0.`,
+          flags: EPH,
+        });
+      } catch (e) {
+        console.error('[reset]', e?.message || e);
+        return respondText(i, `Erreur reset : ${explainError(e)}`);
+      }
+    }
+
+    const boostM = id.match(/^modal_admin_boost_([a-z0-9]+)$/);
+    if (boostM) {
+      const kind = boostM[1];
+      const mRaw = i.fields.getTextInputValue('minutes')?.trim() || '15';
+      const minutes = Math.max(1, Math.min(24 * 60, Math.floor(Number(String(mRaw).replace(',', '.')) || 15)));
+      return postBoostEvent(i, kind, minutes);
+    }
+
+    const evM = id.match(/^modal_admin_event_(claim|giveaway)$/);
+    if (evM) {
+      const type = evM[1];
       const amount = parseAmount(raw);
       if (!amount || amount > MAX_ADMIN_AMOUNT) {
         return respondText(i, `Montant invalide (entre 0.01 et ${num(MAX_ADMIN_AMOUNT)}).`);
       }
-      let minutes = 0;
-      try {
-        const mRaw = i.fields.getTextInputValue('minutes')?.trim() || '0';
-        minutes = Math.max(0, Math.min(24 * 60, Math.floor(Number(String(mRaw).replace(',', '.')) || 0)));
-      } catch {
-        minutes = 0;
-      }
-      return createCasinoEvent(i, amount, minutes);
+      const wRaw = i.fields.getTextInputValue('winners')?.trim() || '1';
+      const winners = Math.max(1, Math.min(50, Math.floor(Number(wRaw) || 1)));
+      const mRaw = i.fields.getTextInputValue('minutes')?.trim() || '0';
+      const minutes = Math.max(0, Math.min(24 * 60, Math.floor(Number(String(mRaw).replace(',', '.')) || 0)));
+      return createClaimOrGiveaway(i, type, amount, winners, minutes);
     }
 
     if (id === 'modal_admin_all') {
@@ -2204,9 +2575,9 @@ async function handleAdmin(i) {
       if (value === null || value < MULT_MIN || value > MULT_MAX) {
         return respondText(i, `Valeur invalide : entre ${fx(MULT_MIN)} et ${fx(MULT_MAX)} (ex : 1.5).`);
       }
-      const { db } = await saveMultiplier(game, value);
+      const { db } = await saveMultiplier(game, value, i.guild.id);
       const note =
-        `✅ **${GAME_NAMES[game]}** : coefficient réglé sur **${fx(value)}**.` +
+        `✅ **${GAME_NAMES[game]}** : coefficient réglé sur **${fx(value)}** (annoncé dans le casino).` +
         (db ? '' : '\n⚠️ Sauvegardé uniquement en local : lance **schema_v3.sql** dans Supabase pour que ça survive à un redéploiement.');
       return respond(i, multAdminPayload(note));
     }
@@ -2737,8 +3108,9 @@ client.on(Events.InteractionCreate, async (i) => {
     // Panneau admin
     if (id.startsWith('admin_') || id.startsWith('modal_admin_')) return await handleAdmin(i);
 
-    // Événements "premier arrivé"
+    // Événements (claim / giveaway)
     if (id.startsWith('event_claim_') && i.isButton()) return await handleEventClaim(i);
+    if (id.startsWith('event_join_') && i.isButton()) return await handleEventJoin(i);
 
     const isGame =
       id.startsWith('panel_') ||
