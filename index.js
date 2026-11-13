@@ -95,8 +95,12 @@ const COLORS = {
 // ============================================================
 const LANG_FILE = path.join(__dirname, 'data', 'lang.json');
 const PING_FILE = path.join(__dirname, 'data', 'winping.json');
+const FAV_FILE = path.join(__dirname, 'data', 'favorites.json');
+const SKIP_FILE = path.join(__dirname, 'data', 'skipanim.json');
 const userLang = new Map(); // userId -> 'fr' | 'en'
 const winPingOff = new Set(); // userIds qui ne veulent plus être ping dans le salon wins
+const userFavs = new Map(); // userId -> Set of game keys
+const skipAnimUsers = new Set(); // userIds who skip animations
 
 function loadPrefs() {
   try {
@@ -108,6 +112,20 @@ function loadPrefs() {
   try {
     const raw = JSON.parse(fs.readFileSync(PING_FILE, 'utf8'));
     if (Array.isArray(raw)) for (const id of raw) winPingOff.add(String(id));
+  } catch {
+    /* premier lancement */
+  }
+  try {
+    const raw = JSON.parse(fs.readFileSync(FAV_FILE, 'utf8'));
+    for (const [id, arr] of Object.entries(raw)) {
+      if (Array.isArray(arr)) userFavs.set(id, new Set(arr.map(String)));
+    }
+  } catch {
+    /* premier lancement */
+  }
+  try {
+    const raw = JSON.parse(fs.readFileSync(SKIP_FILE, 'utf8'));
+    if (Array.isArray(raw)) for (const id of raw) skipAnimUsers.add(String(id));
   } catch {
     /* premier lancement */
   }
@@ -130,6 +148,26 @@ function setWinPing(userId, on) {
   if (on) winPingOff.delete(userId);
   else winPingOff.add(userId);
   saveJson(PING_FILE, [...winPingOff]);
+}
+const getFavs = (userId) => userFavs.get(userId) || new Set();
+function toggleFav(userId, game) {
+  let s = userFavs.get(userId);
+  if (!s) {
+    s = new Set();
+    userFavs.set(userId, s);
+  }
+  if (s.has(game)) s.delete(game);
+  else s.add(game);
+  const obj = {};
+  for (const [id, set] of userFavs) obj[id] = [...set];
+  saveJson(FAV_FILE, obj);
+  return s.has(game);
+}
+const wantsSkipAnim = (userId) => skipAnimUsers.has(userId);
+function setSkipAnim(userId, on) {
+  if (on) skipAnimUsers.add(userId);
+  else skipAnimUsers.delete(userId);
+  saveJson(SKIP_FILE, [...skipAnimUsers]);
 }
 const L = (uid, fr, en) => (getLang(uid) === 'en' ? en : fr);
 
@@ -229,6 +267,18 @@ const CROWN_ONLY = '👑 Seul le propriétaire du serveur (celui qui a la couron
 const ANIM_PALETTE = [COLORS.violet, COLORS.gold, COLORS.blue, 0xE879F9, 0xC026D3];
 
 async function animate(i, frames, title, head = '') {
+  if (!frames || !frames.length) return;
+  // Skip animations if user prefers
+  if (i.user && wantsSkipAnim(i.user.id)) {
+    const f = typeof frames[frames.length - 1] === 'string' ? { art: frames[frames.length - 1] } : frames[frames.length - 1];
+    const embed = new EmbedBuilder()
+      .setTitle(title)
+      .setColor(ANIM_PALETTE[ANIM_PALETTE.length - 1])
+      .setDescription(`${head}${f.art}${f.caption ? `\n**${f.caption}**` : ''}`)
+      .setFooter({ text: 'Animations désactivées' });
+    await i.editReply({ embeds: [embed], components: [] }).catch(() => {});
+    return;
+  }
   const n = frames.length;
   for (let idx = 0; idx < n; idx++) {
     const f = typeof frames[idx] === 'string' ? { art: frames[idx] } : frames[idx];
@@ -497,6 +547,51 @@ const GAME_NAMES = {
   chest2: '📦 Triple coffre',
   spincolor: '🎨 Roue couleur',
   poker: '🃏 Poker',
+  coin2: '🪙 Double pile',
+  dice7: '🎲 Dés 7+',
+  lucky7: '7️⃣ Lucky 7',
+  evenodd2: '🔢 Pair/Impair 2',
+  redblack2: '🔴 Rouge Noir 2',
+  highlow2: '⬆️ Haut Bas',
+  triple: '🎯 Triple chance',
+  quad: '4️⃣ Quad',
+  penta: '5️⃣ Penta',
+  coin3: '🪙 Triple pile',
+  snake: '🐍 Snake eyes',
+  boxcars: '🎲 Boxcars',
+  anydouble: '🎲 Double quelconque',
+  acehigh: '🃏 As haut',
+  facecard: '🃏 Figure',
+  suitspade: '♠️ Pique',
+  suithr: '♥️ Coeur',
+  suitdi: '♦️ Carreau',
+  suitcl: '♣️ Trèfle',
+  blast: '💥 Blast',
+  freeze: '❄️ Freeze',
+  shadow: '🌑 Ombre',
+  pulse: '💓 Pulse',
+  orbit: '🪐 Orbite',
+  spark: '✨ Étincelle',
+  wave: '🌊 Vague',
+  mirror: '🪞 Miroir',
+  portal: '🌀 Portail',
+  rune: '🔮 Rune',
+  totem: '🗿 Totem',
+  cactus: '🌵 Cactus',
+  pearl: '🦪 Perle',
+  compass: '🧭 Boussole',
+  anchor: '⚓ Ancre',
+  torch: '🔥 Torche',
+  keylock: '🔑 Clé',
+  hourglass: '⏳ Sablier',
+  balloon2: '🎈 Ballon 2',
+  dicehi: '🎲 Dé haut',
+  dicelo: '🎲 Dé bas',
+  coinrush: '🪙 Ruée pièces',
+  starfall: '🌟 Pluie d\'étoiles',
+  meteor: '☄️ Météore',
+  rainbow: '🌈 Arc',
+  clover: '🍀 Trèfle chance',
 };
 // Nom du jeu sans l'emoji (pour l'image canvas qui n'affiche pas les emojis)
 const gameNamePlain = (g) => (GAME_NAMES[g] ? GAME_NAMES[g].replace(/^\S+\s/, '') : g);
@@ -3533,15 +3628,64 @@ ANIMS.spincolor = (res) => {
   return frames;
 };
 
+
+// ---------- Jeux bulk (pour atteindre ~100) ----------
+(function registerBulkGames() {
+  const bulk = [['coin2', 'Double pile', '🪙', 'Encore pile ou face', 'pile', 'face', 2], ['dice7', 'Dés 7+', '🎲', 'Somme >= 7', 'over', 'under', 2], ['lucky7', 'Lucky 7', '7️⃣', 'Exactement 7', 'yes', 'no', 5], ['evenodd2', 'Pair/Impair 2', '🔢', 'Dé pair ou impair', 'even', 'odd', 2], ['redblack2', 'Rouge Noir 2', '🔴', 'Carte rouge/noire', 'red', 'black', 2], ['highlow2', 'Haut Bas', '⬆️', 'Carte haute ou basse', 'high', 'low', 2], ['triple', 'Triple chance', '🎯', '1 sur 3', 'a', 'b', 2.8], ['quad', 'Quad', '4️⃣', '1 sur 4', 'a', 'b', 3.5], ['penta', 'Penta', '5️⃣', '1 sur 5', 'a', 'b', 4.5], ['coin3', 'Triple pile', '🪙', "3 piles d\'affilée", 'yes', 'no', 7], ['snake', 'Snake eyes', '🐍', 'Double 1', 'yes', 'no', 30], ['boxcars', 'Boxcars', '🎲', 'Double 6', 'yes', 'no', 30], ['anydouble', 'Double quelconque', '🎲', 'Deux dés égaux', 'yes', 'no', 5.5], ['acehigh', 'As haut', '🃏', 'As sort', 'yes', 'no', 12], ['facecard', 'Figure', '🃏', 'J Q ou K', 'yes', 'no', 3.5], ['suitspade', 'Pique', '♠️', 'Enseigne pique', 'yes', 'no', 3.8], ['suithr', 'Coeur', '♥️', 'Enseigne coeur', 'yes', 'no', 3.8], ['suitdi', 'Carreau', '♦️', 'Enseigne carreau', 'yes', 'no', 3.8], ['suitcl', 'Trèfle', '♣️', 'Enseigne trèfle', 'yes', 'no', 3.8], ['blast', 'Blast', '💥', 'Explosion ou pas', 'safe', 'boom', 1.9], ['freeze', 'Freeze', '❄️', 'Gel ou chaleur', 'ice', 'fire', 2], ['shadow', 'Ombre', '🌑', 'Ombre ou lumière', 'shadow', 'light', 2], ['pulse', 'Pulse', '💓', 'Rythme fort/faible', 'high', 'low', 2], ['orbit', 'Orbite', '🪐', 'Reste en orbite', 'in', 'out', 2.2], ['spark', 'Étincelle', '✨', 'Étincelle allumée', 'on', 'off', 2], ['wave', 'Vague', '🌊', 'Vague haute/basse', 'high', 'low', 2], ['mirror', 'Miroir', '🪞', 'Miroir cassé ou non', 'ok', 'break', 1.95], ['portal', 'Portail', '🌀', 'Portail ouvert', 'open', 'closed', 2.1], ['rune', 'Rune', '🔮', 'Bonne rune', 'yes', 'no', 3], ['totem', 'Totem', '🗿', 'Totem stable', 'yes', 'no', 2.4], ['cactus', 'Cactus', '🌵', 'Évite les épines', 'safe', 'ouch', 1.9], ['pearl', 'Perle', '🦪', 'Trouve la perle', 'yes', 'no', 4], ['compass', 'Boussole', '🧭', 'Bonne direction', 'n', 's', 2], ['anchor', 'Ancre', '⚓', 'Ancre levée', 'up', 'down', 2], ['torch', 'Torche', '🔥', 'Torche allumée', 'on', 'off', 2], ['keylock', 'Clé', '🔑', 'Bonne clé', 'yes', 'no', 3.5], ['hourglass', 'Sablier', '⏳', 'Temps restant', 'ok', 'out', 2.2], ['balloon2', 'Ballon 2', '🎈', 'Gonflé ou éclaté', 'ok', 'pop', 2], ['dicehi', 'Dé haut', '🎲', 'Dé >= 4', 'yes', 'no', 1.9], ['dicelo', 'Dé bas', '🎲', 'Dé <= 3', 'yes', 'no', 1.9], ['coinrush', 'Ruée pièces', '🪙', 'Plus de piles', 'yes', 'no', 2.5], ['starfall', "Pluie d\'étoiles", '🌟', 'Attrape 1 étoile', 'yes', 'no', 3], ['meteor', 'Météore', '☄️', 'Évite le météore', 'dodge', 'hit', 1.85], ['rainbow', 'Arc', '🌈', 'Couleur chanceuse', 'yes', 'no', 5], ['clover', 'Trèfle chance', '🍀', 'Trèfle trouvé', 'yes', 'no', 6]];
+  for (const [key, name, emoji, desc, c1, c2, winMult] of bulk) {
+    if (INSTANT[key]) continue;
+    INSTANT[key] = {
+      title: `${emoji} ${name}`,
+      spinText: code(['...']),
+      choices: [c1, c2],
+      info: (c) => `Choix ${c1}/${c2} · gain ≈ ${fx(winMult * c)}`,
+      picker: (c) =>
+        choicePicker(
+          key,
+          [
+            [c1, c1, '✅', ButtonStyle.Success],
+            [c2, c2, '❌', ButtonStyle.Danger],
+          ],
+          `**${emoji} ${name}**\n${desc}\nGain ~ **${fx(winMult * c)}** si bon.`
+        ),
+      resolve: (choice) => {
+        // 50/50 bias adjusted by winMult: P(win) ≈ 0.96/winMult
+        const pWin = Math.min(0.9, Math.max(0.05, 0.97 / winMult));
+        const ok = Math.random() < pWin;
+        // if player chose c1, outcome aligns when ok
+        const out = ok ? choice : choice === c1 ? c2 : c1;
+        return {
+          base: out === choice ? winMult : 0,
+          pick: choice,
+          detail: out,
+          ok: out === choice,
+          headline: out === choice ? `✅ **${out}** — gagné !` : `❌ Sortie **${out}** — perdu.`,
+        };
+      },
+    };
+    ANIMS[key] = (res) => [
+      { art: code(['  ...']), caption: 'Tirage', ms: 700 },
+      { art: code([`  ${res.detail}`]), caption: res.ok ? 'Gagné' : 'Perdu', ms: 1000 },
+    ];
+  }
+})();
+
 async function playInstant(i, key, bet, choice) {
   const G = INSTANT[key];
   if (!G || !G.choices.includes(choice)) return respondText(i, 'Pari invalide.');
   const uid = i.user.id;
   if (!tryLock(uid)) return respondText(i, MSG.busy);
 
+  // Répondre tout de suite pour éviter "l\'application n'a pas répondu"
+  try {
+    if (!i.deferred && !i.replied) await i.deferReply({ flags: EPH });
+  } catch {
+    /* ignore */
+  }
+
   try {
     const err = await takeBet(uid, bet);
-    if (err) return respondText(i, err);
+    if (err) return i.editReply({ content: err }).catch(() => respondText(i, err));
 
     const c = coef(key);
     const res = G.resolve(choice, c);
@@ -3556,7 +3700,7 @@ async function playInstant(i, key, bet, choice) {
     const profit = round2(payout - bet - extraLoss);
 
     try {
-      await openGame(i, {
+      await i.editReply({
         embeds: [
           new EmbedBuilder()
             .setTitle(G.title)
@@ -3725,16 +3869,21 @@ async function buildDmPlayPayload(userId) {
 
   const row1 = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('panel_play').setLabel(lang === 'en' ? 'Play' : 'Jouer').setEmoji('🎮').setStyle(ButtonStyle.Success),
-    new ButtonBuilder().setCustomId('panel_daily').setLabel('Daily').setEmoji('🎁').setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId('panel_send').setLabel(lang === 'en' ? 'Send' : 'Envoyer').setEmoji('💸').setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId('panel_rules').setLabel(lang === 'en' ? 'Rules' : 'Règles').setEmoji('📖').setStyle(ButtonStyle.Secondary)
+    new ButtonBuilder().setCustomId('panel_search').setLabel(lang === 'en' ? 'Search' : 'Recherche').setEmoji('🔍').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId('panel_favs').setLabel(lang === 'en' ? 'Favorites' : 'Favoris').setEmoji('⭐').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId('panel_daily').setLabel('Daily').setEmoji('🎁').setStyle(ButtonStyle.Success)
   );
   const row2 = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('panel_send').setLabel(lang === 'en' ? 'Send' : 'Envoyer').setEmoji('💸').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId('panel_rules').setLabel(lang === 'en' ? 'Rules' : 'Règles').setEmoji('📖').setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId('panel_history').setLabel(lang === 'en' ? 'History' : 'Historique').setEmoji('📜').setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId('panel_stats').setLabel('Stats').setEmoji('📊').setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId('panel_settings').setLabel(lang === 'en' ? 'Settings' : 'Paramètres').setEmoji('⚙️').setStyle(ButtonStyle.Secondary)
+    new ButtonBuilder().setCustomId('panel_stats').setLabel('Stats').setEmoji('📊').setStyle(ButtonStyle.Secondary)
   );
-  return { embeds: [embed], components: [row1, row2] };
+  const row3 = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('panel_settings').setLabel(lang === 'en' ? 'Settings' : 'Paramètres').setEmoji('⚙️').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('panel_clearall').setLabel(lang === 'en' ? 'Clear chat' : 'Tout effacer').setEmoji('🧹').setStyle(ButtonStyle.Danger)
+  );
+  return { embeds: [embed], components: [row1, row2, row3] };
 }
 
 const GAME_MENU = [
@@ -3796,70 +3945,145 @@ const GAME_MENU = [
   ['diceexact2', 'Double dé', '🎲', 'Somme exacte'],
   ['chest2', 'Triple coffre', '📦', '1 trésor sur 3'],
   ['spincolor', 'Roue couleur', '🎨', 'Roue à 6 couleurs'],
+  ['coin2', 'Double pile', '🪙', 'Encore pile ou face'],
+  ['dice7', 'Dés 7+', '🎲', 'Somme >= 7'],
+  ['lucky7', 'Lucky 7', '7️⃣', 'Exactement 7'],
+  ['evenodd2', 'Pair/Impair 2', '🔢', 'Dé pair ou impair'],
+  ['redblack2', 'Rouge Noir 2', '🔴', 'Carte rouge/noire'],
+  ['highlow2', 'Haut Bas', '⬆️', 'Carte haute ou basse'],
+  ['triple', 'Triple chance', '🎯', '1 sur 3'],
+  ['quad', 'Quad', '4️⃣', '1 sur 4'],
+  ['penta', 'Penta', '5️⃣', '1 sur 5'],
+  ['coin3', 'Triple pile', '🪙', '3 piles d\'affilée'],
+  ['snake', 'Snake eyes', '🐍', 'Double 1'],
+  ['boxcars', 'Boxcars', '🎲', 'Double 6'],
+  ['anydouble', 'Double quelconque', '🎲', 'Deux dés égaux'],
+  ['acehigh', 'As haut', '🃏', 'As sort'],
+  ['facecard', 'Figure', '🃏', 'J Q ou K'],
+  ['suitspade', 'Pique', '♠️', 'Enseigne pique'],
+  ['suithr', 'Coeur', '♥️', 'Enseigne coeur'],
+  ['suitdi', 'Carreau', '♦️', 'Enseigne carreau'],
+  ['suitcl', 'Trèfle', '♣️', 'Enseigne trèfle'],
+  ['blast', 'Blast', '💥', 'Explosion ou pas'],
+  ['freeze', 'Freeze', '❄️', 'Gel ou chaleur'],
+  ['shadow', 'Ombre', '🌑', 'Ombre ou lumière'],
+  ['pulse', 'Pulse', '💓', 'Rythme fort/faible'],
+  ['orbit', 'Orbite', '🪐', 'Reste en orbite'],
+  ['spark', 'Étincelle', '✨', 'Étincelle allumée'],
+  ['wave', 'Vague', '🌊', 'Vague haute/basse'],
+  ['mirror', 'Miroir', '🪞', 'Miroir cassé ou non'],
+  ['portal', 'Portail', '🌀', 'Portail ouvert'],
+  ['rune', 'Rune', '🔮', 'Bonne rune'],
+  ['totem', 'Totem', '🗿', 'Totem stable'],
+  ['cactus', 'Cactus', '🌵', 'Évite les épines'],
+  ['pearl', 'Perle', '🦪', 'Trouve la perle'],
+  ['compass', 'Boussole', '🧭', 'Bonne direction'],
+  ['anchor', 'Ancre', '⚓', 'Ancre levée'],
+  ['torch', 'Torche', '🔥', 'Torche allumée'],
+  ['keylock', 'Clé', '🔑', 'Bonne clé'],
+  ['hourglass', 'Sablier', '⏳', 'Temps restant'],
+  ['balloon2', 'Ballon 2', '🎈', 'Gonflé ou éclaté'],
+  ['dicehi', 'Dé haut', '🎲', 'Dé >= 4'],
+  ['dicelo', 'Dé bas', '🎲', 'Dé <= 3'],
+  ['coinrush', 'Ruée pièces', '🪙', 'Plus de piles'],
+  ['starfall', 'Pluie d\'étoiles', '🌟', 'Attrape 1 étoile'],
+  ['meteor', 'Météore', '☄️', 'Évite le météore'],
+  ['rainbow', 'Arc', '🌈', 'Couleur chanceuse'],
+  ['clover', 'Trèfle chance', '🍀', 'Trèfle trouvé'],
 ];
 
-function buildGameMenuPayload(userId = null, page = 0) {
-  const lang = userId ? getLang(userId) : 'fr';
-  const PAGE_SIZE = 23;
-  const totalPages = Math.ceil(GAME_MENU.length / PAGE_SIZE);
-  const p = Math.max(0, Math.min(page, totalPages - 1));
-  const slice = GAME_MENU.slice(p * PAGE_SIZE, p * PAGE_SIZE + PAGE_SIZE);
+function buildGameMenuPayload(userId = null, page = 0, mode = 'all', query = '') {
+  const favs = userId ? getFavs(userId) : new Set();
+  let list = GAME_MENU.slice();
+  if (mode === 'favs') {
+    list = list.filter(([key]) => favs.has(key));
+  } else if (mode === 'search' && query) {
+    const q = query.toLowerCase().normalize('NFD').replace(/\p{M}/gu, '');
+    list = list.filter(([key, name, , desc]) => {
+      const hay = `${key} ${name} ${desc}`.toLowerCase().normalize('NFD').replace(/\p{M}/gu, '');
+      return hay.includes(q);
+    });
+  }
+  // Favoris en tête si mode all
+  if (mode === 'all' && favs.size) {
+    list = [
+      ...list.filter(([k]) => favs.has(k)),
+      ...list.filter(([k]) => !favs.has(k)),
+    ];
+  }
 
+  const PAGE_SIZE = 23;
+  const totalPages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
+  const p = Math.max(0, Math.min(page, totalPages - 1));
+  const slice = list.slice(p * PAGE_SIZE, p * PAGE_SIZE + PAGE_SIZE);
+
+  const modeLabel =
+    mode === 'favs' ? '⭐ Favoris' : mode === 'search' ? `🔍 « ${query} »` : '🎮 Tous les jeux';
   const embed = new EmbedBuilder()
     .setColor(0xA855F7)
     .setTitle(t(userId, 'lobbyTitle'))
     .setDescription(
-      (t(userId, 'lobbyDesc') || '') +
-        `\n\n**Page ${p + 1}/${totalPages}** · ${GAME_MENU.length} jeux`
+      `${modeLabel}\n` +
+        (list.length ? `**Page ${p + 1}/${totalPages}** · ${list.length} jeu(x)` : '_Aucun résultat_') +
+        `\n⭐ = favori · utilise **Recherche** ou **Favoris** depuis le panneau`
     )
     .setFooter({ text: t(userId, 'lobbyFooter') })
     .setTimestamp();
 
-  const select = new StringSelectMenuBuilder()
-    .setCustomId('panel_gameselect')
-    .setPlaceholder(t(userId, 'lobbyPlaceholder'))
-    .setMinValues(1)
-    .setMaxValues(1)
-    .addOptions(
-      slice.map(([key, name, emoji, desc]) => ({
-        label: `${emoji} ${name}`.slice(0, 100),
-        value: key,
-        description: desc.slice(0, 100),
-      }))
-    );
+  const components = [];
+  if (slice.length) {
+    const select = new StringSelectMenuBuilder()
+      .setCustomId('panel_gameselect')
+      .setPlaceholder(t(userId, 'lobbyPlaceholder'))
+      .setMinValues(1)
+      .setMaxValues(1)
+      .addOptions(
+        slice.map(([key, name, emoji, desc]) => ({
+          label: `${favs.has(key) ? '⭐ ' : ''}${emoji} ${name}`.slice(0, 100),
+          value: key,
+          description: desc.slice(0, 100),
+        }))
+      );
+    components.push(new ActionRowBuilder().addComponents(select));
+  }
 
   const nav = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
-      .setCustomId(`panel_gamepage_${p - 1}`)
+      .setCustomId(`panel_gamepage_${mode}_${p - 1}`)
       .setLabel('◀')
       .setStyle(ButtonStyle.Secondary)
       .setDisabled(p <= 0),
     new ButtonBuilder()
-      .setCustomId(`panel_gamepage_${p + 1}`)
+      .setCustomId(`panel_gamepage_${mode}_${p + 1}`)
       .setLabel('▶')
       .setStyle(ButtonStyle.Secondary)
-      .setDisabled(p >= totalPages - 1)
+      .setDisabled(p >= totalPages - 1 || list.length === 0),
+    new ButtonBuilder().setCustomId('panel_search').setLabel('Recherche').setEmoji('🔍').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId('panel_favs').setLabel('Favoris').setEmoji('⭐').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId('panel_play').setLabel('Tous').setEmoji('🎮').setStyle(ButtonStyle.Secondary)
   );
+  components.push(nav);
 
-  return { embeds: [embed], components: [new ActionRowBuilder().addComponents(select), nav] };
+  return { embeds: [embed], components };
 }
 
 function buildSettingsPayload(userId) {
   const cur = getLang(userId);
   const ping = wantsWinPing(userId);
+  const skip = wantsSkipAnim(userId);
   const embed = new EmbedBuilder()
     .setColor(0x7C3AED)
-    .setAuthor({ name: 'ZNK CASINO' })
     .setTitle(`⚙️ ${L(userId, 'Paramètres', 'Settings')}`)
     .setDescription(
       code([
         `${padR(L(userId, 'Langue', 'Language'), 22)}${padL(cur === 'fr' ? 'Français' : 'English', 10)}`,
         `${padR(L(userId, 'Ping des victoires', 'Win pings'), 22)}${padL(ping ? 'ON' : 'OFF', 10)}`,
+        `${padR(L(userId, 'Animations', 'Animations'), 22)}${padL(skip ? 'SKIP' : 'ON', 10)}`,
       ]) +
         L(
           userId,
-          '**Langue** : menus et messages privés.\n**Ping** : quand il est coupé, le bot ne te mentionne plus dans le salon des victoires (ta victoire reste affichée, sans notification).',
-          '**Language**: menus and private messages.\n**Ping**: when off, the bot no longer mentions you in the wins channel (your win is still shown, without a notification).'
+          '**Langue** : menus privés.\n**Ping** : mentions dans le salon wins.\n**Animations** : SKIP = résultat immédiat sans anim.',
+          '**Language**: private menus.\n**Ping**: mentions in wins channel.\n**Animations**: SKIP = instant result.'
         )
     )
     .setFooter({ text: L(userId, 'Sauvegardé pour toi', 'Saved for you') });
@@ -3870,7 +4094,12 @@ function buildSettingsPayload(userId) {
       .setCustomId('panel_ping')
       .setLabel(`Ping : ${ping ? 'ON' : 'OFF'}`)
       .setEmoji('🔔')
-      .setStyle(ping ? ButtonStyle.Primary : ButtonStyle.Danger)
+      .setStyle(ping ? ButtonStyle.Primary : ButtonStyle.Danger),
+    new ButtonBuilder()
+      .setCustomId('panel_skipanim')
+      .setLabel(skip ? 'Anim : SKIP' : 'Anim : ON')
+      .setEmoji('⏩')
+      .setStyle(skip ? ButtonStyle.Danger : ButtonStyle.Success)
   );
   return { embeds: [embed], components: [row] };
 }
@@ -4003,14 +4232,35 @@ const instantBetModal = (key, choice, bal = 0) =>
 
 async function handlePanelButton(i) {
   if (i.customId.startsWith('panel_gamepage_')) {
-    const page = Number(i.customId.slice('panel_gamepage_'.length));
+    // format: panel_gamepage_{mode}_{page}
+    const rest = i.customId.slice('panel_gamepage_'.length);
+    const parts = rest.split('_');
+    const page = Number(parts[parts.length - 1]);
+    const mode = parts.slice(0, -1).join('_') || 'all';
     if (!Number.isFinite(page) || page < 0) return i.deferUpdate().catch(() => {});
-    return i.update(buildGameMenuPayload(i.user.id, page));
+    return i.update(buildGameMenuPayload(i.user.id, page, mode === 'favs' ? 'favs' : 'all'));
+  }
+
+  if (i.customId.startsWith('panel_favtoggle_')) {
+    const game = i.customId.slice('panel_favtoggle_'.length);
+    const on = toggleFav(i.user.id, game);
+    return i.reply({ content: on ? `⭐ **${GAME_NAMES[game] || game}** ajouté aux favoris.` : `☆ **${GAME_NAMES[game] || game}** retiré des favoris.`, flags: EPH });
   }
 
   const instantKey = i.customId.slice('panel_'.length);
   if (INSTANT[instantKey]) {
-    return i.reply({ ...INSTANT[instantKey].picker(coef(instantKey)), flags: EPH });
+    const payload = INSTANT[instantKey].picker(coef(instantKey));
+    // Ajoute bouton favori
+    const favOn = getFavs(i.user.id).has(instantKey);
+    const favRow = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`panel_favtoggle_${instantKey}`)
+        .setLabel(favOn ? 'Retirer des favoris' : 'Ajouter aux favoris')
+        .setEmoji('⭐')
+        .setStyle(favOn ? ButtonStyle.Secondary : ButtonStyle.Primary)
+    );
+    const comps = [...(payload.components || []), favRow];
+    return i.reply({ ...payload, components: comps, flags: EPH });
   }
 
   switch (i.customId) {
@@ -4033,7 +4283,16 @@ async function handlePanelButton(i) {
       }
     }
     case 'panel_play':
-      return i.reply({ ...buildGameMenuPayload(i.user.id, 0), flags: EPH });
+      return i.reply({ ...buildGameMenuPayload(i.user.id, 0, 'all'), flags: EPH });
+    case 'panel_favs':
+      return i.reply({ ...buildGameMenuPayload(i.user.id, 0, 'favs'), flags: EPH });
+    case 'panel_search':
+      return i.showModal(
+        new ModalBuilder()
+          .setCustomId('modal_search_game')
+          .setTitle('🔍 Rechercher un jeu')
+          .addComponents(modalInput('q', 'Nom du jeu (ex : poker, dés, crash)', { placeholder: 'mines, slots…', max: 40 }))
+      );
     case 'panel_home': {
       const payload = await buildDmPlayPayload(i.user.id);
       if (fromEphemeral(i) && (i.isButton() || i.isModalSubmit())) {
@@ -4052,6 +4311,35 @@ async function handlePanelButton(i) {
     case 'panel_ping':
       setWinPing(i.user.id, !wantsWinPing(i.user.id));
       return i.update(buildSettingsPayload(i.user.id));
+    case 'panel_skipanim':
+      setSkipAnim(i.user.id, !wantsSkipAnim(i.user.id));
+      return i.update(buildSettingsPayload(i.user.id));
+    case 'panel_clearall': {
+      await i.deferReply({ flags: EPH });
+      const channel = i.channel?.isDMBased?.() ? i.channel : await i.user.createDM().catch(() => null);
+      if (!channel) return i.editReply({ content: 'Impossible d’accéder à la conversation.' });
+      let deleted = 0;
+      try {
+        let lastId;
+        for (let page = 0; page < 15; page++) {
+          const opts = { limit: 100 };
+          if (lastId) opts.before = lastId;
+          const fetched = await channel.messages.fetch(opts).catch(() => null);
+          if (!fetched || !fetched.size) break;
+          for (const m of fetched.values()) {
+            await m.delete().catch(() => {});
+            deleted++;
+            await sleep(250);
+          }
+          lastId = fetched.last()?.id;
+          if (fetched.size < 100) break;
+        }
+      } catch (e) {
+        console.error('[clearall]', e?.message || e);
+      }
+      await channel.send(await buildDmPlayPayload(i.user.id)).catch(() => {});
+      return i.editReply({ content: `🧹 **${deleted}** message(s) supprimé(s). Panneau renvoyé.` }).catch(() => {});
+    }
     case 'panel_stats': {
       await i.deferReply({ flags: EPH });
       const lang = getLang(i.user.id);
@@ -5591,7 +5879,98 @@ async function runOnlineGame(lobby, hostInteraction) {
   return runOnlinePoker(lobby, ch);
 }
 
+function sceneEmbed(title, body, color, footer) {
+  return new EmbedBuilder()
+    .setColor(color ?? COLORS.violet)
+    .setTitle(String(title).slice(0, 256))
+    .setDescription(String(body).slice(0, 4000))
+    .setFooter({ text: String(footer || 'Table en direct').slice(0, 200) });
+}
+
+/** Une seule carte qui s’anime : chaque frame remplace la précédente. */
+async function playScene(msg, frames) {
+  for (let i = 0; i < frames.length; i++) {
+    const f = frames[i];
+    await msg.edit({
+      embeds: [
+        sceneEmbed(
+          f.title,
+          f.body,
+          f.color || ANIM_PALETTE[i % ANIM_PALETTE.length],
+          f.footer || `Scène ${i + 1} / ${frames.length}`
+        ),
+      ],
+    }).catch(() => {});
+    await sleep(f.ms ?? 950);
+  }
+}
+
+function meter(n, max, w = 14) {
+  const f = Math.max(0, Math.min(w, Math.round((Math.max(0, n) / Math.max(0.01, max)) * w)));
+  return '█'.repeat(f) + '░'.repeat(w - f);
+}
+function who(p) {
+  return String(p.name || 'Joueur').replace(/[`\n]/g, '').slice(0, 16);
+}
+function potLine(lobby) {
+  return `Pot **${fmt(lobby.pot)}** · ${lobby.players.length} joueur(s) · mise ${fmt(lobby.stake)}`;
+}
+function boardArt(cards) {
+  const shown = (cards || []).filter(Boolean);
+  const hidden = Math.max(0, 5 - shown.length);
+  if (!shown.length && !hidden) return code(['(vide)']);
+  return code(pokerHandArt(shown, hidden));
+}
+function holeArt(cards, n = 2) {
+  const shown = (cards || []).filter(Boolean);
+  if (!shown.length) return code(pokerHandArt([], n));
+  return code(pokerHandArt(shown, Math.max(0, n - shown.length)));
+}
+function seatsBlock(players, faceUp) {
+  return players
+    .map((p) => `**${who(p)}** <@${p.id}>\n${faceUp ? holeArt(p.hole, p.hole?.length || 2) : holeArt([], 2)}`)
+    .join('\n');
+}
+function bjVal(hand) {
+  let t = 0;
+  let aces = 0;
+  for (const c of hand || []) {
+    if (c.r === 'A') {
+      aces++;
+      t += 11;
+    } else if (c.r === 'J' || c.r === 'Q' || c.r === 'K') t += 10;
+    else t += Number(c.r) || 0;
+  }
+  while (t > 21 && aces > 0) {
+    t -= 10;
+    aces--;
+  }
+  return t;
+}
+function handLine(label, cards, extra = '') {
+  const shown = (cards || []).filter(Boolean);
+  const art = shown.length ? code(pokerHandArt(shown)) : code(pokerHandArt([], 1));
+  const v = shown.length ? ` · **${bjVal(shown)}**` : '';
+  return `**${label}**${v}${extra ? ` ${extra}` : ''}\n${art}`;
+}
+
+async function openStage(lobby, ch, title, body) {
+  return onlineSend(lobby, ch, { embeds: [sceneEmbed(title, body, COLORS.violet, 'La partie commence')] });
+}
+
 async function onlineFinish(lobby, ch, embed) {
+  const toDelete = [];
+  if (lobby.messageId) toDelete.push(lobby.messageId);
+  if (Array.isArray(lobby.msgIds)) toDelete.push(...lobby.msgIds);
+  for (const mid of toDelete) {
+    try {
+      const m = await ch.messages.fetch(mid).catch(() => null);
+      if (m) await m.delete().catch(() => {});
+      await sleep(180);
+    } catch {
+      /* ignore */
+    }
+  }
   await ch.send({
     embeds: [embed],
     components: [
@@ -5602,6 +5981,16 @@ async function onlineFinish(lobby, ch, embed) {
   });
   lobby.status = 'done';
   pokerLobbies.delete(lobby.guildId);
+}
+
+function onlineTrack(lobby, msg) {
+  if (!lobby.msgIds) lobby.msgIds = [];
+  if (msg?.id) lobby.msgIds.push(msg.id);
+}
+async function onlineSend(lobby, ch, payload) {
+  const msg = await ch.send(payload);
+  onlineTrack(lobby, msg);
+  return msg;
 }
 
 async function onlinePayWinners(lobby, winnerIds) {
@@ -5632,38 +6021,46 @@ async function onlinePayWinners(lobby, winnerIds) {
 async function runOnlinePoker(lobby, ch) {
   const deck = newPokerDeck();
   lobby.community = [];
-  for (const p of lobby.players) p.hole = [deck.pop(), deck.pop()];
+  for (const p of lobby.players) p.hole = [];
 
-  let boardMsg = await ch.send({
-    embeds: [
-      new EmbedBuilder()
-        .setColor(COLORS.violet)
-        .setTitle('🃏 Poker — Distribution')
-        .setDescription(
-          `**Étape 1/5 — Cartes privées**\n` +
-            `Chaque joueur reçoit **2 cartes** (faces cachées pour l’instant).\n` +
-            `Pot : **${fmt(lobby.pot)}**\n\n` +
-            lobby.players.map((p) => `• <@${p.id}> : ${pokerCardStr(null)} ${pokerCardStr(null)}`).join('\n')
-        ),
-    ],
-  });
-  await sleep(1500);
+  const msg = await openStage(
+    lobby,
+    ch,
+    '🃏 Poker — la table s’ouvre',
+    `${potLine(lobby)}\n\nLe croupier mélange. Chacun va recevoir **2 cartes**, visibles ici.\nPuis 5 cartes communes : flop, turn, river.\nLa meilleure main de 5 cartes **prend le pot**.`
+  );
 
-  // Flop
-  deck.pop();
-  lobby.community.push(deck.pop(), deck.pop(), deck.pop());
-  await animateBoard(boardMsg, lobby, 'Flop (3 cartes communes)', 'Le croupier révèle le flop.');
-  await sleep(1000);
-
-  deck.pop();
-  lobby.community.push(deck.pop());
-  await animateBoard(boardMsg, lobby, 'Turn (4e carte)', 'Le turn est révélé.');
-  await sleep(1000);
-
-  deck.pop();
-  lobby.community.push(deck.pop());
-  await animateBoard(boardMsg, lobby, 'River (5e carte)', 'La river est révélée. Abattage…');
-  await sleep(1000);
+  const frames = [];
+  // distribution carte par carte, faces visibles
+  for (let round = 0; round < 2; round++) {
+    for (const p of lobby.players) p.hole.push(deck.pop());
+    frames.push({
+      title: `🃏 Distribution — carte ${round + 1}`,
+      ms: 1100,
+      body:
+        `${potLine(lobby)}\n` +
+        `**Ce qui se passe :** une carte est posée devant chaque joueur.\n\n` +
+        `${boardArt([])}\n` +
+        seatsBlock(lobby.players, true),
+    });
+  }
+  const street = async (title, explain, take) => {
+    deck.pop(); // burn
+    for (let k = 0; k < take; k++) lobby.community.push(deck.pop());
+    frames.push({
+      title,
+      ms: 1300,
+      color: COLORS.gold,
+      body:
+        `${potLine(lobby)}\n` +
+        `**Ce qui se passe :** ${explain}\n\n` +
+        `**Board**\n${boardArt(lobby.community)}\n` +
+        seatsBlock(lobby.players, true),
+    });
+  };
+  await street('🃏 Flop — 3 cartes', 'trois cartes communes tombent au centre.', 3);
+  await street('🃏 Turn — 4e carte', 'une quatrième carte s’ajoute au board.', 1);
+  await street('🃏 River — 5e carte', 'dernière carte. On compare les mains.', 1);
 
   const results = lobby.players.map((p) => ({
     player: p,
@@ -5672,242 +6069,359 @@ async function runOnlinePoker(lobby, ch) {
   results.sort((a, b) => compareScores(b.ev.score, a.ev.score));
   const best = results[0].ev.score;
   const winners = results.filter((r) => compareScores(r.ev.score, best) === 0);
-  const share = await onlinePayWinners(
-    lobby,
-    winners.map((w) => w.player.id)
-  );
 
+  frames.push({
+    title: '🃏 Abattage',
+    ms: 1600,
+    color: COLORS.green,
+    body:
+      `**Ce qui se passe :** chaque main est lue. Le plus fort gagne.\n\n` +
+      `**Board**\n${boardArt(lobby.community)}\n` +
+      results
+        .map((r, i) => {
+          const mark = winners.some((w) => w.player.id === r.player.id) ? '🏆' : `${i + 1}.`;
+          return `${mark} **${who(r.player)}** — **${r.ev.name}**\n${holeArt(r.player.hole)}`;
+        })
+        .join('\n'),
+  });
+  await playScene(msg, frames);
+
+  const share = await onlinePayWinners(lobby, winners.map((w) => w.player.id));
+  const verdict =
+    winners.length === 1
+      ? `<@${winners[0].player.id}> remporte **${fmt(lobby.pot)}** avec **${winners[0].ev.name}**.`
+      : `Égalité : ${winners.map((w) => `<@${w.player.id}>`).join(', ')} se partagent le pot (**${fmt(share)}** chacun).`;
   await onlineFinish(
     lobby,
     ch,
     new EmbedBuilder()
       .setColor(COLORS.green)
-      .setTitle('🃏 Poker — Résultat')
+      .setTitle('🃏 Poker — résultat')
       .setDescription(
-        `${code(pokerHandArt(lobby.community))}\n` +
-          `**Board** : ${lobby.community.map(pokerCardStr).join(' ')}\n\n` +
-          `**Mains révélées**\n${results
-            .map((r, i) => `${i === 0 ? '🏆' : `${i + 1}.`} <@${r.player.id}> · ${pokerCardStr(r.player.hole[0])} ${pokerCardStr(r.player.hole[1])} · **${r.ev.name}**`)
-            .join('\n')}\n\n` +
-          (winners.length === 1
-            ? `<@${winners[0].player.id}> gagne **${fmt(lobby.pot)}** avec **${winners[0].ev.name}**.`
-            : `Égalité : ${winners.map((w) => `<@${w.player.id}>`).join(', ')} se partagent le pot (**${fmt(share)}** chacun).`)
+        (
+          `${verdict}\n\n**Board**\n${boardArt(lobby.community)}\n` +
+          results
+            .map((r) => {
+              const win = winners.some((w) => w.player.id === r.player.id);
+              return `${win ? '🏆' : '•'} <@${r.player.id}> · ${r.player.hole.map(pokerCardStr).join(' ')} · **${r.ev.name}**`;
+            })
+            .join('\n')
+        ).slice(0, 4000)
       )
   );
 }
 
 async function runOnlineBlackjack(lobby, ch) {
   const deck = newPokerDeck();
-  const dealer = [deck.pop(), deck.pop()];
-  for (const p of lobby.players) p.hole = [deck.pop(), deck.pop()];
-
-  const val = (hand) => {
-    let t = 0, a = 0;
-    for (const c of hand) {
-      if (c.r === 'A') { a++; t += 11; }
-      else if (['J', 'Q', 'K'].includes(c.r)) t += 10;
-      else t += Number(c.r) || 10;
-    }
-    while (t > 21 && a > 0) { t -= 10; a--; }
-    return t;
-  };
-
-  let msg = await ch.send({
-    embeds: [
-      new EmbedBuilder()
-        .setColor(COLORS.violet)
-        .setTitle('🂡 Blackjack table — Distribution')
-        .setDescription(
-          `**Croupier** : ${pokerCardStr(dealer[0])} ${pokerCardStr(null)} (une carte cachée)\n\n` +
-            lobby.players.map((p) => `• <@${p.id}> : ${pokerCardStr(p.hole[0])} ${pokerCardStr(p.hole[1])} → **${val(p.hole)}**`).join('\n') +
-            `\n\nPot **${fmt(lobby.pot)}** · Le croupier tire jusqu’à 17.`
-        ),
-    ],
-  });
-  await sleep(1800);
-
-  while (val(dealer) < 17) dealer.push(deck.pop());
-  const dv = val(dealer);
-  const survivors = lobby.players.filter((p) => val(p.hole) <= 21 && (dv > 21 || val(p.hole) > dv));
-  const share = await onlinePayWinners(
+  const dealer = [];
+  for (const p of lobby.players) p.hole = [];
+  const msg = await openStage(
     lobby,
-    survivors.map((p) => p.id)
+    ch,
+    '🃏 Blackjack — distribution',
+    `${potLine(lobby)}\n\nChacun reçoit **2 cartes**. Le croupier aussi.\nIl tire ensuite jusqu’à **17**. Ceux qui le battent sans dépasser 21 se partagent le pot.`
   );
 
+  const frames = [];
+  const snap = (title, explain, ms = 1100) => {
+    frames.push({
+      title,
+      ms,
+      body:
+        `${potLine(lobby)}\n**Ce qui se passe :** ${explain}\n\n` +
+        handLine('Croupier', dealer, dealer.length === 1 ? '(une carte encore cachée)' : '') +
+        '\n' +
+        lobby.players.map((p) => handLine(who(p) + ' ', p.hole)).join('\n'),
+    });
+  };
+
+  for (const p of lobby.players) p.hole.push(deck.pop());
+  dealer.push(deck.pop());
+  snap('🃏 Première tournée', 'une carte pour chaque joueur, une pour le croupier.');
+  for (const p of lobby.players) p.hole.push(deck.pop());
+  snap('🃏 Deuxième tournée', 'seconde carte des joueurs. La carte cachée du croupier arrive.');
+  dealer.push(deck.pop());
+  snap('🃏 Croupier complet', `le croupier montre **${bjVal(dealer)}**. Il tire tant qu’il est sous 17.`);
+
+  let hits = 0;
+  while (bjVal(dealer) < 17 && hits < 5) {
+    dealer.push(deck.pop());
+    hits++;
+    const v = bjVal(dealer);
+    snap('🃏 Le croupier tire', v > 21 ? `il dépasse 21 (**${v}**) — bust.` : `nouvelle carte. Total **${v}**.`, 1200);
+  }
+
+  const dv = bjVal(dealer);
+  const survivors = lobby.players.filter((p) => bjVal(p.hole) <= 21 && (dv > 21 || bjVal(p.hole) > dv));
+  frames.push({
+    title: '🃏 Comparaison',
+    ms: 1500,
+    color: COLORS.green,
+    body:
+      `${potLine(lobby)}\n` +
+      `Croupier **${dv}**${dv > 21 ? ' — bust, les joueurs encore en jeu gagnent.' : '. Il faut faire mieux, sans dépasser 21.'}\n\n` +
+      handLine('Croupier', dealer) +
+      '\n' +
+      lobby.players
+        .map((p) => {
+          const ok = survivors.some((s) => s.id === p.id);
+          const v = bjVal(p.hole);
+          return handLine(who(p), p.hole, `${ok ? '✅ gagne' : '❌ perd'} (${v})`);
+        })
+        .join('\n'),
+  });
+  await playScene(msg, frames);
+
+  const share = await onlinePayWinners(lobby, survivors.map((p) => p.id));
   await onlineFinish(
     lobby,
     ch,
     new EmbedBuilder()
-      .setColor(COLORS.green)
-      .setTitle('🂡 Blackjack — Résultat')
+      .setColor(survivors.length ? COLORS.green : COLORS.grey)
+      .setTitle('🃏 Blackjack — résultat')
       .setDescription(
-        `**Croupier** : ${dealer.map(pokerCardStr).join(' ')} → **${dv}**${dv > 21 ? ' (bust)' : ''}\n\n` +
+        (
+          `**Croupier** ${dealer.map(pokerCardStr).join(' ')} → **${dv}**${dv > 21 ? ' (bust)' : ''}\n\n` +
           lobby.players
             .map((p) => {
-              const v = val(p.hole);
               const ok = survivors.some((s) => s.id === p.id);
-              return `• <@${p.id}> : ${p.hole.map(pokerCardStr).join(' ')} → **${v}** ${ok ? '✅' : '❌'}`;
+              return `${ok ? '🏆' : '•'} <@${p.id}> ${p.hole.map(pokerCardStr).join(' ')} → **${bjVal(p.hole)}**`;
             })
             .join('\n') +
-          `\n\n` +
+          '\n\n' +
           (survivors.length
-            ? `Gagnant(s) : ${survivors.map((p) => `<@${p.id}>`).join(', ')} · **${fmt(share)}** chacun (pot ${fmt(lobby.pot)})`
-            : `Personne ne bat le croupier — mises redistribuées.`)
+            ? `Gagnant(s) : ${survivors.map((p) => `<@${p.id}>`).join(', ')} · **${fmt(share)}** chacun.`
+            : 'Personne ne bat le croupier — mises rendues.')
+        ).slice(0, 4000)
       )
   );
+}
+
+function rouletteColor(n) {
+  if (n === 0) return 'vert';
+  return REDS.has(n) ? 'rouge' : 'noir';
+}
+function rouletteDot(n) {
+  if (n === 0) return '🟢';
+  return REDS.has(n) ? '🔴' : '⚫';
+}
+function wheelArt(idx, locked = false) {
+  const cells = [];
+  for (let k = -4; k <= 4; k++) {
+    const n = WHEEL_ORDER[(idx + k + WHEEL_ORDER.length * 3) % WHEEL_ORDER.length];
+    const label = String(n).padStart(2, ' ');
+    cells.push(k === 0 ? `[${label}]` : ` ${label} `);
+  }
+  return code([
+    locked ? '        🎯 ARRÊT' : '        🎡 TOURNE',
+    cells.join(''),
+    '            ▲',
+    '         bille',
+  ]);
 }
 
 async function runOnlineRoulette(lobby, ch) {
-  await ch.send({
-    embeds: [
-      new EmbedBuilder()
-        .setColor(COLORS.violet)
-        .setTitle('🎡 Roulette — Les jeux sont faits')
-        .setDescription(
-          lobby.players.map((p) => `• <@${p.id}> a misé sur **${p.choice || '?'}**`).join('\n') +
-            `\n\nLa bille tourne…\nPot **${fmt(lobby.pot)}**`
-        ),
-    ],
-  });
-  await sleep(2000);
   const n = randomInt(0, 37);
-  const col = n === 0 ? 'vert' : REDS.has(n) ? 'rouge' : 'noir';
-  const winners = lobby.players.filter((p) => p.choice === col);
-  const share = await onlinePayWinners(
+  const col = rouletteColor(n);
+  const idx = WHEEL_ORDER.indexOf(n);
+  const bets = lobby.players.map((p) => `• <@${p.id}> mise sur **${p.choice || '?'}**`).join('\n');
+  const msg = await openStage(
     lobby,
-    winners.map((p) => p.id)
+    ch,
+    '🎡 Roulette — les jeux sont faits',
+    `${potLine(lobby)}\n\n${bets}\n\nRouge paie si la bille est rouge, noir si elle est noire. Le **0** est vert : personne ne gagne.`
   );
+  const frames = [];
+  let pos = randomInt(0, WHEEL.length);
+  for (let s = 0; s < 7; s++) {
+    pos = (pos + randomInt(3, 8)) % WHEEL.length;
+    const show = s === 6 ? idx : pos;
+    frames.push({
+      title: s === 6 ? '🎡 La bille s’arrête' : '🎡 La bille tourne',
+      ms: s === 6 ? 1400 : 700,
+      color: s === 6 ? COLORS.gold : COLORS.violet,
+      body:
+        `${potLine(lobby)}\n` +
+        `**Ce qui se passe :** ${s === 6 ? 'la bille tombe dans une case.' : 'la roue défile, regarde la case entre crochets.'}\n\n` +
+        wheelArt(show, s === 6) +
+        (s === 6 ? `\n**${n}** ${rouletteDot(n)} **${col}**` : ''),
+    });
+  }
+  await playScene(msg, frames);
+  const winners = lobby.players.filter((p) => p.choice === col);
+  const share = await onlinePayWinners(lobby, winners.map((p) => p.id));
   await onlineFinish(
     lobby,
     ch,
     new EmbedBuilder()
-      .setColor(COLORS.green)
-      .setTitle('🎡 Roulette — Résultat')
+      .setColor(n === 0 ? COLORS.green : col === 'rouge' ? COLORS.red : 0x111827)
+      .setTitle('🎡 Roulette — résultat')
       .setDescription(
-        `Numéro **${n}** (${col}).\n\n` +
-          lobby.players.map((p) => `• <@${p.id}> : **${p.choice}** ${p.choice === col ? '✅' : '❌'}`).join('\n') +
-          `\n\n` +
+        (
+          `${wheelArt(idx, true)}\n**${n}** ${rouletteDot(n)} **${col}**\n\n` +
+          lobby.players.map((p) => `• <@${p.id}> **${p.choice || '?'}** ${p.choice === col ? '✅' : '❌'}`).join('\n') +
+          '\n\n' +
           (winners.length
-            ? `Gagnant(s) : ${winners.map((p) => `<@${p.id}>`).join(', ')} · **${fmt(share)}** chacun`
+            ? `Gagnant(s) : ${winners.map((p) => `<@${p.id}>`).join(', ')} · **${fmt(share)}** chacun.`
             : n === 0
-              ? 'Zéro ! Personne ne gagne — redistribuées.'
-              : 'Personne sur la bonne couleur — redistribuées.')
+              ? 'Zéro. Personne sur le vert — mises rendues.'
+              : 'Mauvaise couleur — mises rendues.')
+        ).slice(0, 4000)
       )
   );
 }
 
+function coinArt(side, spinning) {
+  if (spinning) {
+    return code(['    ││', '    ││', '   tranche', '    ││']);
+  }
+  const word = side === 'face' ? 'FACE' : 'PILE';
+  return code(['  ╔═══════╗', `  ║ ${word.padEnd(5, ' ')} ║`, '  ╚═══════╝', spinning ? '' : '   🪙'].filter(Boolean));
+}
+
 async function runOnlineCoinflip(lobby, ch) {
-  await ch.send({
-    embeds: [
-      new EmbedBuilder()
-        .setColor(COLORS.violet)
-        .setTitle('🪙 Pile ou Face')
-        .setDescription(
-          lobby.players.map((p) => `• <@${p.id}> → **${p.choice || '?'}**`).join('\n') +
-            `\n\nLa pièce tourne…\nPot **${fmt(lobby.pot)}**`
-        ),
-    ],
-  });
-  await sleep(2000);
   const side = randomInt(0, 2) === 0 ? 'pile' : 'face';
-  const winners = lobby.players.filter((p) => p.choice === side);
-  const share = await onlinePayWinners(
+  const bets = lobby.players.map((p) => `• <@${p.id}> a choisi **${p.choice || '?'}**`).join('\n');
+  const msg = await openStage(
     lobby,
-    winners.map((p) => p.id)
+    ch,
+    '🪙 Pile ou face',
+    `${potLine(lobby)}\n\n${bets}\n\nLa pièce est lancée. Le côté qui sort **prend le pot**.`
   );
+  const seq = ['pile', 'face', 'pile', 'face', 'pile', side];
+  const frames = seq.map((s, i) => {
+    const last = i === seq.length - 1;
+    return {
+      title: last ? `🪙 ${side.toUpperCase()}` : '🪙 La pièce tourne',
+      ms: last ? 1400 : 650,
+      color: last ? COLORS.gold : COLORS.violet,
+      body:
+        `${potLine(lobby)}\n` +
+        `**Ce qui se passe :** ${last ? `elle retombe sur **${side}**.` : 'elle tourne encore.'}\n\n` +
+        coinArt(s, !last) +
+        `\n${bets}`,
+    };
+  });
+  await playScene(msg, frames);
+  const winners = lobby.players.filter((p) => p.choice === side);
+  const share = await onlinePayWinners(lobby, winners.map((p) => p.id));
   await onlineFinish(
     lobby,
     ch,
     new EmbedBuilder()
-      .setColor(COLORS.green)
+      .setColor(COLORS.gold)
       .setTitle('🪙 Résultat')
       .setDescription(
-        `La pièce tombe sur **${side}**.\n\n` +
-          lobby.players.map((p) => `• <@${p.id}> : ${p.choice} ${p.choice === side ? '✅' : '❌'}`).join('\n') +
-          `\n\n` +
-          (winners.length ? `Gagnant(s) : ${winners.map((p) => `<@${p.id}>`).join(', ')} · **${fmt(share)}**` : 'Personne — redistribuées.')
+        `${coinArt(side, false)}\nLa pièce est sur **${side}**.\n\n` +
+          lobby.players.map((p) => `• <@${p.id}> ${p.choice || '?'} ${p.choice === side ? '✅' : '❌'}`).join('\n') +
+          '\n\n' +
+          (winners.length
+            ? `Gagnant(s) : ${winners.map((p) => `<@${p.id}>`).join(', ')} · **${fmt(share)}**.`
+            : 'Personne — mises rendues.')
       )
   );
 }
 
 async function runOnlineDicewar(lobby, ch) {
-  await ch.send({
-    embeds: [
-      new EmbedBuilder()
-        .setColor(COLORS.violet)
-        .setTitle('🎲 Guerre de dés')
-        .setDescription(`Chacun lance un dé. Le plus haut score gagne le pot (**${fmt(lobby.pot)}**).`),
-    ],
-  });
-  await sleep(1200);
   for (const p of lobby.players) p.roll = randomInt(1, 7);
   const best = Math.max(...lobby.players.map((p) => p.roll));
-  const winners = lobby.players.filter((p) => p.roll === best);
-  const share = await onlinePayWinners(
+  const msg = await openStage(
     lobby,
-    winners.map((p) => p.id)
+    ch,
+    '🎲 Guerre de dés',
+    `${potLine(lobby)}\n\nChacun lance **un dé**. Le plus haut score prend le pot. Égalité = partage.`
   );
+  const frames = [];
+  for (let s = 0; s < 5; s++) {
+    const last = s === 4;
+    const nums = lobby.players.map((p) => (last ? p.roll : randomInt(1, 7)));
+    const art = code(sideBySide(nums.map((n) => dieLines(n)), '  '));
+    const names = lobby.players.map((p) => who(p).slice(0, 7).padEnd(9, ' ')).join('  ');
+    frames.push({
+      title: last ? '🎲 Les dés s’arrêtent' : '🎲 Les dés roulent',
+      ms: last ? 1500 : 700,
+      color: last ? COLORS.gold : COLORS.blue,
+      body:
+        `${potLine(lobby)}\n` +
+        `**Ce qui se passe :** ${last ? 'lecture des scores. Le plus haut gagne.' : 'les dés rebondissent.'}\n\n` +
+        `\`${names}\`\n${art}\n` +
+        lobby.players.map((p, i) => `• <@${p.id}> ${last ? `**${p.roll}** ${dieFace(p.roll)}` : '…'}`).join('\n'),
+    });
+  }
+  await playScene(msg, frames);
+  const winners = lobby.players.filter((p) => p.roll === best);
+  const share = await onlinePayWinners(lobby, winners.map((p) => p.id));
   await onlineFinish(
     lobby,
     ch,
     new EmbedBuilder()
-      .setColor(COLORS.green)
+      .setColor(COLORS.gold)
       .setTitle('🎲 Résultat')
       .setDescription(
-        lobby.players.map((p) => `• <@${p.id}> : **${p.roll}** ${dieFace(p.roll)} ${p.roll === best ? '🏆' : ''}`).join('\n') +
-          `\n\n` +
+        lobby.players.map((p) => `• <@${p.id}> **${p.roll}** ${dieFace(p.roll)} ${p.roll === best ? '🏆' : ''}`).join('\n') +
+          '\n\n' +
           (winners.length === 1
-            ? `<@${winners[0].id}> gagne **${fmt(lobby.pot)}**`
-            : `Égalité : ${winners.map((p) => `<@${p.id}>`).join(', ')} · **${fmt(share)}** chacun`)
+            ? `<@${winners[0].id}> gagne **${fmt(lobby.pot)}**.`
+            : `Égalité : ${winners.map((p) => `<@${p.id}>`).join(', ')} · **${fmt(share)}** chacun.`)
       )
   );
 }
 
 async function runOnlineHighcard(lobby, ch) {
   const deck = newPokerDeck();
-  for (const p of lobby.players) p.hole = [deck.pop()];
-  await ch.send({
-    embeds: [
-      new EmbedBuilder()
-        .setColor(COLORS.violet)
-        .setTitle(lobby.game === 'war' ? '⚔️ Bataille' : '⬆️ Carte haute')
-        .setDescription(`Distribution d’une carte à chaque joueur…\nPot **${fmt(lobby.pot)}**`),
-    ],
+  const label = lobby.game === 'war' ? '⚔️ Bataille' : '⬆️ Carte haute';
+  for (const p of lobby.players) p.hole = [];
+  const msg = await openStage(
+    lobby,
+    ch,
+    label,
+    `${potLine(lobby)}\n\nUne carte chacun. La **plus haute** gagne (As est le plus fort). Égalité = partage.`
+  );
+  const frames = [];
+  frames.push({
+    title: `${label} — cartes cachées`,
+    ms: 900,
+    body: `${potLine(lobby)}\n**Ce qui se passe :** le croupier pose une carte face cachée devant chacun.\n\n` + seatsBlock(lobby.players, false),
   });
-  await sleep(1200);
+  for (const p of lobby.players) {
+    p.hole = [deck.pop()];
+    frames.push({
+      title: `${label} — ${who(p)}`,
+      ms: 1100,
+      body:
+        `${potLine(lobby)}\n**Ce qui se passe :** la carte de **${who(p)}** est retournée.\n\n` +
+        lobby.players
+          .map((q) => `**${who(q)}** <@${q.id}>\n${q.hole?.length ? holeArt(q.hole, 1) : holeArt([], 1)}`)
+          .join('\n'),
+    });
+  }
+  await playScene(msg, frames);
   const rank = (c) => pokerRankVal(c.r);
   const best = Math.max(...lobby.players.map((p) => rank(p.hole[0])));
   const winners = lobby.players.filter((p) => rank(p.hole[0]) === best);
-  const share = await onlinePayWinners(
-    lobby,
-    winners.map((p) => p.id)
-  );
+  const share = await onlinePayWinners(lobby, winners.map((p) => p.id));
   await onlineFinish(
     lobby,
     ch,
     new EmbedBuilder()
-      .setColor(COLORS.green)
-      .setTitle('Résultat')
+      .setColor(COLORS.gold)
+      .setTitle(`${label} — résultat`)
       .setDescription(
-        lobby.players.map((p) => `• <@${p.id}> : ${pokerCardStr(p.hole[0])} ${rank(p.hole[0]) === best ? '🏆' : ''}`).join('\n') +
-          `\n\n` +
+        lobby.players.map((p) => `• <@${p.id}> ${pokerCardStr(p.hole[0])} ${rank(p.hole[0]) === best ? '🏆' : ''}`).join('\n') +
+          '\n\n' +
           (winners.length === 1
-            ? `<@${winners[0].id}> gagne **${fmt(lobby.pot)}**`
-            : `Égalité · **${fmt(share)}** chacun`)
+            ? `<@${winners[0].id}> gagne **${fmt(lobby.pot)}**.`
+            : `Égalité · **${fmt(share)}** chacun.`)
       )
   );
 }
 
+function slotWindow(a, b, c) {
+  const cell = (s) => ` ${s} `;
+  return code(['┌────┬────┬────┐', `│${cell(a)}│${cell(b)}│${cell(c)}│`, '└────┴────┴────┘']);
+}
+
 async function runOnlineSlots(lobby, ch) {
-  await ch.send({
-    embeds: [
-      new EmbedBuilder()
-        .setColor(COLORS.violet)
-        .setTitle('🎰 Course de slots')
-        .setDescription(`Chaque joueur fait un spin. Le meilleur multiplicateur gagne le pot (**${fmt(lobby.pot)}**).`),
-    ],
-  });
-  await sleep(1200);
   const syms = ['🍒', '🍋', '🔔', '💎', '7️⃣'];
   for (const p of lobby.players) {
     const a = syms[randomInt(0, syms.length)];
@@ -5918,137 +6432,173 @@ async function runOnlineSlots(lobby, ch) {
     else if (a === b || b === c || a === c) mult = 2;
     p.slot = { a, b, c, mult };
   }
+  const msg = await openStage(
+    lobby,
+    ch,
+    '🎰 Course de slots',
+    `${potLine(lobby)}\n\nChacun a **3 rouleaux**.\n3 identiques = gros score · 2 identiques = petit score.\nLe **meilleur score** prend le pot. Personne payé = mises rendues.`
+  );
+  const frames = [];
+  for (let s = 0; s < 5; s++) {
+    const last = s === 4;
+    const blocks = lobby.players.map((p) => {
+      const a = last ? p.slot.a : syms[randomInt(0, syms.length)];
+      const b = last ? p.slot.b : syms[randomInt(0, syms.length)];
+      const c = last ? p.slot.c : syms[randomInt(0, syms.length)];
+      return `**${who(p)}** <@${p.id}>${last ? ` · score **x${p.slot.mult}**` : ''}\n${slotWindow(a, b, c)}`;
+    });
+    frames.push({
+      title: last ? '🎰 Rouleaux bloqués' : '🎰 Les rouleaux tournent',
+      ms: last ? 1500 : 700,
+      color: last ? COLORS.gold : COLORS.violet,
+      body:
+        `${potLine(lobby)}\n` +
+        `**Ce qui se passe :** ${last ? 'on compare les scores.' : 'les symboles défilent.'}\n\n` +
+        blocks.join('\n'),
+    });
+  }
+  await playScene(msg, frames);
   const best = Math.max(...lobby.players.map((p) => p.slot.mult));
   const winners = best > 0 ? lobby.players.filter((p) => p.slot.mult === best) : [];
-  const share = await onlinePayWinners(
-    lobby,
-    winners.map((p) => p.id)
-  );
+  const share = await onlinePayWinners(lobby, winners.map((p) => p.id));
   await onlineFinish(
     lobby,
     ch,
     new EmbedBuilder()
-      .setColor(COLORS.green)
+      .setColor(COLORS.gold)
       .setTitle('🎰 Résultat')
       .setDescription(
         lobby.players
-          .map((p) => `• <@${p.id}> : [ ${p.slot.a} | ${p.slot.b} | ${p.slot.c} ] ×${p.slot.mult} ${p.slot.mult === best && best > 0 ? '🏆' : ''}`)
+          .map((p) => `• <@${p.id}> ${p.slot.a} ${p.slot.b} ${p.slot.c} · x${p.slot.mult} ${winners.some((w) => w.id === p.id) ? '🏆' : ''}`)
           .join('\n') +
-          `\n\n` +
-          (winners.length
-            ? `Gagnant(s) · **${fmt(share)}** chacun`
-            : 'Aucun symbole payant — redistribuées.')
+          '\n\n' +
+          (winners.length ? `Gagnant(s) · **${fmt(share)}** chacun.` : 'Aucun symbole payant — mises rendues.')
       )
   );
 }
 
-async function runOnlineHorses(lobby, ch) {
-  await ch.send({
-    embeds: [
-      new EmbedBuilder()
-        .setColor(COLORS.violet)
-        .setTitle('🏇 Course hippique')
-        .setDescription(
-          lobby.players.map((p) => `• <@${p.id}> → **${p.choice || '?'}**`).join('\n') +
-            `\n\nLes chevaux s’élancent…\nPot **${fmt(lobby.pot)}**`
-        ),
-    ],
+function trackArt(pos) {
+  const lines = [0, 1, 2, 3].map((i) => {
+    const p = Math.max(0, Math.min(12, pos[i] || 0));
+    return `${i + 1} ${'.'.repeat(p)}🐎${'.'.repeat(12 - p)}|`;
   });
-  await sleep(2000);
+  lines.push('   ------------FIN');
+  return code(lines);
+}
+
+async function runOnlineHorses(lobby, ch) {
   const winH = `h${randomInt(1, 5)}`;
-  const winners = lobby.players.filter((p) => p.choice === winH);
-  const share = await onlinePayWinners(
+  const winIdx = Number(winH.slice(1)) - 1;
+  const picks = lobby.players.map((p) => `• <@${p.id}> → **cheval ${(p.choice || '?').replace('h', '')}**`).join('\n');
+  const msg = await openStage(
     lobby,
-    winners.map((p) => p.id)
+    ch,
+    '🏇 Course hippique',
+    `${potLine(lobby)}\n\n${picks}\n\n4 chevaux. Celui qui franchit la ligne en premier fait gagner ses parieurs.`
   );
+  const pos = [0, 0, 0, 0];
+  const frames = [];
+  for (let s = 0; s < 6; s++) {
+    const last = s === 5;
+    for (let i = 0; i < 4; i++) pos[i] += last ? 0 : randomInt(1, 4);
+    if (last) {
+      const top = Math.max(...pos);
+      for (let i = 0; i < 4; i++) pos[i] = i === winIdx ? 12 : Math.min(pos[i], 9);
+      if (pos[winIdx] < top) pos[winIdx] = 12;
+    }
+    frames.push({
+      title: last ? `🏇 Arrivée — cheval ${winIdx + 1}` : '🏇 La course',
+      ms: last ? 1500 : 800,
+      color: last ? COLORS.gold : COLORS.green,
+      body:
+        `${potLine(lobby)}\n` +
+        `**Ce qui se passe :** ${last ? `le cheval **${winIdx + 1}** passe la ligne.` : 'les chevaux avancent vers la ligne.'}\n\n` +
+        trackArt(pos) +
+        `\n${picks}`,
+    });
+  }
+  await playScene(msg, frames);
+  const winners = lobby.players.filter((p) => p.choice === winH);
+  const share = await onlinePayWinners(lobby, winners.map((p) => p.id));
   await onlineFinish(
     lobby,
     ch,
     new EmbedBuilder()
-      .setColor(COLORS.green)
+      .setColor(COLORS.gold)
       .setTitle('🏇 Arrivée')
       .setDescription(
-        `Vainqueur : **cheval ${winH.slice(1)}**\n\n` +
-          lobby.players.map((p) => `• <@${p.id}> : ${p.choice} ${p.choice === winH ? '🏆' : ''}`).join('\n') +
-          `\n\n` +
-          (winners.length ? `Gagnant(s) · **${fmt(share)}**` : 'Personne sur ce cheval — redistribuées.')
+        `${trackArt([winIdx === 0 ? 12 : 6, winIdx === 1 ? 12 : 5, winIdx === 2 ? 12 : 7, winIdx === 3 ? 12 : 4])}\n` +
+          `Vainqueur : **cheval ${winIdx + 1}**\n\n` +
+          lobby.players.map((p) => `• <@${p.id}> ${p.choice || '?'} ${p.choice === winH ? '🏆' : ''}`).join('\n') +
+          '\n\n' +
+          (winners.length ? `Gagnant(s) · **${fmt(share)}**.` : 'Personne sur ce cheval — mises rendues.')
       )
   );
+}
+
+function rocketArt(mult, crashed) {
+  const h = Math.max(0, Math.min(7, Math.floor(Math.log2(Math.max(mult, 1)) * 3)));
+  const lines = [];
+  for (let y = 7; y >= 0; y--) lines.push(y === h ? (crashed ? '      💥' : '      🚀') : '       ');
+  lines.push(`  x${Number(mult).toFixed(2)}`);
+  lines.push('  ' + meter(Math.min(mult, 8), 8, 16));
+  return code(lines);
 }
 
 async function runOnlineCrash(lobby, ch) {
   const u = randomInt(1, 1_000_001) / 1_000_000;
-  const crashAt = Math.max(1, Math.floor((0.96 / u) * 100) / 100);
-  await ch.send({
-    embeds: [
-      new EmbedBuilder()
-        .setColor(COLORS.violet)
-        .setTitle('🚀 Crash ensemble')
-        .setDescription(
-          lobby.players.map((p) => `• <@${p.id}> cible **${p.choice || '?'}**`).join('\n') +
-            `\n\nLa fusée décolle…\nPot **${fmt(lobby.pot)}**`
-        ),
-    ],
-  });
-  await sleep(1500);
+  const crashAt = Math.max(1.01, Math.floor((0.96 / u) * 100) / 100);
   const parseT = (c) => ({ x15: 1.5, x2: 2, x3: 3, x5: 5 }[c] || 2);
-  const winners = lobby.players.filter((p) => parseT(p.choice) <= crashAt);
-  const share = await onlinePayWinners(
+  const picks = lobby.players
+    .map((p) => `• <@${p.id}> sort à **x${parseT(p.choice)}**`)
+    .join('\n');
+  const msg = await openStage(
     lobby,
-    winners.map((p) => p.id)
+    ch,
+    '🚀 Crash',
+    `${potLine(lobby)}\n\n${picks}\n\nLa fusée monte. Si elle explose **avant** ta cible, tu perds. Si ta cible est sous l’explosion, tu survit et tu partages le pot.`
   );
+  const steps = [1];
+  let m = 1;
+  while (steps.length < 6 && m * 1.45 < crashAt) {
+    m = round2(m * 1.45);
+    steps.push(m);
+  }
+  steps.push(crashAt);
+  const frames = steps.map((v, i) => {
+    const last = i === steps.length - 1;
+    return {
+      title: last ? `🚀 Explosion x${Math.min(crashAt, 1000)}` : `🚀 Montée x${v.toFixed(2)}`,
+      ms: last ? 1500 : 800,
+      color: last ? COLORS.red : COLORS.blue,
+      body:
+        `${potLine(lobby)}\n` +
+        `**Ce qui se passe :** ${last ? 'la fusée explose. On regarde qui était encore en dessous.' : 'le multiplicateur grimpe.'}\n\n` +
+        rocketArt(v, last) +
+        `\n${picks}`,
+    };
+  });
+  await playScene(msg, frames);
+  const winners = lobby.players.filter((p) => parseT(p.choice) <= crashAt);
+  const share = await onlinePayWinners(lobby, winners.map((p) => p.id));
   await onlineFinish(
     lobby,
     ch,
     new EmbedBuilder()
-      .setColor(COLORS.green)
-      .setTitle('🚀 Crash')
+      .setColor(COLORS.red)
+      .setTitle('🚀 Crash — résultat')
       .setDescription(
-        `La fusée explose à **x${Math.min(crashAt, 1000)}**.\n\n` +
+        `${rocketArt(Math.min(crashAt, 1000), true)}\nExplosion à **x${Math.min(crashAt, 1000)}**.\n\n` +
           lobby.players
             .map((p) => {
               const t = parseT(p.choice);
-              const ok = t <= crashAt;
-              return `• <@${p.id}> cible x${t} ${ok ? '✅' : '❌'}`;
+              return `• <@${p.id}> x${t} ${t <= crashAt ? '✅' : '❌'}`;
             })
             .join('\n') +
-          `\n\n` +
-          (winners.length ? `Survivants · **${fmt(share)}** chacun` : 'Tout le monde a crash — redistribuées.')
+          '\n\n' +
+          (winners.length ? `Survivants · **${fmt(share)}** chacun.` : 'Tout le monde a crash — mises rendues.')
       )
   );
-}
-
-async function animateBoard(msg, lobby, title, caption) {
-  const frames = 4;
-  for (let k = 0; k < frames; k++) {
-    const art = pokerHandArt(lobby.community, k < frames - 1 ? 1 : 0);
-    await msg.edit({
-      embeds: [
-        new EmbedBuilder()
-          .setColor(ANIM_PALETTE[k % ANIM_PALETTE.length])
-          .setTitle(`🃏 ${title}`)
-          .setDescription(
-            `${code(art)}\n**${caption}**\nPot **${fmt(lobby.pot)}**\n` +
-              lobby.players.map((p) => `• <@${p.id}> : cartes privées cachées`).join('\n')
-          )
-          .setFooter({ text: `[${'='.repeat(k + 1)}${'-'.repeat(frames - k - 1)}]` }),
-      ],
-    }).catch(() => {});
-    await sleep(700);
-  }
-  await msg.edit({
-    embeds: [
-      new EmbedBuilder()
-        .setColor(COLORS.violet)
-        .setTitle(`🃏 ${title}`)
-        .setDescription(
-          `${code(pokerHandArt(lobby.community))}\n` +
-            `**Board** : ${lobby.community.map(pokerCardStr).join(' ')}\n` +
-            `Pot **${fmt(lobby.pot)}**\n\n` +
-            `*Les cartes privées seront révélées à l’abattage.*`
-        ),
-    ],
-  }).catch(() => {});
 }
 
 async function getAnnounceChannel(guildId) {
@@ -6611,6 +7161,11 @@ client.on(Events.InteractionCreate, async (i) => {
       const stake = parseAmount(raw, bal);
       if (!stake) return respondText(i, 'Mise invalide : nombre ou "all".');
       return pokerCreateLobby(i, stake, 'poker');
+    }
+    if (id === 'modal_search_game' && i.isModalSubmit()) {
+      const q = i.fields.getTextInputValue('q')?.trim() || '';
+      if (!q) return respondText(i, 'Indique un mot-clé.');
+      return i.reply({ ...buildGameMenuPayload(i.user.id, 0, 'search', q), flags: EPH });
     }
 
     const isGame =
