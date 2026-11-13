@@ -29,9 +29,9 @@ const path = require('path');
 //  CONFIG
 // ============================================================
 const PREFIX = '!';
-const COIN = 'USDT';
+const COIN = 'coin';
 const DAILY_AMOUNT = 4;
-const INVITE_REWARD = 1; // pièces offertes à celui qui invite un nouveau membre
+const INVITE_REWARD = 1; // coins offerts à celui qui invite un nouveau membre
 const LEADERBOARD_REFRESH_MS = 60_000;
 const IDLE_MS = 90_000; // une partie inactive est réglée automatiquement après 90 s
 const MAX_ADMIN_AMOUNT = 100_000_000;
@@ -79,13 +79,16 @@ const range = (n) => Array.from({ length: n }, (_, i) => i);
 
 /** Anime un message en plusieurs étapes (editReply successifs). */
 async function animateSteps(i, steps, title, baseDesc = '') {
-  for (const step of steps) {
+  const palette = [COLORS.violet, COLORS.gold, COLORS.blue, 0xE879F9, 0xC026D3];
+  for (let idx = 0; idx < steps.length; idx++) {
+    const step = steps[idx];
     const embed = new EmbedBuilder()
       .setTitle(title)
-      .setColor(COLORS.violet)
-      .setDescription(`${baseDesc}${step.text}`);
+      .setColor(palette[idx % palette.length])
+      .setDescription(`${baseDesc}${step.text}`)
+      .setFooter({ text: `Étape ${idx + 1}/${steps.length}` });
     await i.editReply({ embeds: [embed], components: [] }).catch(() => {});
-    if (step.ms) await sleep(step.ms);
+    if (step.ms) await sleep(Math.min(1200, Math.round(step.ms * 1.2)));
   }
 }
 const round2 = (n) => Math.round(n * 100) / 100;
@@ -121,8 +124,8 @@ function parseUserId(str) {
 
 const MSG = {
   busy: '⏳ Tu as déjà une partie en cours, termine-la d’abord (elle se règle toute seule après 90 s d’inactivité).',
-  noMoney: `Tu n’as pas de pièces ${COIN}. Clique sur **🎁 Daily** dans le panneau pour récupérer ta récompense du jour.`,
-  insufficient: 'Tu n’as pas assez de pièces pour cette mise.',
+  noMoney: `Tu n’as pas de ${COIN}. Clique sur **🎁 Daily** dans le panneau pour récupérer ta récompense du jour.`,
+  insufficient: `Tu n’as pas assez de ${COIN} pour cette mise.`,
 };
 
 const isCrown = (msg) => msg.guild && msg.author.id === msg.guild.ownerId;
@@ -305,7 +308,7 @@ async function loadMultipliers() {
 }
 
 // Renvoie { db: true/false } : db = false si seule la sauvegarde locale a marché
-async function saveMultiplier(game, value, guildId = null) {
+async function saveMultiplier(game, value, guildId = null, actorId = null) {
   multipliers.set(game, value);
   try {
     fs.mkdirSync(path.dirname(MULT_FILE), { recursive: true });
@@ -323,20 +326,20 @@ async function saveMultiplier(game, value, guildId = null) {
     console.error('[multiplicateurs] sauvegarde Supabase :', e?.message || e);
     db = false;
   }
-  // Annonce dans le salon casino
   if (guildId) {
     try {
       const casinoId = casinoChannels.get(guildId);
       if (casinoId) {
         const ch = await client.channels.fetch(casinoId).catch(() => null);
         if (ch) {
+          const who = actorId ? `👤 Par <@${actorId}>\n` : '';
           await ch.send({
             embeds: [
               new EmbedBuilder()
                 .setTitle('🎚️ Multiplicateur modifié')
                 .setColor(COLORS.violet)
                 .setDescription(
-                  `**${GAME_NAMES[game] || game}** : coefficient réglé sur **${fx(value)}**.\n` +
+                  `${who}**${GAME_NAMES[game] || game}** : coefficient réglé sur **${fx(value)}**.\n` +
                     `Tous les gains de ce jeu sont maintenant multipliés par ce coefficient.`
                 )
                 .setTimestamp(),
@@ -1729,12 +1732,6 @@ async function playInstant(i, key, bet, choice) {
   }
 }
 
-const instantBetModal = (key, choice) =>
-  new ModalBuilder()
-    .setCustomId(`modal_ig_${key}_${choice}`)
-    .setTitle(INSTANT[key].title)
-    .addComponents(modalInput('bet', BET_LABEL, { placeholder: 'ex : 1' }));
-
 // ============================================================
 //  PANNEAU DE JEU (boutons) + POP-UPS
 // ============================================================
@@ -1845,28 +1842,38 @@ function modalInput(id, label, { placeholder, value, required = true, max = 30 }
   return new ActionRowBuilder().addComponents(t);
 }
 
-const BET_LABEL = 'Ta mise (ou "all" pour tout miser)';
+const betLabel = (bal) => {
+  const s = `Mise (solde: ${num(bal)} ${COIN})`;
+  return s.length > 45 ? `Mise · solde ${num(bal)}` : s;
+};
+const BET_PLACEHOLDER = 'ex : 1  ou  all';
 
-const minesBetModal = (level) =>
+const minesBetModal = (level, bal = 0) =>
   new ModalBuilder()
     .setCustomId(`modal_mines_${level}`)
-    .setTitle(`💣 Mines · ${LEVELS[level].name}`)
-    .addComponents(modalInput('bet', BET_LABEL, { placeholder: 'ex : 1' }));
+    .setTitle(`💣 Mines · ${LEVELS[level].name}`.slice(0, 45))
+    .addComponents(modalInput('bet', betLabel(bal), { placeholder: BET_PLACEHOLDER }));
 
-const blackjackModal = () =>
+const blackjackModal = (bal = 0) =>
   new ModalBuilder()
     .setCustomId('modal_bj')
     .setTitle('🃏 Blackjack')
-    .addComponents(modalInput('bet', BET_LABEL, { placeholder: 'ex : 2' }));
+    .addComponents(modalInput('bet', betLabel(bal), { placeholder: BET_PLACEHOLDER }));
 
-function rouletteModal(key) {
+function rouletteModal(key, bal = 0) {
   const m = new ModalBuilder()
     .setCustomId(`modal_rl_${key}`)
-    .setTitle(key === 'num' ? '🎡 Roulette · Numéro' : `🎡 Roulette · ${parseRouletteBet(key).label}`)
-    .addComponents(modalInput('bet', BET_LABEL, { placeholder: 'ex : 1' }));
+    .setTitle(key === 'num' ? '🎡 Roulette · Numéro' : `🎡 Roulette · ${parseRouletteBet(key)?.label || key}`.slice(0, 45))
+    .addComponents(modalInput('bet', betLabel(bal), { placeholder: BET_PLACEHOLDER }));
   if (key === 'num') m.addComponents(modalInput('num', 'Ton numéro (0 à 36)', { placeholder: 'ex : 17', max: 2 }));
   return m;
 }
+
+const instantBetModal = (key, choice, bal = 0) =>
+  new ModalBuilder()
+    .setCustomId(`modal_ig_${key}_${choice}`)
+    .setTitle((INSTANT[key]?.title || 'Jeu').slice(0, 45))
+    .addComponents(modalInput('bet', betLabel(bal), { placeholder: BET_PLACEHOLDER }));
 
 async function handlePanelButton(i) {
   if (i.customId.startsWith('panel_page_')) {
@@ -1882,8 +1889,10 @@ async function handlePanelButton(i) {
       return i.reply({ ...buildGameMenuPayload(0), flags: EPH });
     case 'panel_mines':
       return i.reply({ ...minesPickerPayload(), flags: EPH });
-    case 'panel_bj':
-      return i.showModal(blackjackModal());
+    case 'panel_bj': {
+      const bal = await getBalance(i.user.id);
+      return i.showModal(blackjackModal(bal));
+    }
     case 'panel_roulette':
       return i.reply({ ...roulettePickerPayload(), flags: EPH });
     case 'panel_balance': {
@@ -2061,10 +2070,10 @@ function buildAdminPayload() {
     .setColor(COLORS.red)
     .setDescription(
       '➕ **Ajouter** · ➖ **Retirer** · 🎯 **Définir** · 👀 **Voir** un solde\n' +
-        '🎁 **Offrir à tous** · 💥 **Reset soldes** (remet tout le monde à 0)\n' +
-        '🎚️ **Multiplicateurs** (annonce auto dans le casino)\n' +
-        '📢 **Événement** : claim multi-gagnants, giveaway, boosts x2 wins/losses…\n\n' +
-        'Tu choisis le membre dans une liste, puis le montant dans une fenêtre.'
+        '🎁 **Offrir à tous** · 💥 **Reset soldes** · 👑 **Reset all-time**\n' +
+        '🎚️ **Multiplicateurs** · 📢 **Événement** · 📣 **Annonce récompense**\n' +
+        '🏆 **Salon all-time** : créer le salon du classement all-time\n\n' +
+        'Les actions postées dans le casino indiquent **qui** les a faites.'
     );
   const row1 = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('admin_add').setLabel('Ajouter').setEmoji('➕').setStyle(ButtonStyle.Success),
@@ -2075,10 +2084,15 @@ function buildAdminPayload() {
   const row2 = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('admin_all').setLabel('Offrir à tous').setEmoji('🎁').setStyle(ButtonStyle.Success),
     new ButtonBuilder().setCustomId('admin_reset').setLabel('Reset soldes').setEmoji('💥').setStyle(ButtonStyle.Danger),
-    new ButtonBuilder().setCustomId('admin_mult').setLabel('Multiplicateurs').setEmoji('🎚️').setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId('admin_event').setLabel('Événement').setEmoji('📢').setStyle(ButtonStyle.Primary)
+    new ButtonBuilder().setCustomId('admin_resetpeaks').setLabel('Reset all-time').setEmoji('👑').setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId('admin_mult').setLabel('Multiplicateurs').setEmoji('🎚️').setStyle(ButtonStyle.Primary)
   );
-  return { embeds: [embed], components: [row1, row2] };
+  const row3 = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('admin_event').setLabel('Événement').setEmoji('📢').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId('admin_annonce').setLabel('Annonce').setEmoji('📣').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId('admin_alltimechan').setLabel('Salon all-time').setEmoji('🏆').setStyle(ButtonStyle.Secondary)
+  );
+  return { embeds: [embed], components: [row1, row2, row3] };
 }
 
 // ---------- Événements (claim, giveaway, boosts) ----------
@@ -2101,14 +2115,15 @@ const EVENT_TYPES = [
 
 function claimEventEmbed(ev) {
   const left = ev.maxWinners - ev.winners.size;
+  const host = ev.hostId ? `👤 Par <@${ev.hostId}>\n` : '';
   const e = new EmbedBuilder().setTitle('📢 Claim — premier arrivé').setColor(left > 0 ? COLORS.violet : COLORS.grey);
   if (ev.finished || left <= 0) {
     const names = [...ev.winners].map((id) => `<@${id}>`).join(', ') || 'personne';
-    e.setDescription(`🏁 **Terminé** — gagnant(s) : ${names}\nChacun a reçu **${fmt(ev.amount)}**.`);
+    e.setDescription(`${host}🏁 **Terminé** — gagnant(s) : ${names}\nChacun a reçu **${fmt(ev.amount)}**.`);
   } else {
     const timeLine = ev.expiresAt ? `\n⏱️ Expire <t:${Math.floor(ev.expiresAt / 1000)}:R>` : '\n⏱️ Sans limite';
     e.setDescription(
-      `🎁 **${fmt(ev.amount)}** par gagnant\n` +
+      `${host}🎁 **${fmt(ev.amount)}** par gagnant\n` +
         `Places restantes : **${left}/${ev.maxWinners}**\n` +
         `Clique **Réclamer** pour empôcher ta part !${timeLine}`
     );
@@ -2117,16 +2132,17 @@ function claimEventEmbed(ev) {
 }
 
 function giveawayEmbed(ev) {
+  const host = ev.hostId ? `👤 Par <@${ev.hostId}>\n` : '';
   const e = new EmbedBuilder().setTitle('🎉 Giveaway').setColor(ev.finished ? COLORS.grey : COLORS.gold);
   if (ev.finished) {
     const names = [...ev.winners].map((id) => `<@${id}>`).join(', ') || 'personne';
     e.setDescription(
-      `🏁 **Tirage terminé**\nGagnant(s) : ${names}\nPrix : **${fmt(ev.amount)}** chacun\n` +
+      `${host}🏁 **Tirage terminé**\nGagnant(s) : ${names}\nPrix : **${fmt(ev.amount)}** chacun\n` +
         `Participants : **${ev.entries.size}**`
     );
   } else {
     e.setDescription(
-      `🎁 Prix : **${fmt(ev.amount)}** × **${ev.maxWinners}** gagnant(s)\n` +
+      `${host}🎁 Prix : **${fmt(ev.amount)}** × **${ev.maxWinners}** gagnant(s)\n` +
         `Clique **Participer** pour t’inscrire !\n` +
         `👥 Inscrits : **${ev.entries.size}**\n` +
         `⏱️ Tirage <t:${Math.floor(ev.expiresAt / 1000)}:R>`
@@ -2302,7 +2318,8 @@ async function postBoostEvent(i, kind, minutes) {
         .setTitle(`⚡ ${p.label}`)
         .setColor(COLORS.gold)
         .setDescription(
-          `Un boost est actif pendant **${minutes} min** (fin <t:${ends}:R>) !\n` +
+          `👤 Lancé par <@${i.user.id}>\n` +
+            `Un boost est actif pendant **${minutes} min** (fin <t:${ends}:R>) !\n` +
             (p.winMult !== 1 ? `• Gains × **${p.winMult}**\n` : '') +
             (p.loseMult !== 1 ? `• Pertes × **${p.loseMult}** (mise perdue ×${p.loseMult})\n` : '') +
             `\nJoue maintenant pour en profiter !`
@@ -2339,6 +2356,7 @@ async function createClaimOrGiveaway(i, type, amount, winners, minutes) {
     expiresAt,
     finished: false,
     timer: null,
+    hostId: i.user.id,
   };
 
   const msg = await ch.send({
@@ -2444,6 +2462,33 @@ async function handleAdmin(i) {
           )
       );
     }
+    if (action === 'resetpeaks') {
+      return i.showModal(
+        new ModalBuilder()
+          .setCustomId('modal_admin_resetpeaks')
+          .setTitle('👑 Reset classement all-time')
+          .addComponents(
+            modalInput('confirm', 'Tape RESET pour confirmer', { placeholder: 'RESET', max: 10 })
+          )
+      );
+    }
+    if (action === 'annonce') {
+      return i.showModal(
+        new ModalBuilder()
+          .setCustomId('modal_admin_annonce')
+          .setTitle('📣 Annonce récompense')
+          .addComponents(
+            modalInput('amount', `Nombre de ${COIN}`, { placeholder: 'ex : 100' }),
+            modalInput('reward', 'Récompense (texte)', {
+              placeholder: 'ex : un nitro d’1 mois',
+              max: 100,
+            })
+          )
+      );
+    }
+    if (action === 'alltimechan') {
+      return createAllTimeChannel(i);
+    }
     if (ADMIN_TITLES[action]) {
       const row = new ActionRowBuilder().addComponents(
         new UserSelectMenuBuilder()
@@ -2546,7 +2591,6 @@ async function handleAdmin(i) {
         return respondText(i, 'Annulé : tu dois taper **RESET** pour confirmer.');
       }
       try {
-        // PostgREST exige un filtre WHERE : on cible tous les user_id non vides
         const { data, error } = await supabase
           .from('players')
           .update({ balance: 0, updated_at: new Date().toISOString() })
@@ -2554,22 +2598,16 @@ async function handleAdmin(i) {
           .select('user_id');
         if (error) throw error;
         const count = data?.length ?? 0;
-        peaks.clear();
-        savePeaksLocal();
-        try {
-          await supabase.from('player_peaks').update({ peak: 0 }).neq('user_id', '__impossible__');
-        } catch {
-          /* optionnel */
-        }
         const casinoId = casinoChannels.get(i.guild.id);
         if (casinoId) {
           const ch = await client.channels.fetch(casinoId).catch(() => null);
           ch?.send({
             embeds: [
               new EmbedBuilder()
-                .setTitle('💥 Reset des soldes')
+                .setTitle('💥 Reset des soldes (classement actuel)')
                 .setColor(COLORS.red)
-                .setDescription('Tous les soldes ont été remis à **0** par le propriétaire.'),
+                .setDescription(`👤 Par <@${i.user.id}>\nTous les soldes ont été remis à **0**.`)
+                .setTimestamp(),
             ],
           }).catch(() => {});
         }
@@ -2581,6 +2619,60 @@ async function handleAdmin(i) {
         console.error('[reset]', e?.message || e);
         return respondText(i, `Erreur reset : ${explainError(e)}`);
       }
+    }
+
+    if (id === 'modal_admin_resetpeaks') {
+      const confirm = i.fields.getTextInputValue('confirm')?.trim().toUpperCase();
+      if (confirm !== 'RESET') {
+        return respondText(i, 'Annulé : tu dois taper **RESET** pour confirmer.');
+      }
+      peaks.clear();
+      savePeaksLocal();
+      try {
+        await supabase.from('player_peaks').update({ peak: 0 }).neq('user_id', '__impossible__');
+      } catch (e) {
+        console.error('[resetpeaks]', e?.message || e);
+      }
+      const casinoId = casinoChannels.get(i.guild.id);
+      if (casinoId) {
+        const ch = await client.channels.fetch(casinoId).catch(() => null);
+        ch?.send({
+          embeds: [
+            new EmbedBuilder()
+              .setTitle('👑 Reset classement all-time')
+              .setColor(COLORS.red)
+              .setDescription(`👤 Par <@${i.user.id}>\nTous les records de solde max ont été effacés.`)
+              .setTimestamp(),
+          ],
+        }).catch(() => {});
+      }
+      return i.reply({ content: '✅ Classement all-time réinitialisé.', flags: EPH });
+    }
+
+    if (id === 'modal_admin_annonce') {
+      const amountRaw = i.fields.getTextInputValue('amount')?.trim();
+      const amount = parseAmount(amountRaw);
+      const reward = i.fields.getTextInputValue('reward')?.trim();
+      if (!amount) return respondText(i, 'Montant invalide.');
+      if (!reward) return respondText(i, 'Indique la récompense en texte.');
+      const casinoId = casinoChannels.get(i.guild.id);
+      if (!casinoId) return respondText(i, 'Aucun salon casino : fais `!setup` d’abord.');
+      const ch = await client.channels.fetch(casinoId).catch(() => null);
+      if (!ch) return respondText(i, 'Salon casino introuvable.');
+      await ch.send({
+        embeds: [
+          new EmbedBuilder()
+            .setTitle('📣 Récompense disponible')
+            .setColor(COLORS.gold)
+            .setDescription(
+              `👤 Annonce de <@${i.user.id}>\n\n` +
+                `**${fmt(amount)}**  ≈  **${reward}**\n\n` +
+                `Contacte le propriétaire pour échanger tes ${COIN} contre cette récompense.`
+            )
+            .setTimestamp(),
+        ],
+      });
+      return i.reply({ content: `✅ Annonce postée : **${fmt(amount)}** = **${reward}**`, flags: EPH });
     }
 
     // Boosts (champ "minutes" uniquement)
@@ -2619,11 +2711,40 @@ async function handleAdmin(i) {
       if (!amount || amount > MAX_ADMIN_AMOUNT) {
         return respondText(i, `Montant invalide (entre 0.01 et ${num(MAX_ADMIN_AMOUNT)}).`);
       }
-      const count = Number(await rpc('give_all', { p_amount: amount }));
+      let count = 0;
+      try {
+        count = Number(await rpc('give_all', { p_amount: amount }));
+      } catch (e) {
+        // Fallback si la RPC échoue : update ligne par ligne (WHERE obligatoire côté API)
+        console.error('[give_all] rpc', e?.message || e);
+        const { data: rows, error } = await supabase.from('players').select('user_id, balance');
+        if (error) throw error;
+        for (const row of rows || []) {
+          const { error: upErr } = await supabase
+            .from('players')
+            .update({ balance: Number(row.balance) + amount, updated_at: new Date().toISOString() })
+            .eq('user_id', row.user_id);
+          if (!upErr) {
+            count++;
+            await touchPeak(row.user_id, Number(row.balance) + amount);
+          }
+        }
+      }
       const casinoId = casinoChannels.get(i.guild.id);
       if (casinoId) {
         const ch = await client.channels.fetch(casinoId).catch(() => null);
-        ch?.send(`🎁 **Cadeau !** Le propriétaire offre **${fmt(amount)}** à tous les joueurs !`).catch(() => {});
+        ch?.send({
+          embeds: [
+            new EmbedBuilder()
+              .setTitle('🎁 Cadeau pour tous')
+              .setColor(COLORS.green)
+              .setDescription(
+                `👤 Par <@${i.user.id}>\n` +
+                  `💰 **${fmt(amount)}** offerts à **chaque** joueur (**${count}** comptes).`
+              )
+              .setTimestamp(),
+          ],
+        }).catch(() => {});
       }
       return i.reply({ content: `✅ **${fmt(amount)}** offerts à **${count}** joueur(s).`, flags: EPH });
     }
@@ -2636,7 +2757,7 @@ async function handleAdmin(i) {
       if (value === null || value < MULT_MIN || value > MULT_MAX) {
         return respondText(i, `Valeur invalide : entre ${fx(MULT_MIN)} et ${fx(MULT_MAX)} (ex : 1.5).`);
       }
-      const { db } = await saveMultiplier(game, value, i.guild.id);
+      const { db } = await saveMultiplier(game, value, i.guild.id, i.user.id);
       const note =
         `✅ **${GAME_NAMES[game]}** : coefficient réglé sur **${fx(value)}** (annoncé dans le casino).` +
         (db ? '' : '\n⚠️ Sauvegardé uniquement en local : lance **schema_v3.sql** dans Supabase pour que ça survive à un redéploiement.');
@@ -2719,7 +2840,51 @@ async function loadChannels() {
   else for (const r of b.data) guildChannels.set(`${r.guild_id}:${r.kind}`, r.channel_id);
 }
 
-const CHANNEL_NAMES = { wins: 'wins', admin: 'casino-admin', invites: 'invites-notif' };
+const CHANNEL_NAMES = { wins: 'wins', admin: 'casino-admin', invites: 'invites-notif', alltime: 'alltime' };
+const alltimeBoardMessages = new Map(); // guildId -> { channelId, messageId }
+
+async function createAllTimeChannel(i) {
+  const guild = i.guild;
+  const P = PermissionFlagsBits;
+  const me = guild.members.me;
+  const existing = await getSavedChannel(guild, 'alltime');
+  if (existing) {
+    const embed = await buildAllTimeLeaderboardEmbed();
+    const msg = await existing.send({ embeds: [embed] });
+    alltimeBoardMessages.set(guild.id, { channelId: existing.id, messageId: msg.id });
+    return i.reply({ content: `✅ Salon all-time déjà présent : <#${existing.id}> (classement reposté).`, flags: EPH });
+  }
+  if (!me.permissions.has(P.ManageChannels)) {
+    return i.reply({ content: NEED_MANAGE_CHANNELS, flags: EPH });
+  }
+  const channel = await guild.channels.create({
+    name: 'alltime',
+    type: ChannelType.GuildText,
+    topic: 'Classement all-time — solde max historique 👑',
+    permissionOverwrites: [
+      {
+        id: guild.roles.everyone.id,
+        type: OverwriteType.Role,
+        allow: [P.ViewChannel, P.ReadMessageHistory],
+        deny: [P.SendMessages],
+      },
+      {
+        id: me.id,
+        type: OverwriteType.Member,
+        allow: botCan(guild, [P.ViewChannel, P.SendMessages, P.EmbedLinks, P.ReadMessageHistory, P.ManageMessages]),
+      },
+    ],
+  });
+  const embed = await buildAllTimeLeaderboardEmbed();
+  const msg = await channel.send({ embeds: [embed] });
+  await msg.pin().catch(() => {});
+  alltimeBoardMessages.set(guild.id, { channelId: channel.id, messageId: msg.id });
+  const saved = await saveChannel(guild.id, 'alltime', channel.id);
+  return i.reply({
+    content: `✅ Salon <#${channel.id}> créé avec le classement all-time.${saved ? '' : DB_WARN}`,
+    flags: EPH,
+  });
+}
 
 // Au démarrage : retrouve les salons wins/admin par leur nom si la base ne les connaît pas
 async function restoreChannelsByName() {
@@ -3066,20 +3231,38 @@ async function updateLeaderboards() {
   try {
     const { data: rows, error } = await supabase.from('leaderboard_messages').select('*');
     if (error) throw error;
-    if (!rows || rows.length === 0) return;
 
-    const embed = await buildLeaderboardEmbed();
-    for (const row of rows) {
-      try {
-        const ch = await client.channels.fetch(row.channel_id);
-        const m = await ch.messages.fetch(row.message_id);
-        await m.edit({ embeds: [embed] });
-      } catch (e) {
-        // 10008 message supprimé, 10003 salon supprimé, 50001/50013 accès perdu
-        if ([10008, 10003, 50001, 50013].includes(e?.code)) {
-          await supabase.from('leaderboard_messages').delete().eq('guild_id', row.guild_id);
-        } else {
-          console.error('[classement] edit', e?.message || e);
+    if (rows && rows.length > 0) {
+      const embed = await buildLeaderboardEmbed();
+      for (const row of rows) {
+        try {
+          const ch = await client.channels.fetch(row.channel_id);
+          const m = await ch.messages.fetch(row.message_id);
+          await m.edit({ embeds: [embed] });
+        } catch (e) {
+          if ([10008, 10003, 50001, 50013].includes(e?.code)) {
+            await supabase.from('leaderboard_messages').delete().eq('guild_id', row.guild_id);
+          } else {
+            console.error('[classement] edit', e?.message || e);
+          }
+        }
+      }
+    }
+
+    // Classement all-time (salons dédiés)
+    if (alltimeBoardMessages.size > 0) {
+      const allEmbed = await buildAllTimeLeaderboardEmbed();
+      for (const [gid, info] of alltimeBoardMessages) {
+        try {
+          const ch = await client.channels.fetch(info.channelId);
+          const m = await ch.messages.fetch(info.messageId);
+          await m.edit({ embeds: [allEmbed] });
+        } catch (e) {
+          if ([10008, 10003, 50001, 50013].includes(e?.code)) {
+            alltimeBoardMessages.delete(gid);
+          } else {
+            console.error('[alltime] edit', e?.message || e);
+          }
         }
       }
     }
@@ -3208,17 +3391,23 @@ client.on(Events.InteractionCreate, async (i) => {
     if (id.startsWith('replay|')) return await handleReplay(i);
     if (id.startsWith('mines_lvl_')) {
       const level = id.slice('mines_lvl_'.length);
-      return LEVELS[level] ? await i.showModal(minesBetModal(level)) : undefined;
+      if (!LEVELS[level]) return;
+      const bal = await getBalance(i.user.id);
+      return i.showModal(minesBetModal(level, bal));
     }
     if (id.startsWith('mines_')) return await handleMinesButton(i);
     if (id.startsWith('bj_')) return await handleBlackjackButton(i);
     if (id.startsWith('ig_')) {
       const [, key, choice] = id.split('_');
-      return INSTANT[key]?.choices.includes(choice) ? await i.showModal(instantBetModal(key, choice)) : undefined;
+      if (!INSTANT[key]?.choices.includes(choice)) return;
+      const bal = await getBalance(i.user.id);
+      return i.showModal(instantBetModal(key, choice, bal));
     }
     if (id.startsWith('rl_')) {
       const key = id.slice('rl_'.length);
-      return key === 'num' || parseRouletteBet(key) ? await i.showModal(rouletteModal(key)) : undefined;
+      if (!(key === 'num' || parseRouletteBet(key))) return;
+      const bal = await getBalance(i.user.id);
+      return i.showModal(rouletteModal(key, bal));
     }
   } catch (e) {
     console.error('[interaction]', e);
@@ -3377,9 +3566,10 @@ client.on(Events.ChannelDelete, async (channel) => {
     casinoChannels.delete(gid);
     await supabase.from('casino_channels').delete().eq('guild_id', gid);
   }
-  for (const kind of ['wins', 'admin', 'invites']) {
+  for (const kind of ['wins', 'admin', 'invites', 'alltime']) {
     if (guildChannels.get(`${gid}:${kind}`) === channel.id) {
       guildChannels.delete(`${gid}:${kind}`);
+      alltimeBoardMessages.delete(gid);
       await supabase.from('guild_channels').delete().eq('guild_id', gid).eq('kind', kind);
     }
   }
