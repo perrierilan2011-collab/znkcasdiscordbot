@@ -1041,14 +1041,56 @@ async function playRoulette(i, bet, choiceStr) {
 
     const balance = payout > 0 ? await credit(uid, payout) : await getBalance(uid);
 
-    // Animation progressive : la bille tourne puis ralentit
-    const fakeNums = [randomInt(0, 37), randomInt(0, 37), randomInt(0, 37), result];
+    const n1 = randomInt(0, 37);
+    const n2 = randomInt(0, 37);
+    const n3 = randomInt(0, 37);
     await animateSteps(
       i,
       [
-        { text: `🎡 **Tourne** · · ·\n\`${fakeNums[0]}\`  ·  \`${fakeNums[1]}\`  ·  \`${fakeNums[2]}\``, ms: 700 },
-        { text: `🎡 **Ralentit** · ·\nLa bille glisse… **${fakeNums[2]}** → **?**`, ms: 800 },
-        { text: `🎡 **Dernier tour**\nPresque…`, ms: 600 },
+        {
+          text:
+            '```\n' +
+            '    ╭─────────╮\n' +
+            '   ╱  ·  ·  ·  ╲\n' +
+            '  │ ·   ●   ·   │\n' +
+            '   ╲  ·  ·  ·  ╱\n' +
+            '    ╰─────────╯\n' +
+            '```\n🌀 La bille s’élance…',
+          ms: 500,
+        },
+        {
+          text:
+            '```\n' +
+            '    ╭─────────╮\n' +
+            '   ╱  ·  ●  ·  ╲\n' +
+            `  │ ·  ${String(n1).padStart(2, ' ')}  ·   │\n` +
+            '   ╲  ·  ·  ·  ╱\n' +
+            '    ╰─────────╯\n' +
+            '```\n💫 Elle tourne à toute vitesse…',
+          ms: 500,
+        },
+        {
+          text:
+            '```\n' +
+            '    ╭─────────╮\n' +
+            '   ╱  ●  ·  ·  ╲\n' +
+            `  │ ·  ${String(n2).padStart(2, ' ')}  ·   │\n` +
+            '   ╲  ·  ·  ·  ╱\n' +
+            '    ╰─────────╯\n' +
+            '```\n⏳ Ralentit…',
+          ms: 550,
+        },
+        {
+          text:
+            '```\n' +
+            '    ╭─────────╮\n' +
+            '   ╱  ·  ·  ●  ╲\n' +
+            `  │ ·  ${String(n3).padStart(2, ' ')}  ·   │\n` +
+            '   ╲  ·  ·  ·  ╱\n' +
+            '    ╰─────────╯\n' +
+            '```\n🎯 Dernier tour…',
+          ms: 600,
+        },
       ],
       '🎡 Roulette',
       `Mise **${fmt(bet)}** sur **${choice.label}**\n\n`
@@ -1528,102 +1570,109 @@ async function playInstant(i, key, bet, choice) {
 
     const balance = payout > 0 ? await credit(uid, payout) : await getBalance(uid);
 
-    // Animations par jeu (étapes intermédiaires)
+    // Animations visuelles par jeu
     const animFrames = (() => {
+      const d = () => dieFace(randomInt(1, 7));
+      const slotSyms = ['🍒', '🍋', '🍇', '🔔', '💎', '7️⃣'];
+      const s = () => slotSyms[randomInt(0, slotSyms.length)];
       switch (key) {
         case 'coinflip':
           return [
-            { text: '🪙 **(  )**  tourne…\nPile ⟷ Face', ms: 450 },
-            { text: '🪙 **(·)**  dans les airs…', ms: 400 },
-            { text: '🪙 **(··)**  encore…', ms: 400 },
-            { text: '🪙 **(···)**  redescend…', ms: 450 },
+            { text: '```\n    ╭───╮\n    │   │\n    ╰───╯\n```\n✨ La pièce est lancée…', ms: 450 },
+            { text: '```\n   ╱ ─── ╲\n  │  ···  │\n   ╲ ─── ╱\n```\n🪙 Elle tourne dans les airs…', ms: 450 },
+            { text: '```\n    ╭─·─╮\n   ╱     ╲\n  │  ✦ ✦  │\n   ╲     ╱\n    ╰───╯\n```\n💨 Virevolte…', ms: 500 },
+            { text: '```\n    ╭───╮\n    │ ? │\n    ╰───╯\n```\n⬇️ Elle redescend…', ms: 500 },
           ];
         case 'dice':
           return [
-            { text: `${dieFace(randomInt(1, 7))} ${dieFace(randomInt(1, 7))}\nLes dés roulent…`, ms: 400 },
-            { text: `${dieFace(randomInt(1, 7))} ${dieFace(randomInt(1, 7))}\nÇa secoue…`, ms: 400 },
-            { text: `${dieFace(randomInt(1, 7))} ${dieFace(randomInt(1, 7))}\nPresque…`, ms: 450 },
-            { text: `${dieFace(randomInt(1, 7))} ${dieFace(randomInt(1, 7))}\nStabilisation…`, ms: 400 },
+            { text: `\`\`\`\n  ${d()}     ${d()}\n\`\`\`\n🎲 Lancer des dés…`, ms: 400 },
+            { text: `\`\`\`\n ${d()}  ~  ${d()}\n\`\`\`\n💥 Ça rebondit…`, ms: 400 },
+            { text: `\`\`\`\n  ${d()}  ·  ${d()}\n\`\`\`\n🌀 Encore un tour…`, ms: 450 },
+            { text: `\`\`\`\n   ${d()}   ${d()}\n\`\`\`\n⏳ Stabilisation…`, ms: 500 },
           ];
         case 'slots':
           return [
-            { text: '🎰 **[ ❓ | ❓ | ❓ ]**\nRouleaux en marche…', ms: 450 },
-            { text: '🎰 **[ 🍒 | ❓ | ❓ ]**\n1er rouleau…', ms: 500 },
-            { text: '🎰 **[ 🍒 | 🍋 | ❓ ]**\n2e rouleau…', ms: 500 },
-            { text: '🎰 **[ 🍒 | 🍋 | 💎 ]**\n3e rouleau…', ms: 450 },
+            { text: '```\n╔═══════════════╗\n║  ░  │  ░  │  ░  ║\n╚═══════════════╝\n```\n🎰 Rouleaux en marche…', ms: 450 },
+            { text: `\`\`\`\n╔═══════════════╗\n║  ${s()}  │  ░  │  ░  ║\n╚═══════════════╝\n\`\`\`\n🔒 1er rouleau bloqué…`, ms: 550 },
+            { text: `\`\`\`\n╔═══════════════╗\n║  ${s()}  │  ${s()}  │  ░  ║\n╚═══════════════╝\n\`\`\`\n🔒 2e rouleau…`, ms: 550 },
+            { text: `\`\`\`\n╔═══════════════╗\n║  ${s()}  │  ${s()}  │  ${s()}  ║\n╚═══════════════╝\n\`\`\`\n✨ Révélation…`, ms: 500 },
           ];
         case 'wheel':
           return [
-            { text: `${WHEEL_FRAMES[0]}  La roue s’élance…\n╔═══🎡═══╗`, ms: 400 },
-            { text: `${WHEEL_FRAMES[1]}  Vitesse max…\n╔═══🎡═══╗`, ms: 400 },
-            { text: `${WHEEL_FRAMES[2]}  Elle tourne…\n╔═══🎡═══╗`, ms: 400 },
-            { text: `${WHEEL_FRAMES[3]}  Ralentit…\n╔═══🎡═══╗`, ms: 500 },
-            { text: `${WHEEL_FRAMES[0]}  Dernier tour…\n╔═══🎡═══╗`, ms: 450 },
+            { text: '```\n      ╭───╮\n   ╱    ▲    ╲\n  │  ·  ·  ·  │\n   ╲    ·    ╱\n      ╰───╯\n```\n🎡 La roue s’élance…', ms: 450 },
+            { text: '```\n      ╭───╮\n   ╱    ·    ╲\n  │  ▲  ·  ·  │\n   ╲    ·    ╱\n      ╰───╯\n```\n💫 Vitesse max…', ms: 400 },
+            { text: '```\n      ╭───╮\n   ╱    ·    ╲\n  │  ·  ·  ▲  │\n   ╲    ·    ╱\n      ╰───╯\n```\n🌀 Elle tourne…', ms: 400 },
+            { text: '```\n      ╭───╮\n   ╱    ·    ╲\n  │  ·  ▲  ·  │\n   ╲    ·    ╱\n      ╰───╯\n```\n⏳ Ralentit…', ms: 550 },
+            { text: '```\n      ╭───╮\n   ╱    ▲    ╲\n  │  ·  ·  ·  │\n   ╲    ·    ╱\n      ╰───╯\n```\n🎯 Dernier tour…', ms: 500 },
           ];
         case 'duel':
           return [
-            { text: '⚔️ Distribution…\n🂠    🂠', ms: 500 },
-            { text: '⚔️ Les cartes glissent…\n🂠 →  🂠 →', ms: 550 },
-            { text: '⚔️ Révélation…', ms: 500 },
+            { text: '```\n  🂠          🂠\n   Toi      Croupier\n```\n⚔️ Distribution des cartes…', ms: 500 },
+            { text: '```\n  🂠  →        🂠  →\n```\n✨ Les cartes glissent…', ms: 550 },
+            { text: '```\n  ┌───┐      ┌───┐\n  │ ? │  VS  │ ? │\n  └───┘      └───┘\n```\n👁️ Révélation…', ms: 550 },
           ];
         case 'suit':
           return [
-            { text: '🃏 Mélange\n♠️ ♥️ ♦️ ♣️', ms: 450 },
-            { text: '🃏 ♠️ → ♥️ → ♦️ → ♣️', ms: 450 },
-            { text: '🃏 Une carte est choisie…', ms: 500 },
+            { text: '```\n  ♠️  ♥️  ♦️  ♣️\n```\n🃏 Mélange du jeu…', ms: 450 },
+            { text: '```\n  ♥️  ♦️  ♣️  ♠️\n```\n🔀 Les enseignes défilent…', ms: 450 },
+            { text: '```\n  ♦️  ♣️  ♠️  ♥️\n```\n✨ Une carte est tirée…', ms: 500 },
+            { text: '```\n     ┌───┐\n     │ ? │\n     └───┘\n```\n🎴 Face visible…', ms: 500 },
           ];
         case 'zone':
           return [
-            { text: '🎯 Tirage 1–10…\n**?**', ms: 400 },
-            { text: '🎯 **3** · **7** · **5** · **?**', ms: 450 },
-            { text: '🎯 Le nombre tombe…', ms: 450 },
+            { text: '```\n  [ 1 ][ 2 ][ 3 ][ 4 ][ 5 ]\n  [ 6 ][ 7 ][ 8 ][ 9 ][10 ]\n```\n🎯 Tirage en cours…', ms: 450 },
+            { text: '```\n  [ · ][ · ][ ★ ][ · ][ · ]\n  [ · ][ · ][ · ][ · ][ · ]\n```\n⚡ Le curseur bouge…', ms: 450 },
+            { text: '```\n  [ · ][ · ][ · ][ · ][ · ]\n  [ · ][ ★ ][ · ][ · ][ · ]\n```\n🎲 Ça ralentit…', ms: 500 },
           ];
         case 'plinko':
           return [
-            { text: '🎱 ●\n⬇️\n· · · · · · · · ·', ms: 400 },
-            { text: '🎱\n  ●\n· · · · · · · · ·', ms: 400 },
-            { text: '🎱\n    ●\n· · · · · · · · ·', ms: 400 },
-            { text: '🎱\n      ●\n· · · · · · · · ·', ms: 450 },
+            { text: '```\n        ●\n   ·  ·  ·  ·  ·\n  ·  ·  ·  ·  ·  ·\n ·  ·  ·  ·  ·  ·  ·\n```\n🎱 Lâcher de la bille…', ms: 400 },
+            { text: '```\n\n     ●\n   ·  ·  ·  ·  ·\n  ·  ·  ·  ·  ·  ·\n ·  ·  ·  ·  ·  ·  ·\n```\n↙️ Rebond…', ms: 400 },
+            { text: '```\n\n\n       ●\n  ·  ·  ·  ·  ·  ·\n ·  ·  ·  ·  ·  ·  ·\n```\n↘️ Encore…', ms: 400 },
+            { text: '```\n\n\n\n         ●\n ·  ·  ·  ·  ·  ·  ·\n```\n⬇️ Vers les cases…', ms: 500 },
           ];
         case 'crash':
           return [
-            { text: '🚀 3…', ms: 350 },
-            { text: '🚀 2…', ms: 350 },
-            { text: '🚀 1… Décollage !', ms: 350 },
-            { text: '🚀 x1.2 · x1.5 · x2…', ms: 500 },
-            { text: '🚀 Monte encore…', ms: 450 },
+            { text: '```\n   🚀\n   ║\n   ║\n  ═╩═\n```\n3️⃣ …', ms: 350 },
+            { text: '```\n   🚀\n   ║\n  ═╩═\n```\n2️⃣ …', ms: 350 },
+            { text: '```\n   🚀\n  ═╩═\n```\n1️⃣ Décollage !', ms: 350 },
+            { text: '```\n      🚀 ✦\n     ╱\n    ╱\n   ═\n```\n📈 x1.5 · x2 · x3…', ms: 500 },
+            { text: '```\n         🚀 ✦✦\n        ╱\n       ╱\n      ╱\n```\n🔥 Monte encore…', ms: 550 },
           ];
         case 'scratch':
           return [
-            { text: '🎟️ **[ ░ | ░ | ░ ]**', ms: 400 },
-            { text: '🎟️ **[ ⭐ | ░ | ░ ]**', ms: 400 },
-            { text: '🎟️ **[ ⭐ | 🔔 | ░ ]**', ms: 400 },
-            { text: '🎟️ Dernière case…', ms: 400 },
+            { text: '```\n┌─────┬─────┬─────┐\n│ ░░░ │ ░░░ │ ░░░ │\n└─────┴─────┴─────┘\n```\n🎟️ Tu commences à gratter…', ms: 450 },
+            { text: '```\n┌─────┬─────┬─────┐\n│  ⭐  │ ░░░ │ ░░░ │\n└─────┴─────┴─────┘\n```\n✨ Première case…', ms: 450 },
+            { text: '```\n┌─────┬─────┬─────┐\n│  ⭐  │  🔔  │ ░░░ │\n└─────┴─────┴─────┘\n```\n✨ Deuxième case…', ms: 450 },
+            { text: '```\n┌─────┬─────┬─────┐\n│  ⭐  │  🔔  │  ??  │\n└─────┴─────┴─────┘\n```\n👀 Dernière case…', ms: 500 },
           ];
         case 'die':
           return [
-            { text: `${dieFace(randomInt(1, 7))}  le dé tourne…`, ms: 350 },
-            { text: `${dieFace(randomInt(1, 7))}  · · ·`, ms: 350 },
-            { text: `${dieFace(randomInt(1, 7))}  · · ·`, ms: 350 },
-            { text: `${dieFace(randomInt(1, 7))}  ralentit…`, ms: 400 },
+            { text: `\`\`\`\n   ╭─────╮\n   │  ${d()}  │\n   ╰─────╯\n\`\`\`\n🎲 Le dé tourne…`, ms: 350 },
+            { text: `\`\`\`\n  ╱───────╲\n │    ${d()}    │\n  ╲───────╱\n\`\`\`\n🌀 …`, ms: 350 },
+            { text: `\`\`\`\n   ╭─────╮\n   │  ${d()}  │\n   ╰─────╯\n\`\`\`\n⏳ Ralentit…`, ms: 400 },
+            { text: `\`\`\`\n   ╔═════╗\n   ║  ${d()}  ║\n   ╚═════╝\n\`\`\`\n🎯 Presque…`, ms: 450 },
           ];
         case 'chest':
           return [
-            { text: '📦 📦 📦\nTu hésites…', ms: 450 },
-            { text: '📦✨📦 📦\nTu ouvres…', ms: 550 },
-            { text: '✨ ✨ ✨', ms: 450 },
+            { text: '```\n  📦     📦     📦\n  #1     #2     #3\n```\n👀 Tu observes les coffres…', ms: 450 },
+            { text: '```\n  📦     📦✨    📦\n  #1     #2     #3\n```\n✨ Une lueur…', ms: 500 },
+            { text: '```\n  📦     📦     📦\n   ↑      ↑      ↑\n```\n🔑 Tu fais ton choix…', ms: 500 },
+            { text: '```\n     ╔══════╗\n     ║  ??  ║\n     ╚══════╝\n```\n📤 Ouverture…', ms: 550 },
           ];
         case 'russian':
           return [
-            { text: '🔫 🔄 Barillet…', ms: 500 },
-            { text: '🔫 🔄🔄 Encore…', ms: 500 },
-            { text: '🔫 Détente…', ms: 700 },
+            { text: '```\n    ╭──────╮\n   ╱ ● ● ● ╲\n  │  ● ● ●  │\n   ╲______╱\n```\n🔫 Barillet chargé…', ms: 500 },
+            { text: '```\n    ╭──────╮\n   ╱  ● ●  ╲\n  │ ●  ·  ● │\n   ╲__●___╱\n```\n🔄 Ça tourne…', ms: 550 },
+            { text: '```\n    ╭──────╮\n   ╱ ·  ·  ╲\n  │ ·  ●  · │\n   ╲__·___╱\n```\n😬 Une chambre…', ms: 600 },
+            { text: '```\n      ╭─╮\n      │⚡│\n      ╰─╯\n```\n👆 Détente…', ms: 700 },
           ];
         case 'horses':
           return [
-            { text: '🏇 🏁\n🐎 🐎 🐎 🐎 🐎', ms: 400 },
-            { text: '🏇 💨💨\n🐎🐎 🐎 🐎 🐎', ms: 500 },
-            { text: '🏇 Dernière ligne…\n🐎  🐎🐎  🐎 🐎', ms: 550 },
+            { text: '```\n🏁 1 🐎\n   2 🐎\n   3 🐎\n   4 🐎\n   5 🐎\n```\n📢 Sous les starters…', ms: 450 },
+            { text: '```\n🏁 1  🐎💨\n   2 🐎\n   3  🐎💨\n   4 🐎\n   5   🐎💨\n```\n🚀 Ils s’élancent !', ms: 550 },
+            { text: '```\n🏁 1    🐎💨\n   2   🐎💨\n   3     🐎💨\n   4  🐎💨\n   5    🐎💨\n```\n🔥 Dernière ligne droite…', ms: 600 },
+            { text: '```\n🏁 1      🐎\n   2     🐎\n   3       🐎\n   4    🐎\n   5      🐎\n```\n🏆 Sprint final…', ms: 550 },
           ];
         default:
           return [{ text: G.spinText, ms: 1200 }];
@@ -1706,7 +1755,6 @@ function buildHelpEmbed() {
         `🎁 **Daily** : ${DAILY_AMOUNT} pièces gratuites par jour`,
         `📨 **Invitations** : +${INVITE_REWARD} 🪙 à chaque nouveau membre que tu invites (**${PREFIX}invites** pour ton total)`,
         '💸 **Envoyer** : transfère une partie de ton solde à un autre membre',
-        '🧹 **Nettoyer** : efface le salon casino et reposte le panneau (tout le monde)',
         '📜 **Historique** : tes 15 dernières parties',
         '🔁 À la fin d’une partie, le bouton **Rejouer** relance la même mise.',
         '',
@@ -1726,12 +1774,9 @@ function buildPanelPayload() {
     .setTitle('🎰 Casino')
     .setColor(COLORS.gold)
     .setDescription(
-      'Clique sur **🎮 Jouer** pour ouvrir le menu des jeux, puis choisis ton jeu. Une fenêtre s’ouvre pour régler ta mise.\n\n' +
-        `17 jeux : Mines, Blackjack, Roulette, Pile ou Face, Dés, Machine à sous, Roue, Duel, Enseigne, Zone, Plinko, Crash, Ticket, Dé exact, Coffre, Roulette russe, Chevaux\n` +
-        `🎁 **Daily** : ${DAILY_AMOUNT} pièces gratuites par jour\n` +
-        '💰 **Solde** · 💸 **Envoyer** · 🏆 **Classement** · 👑 **All-time** · 📜 **Historique** · 📨 **Invites**\n' +
-        '🧹 **Nettoyer** : efface les messages du salon et reposte ce panneau (tout le monde)\n\n' +
-        '🔒 Tes parties, ton solde et ton historique ne sont visibles que par toi.'
+      `🎁 **Daily** — récupère **${DAILY_AMOUNT} ${COIN}** gratuits **une fois par jour** (après minuit, heure de Paris).\n` +
+        `Clique sur **Daily** ci-dessous pour les réclamer.\n\n` +
+        `🎮 **Jouer** ouvre le menu des jeux (parties privées).`
     );
   const main = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('panel_play').setLabel('Jouer').setEmoji('🎮').setStyle(ButtonStyle.Success),
@@ -1743,8 +1788,7 @@ function buildPanelPayload() {
     new ButtonBuilder().setCustomId('panel_top').setLabel('Classement').setEmoji('🏆').setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId('panel_topall').setLabel('All-time').setEmoji('👑').setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId('panel_history').setLabel('Historique').setEmoji('📜').setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId('panel_invites').setLabel('Invites').setEmoji('📨').setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId('panel_clean').setLabel('Nettoyer').setEmoji('🧹').setStyle(ButtonStyle.Danger)
+    new ButtonBuilder().setCustomId('panel_invites').setLabel('Invites').setEmoji('📨').setStyle(ButtonStyle.Secondary)
   );
   return { embeds: [panel], components: [main, extra] };
 }
@@ -1881,8 +1925,6 @@ async function handlePanelButton(i) {
         flags: EPH,
       });
     }
-    case 'panel_clean':
-      return cleanCasinoChannel(i);
     default:
       return;
   }
@@ -2497,18 +2539,28 @@ async function handleAdmin(i) {
   }
 
   if (i.isModalSubmit()) {
-    const raw = i.fields.getTextInputValue('amount').trim();
-
+    // Reset soldes (pas de champ "amount")
     if (id === 'modal_admin_reset') {
       const confirm = i.fields.getTextInputValue('confirm')?.trim().toUpperCase();
       if (confirm !== 'RESET') {
         return respondText(i, 'Annulé : tu dois taper **RESET** pour confirmer.');
       }
       try {
-        const { error, count } = await supabase.from('players').update({ balance: 0 }).neq('user_id', '').select('user_id', { count: 'exact' });
+        // PostgREST exige un filtre WHERE : on cible tous les user_id non vides
+        const { data, error } = await supabase
+          .from('players')
+          .update({ balance: 0, updated_at: new Date().toISOString() })
+          .neq('user_id', '__impossible__')
+          .select('user_id');
         if (error) throw error;
+        const count = data?.length ?? 0;
         peaks.clear();
         savePeaksLocal();
+        try {
+          await supabase.from('player_peaks').update({ peak: 0 }).neq('user_id', '__impossible__');
+        } catch {
+          /* optionnel */
+        }
         const casinoId = casinoChannels.get(i.guild.id);
         if (casinoId) {
           const ch = await client.channels.fetch(casinoId).catch(() => null);
@@ -2522,7 +2574,7 @@ async function handleAdmin(i) {
           }).catch(() => {});
         }
         return i.reply({
-          content: `✅ Soldes reset : **${count ?? 'tous les'}** joueur(s) à 0.`,
+          content: `✅ Soldes reset : **${count}** joueur(s) à 0.`,
           flags: EPH,
         });
       } catch (e) {
@@ -2531,12 +2583,21 @@ async function handleAdmin(i) {
       }
     }
 
+    // Boosts (champ "minutes" uniquement)
     const boostM = id.match(/^modal_admin_boost_([a-z0-9]+)$/);
     if (boostM) {
       const kind = boostM[1];
       const mRaw = i.fields.getTextInputValue('minutes')?.trim() || '15';
       const minutes = Math.max(1, Math.min(24 * 60, Math.floor(Number(String(mRaw).replace(',', '.')) || 15)));
       return postBoostEvent(i, kind, minutes);
+    }
+
+    // À partir d'ici les modals ont un champ "amount"
+    let raw;
+    try {
+      raw = i.fields.getTextInputValue('amount').trim();
+    } catch {
+      return respondText(i, 'Formulaire invalide (champ montant manquant).');
     }
 
     const evM = id.match(/^modal_admin_event_(claim|giveaway)$/);
