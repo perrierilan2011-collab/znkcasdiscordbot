@@ -457,6 +457,37 @@ const GAME_NAMES = {
   hilo: '🃏 Hi-Lo',
   bingo: '🅱️ Bingo',
   jackpot: '💎 Jackpot',
+  // 30 nouveaux jeux
+  dicewar: '🎲 Guerre de dés',
+  coinladder: '🪙 Échelle de pièces',
+  cardmatch: '🃏 Match de cartes',
+  numguess: '🔢 Devine le nombre',
+  bombdefuse: '💣 Désamorçage',
+  treasure: '🗺️ Carte au trésor',
+  highcard: '🃏 Carte haute',
+  lowcard: '🃏 Carte basse',
+  pairmatch: '🃏 Paire',
+  freefall: '🪂 Chute libre',
+  balloon: '🎈 Ballon',
+  target: '🎯 Cible',
+  sequence: '🔢 Séquence',
+  animalrace: '🐾 Course d\'animaux',
+  fruitmatch: '🍎 Fruits',
+  gemhunt: '💎 Chasse aux gemmes',
+  stardrop: '⭐ Étoile filante',
+  moonshot: '🌙 Tir lunaire',
+  volcano: '🌋 Volcan',
+  lightning: '⚡ Éclair',
+  pokerhand: '🃏 Poker express',
+  redblack: '🔴 Noir ou Rouge',
+  oddseven: '🔢 Pair ou Impair+',
+  multiplier: '✖️ Multiplicateur',
+  memory: '🧠 Mémoire',
+  colorswipe: '🌈 Arc-en-ciel',
+  rocket2: '🚀 Fusée 2',
+  diceexact2: '🎲 Double dé',
+  chest2: '📦 Triple coffre',
+  spincolor: '🎨 Roue couleur',
 };
 // Nom du jeu sans l'emoji (pour l'image canvas qui n'affiche pas les emojis)
 const gameNamePlain = (g) => (GAME_NAMES[g] ? GAME_NAMES[g].replace(/^\S+\s/, '') : g);
@@ -2415,6 +2446,398 @@ Object.assign(INSTANT, {
       };
     },
   },
+
+  // ========== 30 NOUVEAUX JEUX ==========
+  dicewar: {
+    title: '🎲 Guerre de dés',
+    choices: ['go'],
+    spinText: 'Les dés s\'affrontent...',
+    info: (c) => `victoire ${fx(1.95 * c)}`,
+    picker: (c) => choicePicker('dicewar', '🎲 Guerre de dés', `Ton dé contre celui du croupier. Le plus haut gagne (**${fx(1.95 * c)}**). Égalité = perdu.`, [['go', 'Lancer', '🎲', ButtonStyle.Success]]),
+    resolve() {
+      const me = randomInt(1, 7), dealer = randomInt(1, 7);
+      return { base: me > dealer ? 1.95 : 0, pick: 'Guerre', headline: code(sideBySide([dieLines(me), dieLines(dealer)], '   ')) + `Toi **${me}** · Croupier **${dealer}**`, detail: `${me} vs ${dealer}`, me, dealer };
+    },
+  },
+  coinladder: {
+    title: '🪙 Échelle de pièces',
+    choices: ['s1', 's2', 's3', 's4'],
+    spinText: 'La pièce tourne encore...',
+    info: (c) => `x1.8 à x8`,
+    picker: (c) => choicePicker('coinladder', '🪙 Échelle de pièces', 'Gagne plusieurs pile/face d\'affilée. Plus tu vises haut, plus c\'est risqué.', [['s1', '1 face (x1.8)', '🪙'], ['s2', '2 faces (x3)', '🪙'], ['s3', '3 faces (x5)', '🪙'], ['s4', '4 faces (x8)', '🪙']]),
+    resolve(choice) {
+      const need = Number(choice.slice(1));
+      const mults = [0, 1.8, 3, 5, 8];
+      let streak = 0;
+      const flips = [];
+      for (let k = 0; k < need; k++) {
+        const ok = randomInt(0, 2) === 0;
+        flips.push(ok ? 'P' : 'F');
+        if (ok) streak++;
+        else break;
+      }
+      return { base: streak >= need ? mults[need] : 0, pick: `${need} face(s)`, headline: `Résultats : **${flips.join(' · ')}** (${streak}/${need})`, detail: flips.join(''), streak, need };
+    },
+  },
+  cardmatch: {
+    title: '🃏 Match de cartes',
+    choices: ['go'],
+    spinText: 'Mélange des cartes...',
+    info: (c) => `victoire ${fx(3.8 * c)}`,
+    picker: (c) => choicePicker('cardmatch', '🃏 Match de cartes', `Une carte secrète est tirée parmi 4. Retrouve-la : **${fx(3.8 * c)}**.`, [['go', 'Révéler', '🃏', ButtonStyle.Success]]),
+    resolve() {
+      const cards = shuffle([{ r: 'A', s: '♠' }, { r: 'K', s: '♥' }, { r: 'Q', s: '♦' }, { r: 'J', s: '♣' }]);
+      const secret = cards[0];
+      const pick = cards[randomInt(0, 4)];
+      return { base: pick.r === secret.r && pick.s === secret.s ? 3.8 : 0, pick: 'Match', headline: `Secrète : ${cardStr(secret)} · Tirée : ${cardStr(pick)}`, detail: `${secret.r}${secret.s}`, secret, pickCard: pick };
+    },
+  },
+  numguess: {
+    title: '🔢 Devine le nombre',
+    choices: Array.from({ length: 10 }, (_, i) => `n${i + 1}`),
+    spinText: 'Tirage entre 1 et 10...',
+    info: (c) => `victoire ${fx(9.5 * c)}`,
+    picker: (c) => choicePicker('numguess', '🔢 Devine le nombre (1-10)', `1 chance sur 10 · **${fx(9.5 * c)}**`, Array.from({ length: 10 }, (_, i) => [`n${i + 1}`, String(i + 1), '🔢'])),
+    resolve(choice) {
+      const n = randomInt(1, 11), want = Number(choice.slice(1));
+      return { base: n === want ? 9.5 : 0, pick: `N° ${want}`, headline: `Nombre tiré : **${n}**`, detail: `${want}->${n}`, n, want };
+    },
+  },
+  bombdefuse: {
+    title: '💣 Désamorçage',
+    choices: ['w1', 'w2', 'w3', 'w4'],
+    spinText: 'Le compteur tourne...',
+    info: (c) => `victoire ${fx(3.6 * c)}`,
+    picker: (c) => choicePicker('bombdefuse', '💣 Désamorçage : coupe un fil', `4 fils, 1 seul désamorce. **${fx(3.6 * c)}** si tu trouves le bon.`, [['w1', 'Fil rouge', '🔴'], ['w2', 'Fil bleu', '🔵'], ['w3', 'Fil vert', '🟢'], ['w4', 'Fil jaune', '🟡']]),
+    resolve(choice) {
+      const good = randomInt(1, 5), want = Number(choice.slice(1));
+      return { base: good === want ? 3.6 : 0, pick: `Fil ${want}`, headline: good === want ? '✅ Bombe désamorcée !' : `💥 Mauvais fil (c\'était le n°${good})`, detail: `${want}->${good}`, good, want };
+    },
+  },
+  treasure: {
+    title: '🗺️ Carte au trésor',
+    choices: ['c1', 'c2', 'c3', 'c4', 'c5'],
+    spinText: 'Tu creuses...',
+    info: (c) => `victoire ${fx(4.5 * c)}`,
+    picker: (c) => choicePicker('treasure', '🗺️ Carte au trésor', `5 cases, 1 trésor. **${fx(4.5 * c)}**`, [1, 2, 3, 4, 5].map((n) => [`c${n}`, `Case ${n}`, '🗺️'])),
+    resolve(choice) {
+      const win = randomInt(1, 6), want = Number(choice.slice(1));
+      return { base: win === want ? 4.5 : 0, pick: `Case ${want}`, headline: `Trésor en case **${win}**`, detail: `${want}->${win}`, win, want };
+    },
+  },
+  highcard: {
+    title: '🃏 Carte haute',
+    choices: ['go'],
+    spinText: 'Tirage de la carte...',
+    info: (c) => `≥ 8 → ${fx(1.9 * c)}`,
+    picker: (c) => choicePicker('highcard', '🃏 Carte haute', `Carte ≥ 8 (8,9,10,J,Q,K) gagne **${fx(1.9 * c)}**. As = 1.`, [['go', 'Tirer', '🃏', ButtonStyle.Success]]),
+    resolve() {
+      const v = randomInt(1, 14);
+      const ranks = ['', 'A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+      return { base: v >= 8 ? 1.9 : 0, pick: 'Haute', headline: `Carte : **${ranks[v]}**`, detail: ranks[v], v };
+    },
+  },
+  lowcard: {
+    title: '🃏 Carte basse',
+    choices: ['go'],
+    spinText: 'Tirage de la carte...',
+    info: (c) => `≤ 7 → ${fx(1.9 * c)}`,
+    picker: (c) => choicePicker('lowcard', '🃏 Carte basse', `Carte ≤ 7 gagne **${fx(1.9 * c)}**. As = 1.`, [['go', 'Tirer', '🃏', ButtonStyle.Success]]),
+    resolve() {
+      const v = randomInt(1, 14);
+      const ranks = ['', 'A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+      return { base: v <= 7 ? 1.9 : 0, pick: 'Basse', headline: `Carte : **${ranks[v]}**`, detail: ranks[v], v };
+    },
+  },
+  pairmatch: {
+    title: '🃏 Paire',
+    choices: ['go'],
+    spinText: 'Deux cartes...',
+    info: (c) => `paire ${fx(5.5 * c)}`,
+    picker: (c) => choicePicker('pairmatch', '🃏 Paire', `Deux cartes. Même rang = **${fx(5.5 * c)}**.`, [['go', 'Tirer', '🃏', ButtonStyle.Success]]),
+    resolve() {
+      const a = randomInt(1, 14), b = randomInt(1, 14);
+      const ranks = ['', 'A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+      return { base: a === b ? 5.5 : 0, pick: 'Paire', headline: `**${ranks[a]}** · **${ranks[b]}**`, detail: `${ranks[a]}-${ranks[b]}`, a, b };
+    },
+  },
+  freefall: {
+    title: '🪂 Chute libre',
+    choices: ['safe', 'mid', 'risk'],
+    spinText: 'Tu sautes...',
+    info: (c) => `x1.5 / x2.5 / x5`,
+    picker: (c) => choicePicker('freefall', '🪂 Chute libre', 'Choisis ta zone d\'atterrissage.', [['safe', 'Zone sûre (x1.5)', '🟢'], ['mid', 'Zone moyenne (x2.5)', '🟡'], ['risk', 'Zone risquée (x5)', '🔴']]),
+    resolve(choice) {
+      const zones = { safe: { mult: 1.5, p: 0.65 }, mid: { mult: 2.5, p: 0.38 }, risk: { mult: 5, p: 0.18 } };
+      const z = zones[choice];
+      const ok = Math.random() < z.p;
+      return { base: ok ? z.mult : 0, pick: choice, headline: ok ? '✅ Atterrissage parfait !' : '💥 Tu rates la zone...', detail: choice, ok };
+    },
+  },
+  balloon: {
+    title: '🎈 Ballon',
+    choices: ['s1', 's2', 's3', 's4', 's5'],
+    spinText: 'Le ballon gonfle...',
+    info: (c) => `x1.4 à x7`,
+    picker: (c) => choicePicker('balloon', '🎈 Ballon', 'Gonfle le ballon. Plus tu vas loin, plus tu gagnes — mais il peut éclater.', [['s1', 'Niveau 1 (x1.4)', '🎈'], ['s2', 'Niveau 2 (x2)', '🎈'], ['s3', 'Niveau 3 (x3)', '🎈'], ['s4', 'Niveau 4 (x4.5)', '🎈'], ['s5', 'Niveau 5 (x7)', '🎈']]),
+    resolve(choice) {
+      const need = Number(choice.slice(1));
+      const mults = [0, 1.4, 2, 3, 4.5, 7];
+      const probs = [0, 0.8, 0.6, 0.42, 0.28, 0.15];
+      const ok = Math.random() < probs[need];
+      return { base: ok ? mults[need] : 0, pick: `Niv. ${need}`, headline: ok ? `🎈 Ballon intact au niveau ${need} !` : `💥 Le ballon a éclaté au niveau ${need}`, detail: `${need}:${ok}`, need, ok };
+    },
+  },
+  target: {
+    title: '🎯 Cible',
+    choices: ['center', 'inner', 'outer'],
+    spinText: 'La fléchette vole...',
+    info: (c) => `centre ${fx(5 * c)} · intérieur ${fx(2.5 * c)} · extérieur ${fx(1.5 * c)}`,
+    picker: (c) => choicePicker('target', '🎯 Cible', 'Vise le centre, l\'intérieur ou l\'extérieur.', [['center', 'Centre (x5)', '🔴'], ['inner', 'Intérieur (x2.5)', '🟡'], ['outer', 'Extérieur (x1.5)', '🟢']]),
+    resolve(choice) {
+      const r = Math.random();
+      const hit = r < 0.12 ? 'center' : r < 0.4 ? 'inner' : 'outer';
+      const mults = { center: 5, inner: 2.5, outer: 1.5 };
+      return { base: hit === choice ? mults[choice] : 0, pick: choice, headline: `Impact : **${hit}**`, detail: `${choice}->${hit}`, hit };
+    },
+  },
+  sequence: {
+    title: '🔢 Séquence',
+    choices: ['go'],
+    spinText: 'Suite de 3 chiffres...',
+    info: (c) => `suite ${fx(6 * c)}`,
+    picker: (c) => choicePicker('sequence', '🔢 Séquence', `3 chiffres. S\'ils forment une suite (ex 3-4-5), **${fx(6 * c)}**.`, [['go', 'Tirer', '🔢', ButtonStyle.Success]]),
+    resolve() {
+      const a = randomInt(1, 9), b = randomInt(1, 9), c = randomInt(1, 9);
+      const sorted = [a, b, c].sort((x, y) => x - y);
+      const ok = sorted[1] === sorted[0] + 1 && sorted[2] === sorted[1] + 1;
+      return { base: ok ? 6 : 0, pick: 'Séquence', headline: `**${a} · ${b} · ${c}**${ok ? ' · SUITE !' : ''}`, detail: `${a}-${b}-${c}`, a, b, c, ok };
+    },
+  },
+  animalrace: {
+    title: '🐾 Course d\'animaux',
+    choices: ['a1', 'a2', 'a3', 'a4'],
+    spinText: 'Les animaux s\'élancent...',
+    info: (c) => `x2 à x6`,
+    picker: (c) => choicePicker('animalrace', '🐾 Course d\'animaux', 'Parie sur un animal.', [['a1', 'Lapin (x2)', '🐰'], ['a2', 'Renard (x3)', '🦊'], ['a3', 'Loup (x4)', '🐺'], ['a4', 'Aigle (x6)', '🦅']]),
+    resolve(choice) {
+      const animals = [{ id: 'a1', name: 'Lapin', mult: 2, p: 0.42 }, { id: 'a2', name: 'Renard', mult: 3, p: 0.28 }, { id: 'a3', name: 'Loup', mult: 4, p: 0.18 }, { id: 'a4', name: 'Aigle', mult: 6, p: 0.12 }];
+      let r = Math.random(), winner = animals[animals.length - 1];
+      for (const a of animals) { if (r < a.p) { winner = a; break; } r -= a.p; }
+      const want = animals.find((a) => a.id === choice);
+      return { base: winner.id === choice ? want.mult : 0, pick: want.name, headline: `🏆 Gagnant : **${winner.name}**`, detail: `${choice}->${winner.id}`, winner };
+    },
+  },
+  fruitmatch: {
+    title: '🍎 Fruits',
+    choices: ['go'],
+    spinText: 'Les fruits tournent...',
+    info: (c) => `3 identiques ${fx(12 * c)} · 2 ${fx(2.5 * c)}`,
+    picker: (c) => choicePicker('fruitmatch', '🍎 Fruits', `3 fruits. 3 identiques = **${fx(12 * c)}**, 2 = **${fx(2.5 * c)}**.`, [['go', 'Lancer', '🍎', ButtonStyle.Success]]),
+    resolve() {
+      const fruits = ['🍎', '🍌', '🍇', '🍊', '🍓'];
+      const a = fruits[randomInt(0, 5)], b = fruits[randomInt(0, 5)], c = fruits[randomInt(0, 5)];
+      let base = 0;
+      if (a === b && b === c) base = 12;
+      else if (a === b || b === c || a === c) base = 2.5;
+      return { base, pick: 'Fruits', headline: `**[ ${a} | ${b} | ${c} ]**`, detail: `${a}${b}${c}`, a, b, c };
+    },
+  },
+  gemhunt: {
+    title: '💎 Chasse aux gemmes',
+    choices: ['g1', 'g2', 'g3', 'g4', 'g5', 'g6'],
+    spinText: 'Tu fouilles...',
+    info: (c) => `victoire ${fx(5.5 * c)}`,
+    picker: (c) => choicePicker('gemhunt', '💎 Chasse aux gemmes', `6 roches, 1 gemme. **${fx(5.5 * c)}**`, [1, 2, 3, 4, 5, 6].map((n) => [`g${n}`, `Roche ${n}`, '🪨'])),
+    resolve(choice) {
+      const win = randomInt(1, 7), want = Number(choice.slice(1));
+      return { base: win === want ? 5.5 : 0, pick: `Roche ${want}`, headline: win === want ? '💎 Gemme trouvée !' : `Rien dans la roche ${want} (c\'était la n°${win})`, detail: `${want}->${win}`, win, want };
+    },
+  },
+  stardrop: {
+    title: '⭐ Étoile filante',
+    choices: ['catch', 'miss'],
+    spinText: 'L\'étoile traverse le ciel...',
+    info: (c) => `attraper ${fx(2.2 * c)}`,
+    picker: (c) => choicePicker('stardrop', '⭐ Étoile filante', `Essaie d\'attraper l\'étoile (**${fx(2.2 * c)}**) ou laisse passer (mise remboursée si elle passe vraiment).`, [['catch', 'Attraper', '⭐'], ['miss', 'Laisser passer', '🌑']]),
+    resolve(choice) {
+      const falls = Math.random() < 0.55;
+      if (choice === 'catch') return { base: falls ? 2.2 : 0, pick: 'Attraper', headline: falls ? '⭐ Tu l\'as eue !' : 'Elle est passée trop vite...', detail: 'catch', falls };
+      return { base: falls ? 0 : 1, pick: 'Laisser', headline: falls ? '⭐ Elle est tombée (tu l\'as ratée)' : 'Elle a continué sa route, mise rendue.', detail: 'miss', falls };
+    },
+  },
+  moonshot: {
+    title: '🌙 Tir lunaire',
+    choices: ['x2', 'x4', 'x8'],
+    spinText: 'La fusée décolle vers la lune...',
+    info: (c) => `x2 / x4 / x8`,
+    picker: (c) => choicePicker('moonshot', '🌙 Tir lunaire', 'Atteins la distance choisie.', [['x2', 'Orbite (x2)', '🌍'], ['x4', 'Lune (x4)', '🌙'], ['x8', 'Au-delà (x8)', '🚀']]),
+    resolve(choice) {
+      const targets = { x2: 2, x4: 4, x8: 8 };
+      const probs = { x2: 0.48, x4: 0.24, x8: 0.11 };
+      const t = targets[choice];
+      const ok = Math.random() < probs[choice];
+      return { base: ok ? t : 0, pick: choice, headline: ok ? `🌙 Distance ${choice} atteinte !` : `💥 Échec avant ${choice}`, detail: choice, ok };
+    },
+  },
+  volcano: {
+    title: '🌋 Volcan',
+    choices: ['close', 'mid', 'far'],
+    spinText: 'Le volcan gronde...',
+    info: (c) => `proche ${fx(4 * c)} · moyen ${fx(2.2 * c)} · loin ${fx(1.4 * c)}`,
+    picker: (c) => choicePicker('volcano', '🌋 Volcan', 'Où te places-tu ? Plus près = plus risqué.', [['close', 'Proche (x4)', '🔴'], ['mid', 'Moyen (x2.2)', '🟡'], ['far', 'Loin (x1.4)', '🟢']]),
+    resolve(choice) {
+      const r = Math.random();
+      const eruption = r < 0.35 ? 'close' : r < 0.7 ? 'mid' : 'far';
+      // tu gagnes si tu n'es PAS dans la zone d'éruption... non: on gagne si on a deviné la zone
+      const mults = { close: 4, mid: 2.2, far: 1.4 };
+      return { base: eruption === choice ? mults[choice] : 0, pick: choice, headline: `Éruption zone **${eruption}**`, detail: `${choice}->${eruption}`, eruption };
+    },
+  },
+  lightning: {
+    title: '⚡ Éclair',
+    choices: ['stay', 'run'],
+    spinText: 'L\'orage arrive...',
+    info: (c) => `rester ${fx(2.5 * c)} · fuir (remboursé si éclair)`,
+    picker: (c) => choicePicker('lightning', '⚡ Éclair', 'Rester sous l\'orage (**${fx(2.5 * c)}** si tu survis) ou fuir.', [['stay', 'Rester', '⚡'], ['run', 'Fuir', '🏃']]),
+    resolve(choice) {
+      const strike = Math.random() < 0.4;
+      if (choice === 'stay') return { base: strike ? 0 : 2.5, pick: 'Rester', headline: strike ? '⚡ Foudroyé !' : 'Tu as survécu à l\'orage !', detail: 'stay', strike };
+      return { base: strike ? 1 : 0, pick: 'Fuir', headline: strike ? 'Tu as bien fait de fuir (mise rendue).' : 'Pas d\'éclair... tu as fui pour rien.', detail: 'run', strike };
+    },
+  },
+  pokerhand: {
+    title: '🃏 Poker express',
+    choices: ['go'],
+    spinText: 'Distribution...',
+    info: (c) => `paire+ ${fx(2 * c)} · brelan ${fx(8 * c)}`,
+    picker: (c) => choicePicker('pokerhand', '🃏 Poker express', `3 cartes. Paire = **${fx(2 * c)}**, brelan = **${fx(8 * c)}**.`, [['go', 'Distribuer', '🃏', ButtonStyle.Success]]),
+    resolve() {
+      const ranks = [randomInt(1, 14), randomInt(1, 14), randomInt(1, 14)];
+      const names = ['', 'A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+      const counts = {};
+      for (const r of ranks) counts[r] = (counts[r] || 0) + 1;
+      const max = Math.max(...Object.values(counts));
+      let base = 0;
+      if (max >= 3) base = 8;
+      else if (max >= 2) base = 2;
+      return { base, pick: 'Poker', headline: `**${ranks.map((r) => names[r]).join(' · ')}**${max >= 3 ? ' · BRELAN !' : max >= 2 ? ' · Paire' : ''}`, detail: ranks.join('-'), ranks, max };
+    },
+  },
+  redblack: {
+    title: '🔴 Noir ou Rouge',
+    choices: ['red', 'black'],
+    spinText: 'La carte se retourne...',
+    info: (c) => `victoire ${fx(1.95 * c)}`,
+    picker: (c) => choicePicker('redblack', '🔴 Noir ou Rouge', `Devine la couleur. **${fx(1.95 * c)}**.`, [['red', 'Rouge', '🔴'], ['black', 'Noir', '⚫']]),
+    resolve(choice) {
+      const col = randomInt(0, 2) === 0 ? 'red' : 'black';
+      return { base: col === choice ? 1.95 : 0, pick: choice === 'red' ? 'Rouge' : 'Noir', headline: `Couleur : **${col === 'red' ? '🔴 Rouge' : '⚫ Noir'}**`, detail: `${choice}->${col}`, col };
+    },
+  },
+  oddseven: {
+    title: '🔢 Pair ou Impair+',
+    choices: ['even', 'odd'],
+    spinText: 'Le dé roule...',
+    info: (c) => `victoire ${fx(1.95 * c)}`,
+    picker: (c) => choicePicker('oddseven', '🔢 Pair ou Impair', `Un dé. Pair ou impair : **${fx(1.95 * c)}**.`, [['even', 'Pair', '🔵'], ['odd', 'Impair', '🔴']]),
+    resolve(choice) {
+      const n = randomInt(1, 7);
+      const isEven = n % 2 === 0;
+      const ok = (choice === 'even' && isEven) || (choice === 'odd' && !isEven);
+      return { base: ok ? 1.95 : 0, pick: choice === 'even' ? 'Pair' : 'Impair', headline: code(dieLines(n)) + `**${n}** (${isEven ? 'pair' : 'impair'})`, detail: `${choice}->${n}`, n };
+    },
+  },
+  multiplier: {
+    title: '✖️ Multiplicateur',
+    choices: ['m15', 'm2', 'm3', 'm5'],
+    spinText: 'Le multiplicateur tourne...',
+    info: (c) => `x1.5 à x5`,
+    picker: (c) => choicePicker('multiplier', '✖️ Multiplicateur', 'Choisis ta cible. Un tirage aléatoire décide.', [['m15', 'x1.5', '✖️'], ['m2', 'x2', '✖️'], ['m3', 'x3', '✖️'], ['m5', 'x5', '✖️']]),
+    resolve(choice) {
+      const targets = { m15: 1.5, m2: 2, m3: 3, m5: 5 };
+      const probs = { m15: 0.62, m2: 0.45, m3: 0.3, m5: 0.18 };
+      const t = targets[choice];
+      const ok = Math.random() < probs[choice];
+      return { base: ok ? t : 0, pick: `x${t}`, headline: ok ? `✅ Multiplicateur x${t} validé !` : `❌ Pas cette fois (cible x${t})`, detail: choice, ok };
+    },
+  },
+  memory: {
+    title: '🧠 Mémoire',
+    choices: ['go'],
+    spinText: 'Les cartes se retournent...',
+    info: (c) => `paire ${fx(3.5 * c)}`,
+    picker: (c) => choicePicker('memory', '🧠 Mémoire', `4 cartes face cachée, 2 paires. Tu en retournes 2 : si paire **${fx(3.5 * c)}**.`, [['go', 'Retourner', '🧠', ButtonStyle.Success]]),
+    resolve() {
+      const vals = shuffle([1, 1, 2, 2]);
+      const i1 = randomInt(0, 4), i2 = (i1 + 1 + randomInt(0, 3)) % 4;
+      const ok = vals[i1] === vals[i2];
+      return { base: ok ? 3.5 : 0, pick: 'Mémoire', headline: `Cartes retournées : **${vals[i1]}** et **${vals[i2]}**${ok ? ' · Paire !' : ''}`, detail: `${vals[i1]}-${vals[i2]}`, ok };
+    },
+  },
+  colorswipe: {
+    title: '🌈 Arc-en-ciel',
+    choices: ['red', 'orange', 'yellow', 'green', 'blue', 'purple'],
+    spinText: 'L\'arc-en-ciel tourne...',
+    info: (c) => `victoire ${fx(5.5 * c)}`,
+    picker: (c) => choicePicker('colorswipe', '🌈 Arc-en-ciel', `6 couleurs. **${fx(5.5 * c)}**.`, [['red', 'Rouge', '🔴'], ['orange', 'Orange', '🟠'], ['yellow', 'Jaune', '🟡'], ['green', 'Vert', '🟢'], ['blue', 'Bleu', '🔵'], ['purple', 'Violet', '🟣']]),
+    resolve(choice) {
+      const cols = ['red', 'orange', 'yellow', 'green', 'blue', 'purple'];
+      const em = { red: '🔴', orange: '🟠', yellow: '🟡', green: '🟢', blue: '🔵', purple: '🟣' };
+      const out = cols[randomInt(0, 6)];
+      return { base: out === choice ? 5.5 : 0, pick: choice, headline: `Couleur : **${em[out]}**`, detail: `${choice}->${out}`, out };
+    },
+  },
+  rocket2: {
+    title: '🚀 Fusée 2',
+    choices: ['x2', 'x5', 'x10', 'x20'],
+    spinText: 'Décollage...',
+    info: (c) => `x2 à x20`,
+    picker: (c) => choicePicker('rocket2', '🚀 Fusée 2', 'Choisis ta cible de multiplicateur.', [['x2', 'x2', '🚀'], ['x5', 'x5', '🚀'], ['x10', 'x10', '🚀'], ['x20', 'x20', '🚀']]),
+    resolve(choice) {
+      const targets = { x2: 2, x5: 5, x10: 10, x20: 20 };
+      const u = randomInt(1, 1_000_001) / 1_000_000;
+      const peak = Math.max(1, Math.floor((0.96 / u) * 100) / 100);
+      const t = targets[choice];
+      return { base: peak >= t ? t : 0, pick: choice, headline: `Pic **${fx(Math.min(peak, 500))}** · cible ${choice}`, detail: `${choice}/${peak}`, peak, t };
+    },
+  },
+  diceexact2: {
+    title: '🎲 Double dé',
+    choices: ['s7', 's8', 's9', 's10', 's11', 's12'],
+    spinText: 'Deux dés roulent...',
+    info: (c) => `somme exacte ${fx(6 * c)}`,
+    picker: (c) => choicePicker('diceexact2', '🎲 Double dé : somme exacte', `Devine la somme (7 à 12). **${fx(6 * c)}**.`, [7, 8, 9, 10, 11, 12].map((n) => [`s${n}`, String(n), '🎲'])),
+    resolve(choice) {
+      const a = randomInt(1, 7), b = randomInt(1, 7), sum = a + b, want = Number(choice.slice(1));
+      return { base: sum === want ? 6 : 0, pick: `Somme ${want}`, headline: code(sideBySide([dieLines(a), dieLines(b)], '   ')) + `**${a}+${b}=${sum}**`, detail: `${want}->${sum}`, a, b, sum };
+    },
+  },
+  chest2: {
+    title: '📦 Triple coffre',
+    choices: ['c1', 'c2', 'c3'],
+    spinText: 'Ouverture...',
+    info: (c) => `victoire ${fx(2.85 * c)}`,
+    picker: (c) => choicePicker('chest2', '📦 Triple coffre', `1 trésor sur 3. **${fx(2.85 * c)}**.`, [['c1', 'Coffre 1', '📦'], ['c2', 'Coffre 2', '📦'], ['c3', 'Coffre 3', '📦']]),
+    resolve(choice) {
+      const win = randomInt(1, 4), want = Number(choice.slice(1));
+      const view = [1, 2, 3].map((k) => (k === win ? '💎' : '💨')).join('  ');
+      return { base: win === want ? 2.85 : 0, pick: `Coffre ${want}`, headline: `Contenu : ${view}`, detail: `${want}->${win}`, win, want };
+    },
+  },
+  spincolor: {
+    title: '🎨 Roue couleur',
+    choices: ['red', 'blue', 'green', 'yellow', 'purple', 'orange'],
+    spinText: 'La roue tourne...',
+    info: (c) => `victoire ${fx(5.5 * c)}`,
+    picker: (c) => choicePicker('spincolor', '🎨 Roue couleur', `6 segments. **${fx(5.5 * c)}**.`, [['red', 'Rouge', '🔴'], ['blue', 'Bleu', '🔵'], ['green', 'Vert', '🟢'], ['yellow', 'Jaune', '🟡'], ['purple', 'Violet', '🟣'], ['orange', 'Orange', '🟠']]),
+    resolve(choice) {
+      const cols = ['red', 'blue', 'green', 'yellow', 'purple', 'orange'];
+      const em = { red: '🔴', blue: '🔵', green: '🟢', yellow: '🟡', purple: '🟣', orange: '🟠' };
+      const out = cols[randomInt(0, 6)];
+      return { base: out === choice ? 5.5 : 0, pick: choice, headline: `La roue s'arrête sur **${em[out]}**`, detail: `${choice}->${out}`, out };
+    },
+  },
 });
 
 // ============================================================
@@ -2882,6 +3305,217 @@ ANIMS.jackpot = (res) => {
   return frames;
 };
 
+// Animations des 30 nouveaux jeux
+ANIMS.dicewar = (res) => {
+  const r = () => randomInt(1, 7);
+  return [
+    { art: code(sideBySide([dieLines(r()), dieLines(r())], '   ')), caption: 'Les dés roulent', ms: 700 },
+    { art: code(sideBySide([dieLines(r()), dieLines(r())], '   ')), caption: 'Rebond', ms: 700 },
+    { art: code(sideBySide([dieLines(res.me), dieLines(r())], '   ')), caption: `Ton dé : ${res.me}`, ms: 900 },
+    { art: code(sideBySide([dieLines(res.me), dieLines(res.dealer)], '   ')), caption: `Croupier : ${res.dealer}`, ms: 1100 },
+  ];
+};
+ANIMS.coinladder = (res) => {
+  const frames = [{ art: code(['  Pièce prête...']), caption: 'Début de l\'échelle', ms: 700 }];
+  const flips = (res.detail || '').split('');
+  flips.forEach((f, k) => {
+    frames.push({ art: code([`  ${f === 'P' ? 'PILE' : 'FACE'}`, '', `  Série : ${k + 1}/${res.need}`]), caption: f === 'P' ? 'Pile !' : 'Face...', ms: 800 });
+  });
+  frames.push({ art: code([`  Résultat : ${flips.join(' · ')}`]), caption: res.streak >= res.need ? 'Échelle réussie !' : 'Échelle cassée', ms: 1100 });
+  return frames;
+};
+ANIMS.cardmatch = (res) => [
+  { art: code(['  [?] [?] [?] [?]']), caption: 'Cartes mélangées', ms: 800 },
+  { art: code(['  Les cartes se mélangent...']), caption: 'Mélange', ms: 900 },
+  { art: code([`  Secrète révélée : ${res.secret.r}${res.secret.s}`]), caption: 'Carte secrète', ms: 1000 },
+  { art: code([`  Tirée : ${res.pickCard.r}${res.pickCard.s}`]), caption: 'Ta carte', ms: 1100 },
+];
+ANIMS.numguess = (res) => {
+  const frames = [];
+  for (let k = 0; k < 6; k++) frames.push({ art: code([`  [ ${randomInt(1, 11)} ]`]), caption: 'Les nombres défilent', ms: 550 });
+  frames.push({ art: code([`  [ ${res.n} ]`]), caption: `Tirage : ${res.n}`, ms: 1100 });
+  return frames;
+};
+ANIMS.bombdefuse = (res) => [
+  { art: code(['  💣  3...']), caption: 'Compte à rebours', ms: 800 },
+  { art: code(['  💣  2...']), caption: 'Compte à rebours', ms: 800 },
+  { art: code(['  💣  1...']), caption: 'Compte à rebours', ms: 800 },
+  { art: code([res.good === res.want ? '  ✅ Désamorcé' : '  💥 BOOM']), caption: res.good === res.want ? 'Bon fil !' : `Mauvais fil (bon = ${res.good})`, ms: 1200 },
+];
+ANIMS.treasure = (res) => {
+  const frames = [];
+  for (let k = 1; k <= 5; k++) {
+    frames.push({ art: code([`  Case ${k} : ${k === res.win ? '💎' : '🕳️'}`]), caption: 'Fouille', ms: 600 });
+  }
+  frames.push({ art: code([`  Trésor en case ${res.win}`]), caption: 'Résultat', ms: 1100 });
+  return frames;
+};
+ANIMS.highcard = (res) => {
+  const ranks = ['', 'A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+  return [
+    { art: code(['  [?]']), caption: 'Carte face cachée', ms: 800 },
+    { art: code(['  [...]']), caption: 'Retournement...', ms: 900 },
+    { art: code([`  [${ranks[res.v]}]`]), caption: `Carte : ${ranks[res.v]}`, ms: 1100 },
+  ];
+};
+ANIMS.lowcard = ANIMS.highcard;
+ANIMS.pairmatch = (res) => {
+  const ranks = ['', 'A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+  return [
+    { art: code(['  [?]  [?]' ]), caption: 'Deux cartes', ms: 800 },
+    { art: code([`  [${ranks[res.a]}]  [?]`]), caption: 'Première carte', ms: 900 },
+    { art: code([`  [${ranks[res.a]}]  [${ranks[res.b]}]`]), caption: 'Deuxième carte', ms: 1100 },
+  ];
+};
+ANIMS.freefall = (res) => [
+  { art: code(['  🪂', '  |', '  |', '  v']), caption: 'Saut !', ms: 800 },
+  { art: code(['  🪂', '  |', '  v']), caption: 'Chute...', ms: 800 },
+  { art: code(['  🪂', '  v']), caption: 'Approche du sol', ms: 800 },
+  { art: code([res.ok ? '  ✅ Atterri' : '  💥 Crash']), caption: res.ok ? 'Zone atteinte' : 'Raté', ms: 1100 },
+];
+ANIMS.balloon = (res) => {
+  const frames = [];
+  for (let k = 1; k <= res.need; k++) {
+    frames.push({ art: code([`  ${'O'.repeat(k + 2)}`, `  Niveau ${k}`]), caption: 'Gonflage...', ms: 700 });
+  }
+  frames.push({ art: code([res.ok ? '  🎈 Intact' : '  💥 Éclaté']), caption: res.ok ? 'Succès' : 'Trop gonflé', ms: 1100 });
+  return frames;
+};
+ANIMS.target = (res) => [
+  { art: code(['  →']), caption: 'Visée', ms: 700 },
+  { art: code(['    →']), caption: 'Lancer', ms: 700 },
+  { art: code(['      →']), caption: 'Vol', ms: 700 },
+  { art: code([`  Impact : ${res.hit}`]), caption: 'Résultat', ms: 1100 },
+];
+ANIMS.sequence = (res) => [
+  { art: code([`  ${res.a}  ?  ?`]), caption: 'Premier chiffre', ms: 800 },
+  { art: code([`  ${res.a}  ${res.b}  ?`]), caption: 'Deuxième', ms: 800 },
+  { art: code([`  ${res.a}  ${res.b}  ${res.c}`]), caption: res.ok ? 'SUITE !' : 'Pas de suite', ms: 1100 },
+];
+ANIMS.animalrace = (res) => {
+  const names = { a1: '🐰', a2: '🦊', a3: '🐺', a4: '🦅' };
+  const frames = [];
+  for (let k = 0; k < 5; k++) {
+    frames.push({ art: code(Object.values(names).map((e, i) => `${e} ${'.'.repeat(randomInt(1, 8))}`)), caption: 'Course en cours', ms: 700 });
+  }
+  frames.push({ art: code([`  Gagnant : ${res.winner.name}`]), caption: 'Arrivée', ms: 1200 });
+  return frames;
+};
+ANIMS.fruitmatch = (res) => {
+  const fruits = ['🍎', '🍌', '🍇', '🍊', '🍓'];
+  const frames = [];
+  for (let k = 0; k < 5; k++) {
+    frames.push({ art: code([`  [ ${fruits[randomInt(0, 5)]} | ${fruits[randomInt(0, 5)]} | ${fruits[randomInt(0, 5)]} ]`]), caption: 'Rouleaux', ms: 650 });
+  }
+  frames.push({ art: code([`  [ ${res.a} | ${res.b} | ${res.c} ]`]), caption: 'Résultat', ms: 1100 });
+  return frames;
+};
+ANIMS.gemhunt = (res) => {
+  const frames = [];
+  for (let k = 1; k <= 6; k++) {
+    frames.push({ art: code([`  Roche ${k} ${k === res.win ? '💎' : '🪨'}`]), caption: 'Fouille', ms: 550 });
+  }
+  frames.push({ art: code([`  Gemme en roche ${res.win}`]), caption: 'Trouvée', ms: 1100 });
+  return frames;
+};
+ANIMS.stardrop = (res) => [
+  { art: code(['  ⭐', '    \\', '     \\']), caption: 'Étoile filante', ms: 800 },
+  { art: code(['     ⭐', '    /', '   /']), caption: 'Elle traverse', ms: 800 },
+  { art: code([res.falls ? '  ⭐ au sol' : '  ⭐ disparue']), caption: res.falls ? 'Elle est tombée' : 'Elle continue', ms: 1100 },
+];
+ANIMS.moonshot = (res) => [
+  { art: code(['  🚀', '  |', '  |']), caption: 'Décollage', ms: 800 },
+  { art: code(['  🚀', '  |']), caption: 'Montée', ms: 800 },
+  { art: code(['  🚀']), caption: 'Espace', ms: 800 },
+  { art: code([res.ok ? '  🌙 Objectif atteint' : '  💥 Échec']), caption: res.ok ? 'Succès' : 'Retour', ms: 1100 },
+];
+ANIMS.volcano = (res) => [
+  { art: code(['  🌋', '  ~ ~']), caption: 'Le volcan gronde', ms: 800 },
+  { art: code(['  🌋', '  ~~~']), caption: 'Ça chauffe', ms: 800 },
+  { art: code(['  🌋💥', '  ~~~~']), caption: `Éruption zone ${res.eruption}`, ms: 1100 },
+];
+ANIMS.lightning = (res) => [
+  { art: code(['  ☁️ ☁️', '   ~']), caption: 'Nuages', ms: 800 },
+  { art: code(['  ☁️☁️☁️', '  ~ ~']), caption: 'Orage proche', ms: 800 },
+  { art: code([res.strike ? '  ⚡ BOOM' : '  ☁️ ...']), caption: res.strike ? 'Éclair !' : 'L\'orage passe', ms: 1100 },
+];
+ANIMS.pokerhand = (res) => {
+  const names = ['', 'A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+  return [
+    { art: code(['  [?] [?] [?]' ]), caption: 'Distribution', ms: 800 },
+    { art: code([`  [${names[res.ranks[0]]}] [?] [?]`]), caption: 'Carte 1', ms: 800 },
+    { art: code([`  [${names[res.ranks[0]]}] [${names[res.ranks[1]]}] [?]`]), caption: 'Carte 2', ms: 800 },
+    { art: code([`  [${names[res.ranks[0]]}] [${names[res.ranks[1]]}] [${names[res.ranks[2]]}]`]), caption: res.max >= 3 ? 'Brelan !' : res.max >= 2 ? 'Paire' : 'Rien', ms: 1100 },
+  ];
+};
+ANIMS.redblack = (res) => [
+  { art: code(['  [?]']), caption: 'Carte cachée', ms: 800 },
+  { art: code(['  [...]']), caption: 'Retournement', ms: 900 },
+  { art: code([`  ${res.col === 'red' ? '🔴 ROUGE' : '⚫ NOIR'}`]), caption: 'Couleur', ms: 1100 },
+];
+ANIMS.oddseven = (res) => {
+  const r = () => randomInt(1, 7);
+  return [
+    { art: code(dieLines(r())), caption: 'Le dé roule', ms: 700 },
+    { art: code(dieLines(r())), caption: 'Rebond', ms: 700 },
+    { art: code(dieLines(res.n)), caption: `Résultat : ${res.n}`, ms: 1100 },
+  ];
+};
+ANIMS.multiplier = (res) => {
+  const frames = [];
+  for (let k = 0; k < 6; k++) {
+    const m = [1.5, 2, 3, 5][randomInt(0, 4)];
+    frames.push({ art: code([`  x${m}`]), caption: 'Multiplicateurs', ms: 600 });
+  }
+  frames.push({ art: code([`  Cible ${res.pick}`]), caption: res.ok ? 'Validé !' : 'Raté', ms: 1100 });
+  return frames;
+};
+ANIMS.memory = (res) => [
+  { art: code(['  [?] [?] [?] [?]' ]), caption: 'Cartes cachées', ms: 800 },
+  { art: code(['  Retournement...']), caption: 'Mémoire', ms: 900 },
+  { art: code([`  ${res.detail.replace('-', ' et ')}`]), caption: res.ok ? 'Paire !' : 'Pas de paire', ms: 1100 },
+];
+ANIMS.colorswipe = (res) => {
+  const cols = ['🔴', '🟠', '🟡', '🟢', '🔵', '🟣'];
+  const frames = cols.map((e) => ({ art: code([`  ${e}`]), caption: 'Arc-en-ciel', ms: 500 }));
+  const em = { red: '🔴', orange: '🟠', yellow: '🟡', green: '🟢', blue: '🔵', purple: '🟣' };
+  frames.push({ art: code([`  ${em[res.out]}`]), caption: 'Couleur tirée', ms: 1100 });
+  return frames;
+};
+ANIMS.rocket2 = (res) => {
+  const steps = 8;
+  const frames = [];
+  for (let k = 1; k <= steps; k++) {
+    const m = Math.max(1, Math.round(Math.pow(Math.min(res.peak, 100), k / steps) * 100) / 100);
+    frames.push({ art: code([`  🚀 x${m.toFixed(2)}`, `  Cible ${res.pick}`]), caption: 'Montée', ms: 650 });
+  }
+  frames.push({ art: code([`  Pic x${Math.min(res.peak, 500).toFixed(2)}`]), caption: res.peak >= res.t ? 'Cible OK' : 'Trop bas', ms: 1100 });
+  return frames;
+};
+ANIMS.diceexact2 = (res) => {
+  const r = () => randomInt(1, 7);
+  return [
+    { art: code(sideBySide([dieLines(r()), dieLines(r())], '   ')), caption: 'Lancer', ms: 700 },
+    { art: code(sideBySide([dieLines(r()), dieLines(r())], '   ')), caption: 'Roulement', ms: 700 },
+    { art: code(sideBySide([dieLines(res.a), dieLines(res.b)], '   ')), caption: `${res.a}+${res.b}=${res.sum}`, ms: 1100 },
+  ];
+};
+ANIMS.chest2 = (res) => [
+  { art: code(['  📦  📦  📦']), caption: 'Trois coffres', ms: 800 },
+  { art: code(['  Ouverture...']), caption: 'Suspense', ms: 900 },
+  { art: code([`  ${[1, 2, 3].map((k) => (k === res.win ? '💎' : '💨')).join('  ')}`]), caption: 'Contenu', ms: 1100 },
+];
+ANIMS.spincolor = (res) => {
+  const cols = ['🔴', '🔵', '🟢', '🟡', '🟣', '🟠'];
+  const frames = [];
+  for (let k = 0; k < 8; k++) {
+    frames.push({ art: code([`  ${cols[k % 6]}`]), caption: 'La roue tourne', ms: 500 });
+  }
+  const em = { red: '🔴', blue: '🔵', green: '🟢', yellow: '🟡', purple: '🟣', orange: '🟠' };
+  frames.push({ art: code([`  ${em[res.out]}`]), caption: 'Arrêt', ms: 1100 });
+  return frames;
+};
+
 async function playInstant(i, key, bet, choice) {
   const G = INSTANT[key];
   if (!G || !G.choices.includes(choice)) return respondText(i, 'Pari invalide.');
@@ -2923,8 +3557,13 @@ async function playInstant(i, key, bet, choice) {
 
     const balance = payout > 0 ? await credit(uid, payout) : await getBalance(uid);
 
-    const frames = ANIMS[key] ? ANIMS[key](res, { c, bet, choice }) : [{ art: G.spinText, ms: 1200 }];
-    await animate(i, frames, G.title, `Mise **${fmt(bet)}** · ${res.pick}\n`);
+    let frames = [{ art: G.spinText || '...', ms: 1000 }];
+    try {
+      if (ANIMS[key]) frames = ANIMS[key](res, { c, bet, choice }) || frames;
+    } catch (animErr) {
+      console.error('[anim]', key, animErr?.message || animErr);
+    }
+    await animate(i, frames, G.title, `Mise **${fmt(bet)}** · ${res.pick || ''}\n`);
 
     let text;
     let color;
@@ -3115,33 +3754,53 @@ const GAME_MENU = [
   ['hilo', 'Hi-Lo', '🃏', 'Suite de cartes'],
   ['bingo', 'Bingo', '🅱️', 'Numéro tiré'],
   ['jackpot', 'Jackpot', '💎', '3 symboles = jackpot'],
+  // 30 nouveaux
+  ['dicewar', 'Guerre dés', '🎲', 'Dés vs dés'],
+  ['coinladder', 'Échelle pièces', '🪙', 'Pile/face en chaîne'],
+  ['cardmatch', 'Match cartes', '🃏', 'Retrouve la carte'],
+  ['numguess', 'Devine nombre', '🔢', '1 à 20'],
+  ['bombdefuse', 'Désamorçage', '💣', 'Coupe le bon fil'],
+  ['treasure', 'Trésor', '🗺️', 'Choisis la case'],
+  ['highcard', 'Carte haute', '🃏', 'Au-dessus de 7'],
+  ['lowcard', 'Carte basse', '🃏', 'En-dessous de 8'],
+  ['pairmatch', 'Paire', '🃏', 'Deux mêmes rangs'],
+  ['freefall', 'Chute libre', '🪂', 'Atterris bien'],
+  ['balloon', 'Ballon', '🎈', 'Gonfle sans éclater'],
+  ['target', 'Cible', '🎯', 'Vise le centre'],
+  ['sequence', 'Séquence', '🔢', 'Suite de chiffres'],
+  ['animalrace', 'Course animaux', '🐾', 'Parie sur un animal'],
+  ['fruitmatch', 'Fruits', '🍎', '3 fruits identiques'],
+  ['gemhunt', 'Gemmes', '💎', 'Trouve la gemme'],
+  ['stardrop', 'Étoile', '⭐', 'Attrape l\'étoile'],
+  ['moonshot', 'Tir lunaire', '🌙', 'Atteins la lune'],
+  ['volcano', 'Volcan', '🌋', 'Évite l\'éruption'],
+  ['lightning', 'Éclair', '⚡', 'Survis à l\'orage'],
+  ['pokerhand', 'Poker express', '🃏', 'Meilleure main'],
+  ['redblack', 'Rouge/Noir', '🔴', 'Couleur simple'],
+  ['oddseven', 'Pair/Impair+', '🔢', 'Sur un dé'],
+  ['multiplier', 'Multi', '✖️', 'Choisis ton multi'],
+  ['memory', 'Mémoire', '🧠', 'Retrouve la paire'],
+  ['colorswipe', 'Arc-en-ciel', '🌈', 'Couleur tirée'],
+  ['rocket2', 'Fusée 2', '🚀', 'Cible haute'],
+  ['diceexact2', 'Double dé', '🎲', 'Somme exacte'],
+  ['chest2', 'Triple coffre', '📦', '1 trésor sur 3'],
+  ['spincolor', 'Roue couleur', '🎨', 'Roue à 6 couleurs'],
 ];
 
-function buildGameMenuPayload(userId = null) {
+function buildGameMenuPayload(userId = null, page = 0) {
   const lang = userId ? getLang(userId) : 'fr';
-  const names = {
-    mines: 'Mines', bj: 'Blackjack', roulette: 'Roulette', coinflip: 'Coin Flip', dice: 'Dice', slots: 'Slots',
-    wheel: 'Wheel', duel: 'Duel', suit: 'Suit', zone: 'Zone', plinko: 'Plinko', crash: 'Crash', scratch: 'Scratch',
-    die: 'Exact die', chest: 'Chest', russian: 'Russian roulette', horses: 'Horses',
-    limbo: 'Limbo', higher: 'Higher/Lower', rps: 'RPS', colorpick: 'Color', ladder: 'Ladder',
-    keno: 'Keno', war: 'War', hilo: 'Hi-Lo', bingo: 'Bingo', jackpot: 'Jackpot',
-  };
-  const descs = {
-    mines: 'Avoid bombs · rising mult', bj: 'Beat the dealer · soft aces', roulette: 'Color · parity · number',
-    coinflip: '50 / 50', dice: 'Sum of 2 dice', slots: '3 reels · jackpot', wheel: 'Wheel of fortune',
-    duel: 'Card vs dealer', suit: 'Guess the suit', zone: 'Low · mid · high', plinko: 'Ball · risk level',
-    crash: 'Cash out before boom', scratch: 'Scratch & win', die: '1 in 6', chest: 'Find the treasure',
-    russian: 'Survive the cylinder', horses: 'Pick the winner',
-    limbo: 'Pick your target mult', higher: 'Higher or lower', rps: 'Rock paper scissors',
-    colorpick: 'Guess the color', ladder: 'Climb the ladder', keno: '1 number out of 10',
-    war: 'Card vs card', hilo: 'Card sequence', bingo: 'Drawn number', jackpot: '3 symbols',
-  };
+  const PAGE_SIZE = 23;
+  const totalPages = Math.ceil(GAME_MENU.length / PAGE_SIZE);
+  const p = Math.max(0, Math.min(page, totalPages - 1));
+  const slice = GAME_MENU.slice(p * PAGE_SIZE, p * PAGE_SIZE + PAGE_SIZE);
 
   const embed = new EmbedBuilder()
     .setColor(0xA855F7)
-    .setAuthor({ name: 'ZNK CASINO' })
     .setTitle(t(userId, 'lobbyTitle'))
-    .setDescription(t(userId, 'lobbyDesc'))
+    .setDescription(
+      (t(userId, 'lobbyDesc') || '') +
+        `\n\n**Page ${p + 1}/${totalPages}** · ${GAME_MENU.length} jeux`
+    )
     .setFooter({ text: t(userId, 'lobbyFooter') })
     .setTimestamp();
 
@@ -3151,15 +3810,27 @@ function buildGameMenuPayload(userId = null) {
     .setMinValues(1)
     .setMaxValues(1)
     .addOptions(
-      GAME_MENU.map(([key, name, emoji, desc]) => ({
-        label: (lang === 'en' ? names[key] : name).slice(0, 100),
+      slice.map(([key, name, emoji, desc]) => ({
+        label: `${emoji} ${name}`.slice(0, 100),
         value: key,
-        emoji,
-        description: (lang === 'en' ? descs[key] : desc).slice(0, 100),
+        description: desc.slice(0, 100),
       }))
     );
 
-  return { embeds: [embed], components: [new ActionRowBuilder().addComponents(select)] };
+  const nav = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`panel_gamepage_${p - 1}`)
+      .setLabel('◀')
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(p <= 0),
+    new ButtonBuilder()
+      .setCustomId(`panel_gamepage_${p + 1}`)
+      .setLabel('▶')
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(p >= totalPages - 1)
+  );
+
+  return { embeds: [embed], components: [new ActionRowBuilder().addComponents(select), nav] };
 }
 
 function buildSettingsPayload(userId) {
@@ -3224,15 +3895,59 @@ function buildRulesPayload(userId) {
     ['🃏 Hi-Lo', fr ? '3 cartes. Si les 3 sont hautes (8+) ou les 3 basses (7-), tu gagnes.' : '3 cards. If all high (8+) or all low (7-), you win.'],
     ['🅱️ Bingo', fr ? 'Choisis une case parmi 5. Une bille sort.' : 'Pick one of 5 slots. A ball is drawn.'],
     ['💎 Jackpot', fr ? '3 symboles. 3 identiques = gros jackpot, 2 identiques = petit gain.' : '3 symbols. 3 matching = big jackpot, 2 matching = small win.'],
+    ['🎲 Guerre de dés', fr ? 'Ton dé contre le croupier. Le plus haut gagne.' : 'Your die vs dealer. Highest wins.'],
+    ['🪙 Échelle de pièces', fr ? 'Enchaîne des piles pour monter l\'échelle.' : 'Chain heads to climb the ladder.'],
+    ['🃏 Match de cartes', fr ? 'Retrouve la carte secrète parmi 4.' : 'Find the secret card among 4.'],
+    ['🔢 Devine le nombre', fr ? 'Un nombre de 1 à 10.' : 'A number from 1 to 10.'],
+    ['💣 Désamorçage', fr ? 'Coupe le bon fil parmi 4.' : 'Cut the right wire among 4.'],
+    ['🗺️ Carte au trésor', fr ? '5 cases, 1 trésor.' : '5 spots, 1 treasure.'],
+    ['🃏 Carte haute / basse', fr ? 'Carte ≥ 8 ou ≤ 7.' : 'Card ≥ 8 or ≤ 7.'],
+    ['🃏 Paire', fr ? 'Deux cartes du même rang.' : 'Two cards of the same rank.'],
+    ['🪂 Chute libre', fr ? 'Choisis ta zone d\'atterrissage.' : 'Pick your landing zone.'],
+    ['🎈 Ballon', fr ? 'Gonfle sans faire éclater.' : 'Inflate without popping.'],
+    ['🎯 Cible', fr ? 'Centre, intérieur ou extérieur.' : 'Center, inner or outer.'],
+    ['🔢 Séquence', fr ? '3 chiffres en suite.' : '3 numbers in a row.'],
+    ['🐾 Course d\'animaux', fr ? 'Parie sur un animal.' : 'Bet on an animal.'],
+    ['🍎 Fruits', fr ? '3 fruits identiques ou 2.' : '3 matching fruits or 2.'],
+    ['💎 Chasse aux gemmes', fr ? '6 roches, 1 gemme.' : '6 rocks, 1 gem.'],
+    ['⭐ Étoile filante', fr ? 'Attrape ou laisse passer.' : 'Catch or let pass.'],
+    ['🌙 Tir lunaire', fr ? 'Atteins la distance choisie.' : 'Reach the chosen distance.'],
+    ['🌋 Volcan', fr ? 'Devine la zone d\'éruption.' : 'Guess the eruption zone.'],
+    ['⚡ Éclair', fr ? 'Reste ou fuis l\'orage.' : 'Stay or run from the storm.'],
+    ['🃏 Poker express', fr ? '3 cartes : paire ou brelan.' : '3 cards: pair or three of a kind.'],
+    ['🔴 Rouge/Noir', fr ? 'Couleur de la carte.' : 'Card color.'],
+    ['🔢 Pair/Impair', fr ? 'Sur un dé.' : 'On a die.'],
+    ['✖️ Multiplicateur', fr ? 'Valide ta cible de multi.' : 'Hit your multi target.'],
+    ['🧠 Mémoire', fr ? 'Retourne 2 cartes, trouve la paire.' : 'Flip 2 cards, find the pair.'],
+    ['🌈 Arc-en-ciel', fr ? '6 couleurs possibles.' : '6 possible colors.'],
+    ['🚀 Fusée 2', fr ? 'Cible de multiplicateur haute.' : 'High multiplier target.'],
+    ['🎲 Double dé', fr ? 'Devine la somme exacte.' : 'Guess the exact sum.'],
+    ['📦 Triple coffre', fr ? '1 trésor sur 3 coffres.' : '1 treasure in 3 chests.'],
+    ['🎨 Roue couleur', fr ? 'Roue à 6 couleurs.' : '6-color wheel.'],
   ];
-  const embed = new EmbedBuilder()
-    .setColor(0x8B5CF6)
-    .setTitle(fr ? '📖 Règles des jeux' : '📖 Game rules')
-    .setDescription(
-      lines.map(([name, rule]) => `**${name}**\n${rule}`).join('\n\n').slice(0, 4000)
-    )
-    .setFooter({ text: fr ? 'Mise toujours avant de lancer · parties privées' : 'Always bet before playing · private games' });
-  return { embeds: [embed], components: [] };
+  // Plusieurs embeds si trop long
+  const chunks = [];
+  let buf = [];
+  let len = 0;
+  for (const [name, rule] of lines) {
+    const block = `**${name}**\n${rule}\n\n`;
+    if (len + block.length > 3800 && buf.length) {
+      chunks.push(buf.join(''));
+      buf = [];
+      len = 0;
+    }
+    buf.push(block);
+    len += block.length;
+  }
+  if (buf.length) chunks.push(buf.join(''));
+  const embeds = chunks.map((desc, i) =>
+    new EmbedBuilder()
+      .setColor(0x8B5CF6)
+      .setTitle(fr ? `📖 Règles des jeux${chunks.length > 1 ? ` (${i + 1}/${chunks.length})` : ''}` : `📖 Game rules${chunks.length > 1 ? ` (${i + 1}/${chunks.length})` : ''}`)
+      .setDescription(desc)
+      .setFooter({ text: fr ? 'Mise avant de lancer · parties privées' : 'Bet before playing · private games' })
+  );
+  return { embeds, components: [] };
 }
 
 function modalInput(id, label, { placeholder, value, required = true, max = 30 } = {}) {
@@ -3276,6 +3991,12 @@ const instantBetModal = (key, choice, bal = 0) =>
     .addComponents(modalInput('bet', betLabel(bal), { placeholder: BET_PLACEHOLDER }));
 
 async function handlePanelButton(i) {
+  if (i.customId.startsWith('panel_gamepage_')) {
+    const page = Number(i.customId.slice('panel_gamepage_'.length));
+    if (!Number.isFinite(page) || page < 0) return i.deferUpdate().catch(() => {});
+    return i.update(buildGameMenuPayload(i.user.id, page));
+  }
+
   const instantKey = i.customId.slice('panel_'.length);
   if (INSTANT[instantKey]) {
     return i.reply({ ...INSTANT[instantKey].picker(coef(instantKey)), flags: EPH });
@@ -3301,7 +4022,7 @@ async function handlePanelButton(i) {
       }
     }
     case 'panel_play':
-      return i.reply({ ...buildGameMenuPayload(i.user.id), flags: EPH });
+      return i.reply({ ...buildGameMenuPayload(i.user.id, 0), flags: EPH });
     case 'panel_settings':
       return i.reply({ ...buildSettingsPayload(i.user.id), flags: EPH });
     case 'panel_lang_fr':
@@ -3842,31 +4563,59 @@ const MULT_INFO = {
   roulette: (c) => `couleur/pair/impair ${fx(2 * c)} · numéro ${fx(36 * c)}`,
 };
 
-function multAdminPayload(note) {
-  const lines = Object.keys(GAME_NAMES).map((g) => {
+function multAdminPayload(note, page = 0) {
+  const games = Object.keys(GAME_NAMES);
+  const PAGE = 23;
+  const totalPages = Math.max(1, Math.ceil(games.length / PAGE));
+  const p = Math.max(0, Math.min(page, totalPages - 1));
+  const slice = games.slice(p * PAGE, p * PAGE + PAGE);
+
+  const lines = slice.map((g) => {
     const c = coef(g);
-    return `${GAME_NAMES[g]} : coefficient **${fx(c)}**\n└ ${(MULT_INFO[g] || INSTANT[g].info)(c)}`;
+    let info = '';
+    try {
+      const fn = MULT_INFO[g] || INSTANT[g]?.info;
+      info = fn ? fn(c) : '—';
+    } catch {
+      info = '—';
+    }
+    return `**${GAME_NAMES[g]}** · coef ${fx(c)}\n└ ${info}`;
   });
+
   const embed = new EmbedBuilder()
     .setTitle('🎚️ Multiplicateurs des jeux')
     .setColor(COLORS.red)
     .setDescription(
-      `Le coefficient multiplie **tous les gains** du jeu (x1.00 = normal, ex : x1.50 = gains +50 %). ` +
-        `Valeurs autorisées : ${fx(MULT_MIN)} à ${fx(MULT_MAX)}.\n\n${lines.join('\n\n')}` +
+      `Coefficient × tous les gains (x1.00 = normal). Plage ${fx(MULT_MIN)}–${fx(MULT_MAX)}.\n` +
+        `**Page ${p + 1}/${totalPages}**\n\n${lines.join('\n\n')}`.slice(0, 4000) +
         (note ? `\n\n${note}` : '')
     );
+
   const select = new StringSelectMenuBuilder()
     .setCustomId('admin_multpick')
     .setPlaceholder('Choisis le jeu à modifier')
     .addOptions(
-      Object.keys(GAME_NAMES).map((g) => ({
-        label: GAME_NAMES[g].replace(/^\S+\s/, ''),
-        emoji: GAME_NAMES[g].split(' ')[0],
+      slice.map((g) => ({
+        label: (GAME_NAMES[g] || g).replace(/^\S+\s/, '').slice(0, 100),
         value: g,
-        description: `Coefficient actuel : ${fx(coef(g))}`,
+        description: `Coefficient actuel : ${fx(coef(g))}`.slice(0, 100),
       }))
     );
-  return { embeds: [embed], components: [new ActionRowBuilder().addComponents(select)] };
+
+  const nav = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`admin_multpage_${p - 1}`)
+      .setLabel('◀')
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(p <= 0),
+    new ButtonBuilder()
+      .setCustomId(`admin_multpage_${p + 1}`)
+      .setLabel('▶')
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(p >= totalPages - 1)
+  );
+
+  return { embeds: [embed], components: [new ActionRowBuilder().addComponents(select), nav] };
 }
 
 const ADMIN_TITLES = {
@@ -3883,7 +4632,12 @@ async function handleAdmin(i) {
 
   if (i.isButton()) {
     const action = id.slice('admin_'.length);
-    if (action === 'mult') return i.reply({ ...multAdminPayload(), flags: EPH });
+    if (action === 'mult') return i.reply({ ...multAdminPayload(null, 0), flags: EPH });
+    if (action.startsWith('multpage_')) {
+      const page = Number(action.slice('multpage_'.length));
+      if (!Number.isFinite(page) || page < 0) return i.deferUpdate().catch(() => {});
+      return i.update(multAdminPayload(null, page));
+    }
     if (action === 'event') {
       const select = new StringSelectMenuBuilder()
         .setCustomId('admin_eventpick')
@@ -4872,9 +5626,13 @@ client.on(Events.InteractionCreate, async (i) => {
     }
   } catch (e) {
     console.error('[interaction]', e);
-    if (i.isRepliable?.() && !i.replied && !i.deferred) {
-      const hint = i.guild && i.user.id === i.guild.ownerId ? `\n${explainError(e)}` : '';
-      i.reply({ content: `⚠️ Une erreur est survenue, réessaie dans un instant.${hint}`, flags: EPH }).catch(() => {});
+    const detail = String(e?.message || e || 'erreur inconnue').slice(0, 300);
+    const text = `⚠️ Une erreur est survenue : \`${detail}\``;
+    try {
+      if (i.deferred || i.replied) await i.followUp({ content: text, flags: EPH }).catch(() => {});
+      else if (i.isRepliable?.()) await i.reply({ content: text, flags: EPH }).catch(() => {});
+    } catch {
+      /* ignore */
     }
   }
 });
