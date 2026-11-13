@@ -2077,25 +2077,28 @@ function buildPanelPayload() {
       [
         `Bienvenue sur **ZNK Casino**.`,
         '',
-        `🎁 **Daily** · **${DAILY_AMOUNT}** ${COIN} · 1× / jour · minuit Paris`,
+        `🎁 **Daily** · **${DAILY_AMOUNT}** Z · 1× / jour · minuit Paris`,
         '',
         '▶️ **Start** — casino privé en MP',
         '🌐 **Langue** — Français / English',
         '🧹 **Clear** — ferme parties + nettoie les MP du bot',
         '',
         '🔒 Parties privées · classements partagés',
+        '',
+        '_La pièce Z est affichée en miniature et au-dessus du panel._',
       ].join('\n')
     )
     .addFields(
       { name: 'Jouer', value: 'Start → MP', inline: true },
-      { name: 'Monnaie', value: `${COIN} ZNK`, inline: true },
+      { name: 'Monnaie', value: 'ZNK Z', inline: true },
       { name: 'Langues', value: 'FR · EN', inline: true }
     )
     .setFooter({ text: 'ZNK Casino', iconURL: COIN_IMG })
     .setTimestamp();
 
+  const znkBtn = { id: COIN_EMOJI_ID, name: 'znk' };
   const rowMain = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('panel_start').setLabel('Start').setEmoji('▶️').setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId('panel_start').setLabel('Start').setEmoji(znkBtn).setStyle(ButtonStyle.Success),
     new ButtonBuilder().setCustomId('panel_settings').setLabel('Langue').setEmoji('🌐').setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId('panel_clear').setLabel('Clear').setEmoji('🧹').setStyle(ButtonStyle.Danger)
   );
@@ -2104,7 +2107,12 @@ function buildPanelPayload() {
     new ButtonBuilder().setCustomId('panel_topall').setLabel('All-time').setEmoji('👑').setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId('panel_invites').setLabel('Invites').setEmoji('📨').setStyle(ButtonStyle.Secondary)
   );
-  return { embeds: [panel], components: [rowMain, rowRanks] };
+  // Emoji custom dans le content (hors embed) = affichage fiable
+  return {
+    content: `${COIN} **ZNK Casino**`,
+    embeds: [panel],
+    components: [rowMain, rowRanks],
+  };
 }
 
 /** Panel privé (MP) : tout pour jouer. */
