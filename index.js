@@ -30,9 +30,12 @@ const path = require('path');
 //  CONFIG
 // ============================================================
 const PREFIX = '!';
-const COIN = 'coin';
+// Monnaie = pièce Z violette (emoji custom Discord)
+// Dans .env : COIN_EMOJI=<:znk:ID_DE_LEMOJI>
+// Sans ça → fallback 🟣Z
+const COIN = process.env.COIN_EMOJI || '🟣Z';
 const DAILY_AMOUNT = 4;
-const INVITE_REWARD = 1; // coins offerts à celui qui invite un nouveau membre
+const INVITE_REWARD = 1; // Z offerts à celui qui invite un nouveau membre
 const LEADERBOARD_REFRESH_MS = 60_000;
 const IDLE_MS = 90_000; // une partie inactive est réglée automatiquement après 90 s
 const MAX_ADMIN_AMOUNT = 100_000_000;
@@ -1998,73 +2001,64 @@ function buildHelpEmbed() {
   const p = PREFIX;
   return new EmbedBuilder()
     .setColor(COLORS.violet)
-    .setAuthor({ name: 'Guide du Casino' })
-    .setTitle('✨ Comment jouer')
-    .setDescription(
-      [
-        '```',
-        ' ┌─────────────────────────────┐',
-        ' │   PARTIES 100 % PRIVÉES     │',
-        ' │   Clique · Mise · Résultat  │',
-        ' └─────────────────────────────┘',
-        '```',
-        '',
-        'Tout se joue avec les **boutons** — aucune commande obligatoire.',
-      ].join('\n')
-    )
+    .setAuthor({ name: 'ZNK CASINO' })
+    .setTitle('✨ Guide')
+    .setDescription('Tout se joue avec les **boutons**. Parties **privées**.')
     .addFields(
       {
         name: '🎮 Jeux',
-        value:
-          '**Mines** · **Blackjack** · **Roulette** · **Slots** · **Plinko** · **Crash** et 11 autres.\n' +
-          'Ouvre **Jouer** → choisis un jeu → entre ta mise.',
+        value: '**Start** → MP → **Jouer** → choix du jeu → mise.',
         inline: false,
       },
       {
         name: '🎁 Daily',
-        value: `**${DAILY_AMOUNT} ${COIN}** / jour (reset à minuit **Paris**).`,
+        value: `**${DAILY_AMOUNT} ${COIN}** / jour (minuit Paris)`,
         inline: true,
       },
       {
         name: '📨 Invites',
-        value: `**+${INVITE_REWARD} ${COIN}** par ami qui rejoint.`,
+        value: `**+${INVITE_REWARD} ${COIN}** / ami`,
         inline: true,
       },
       {
-        name: '💸 Transfert',
-        value: 'Envoie des coins à un membre du serveur.',
+        name: '💸 Envoyer',
+        value: `Transfert de ${COIN} (serveur ou MP)`,
         inline: true,
       },
       {
         name: '👑 Admin',
-        value:
-          `\`${p}setup\` salon · \`${p}admin\` panneau · \`${p}wins\` · \`${p}classement\`\n` +
-          `\`${p}add\` / \`${p}remove\` · événements · boosts · notifs`,
+        value: `\`${p}setup\` · \`${p}admin\` · \`${p}wins\` · \`${p}classement\``,
         inline: false,
       }
     )
-    .setFooter({ text: `Monnaie : ${COIN} · Rejouer dispo après chaque partie` })
+    .setFooter({ text: `Monnaie ${COIN} · ZNK` })
     .setTimestamp();
 }
 
 function buildPanelPayload() {
-  // Style simple (mobile-friendly) — pas de blocs ANSI
   const panel = new EmbedBuilder()
     .setColor(0x7C3AED)
     .setAuthor({ name: 'ZNK CASINO' })
-    .setTitle('Salon de jeu')
+    .setTitle(`✦  Salon · ${COIN}`)
     .setDescription(
       [
-        `**Daily** · **${DAILY_AMOUNT} ${COIN}** · 1× / jour · minuit Paris`,
+        `Bienvenue sur **ZNK Casino**.`,
         '',
-        '**Start** → ouvre ton casino **en message privé** (jeux, solde, daily…)',
-        '**Langue** → 🇫🇷 Français ou 🇬🇧 English (sauvegardé)',
-        '**Clear** → ferme tes parties en cours',
+        `🎁 Daily **${DAILY_AMOUNT} ${COIN}** · 1× / jour · minuit Paris`,
         '',
-        '🔒 Tes parties restent privées.',
+        '▶️ **Start** — casino privé en MP',
+        '🌐 **Langue** — Français / English',
+        '🧹 **Clear** — ferme parties + nettoie les MP du bot',
+        '',
+        '🔒 Parties privées · classements partagés',
       ].join('\n')
     )
-    .setFooter({ text: `${COIN} · ZNK Casino` })
+    .addFields(
+      { name: 'Jouer', value: 'Start → MP', inline: true },
+      { name: 'Monnaie', value: COIN, inline: true },
+      { name: 'Langues', value: 'FR · EN', inline: true }
+    )
+    .setFooter({ text: `ZNK Casino · ${COIN}` })
     .setTimestamp();
 
   const rowMain = new ActionRowBuilder().addComponents(
@@ -2080,17 +2074,31 @@ function buildPanelPayload() {
   return { embeds: [panel], components: [rowMain, rowRanks] };
 }
 
-/** Panel privé (MP ou éphémère) : tout pour jouer. */
+/** Panel privé (MP) : tout pour jouer. */
 function buildDmPlayPayload(userId) {
   const lang = getLang(userId);
   const embed = new EmbedBuilder()
     .setColor(0xA855F7)
     .setAuthor({ name: 'ZNK CASINO' })
-    .setTitle(lang === 'en' ? 'Your private casino' : 'Ton casino privé')
+    .setTitle(lang === 'en' ? `✦ Your table · ${COIN}` : `✦ Ta table · ${COIN}`)
     .setDescription(
       lang === 'en'
-        ? `Language saved: **English**\nDaily: **${DAILY_AMOUNT} ${COIN}** · once per day (Paris midnight)\nPick a game below or use the account buttons.`
-        : `Langue enregistrée : **Français**\nDaily : **${DAILY_AMOUNT} ${COIN}** · 1× / jour (minuit Paris)\nChoisis un jeu ci-dessous ou utilise les boutons compte.`
+        ? [
+            `Language: **English**`,
+            `Daily: **${DAILY_AMOUNT} ${COIN}** · once / day (Paris midnight)`,
+            '',
+            '**Play** opens the game picker.',
+            '**Send** transfers **Z** to another player (ID or mention).',
+            '**Clear** closes games and cleans this chat.',
+          ].join('\n')
+        : [
+            `Langue : **Français**`,
+            `Daily : **${DAILY_AMOUNT} ${COIN}** · 1× / jour (minuit Paris)`,
+            '',
+            '**Jouer** ouvre le choix des jeux.',
+            '**Envoyer** transfère des **Z** (ID Discord ou mention).',
+            '**Clear** ferme les parties et nettoie ce chat.',
+          ].join('\n')
     )
     .setFooter({ text: `ZNK · ${COIN}` })
     .setTimestamp();
@@ -2103,7 +2111,7 @@ function buildDmPlayPayload(userId) {
   );
   const row2 = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('panel_history').setLabel(lang === 'en' ? 'History' : 'Historique').setEmoji('📜').setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId('panel_top').setLabel(lang === 'en' ? 'Leaderboard' : 'Classement').setEmoji('🏆').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('panel_top').setLabel(lang === 'en' ? 'Ranks' : 'Classement').setEmoji('🏆').setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId('panel_topall').setLabel('All-time').setEmoji('👑').setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId('panel_clear').setLabel('Clear').setEmoji('🧹').setStyle(ButtonStyle.Danger)
   );
@@ -2212,12 +2220,15 @@ function buildGameMenuPayload(userId = null) {
 function buildSettingsPayload(userId) {
   const cur = getLang(userId);
   const embed = new EmbedBuilder()
-    .setColor(COLORS.violet)
+    .setColor(0x7C3AED)
+    .setAuthor({ name: 'ZNK CASINO' })
     .setTitle(`🌐 ${t(userId, 'langTitle')}`)
     .setDescription(
       `${t(userId, 'langDesc')}\n\n` +
-        (cur === 'fr' ? '**Actuel / Current :** 🇫🇷 Français' : '**Actuel / Current :** 🇬🇧 English')
-    );
+        (cur === 'fr' ? '**Actuel :** 🇫🇷 Français' : '**Current :** 🇬🇧 English') +
+        `\n\nMonnaie : **${COIN}**`
+    )
+    .setFooter({ text: 'Sauvegardé pour Start et les MP' });
   const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId('panel_lang_fr')
@@ -2315,11 +2326,41 @@ async function handlePanelButton(i) {
       if (g?.timer) clearTimeout(g.timer);
       games.delete(i.user.id);
       unlock(i.user.id);
+
+      // En MP : supprimer les messages du bot et reposter un panneau propre
+      const inDm = !i.guild;
+      if (inDm || i.channel?.isDMBased?.()) {
+        try {
+          await i.deferReply({ flags: EPH });
+          const channel = i.channel?.isDMBased?.()
+            ? i.channel
+            : await i.user.createDM().catch(() => null);
+          if (channel) {
+            const fetched = await channel.messages.fetch({ limit: 40 }).catch(() => null);
+            if (fetched) {
+              const mine = fetched.filter((m) => m.author.id === client.user.id);
+              for (const m of mine.values()) {
+                await m.delete().catch(() => {});
+              }
+            }
+            await channel.send(buildDmPlayPayload(i.user.id));
+          }
+          return i.editReply({
+            content:
+              getLang(i.user.id) === 'en'
+                ? '🧹 Chat cleaned · games closed · fresh panel sent.'
+                : '🧹 Chat nettoyé · parties fermées · panneau renvoyé.',
+          });
+        } catch (e) {
+          console.error('[clear dm]', e?.message || e);
+        }
+      }
+
       return i.reply({
         content:
           getLang(i.user.id) === 'en'
-            ? '🧹 Open games closed. You can play again from **Start** / **Play**.'
-            : '🧹 Parties en cours fermées. Tu peux rejouer via **Start** / **Jouer**.',
+            ? '🧹 Open games closed. Use **Start** for a clean private panel.'
+            : '🧹 Parties fermées. **Start** pour un panneau privé propre.',
         flags: EPH,
       });
     }
@@ -2382,18 +2423,34 @@ async function handlePanelButton(i) {
       return i.editReply({ embeds: [await buildInvitesEmbed(i.guild, i.user.id)] });
     }
     case 'panel_send': {
-      const row = new ActionRowBuilder().addComponents(
-        new UserSelectMenuBuilder()
-          .setCustomId('panel_send_pick')
-          .setPlaceholder(getLang(i.user.id) === 'en' ? 'Pick a member' : 'Choisis un membre')
-          .setMinValues(1)
-          .setMaxValues(1)
+      // Sur serveur : select membre. En MP : modal (ID Discord).
+      if (i.guild) {
+        const row = new ActionRowBuilder().addComponents(
+          new UserSelectMenuBuilder()
+            .setCustomId('panel_send_pick')
+            .setPlaceholder(getLang(i.user.id) === 'en' ? 'Pick a member' : 'Choisis un membre')
+            .setMinValues(1)
+            .setMaxValues(1)
+        );
+        return i.reply({
+          content: t(i.user.id, 'sendPick'),
+          components: [row],
+          flags: EPH,
+        });
+      }
+      const bal = await getBalance(i.user.id);
+      return i.showModal(
+        new ModalBuilder()
+          .setCustomId('modal_send_dm')
+          .setTitle(getLang(i.user.id) === 'en' ? `Send ${COIN}` : `Envoyer ${COIN}`)
+          .addComponents(
+            modalInput('to', getLang(i.user.id) === 'en' ? 'User ID (Discord)' : 'ID Discord du joueur', {
+              placeholder: 'ex : 123456789012345678',
+              max: 25,
+            }),
+            modalInput('amount', betLabel(bal), { placeholder: 'ex : 5  ou  all' })
+          )
       );
-      return i.reply({
-        content: t(i.user.id, 'sendPick'),
-        components: [row],
-        flags: EPH,
-      });
     }
     default:
       return;
@@ -2491,21 +2548,38 @@ async function handleModalSubmit(i) {
     const bet = await readBet();
     return bet ? playRoulette(i, bet, choiceStr) : badBet();
   }
-  if (id.startsWith('modal_send_')) {
-    const toId = id.slice('modal_send_'.length);
-    if (!/^\d{15,25}$/.test(toId)) return respondText(i, 'Destinataire invalide.');
-    if (toId === i.user.id) return respondText(i, '❌ Tu ne peux pas t’envoyer de l’argent à toi-même.');
+  if (id === 'modal_send_dm' || id.startsWith('modal_send_')) {
+    let toId;
+    if (id === 'modal_send_dm') {
+      toId = String(get('to') || '').replace(/[<@!>]/g, '').trim();
+    } else {
+      toId = id.slice('modal_send_'.length);
+    }
+    if (!/^\d{15,25}$/.test(toId)) {
+      return respondText(
+        i,
+        getLang(i.user.id) === 'en'
+          ? 'Invalid user ID. Right-click the user → Copy User ID.'
+          : 'ID invalide. Clic droit sur le joueur → Copier l’identifiant.'
+      );
+    }
+    if (toId === i.user.id) {
+      return respondText(
+        i,
+        getLang(i.user.id) === 'en' ? '❌ You cannot send Z to yourself.' : '❌ Tu ne peux pas t’envoyer des Z à toi-même.'
+      );
+    }
     const bal = await getBalance(i.user.id);
     const amount = parseAmount(get('amount'), bal);
-    if (!amount) return respondText(i, 'Montant invalide : écris un nombre (ex : 1 ou 2.5) ou "all".');
-    if (amount > bal) return respondText(i, MSG.insufficient);
+    if (!amount) return respondText(i, 'Montant invalide : nombre ou "all".');
+    if (amount > bal) return respondText(i, t(i.user.id, 'insufficient'));
     const newBal = await debit(i.user.id, amount);
-    if (newBal === null) return respondText(i, MSG.insufficient);
+    if (newBal === null) return respondText(i, t(i.user.id, 'insufficient'));
     const toBal = await credit(toId, amount);
     return i.reply({
       content:
-        `✅ Tu as envoyé **${fmt(amount)}** à <@${toId}>.\n` +
-        `💰 Ton solde : **${fmt(newBal)}** · Solde du destinataire : **${fmt(toBal)}**`,
+        `✅ **${fmt(amount)}** → <@${toId}>\n` +
+        `💰 ${t(i.user.id, 'yourBalance')} : **${fmt(newBal)}** · Dest. : **${fmt(toBal)}**`,
       flags: EPH,
     });
   }
@@ -2528,26 +2602,16 @@ async function handleReplay(i) {
 function buildAdminPayload() {
   const embed = new EmbedBuilder()
     .setColor(0xEF4444)
-    .setAuthor({ name: 'Console administrateur' })
-    .setTitle('✦ Contrôle du casino')
-    .setDescription(
-      [
-        '```ansi',
-        '[2;31m╔══════════════════════════╗[0m',
-        '[2;31m║[0m  [1;37mOWNER ONLY · ACTIONS[0m   [2;31m║[0m',
-        '[2;31m╚══════════════════════════╝[0m',
-        '```',
-        '',
-        'Chaque action publique affiche **qui** l’a lancée.',
-      ].join('\n')
-    )
+    .setAuthor({ name: 'ZNK CASINO' })
+    .setTitle('✦ Admin')
+    .setDescription(`Contrôle propriétaire · monnaie **${COIN}**\nChaque action publique indique **qui** l’a faite.`)
     .addFields(
-      { name: '💰 Économie', value: 'Ajouter · Retirer · Définir · Voir · Offrir à tous', inline: false },
-      { name: '💥 Resets', value: 'Soldes (classement) · Records all-time', inline: false },
-      { name: '🎚️ Live', value: 'Multiplicateurs · Événements · Boosts · Annonces', inline: false },
-      { name: '📡 Salons', value: 'All-time · **Notifs** (cible des annonces admin)', inline: false }
+      { name: '💰 Économie', value: 'Ajouter · Retirer · Définir · Voir · Offrir all', inline: false },
+      { name: '💥 Resets', value: 'Soldes · All-time', inline: true },
+      { name: '🎚️ Live', value: 'Mult · Events · Boosts', inline: true },
+      { name: '📡 Salons', value: 'All-time · Notifs', inline: true }
     )
-    .setFooter({ text: 'Visible uniquement par le propriétaire' })
+    .setFooter({ text: 'Owner only · ZNK' })
     .setTimestamp();
   const row1 = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('admin_add').setLabel('Ajouter').setEmoji('➕').setStyle(ButtonStyle.Success),
