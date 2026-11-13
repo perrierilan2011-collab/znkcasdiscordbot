@@ -176,6 +176,14 @@ function t(userId, key) {
 
 loadLangs();
 
+/** Dernier serveur d’où le joueur a lancé Start (pour les parties en MP). */
+const userHomeGuild = new Map(); // userId -> guildId
+
+function resolveGuildId(i) {
+  if (i.guild?.id) return i.guild.id;
+  return userHomeGuild.get(i.user.id) || null;
+}
+
 // ============================================================
 //  OUTILS
 // ============================================================
@@ -688,7 +696,7 @@ async function startMines(i, level, bet) {
       type: 'mines',
       userId: uid,
       user: i.user,
-      guildId: i.guildId,
+      guildId: resolveGuildId(i),
       bet,
       level,
       mines: L.mines,
@@ -971,7 +979,7 @@ async function startBlackjack(i, bet) {
       type: 'bj',
       userId: uid,
       user: i.user,
-      guildId: i.guildId,
+      guildId: resolveGuildId(i),
       bet,
       baseBet: bet,
       deck,
@@ -1314,7 +1322,7 @@ async function playRoulette(i, bet, choiceStr) {
     await i.editReply({ embeds: [embed], components: [row] });
 
     recordResult({
-      guildId: i.guildId,
+      guildId: resolveGuildId(i),
       user: i.user,
       game: 'roulette',
       bet,
@@ -1970,7 +1978,7 @@ async function playInstant(i, key, bet, choice) {
     await i.editReply({ embeds: [embed], components: [row] });
 
     recordResult({
-      guildId: i.guildId,
+      guildId: resolveGuildId(i),
       user: i.user,
       game: key,
       bet,
@@ -2040,46 +2048,66 @@ function buildHelpEmbed() {
 }
 
 function buildPanelPayload() {
+  // Style simple (mobile-friendly) — pas de blocs ANSI
   const panel = new EmbedBuilder()
     .setColor(0x7C3AED)
-    .setAuthor({ name: 'VIP CASINO' })
-    .setTitle('━━━━━━━━━━━━━━━━━━━━')
+    .setAuthor({ name: 'ZNK CASINO' })
+    .setTitle('Salon de jeu')
     .setDescription(
       [
-        '```ansi',
-        '[2;35m╔══════════════════════════╗[0m',
-        '[2;35m║[0m   [1;37m✦  SALON DE JEU  ✦[0m    [2;35m║[0m',
-        '[2;35m╚══════════════════════════╝[0m',
-        '```',
+        `**Daily** · **${DAILY_AMOUNT} ${COIN}** · 1× / jour · minuit Paris`,
         '',
-        `> 🎁 **Daily** — **${DAILY_AMOUNT} ${COIN}** · 1× / day · midnight **Paris**`,
-        '> 🎮 **Jouer / Play** — menu popup privé · private game picker',
+        '**Start** → ouvre ton casino **en message privé** (jeux, solde, daily…)',
+        '**Langue** → 🇫🇷 Français ou 🇬🇧 English (sauvegardé)',
+        '**Clear** → ferme tes parties en cours',
         '',
-        '🔒 Parties privées · Private hands · 🇫🇷 / 🇬🇧 via **Langue**',
+        '🔒 Tes parties restent privées.',
       ].join('\n')
     )
-    .addFields(
-      { name: '🎮 Play', value: '```\n17 games · animations\n```', inline: true },
-      { name: '💰 Account', value: '```\nBalance · Send · History\n```', inline: true },
-      { name: '🏆 Ranks', value: '```\nLive · All-time · Invites\n```', inline: true }
-    )
-    .setFooter({ text: `${COIN} · FR / EN in settings` })
+    .setFooter({ text: `${COIN} · ZNK Casino` })
     .setTimestamp();
 
-  const rowPlay = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('panel_play').setLabel('JOUER').setEmoji('🎮').setStyle(ButtonStyle.Success),
-    new ButtonBuilder().setCustomId('panel_daily').setLabel('Daily').setEmoji('🎁').setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId('panel_balance').setLabel('Solde').setEmoji('💰').setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId('panel_send').setLabel('Envoyer').setEmoji('💸').setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId('panel_settings').setLabel('Langue').setEmoji('🌐').setStyle(ButtonStyle.Secondary)
+  const rowMain = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('panel_start').setLabel('Start').setEmoji('▶️').setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId('panel_settings').setLabel('Langue').setEmoji('🌐').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId('panel_clear').setLabel('Clear').setEmoji('🧹').setStyle(ButtonStyle.Danger)
   );
-  const rowSocial = new ActionRowBuilder().addComponents(
+  const rowRanks = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('panel_top').setLabel('Classement').setEmoji('🏆').setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId('panel_topall').setLabel('All-time').setEmoji('👑').setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId('panel_history').setLabel('Historique').setEmoji('📜').setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId('panel_invites').setLabel('Invites').setEmoji('📨').setStyle(ButtonStyle.Secondary)
   );
-  return { embeds: [panel], components: [rowPlay, rowSocial] };
+  return { embeds: [panel], components: [rowMain, rowRanks] };
+}
+
+/** Panel privé (MP ou éphémère) : tout pour jouer. */
+function buildDmPlayPayload(userId) {
+  const lang = getLang(userId);
+  const embed = new EmbedBuilder()
+    .setColor(0xA855F7)
+    .setAuthor({ name: 'ZNK CASINO' })
+    .setTitle(lang === 'en' ? 'Your private casino' : 'Ton casino privé')
+    .setDescription(
+      lang === 'en'
+        ? `Language saved: **English**\nDaily: **${DAILY_AMOUNT} ${COIN}** · once per day (Paris midnight)\nPick a game below or use the account buttons.`
+        : `Langue enregistrée : **Français**\nDaily : **${DAILY_AMOUNT} ${COIN}** · 1× / jour (minuit Paris)\nChoisis un jeu ci-dessous ou utilise les boutons compte.`
+    )
+    .setFooter({ text: `ZNK · ${COIN}` })
+    .setTimestamp();
+
+  const row1 = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('panel_play').setLabel(lang === 'en' ? 'Play' : 'Jouer').setEmoji('🎮').setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId('panel_daily').setLabel('Daily').setEmoji('🎁').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId('panel_balance').setLabel(lang === 'en' ? 'Balance' : 'Solde').setEmoji('💰').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('panel_send').setLabel(lang === 'en' ? 'Send' : 'Envoyer').setEmoji('💸').setStyle(ButtonStyle.Primary)
+  );
+  const row2 = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('panel_history').setLabel(lang === 'en' ? 'History' : 'Historique').setEmoji('📜').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('panel_top').setLabel(lang === 'en' ? 'Leaderboard' : 'Classement').setEmoji('🏆').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('panel_topall').setLabel('All-time').setEmoji('👑').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('panel_clear').setLabel('Clear').setEmoji('🧹').setStyle(ButtonStyle.Danger)
+  );
+  return { embeds: [embed], components: [row1, row2] };
 }
 
 // Menu jeux : TOUS les jeux visibles (17 ≤ 5×4 boutons), + select menu en secours
@@ -2154,19 +2182,9 @@ function buildGameMenuPayload(userId = null) {
 
   const embed = new EmbedBuilder()
     .setColor(0xA855F7)
-    .setAuthor({ name: t(userId, 'lobbyAuthor') })
+    .setAuthor({ name: 'ZNK CASINO' })
     .setTitle(t(userId, 'lobbyTitle'))
-    .setDescription(
-      [
-        '```ansi',
-        '[2;35m╭──────────────────────────╮[0m',
-        '[2;35m│[0m  [1;37m▼  OPEN THE MENU  ▼[0m     [2;35m│[0m',
-        '[2;35m╰──────────────────────────╯[0m',
-        '```',
-        '',
-        t(userId, 'lobbyDesc'),
-      ].join('\n')
-    )
+    .setDescription(t(userId, 'lobbyDesc'))
     .setFooter({ text: t(userId, 'lobbyFooter') })
     .setTimestamp();
 
@@ -2264,10 +2282,47 @@ async function handlePanelButton(i) {
   }
 
   switch (i.customId) {
+    case 'panel_start': {
+      if (i.guild?.id) userHomeGuild.set(i.user.id, i.guild.id);
+      const payload = buildDmPlayPayload(i.user.id);
+      try {
+        const dm = await i.user.createDM();
+        await dm.send(payload);
+        return i.reply({
+          content:
+            getLang(i.user.id) === 'en'
+              ? '✅ **Start** sent in your DMs. Open your private messages with the bot.'
+              : '✅ **Start** envoyé en **message privé**. Ouvre tes MP avec le bot.',
+          flags: EPH,
+        });
+      } catch {
+        return i.reply({
+          content:
+            getLang(i.user.id) === 'en'
+              ? '⚠️ Could not DM you (DMs closed). Here’s your private panel instead:'
+              : '⚠️ Impossible de t’écrire en MP (MP fermés). Voici ton panneau privé :',
+          ...payload,
+          flags: EPH,
+        });
+      }
+    }
     case 'panel_play':
       return i.reply({ ...buildGameMenuPayload(i.user.id), flags: EPH });
     case 'panel_settings':
       return i.reply({ ...buildSettingsPayload(i.user.id), flags: EPH });
+    case 'panel_clear': {
+      const g = games.get(i.user.id);
+      if (g?.timer) clearTimeout(g.timer);
+      games.delete(i.user.id);
+      unlock(i.user.id);
+      return i.reply({
+        content:
+          getLang(i.user.id) === 'en'
+            ? '🧹 Open games closed. You can play again from **Start** / **Play**.'
+            : '🧹 Parties en cours fermées. Tu peux rejouer via **Start** / **Jouer**.',
+        flags: EPH,
+      });
+    }
     case 'panel_lang_fr': {
       setLang(i.user.id, 'fr');
       return i.update({
@@ -2299,7 +2354,6 @@ async function handlePanelButton(i) {
     case 'panel_daily': {
       const res = await rpc('claim_daily', { p_user_id: i.user.id, p_amount: DAILY_AMOUNT });
       if (res?.balance != null) await touchPeak(i.user.id, res.balance);
-      // dailyText + i18n léger
       if (res?.claimed) {
         return i.reply({
           content: `🎁 ${t(i.user.id, 'dailyOk')} **${fmt(DAILY_AMOUNT)}** ! ${t(i.user.id, 'newBalance')} : **${fmt(res.balance)}**`,
@@ -2313,11 +2367,11 @@ async function handlePanelButton(i) {
     }
     case 'panel_top': {
       await i.deferReply({ flags: EPH });
-      return i.editReply({ embeds: [await buildLeaderboardEmbed()] });
+      return i.editReply({ embeds: [await buildLeaderboardEmbed(getLang(i.user.id))] });
     }
     case 'panel_topall': {
       await i.deferReply({ flags: EPH });
-      return i.editReply({ embeds: [await buildAllTimeLeaderboardEmbed()] });
+      return i.editReply({ embeds: [await buildAllTimeLeaderboardEmbed(getLang(i.user.id))] });
     }
     case 'panel_history': {
       await i.deferReply({ flags: EPH });
@@ -3585,7 +3639,7 @@ async function cmdAdmin(msg) {
 // ============================================================
 //  CLASSEMENT (auto-actualisé toutes les minutes)
 // ============================================================
-async function buildLeaderboardEmbed() {
+async function buildLeaderboardEmbed(lang = 'fr') {
   const { data, error } = await supabase
     .from('players')
     .select('user_id, balance')
@@ -3598,20 +3652,31 @@ async function buildLeaderboardEmbed() {
   const lines = [];
   for (let i = 0; i < data.length; i++) {
     const u = await client.users.fetch(data[i].user_id).catch(() => null);
-    const name = u ? escapeMarkdown(u.globalName || u.username) : 'Utilisateur inconnu';
+    const name = u
+      ? escapeMarkdown(u.globalName || u.username)
+      : lang === 'en'
+        ? 'Unknown user'
+        : 'Utilisateur inconnu';
     lines.push(`${medals[i] ?? `**${i + 1}.**`} ${name} : **${fmt(data[i].balance)}**`);
   }
 
   return new EmbedBuilder()
-    .setTitle('🏆 Classement des plus riches')
+    .setTitle(lang === 'en' ? '🏆 Richest players' : '🏆 Classement des plus riches')
     .setColor(COLORS.gold)
-    .setDescription(lines.length ? lines.join('\n') : 'Personne n’a encore de pièces.')
-    .setFooter({ text: 'Mis à jour automatiquement toutes les minutes' })
+    .setDescription(
+      lines.length
+        ? lines.join('\n')
+        : lang === 'en'
+          ? 'No balances yet.'
+          : 'Personne n’a encore de coins.'
+    )
+    .setFooter({
+      text: lang === 'en' ? 'Auto-updated every minute' : 'Mis à jour automatiquement toutes les minutes',
+    })
     .setTimestamp();
 }
 
-async function buildAllTimeLeaderboardEmbed() {
-  // Seed peaks with current balances so the ranking is useful dès le démarrage
+async function buildAllTimeLeaderboardEmbed(lang = 'fr') {
   try {
     const { data } = await supabase.from('players').select('user_id, balance').gt('balance', 0).limit(50);
     if (data) {
@@ -3631,19 +3696,27 @@ async function buildAllTimeLeaderboardEmbed() {
   for (let i = 0; i < ranked.length; i++) {
     const [uid, peak] = ranked[i];
     const u = await client.users.fetch(uid).catch(() => null);
-    const name = u ? escapeMarkdown(u.globalName || u.username) : 'Utilisateur inconnu';
+    const name = u
+      ? escapeMarkdown(u.globalName || u.username)
+      : lang === 'en'
+        ? 'Unknown user'
+        : 'Utilisateur inconnu';
     lines.push(`${medals[i] ?? `**${i + 1}.**`} ${name} : **${fmt(peak)}**`);
   }
 
   return new EmbedBuilder()
-    .setTitle('👑 Classement all-time (solde max)')
+    .setTitle(lang === 'en' ? '👑 All-time leaderboard (peak balance)' : '👑 Classement all-time (solde max)')
     .setColor(COLORS.violet)
     .setDescription(
       lines.length
         ? lines.join('\n')
-        : 'Aucun record encore. Les pics se mettent à jour à chaque gain.'
+        : lang === 'en'
+          ? 'No records yet. Peaks update on every win.'
+          : 'Aucun record encore. Les pics se mettent à jour à chaque gain.'
     )
-    .setFooter({ text: 'Record = plus haut solde jamais atteint' })
+    .setFooter({
+      text: lang === 'en' ? 'Record = highest balance ever reached' : 'Record = plus haut solde jamais atteint',
+    })
     .setTimestamp();
 }
 
@@ -3800,7 +3873,11 @@ client.on(Events.MessageCreate, async (msg) => {
 // ============================================================
 client.on(Events.InteractionCreate, async (i) => {
   try {
-    if (!i.guild || !i.customId) return;
+    // Autorise le serveur + les MP (Start en DM) si on a un customId
+    if (!i.customId) return;
+    if (!i.guild && !userHomeGuild.has(i.user.id) && !i.customId.startsWith('panel_') && !i.customId.startsWith('modal_') && !i.customId.startsWith('ig_') && !i.customId.startsWith('rl_') && !i.customId.startsWith('bj_') && !i.customId.startsWith('mines_') && !i.customId.startsWith('replay|')) {
+      return;
+    }
     const id = i.customId;
 
     // Panneau admin
