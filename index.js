@@ -366,6 +366,47 @@ function receipt(rows) {
   return code(rows.map(([a, b]) => padR(a, 13) + padL(plain(b), 17)));
 }
 
+// ============================================================
+//  ANIMATIONS EN IMAGES  (dossier ./games : style néon violet, une image par étape)
+//  Jeux couverts pour l'instant : mines, bj, roulette, coinflip, dice, slots, wheel, duel, suit, zone.
+//  Les autres jeux gardent l'animation texte. Désactiver : variable GAME_IMAGES=off
+// ============================================================
+let gameAnimator = null;
+let gameAnimatorFailed = false;
+function getGameAnimator() {
+  if (gameAnimator || gameAnimatorFailed || !canvasLib) return gameAnimator;
+  try {
+    gameAnimator = require('./games').create({
+      canvasLib,
+      font: () => STATS_FONT,
+      sleep,
+      wantsSkip: wantsSkipAnim,
+      getTemplate: async () =>
+        (await getBgByUrl(CARD_BG.result, canvasLib.loadImage)) ||
+        (await getBgByUrl(localImg('game_result.png'), canvasLib.loadImage)),
+      getAvatar: (u) => getAvatarCached(u, canvasLib.loadImage),
+      userName: (u) => userName(u),
+      clean: (txt) => noEmoji(txt),
+      EmbedBuilder,
+      AttachmentBuilder,
+      color: gradientColor,
+    });
+    console.log(`[games] animations en images prêtes : ${gameAnimator.keys().join(', ')}`);
+  } catch (e) {
+    gameAnimatorFailed = true;
+    console.warn('[games] dossier ./games introuvable ou invalide, animations texte conservées :', e?.message || e);
+  }
+  return gameAnimator;
+}
+// true = animation image jouée (ou sautée par choix du joueur) ; false = repli sur l'animation texte
+async function playGameImages(i, key, res, ctx = {}) {
+  if (String(process.env.GAME_IMAGES || 'on').toLowerCase() === 'off') return false;
+  const a = getGameAnimator();
+  if (!a || !a.has(key)) return false;
+  return a.play(i, key, res, ctx);
+}
+const animResultText = (kind, mult) => (kind === 'win' ? `VICTOIRE ${fx(mult)}` : kind === 'lose' ? 'PERDU' : 'ÉGALITÉ');
+
 // ---------- Dés ASCII ----------
 const PIPS = { 1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] };
 function dieLines(n) {
@@ -818,14 +859,44 @@ async function recordResult({ guildId, user, game, bet, mult, payout, detail }) 
     console.error('[historique]', e?.message || e);
   }
 
-  if (profit <= 0 || !guildId) return;
+  if (profit <= 0) return;
   try {
-    const chId = guildChannels.get(`${guildId}:wins`);
-    if (!chId) return;
-    const ch = await client.channels.fetch(chId).catch(() => null);
-    if (!ch) return;
+    const ch = await findWinsChannel(guildId);
+    if (!ch) {
+      console.warn('[wins] aucun salon "wins" trouvé pour ce serveur : lance !wins (ou !setup) dans le serveur.');
+      return;
+    }
     const ping = wantsWinPing(user.id);
     const display = escapeMarkdown(user.globalName || user.username);
+    const mention = ping ? `<@${user.id}>` : undefined;
+    const allowedMentions = ping ? { users: [user.id] } : { parse: [] };
+
+    // 1) Image du profit (carte "victoire" : avatar, jeu, mise, multiplicateur, gain, profit)
+    let buf = null;
+    try {
+      buf = await withTimeout(renderWinNotif(user, game, bet, mult, profit, detail), 12000, null);
+    } catch (e) {
+      console.error('[wins] rendu de l\'image :', e?.message || e);
+    }
+    if (buf) {
+      try {
+        const fname = `win-${Date.now()}.png`;
+        const imgEmbed = new EmbedBuilder().setColor(COLORS.violet).setImage(`attachment://${fname}`);
+        await ch.send({
+          content: mention,
+          embeds: [imgEmbed],
+          files: [new AttachmentBuilder(buf, { name: fname })],
+          allowedMentions,
+        });
+        return;
+      } catch (e) {
+        console.error('[wins] envoi de l\'image refusé (droits "Joindre des fichiers" / "Intégrer des liens" ?), repli sur le texte :', e?.message || e);
+      }
+    } else {
+      console.warn('[wins] image non générée (@napi-rs/canvas ou images/win_notification.png manquant ?), repli sur le texte.');
+    }
+
+    // 2) Repli texte (jamais silencieux)
     const embed = new EmbedBuilder()
       .setColor(COLORS.violet)
       .setAuthor({ name: `${display} a gagné !`, iconURL: user.displayAvatarURL() })
@@ -839,32 +910,23 @@ async function recordResult({ guildId, user, game, bet, mult, payout, detail }) 
       )
       .setFooter({ text: 'ZNK Casino  •  Salon des victoires' })
       .setTimestamp();
-
-    const payload = {
-      content: ping ? `<@${user.id}>` : undefined,
-      embeds: [embed],
-      allowedMentions: ping ? { users: [user.id] } : { parse: [] },
-    };
-    let sent = false;
-    try {
-      const buf = await renderWinNotif(user, game, bet, mult, profit, detail);
-      if (buf) {
-        const fname = `win-${Date.now()}.png`;
-        const imgEmbed = new EmbedBuilder(embed.toJSON())
-          .setDescription(`### 🏆 ${ping ? `<@${user.id}>` : `**${display}**`} remporte **${fmt(profit)}** !`)
-          .setFields()
-          .setThumbnail(null)
-          .setImage(`attachment://${fname}`);
-        await ch.send({ ...payload, embeds: [imgEmbed], files: [new AttachmentBuilder(buf, { name: fname })] });
-        sent = true;
-      }
-    } catch (e) {
-      console.error('[wins] image refusée, repli sur le texte :', e?.message || e);
-    }
-    if (!sent) await ch.send(payload);
+    await ch.send({ content: mention, embeds: [embed], allowedMentions });
   } catch (e) {
     console.error('[wins]', e?.message || e);
   }
+}
+
+// Salon des victoires : mémorisé, sinon retrouvé par son nom (#wins). Partie en MP sans serveur connu : seul serveur du bot.
+async function findWinsChannel(guildId) {
+  let gid = guildId;
+  if (!gid) {
+    if (client.guilds.cache.size !== 1) return null;
+    gid = client.guilds.cache.first().id;
+  }
+  const guild = client.guilds.cache.get(gid) || (await client.guilds.fetch(gid).catch(() => null));
+  if (!guild) return null;
+  const ch = await getSavedChannel(guild, 'wins').catch(() => null);
+  return ch && ch.isTextBased && ch.isTextBased() ? ch : null;
 }
 
 async function historyEmbed(uid) {
@@ -1463,8 +1525,21 @@ async function settleMines(game, kind, i) {
     const payload = { embeds: [minesEmbed(game, { text, color, balance })], components: minesRows(game, true) };
     putCard(payload, await withTimeout(resultCard(game.user, 'mines', game.bet, mult, round2(payout - game.bet), balance), 4000, null));
 
+    let minesImgDone = false;
+    if (counted) {
+      const mKind = kind === 'lose' ? 'lose' : 'win';
+      minesImgDone = await playGameImages(i || game.lastI, 'mines', null, {
+        user: game.user,
+        bet: game.bet,
+        outcome: mKind,
+        resultText: animResultText(mKind, mult),
+        sub: `Mise ${coinTxt(game.bet)} · ${LEVELS[game.level].name}`,
+        data: { revealed: [...game.revealed], mines: [...game.mineSet], hit: kind === 'lose' ? game.hit : null },
+      });
+    }
+
     if (i) {
-      if (held) {
+      if (held && !minesImgDone) {
         const wait = 900 - (Date.now() - t0); // suspense : la case s'ouvre avant le verdict
         if (wait > 0) await sleep(wait);
       }
@@ -1643,7 +1718,22 @@ async function dealAnimation(i, game) {
     caption: s.cap,
     ms: 850,
   }));
-  await animate(i, frames, '🃏 Blackjack', '', 'bj');
+  const imgSteps = steps.map((s) => ({
+    p: s.p,
+    d: s.d,
+    hidden: s.hidden,
+    cap: s.cap,
+    ms: 850,
+    pv: s.p.length ? handValue(s.p) : null,
+    dv: s.d.length ? handValue(s.d) : null,
+  }));
+  const bjDone = await playGameImages(i, 'bj', null, {
+    user: game.user,
+    bet: game.bet,
+    sub: `Mise ${coinTxt(game.bet)}`,
+    data: { steps: imgSteps },
+  });
+  if (!bjDone) await animate(i, frames, '🃏 Blackjack', '', 'bj');
 }
 
 async function startBlackjack(i, bet) {
@@ -1963,10 +2053,19 @@ async function playRoulette(i, bet, choiceStr) {
 
     const balance = payout > 0 ? await credit(uid, payout) : await getBalance(uid);
 
-    await animate(i, rouletteFrames(result, choice), '🎡 Roulette', `Mise **${fmt(bet)}**\n`, 'roulette');
-
     const profit = round2(payout - bet);
     const kind = won ? 'win' : 'lose';
+    const rlImgDone = await playGameImages(i, 'roulette', null, {
+      user: i.user,
+      bet,
+      outcome: kind,
+      resultText: animResultText(kind, rlMult),
+      pickLabel: noEmoji(choice.label),
+      sub: `Mise ${coinTxt(bet)} · ${noEmoji(choice.label)}`,
+      data: { order: WHEEL_ORDER, reds: [...REDS], result },
+    });
+    if (!rlImgDone) await animate(i, rouletteFrames(result, choice), '🎡 Roulette', `Mise **${fmt(bet)}**\n`, 'roulette');
+
     const embed = brand(
       new EmbedBuilder()
         .setTitle('🎡 Roulette')
@@ -4449,9 +4548,19 @@ async function playInstant(i, key, bet, choice) {
     } catch (animErr) {
       console.error('[anim]', key, animErr?.message || animErr);
     }
-    await animate(i, frames, G.title, `Mise **${fmt(bet)}** · ${res.pick || ''}\n`, key);
-
     const kind = profit > 0 ? 'win' : profit < 0 ? 'lose' : 'push';
+    const imgDone = await playGameImages(i, key, res, {
+      user: i.user,
+      bet,
+      choice,
+      coef: c,
+      outcome: kind,
+      resultText: animResultText(kind, mult),
+      sub: `Mise ${coinTxt(bet)} · ${noEmoji(res.pick || '')}`,
+      data: { wheel: WHEEL },
+    });
+    if (!imgDone) await animate(i, frames, G.title, `Mise **${fmt(bet)}** · ${res.pick || ''}\n`, key);
+
     const text =
       payout === 0
         ? `Tu laisses **${fmt(bet)}**.`
@@ -8348,6 +8457,16 @@ const CARD_BG = {
   menu: bgSource('MENU_BG_URL', 'casino_menu.png'),
   invite: bgSource('INVITE_NOTIF_BG_URL', 'invite_notification.png'),
 };
+const CARD_FILE = {
+  win: 'win_notification.png',
+  result: 'game_result.png',
+  daily: 'daily_reward.png',
+  transfer: 'transfer.png',
+  announce: 'announcement.png',
+  online: 'online_games.png',
+  menu: 'casino_menu.png',
+  invite: 'invite_notification.png',
+};
 const CARD_L = {
   av: { cx: 103, cy: 114.5, d: 84 },
   tx: 171,
@@ -8386,17 +8505,39 @@ function drawStar(g, cx, cy, r) {
 async function renderCard(kind, d) {
   if (!canvasLib) return null;
   const { createCanvas, loadImage } = canvasLib;
-  const bgImg = await getBgByUrl(CARD_BG[kind], loadImage);
-  if (!bgImg) return null;
+  // 1) lien Railway  2) fichier local images/…  3) dégradé violet dessiné (la carte est TOUJOURS une image)
+  let bgImg = await getBgByUrl(CARD_BG[kind], loadImage);
+  if (!bgImg && CARD_FILE[kind]) bgImg = await getBgByUrl(localImg(CARD_FILE[kind]), loadImage);
   const W = 800, H = 400, SCALE = 1.25;
   const cv = createCanvas(W * SCALE, H * SCALE);
   const g = cv.getContext('2d');
   g.scale(SCALE, SCALE);
   const FONT = STATS_FONT;
   const S = noEmoji;
-  const k = Math.max(W / bgImg.width, H / bgImg.height);
-  const sw = W / k, sh = H / k;
-  g.drawImage(bgImg, (bgImg.width - sw) / 2, (bgImg.height - sh) / 2, sw, sh, 0, 0, W, H);
+  if (bgImg) {
+    const k = Math.max(W / bgImg.width, H / bgImg.height);
+    const sw = W / k, sh = H / k;
+    g.drawImage(bgImg, (bgImg.width - sw) / 2, (bgImg.height - sh) / 2, sw, sh, 0, 0, W, H);
+  } else {
+    console.warn(`[carte ${kind}] image de fond introuvable : dégradé violet de secours`);
+    const bg = g.createLinearGradient(0, 0, W, H);
+    bg.addColorStop(0, '#1A0B2E');
+    bg.addColorStop(0.5, '#4C1D95');
+    bg.addColorStop(1, '#A81CFD');
+    g.fillStyle = bg;
+    g.fillRect(0, 0, W, H);
+    g.fillStyle = 'rgba(12,3,30,0.6)';
+    roundRect(g, 50, 70, 695, 270, 18);
+    g.fill();
+    g.fillStyle = 'rgba(168,85,247,0.55)';
+    roundRect(g, CARD_L.bar.x, CARD_L.bar.y, CARD_L.bar.w, CARD_L.bar.h, 10);
+    g.fill();
+    g.fillStyle = 'rgba(12,3,30,0.75)';
+    for (const [ry, rh] of CARD_L.rows) for (const [cx, cw] of CARD_L.cols) {
+      roundRect(g, cx, ry, cw, rh, 10);
+      g.fill();
+    }
+  }
 
   // avatar rond (dans le cadre du gabarit)
   const A = CARD_L.av;
@@ -8463,6 +8604,7 @@ async function makeCard(kind, d) {
   }
 }
 async function editWithCard(i, payload) {
+  if (payload.attachments === undefined && !payload.files?.length) payload.attachments = []; // retire les images d'animation
   try {
     return await i.editReply(payload);
   } catch (e) {
@@ -8470,6 +8612,7 @@ async function editWithCard(i, payload) {
     console.error('[carte] image refusée, repli sur le texte :', e?.message || e);
     payload.embeds.forEach((em) => em.setImage(null));
     payload.files = [];
+    payload.attachments = [];
     return i.editReply(payload);
   }
 }
@@ -9387,6 +9530,28 @@ client.on(Events.ChannelDelete, async (channel) => {
   }
 });
 
+// Image dédiée à chaque jeu : images/games/<clé>.jpg (sinon carte générique)
+const GAME_BG_BY_NAME = new Map();
+const GAME_BG_BY_TITLE = new Map();
+const GAME_BG_BY_ICON = new Map();
+for (const k of Object.keys(GAME_NAMES)) {
+  GAME_BG_BY_NAME.set(gameNamePlain(k).toUpperCase(), k);
+  GAME_BG_BY_TITLE.set(GAME_NAMES[k], k);
+  const ic = gameIcon(k);
+  GAME_BG_BY_ICON.set(ic, GAME_BG_BY_ICON.has(ic) ? null : k); // icône partagée par plusieurs jeux : ignorée
+}
+function gameBgForEmbed(e) {
+  const authorName = String(e?.author?.name || '');
+  const last = authorName.includes('•') ? authorName.split('•').pop().trim().toUpperCase() : '';
+  const key =
+    GAME_BG_BY_NAME.get(last) ||
+    GAME_BG_BY_TITLE.get(String(e?.title || '').trim()) ||
+    GAME_BG_BY_ICON.get(e?.thumbnail?.url) ||
+    null;
+  if (!key) return null;
+  return localImg(`games/${key}.jpg`) || null;
+}
+
 // ============================================================
 //  TEXTE -> IMAGE : plus aucun texte "normal", tout est converti en image (voir textcard.js)
 //  Désactiver temporairement : variable Railway TEXT_CARDS=off
@@ -9402,6 +9567,7 @@ if (String(process.env.TEXT_CARDS || 'on').toLowerCase() !== 'off') {
       getBg: getBgByUrl,
       loadRemoteImage,
       getAvatar: getAvatarCached,
+      gameBg: gameBgForEmbed,
     });
   } catch (e) {
     console.error('[textcard] non chargé (textcard.js manquant ?) :', e?.message || e);
