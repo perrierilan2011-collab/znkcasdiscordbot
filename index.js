@@ -40,10 +40,17 @@ let STATS_FONT = 'sans-serif';
 if (canvasLib && canvasLib.GlobalFonts) {
   try {
     const dir = path.join(__dirname, 'fonts');
-    const reg = canvasLib.GlobalFonts.registerFromPath(path.join(dir, 'DejaVuSans.ttf'), 'ZNKSans');
-    canvasLib.GlobalFonts.registerFromPath(path.join(dir, 'DejaVuSans-Bold.ttf'), 'ZNKSans');
-    if (reg) STATS_FONT = 'ZNKSans';
-    else console.warn('[stats] police ./fonts/DejaVuSans.ttf introuvable : texte de la bannière peut être invisible.');
+    const files = fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => /\.(ttf|otf)$/i.test(f)) : [];
+    let loaded = 0;
+    for (const f of files) {
+      if (canvasLib.GlobalFonts.registerFromPath(path.join(dir, f), 'ZNKSans')) loaded++;
+    }
+    if (loaded) {
+      STATS_FONT = 'ZNKSans';
+      console.log(`[stats] ${loaded} police(s) chargée(s) depuis ${dir} : ${files.join(', ')}`);
+    } else {
+      console.warn(`[stats] aucune police valide dans ${dir} (fichiers trouvés : ${files.join(', ') || 'aucun'}) : le texte de la bannière sera invisible.`);
+    }
   } catch (e) {
     console.warn('[stats] enregistrement de la police impossible :', e?.message || e);
   }
