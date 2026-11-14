@@ -926,6 +926,8 @@ function fitText(g, text, maxW) {
 
 // Image de fond des stats (variable Railway STATS_BG_URL). Chargée une fois puis gardée en cache.
 const STATS_BG_URL = String(process.env.STATS_BG_URL || '').trim();
+// STATS_BG_MODE=template : l'image contient déjà les cartes (le bot n'écrit que le texte dedans)
+const STATS_BG_MODE = String(process.env.STATS_BG_MODE || '').trim().toLowerCase();
 let statsBgPromise = null;
 function getStatsBg(loadImage) {
   if (!STATS_BG_URL) return Promise.resolve(null);
@@ -956,9 +958,9 @@ async function renderStatsBanner(user, st, balance, lang) {
   const W = 800;
   const H = 400;
   const SCALE = 1.25;
-const cv = createCanvas(W * SCALE, H * SCALE);
-const g = cv.getContext('2d');
-g.scale(SCALE, SCALE);
+  const cv = createCanvas(W * SCALE, H * SCALE);
+  const g = cv.getContext('2d');
+  g.scale(SCALE, SCALE);
   const FONT = STATS_FONT;
   const en = lang === 'en';
 
@@ -970,31 +972,53 @@ g.scale(SCALE, SCALE);
   g.fillStyle = bg;
   g.fillRect(0, 0, W, H);
   const bgImg = await getStatsBg(loadImage);
+  // Mode "template" : l'image contient déjà les cartes, on n'écrit que le texte dedans.
+  const T = !!(bgImg && STATS_BG_MODE === 'template');
   if (bgImg) {
-    // recadrage "cover" centré (aucune déformation), puis voile sombre pour garder le texte lisible
+    // recadrage "cover" centré (aucune déformation)
     const k = Math.max(W / bgImg.width, H / bgImg.height);
     const sw = W / k;
     const sh = H / k;
     g.drawImage(bgImg, (bgImg.width - sw) / 2, (bgImg.height - sh) / 2, sw, sh, 0, 0, W, H);
-    g.fillStyle = 'rgba(15,4,30,0.45)';
-    g.fillRect(0, 0, W, H);
+    if (!T) {
+      g.fillStyle = 'rgba(15,4,30,0.45)'; // voile sombre pour garder le texte lisible
+      g.fillRect(0, 0, W, H);
+    }
   }
-  g.fillStyle = 'rgba(255,255,255,0.06)';
-  g.beginPath(); g.arc(W - 60, -20, 170, 0, Math.PI * 2); g.fill();
-  g.beginPath(); g.arc(-40, H + 20, 130, 0, Math.PI * 2); g.fill();
-  g.fillStyle = 'rgba(217,70,239,0.10)';
-  g.beginPath(); g.arc(W - 200, H + 50, 150, 0, Math.PI * 2); g.fill();
+  if (!T) {
+    g.fillStyle = 'rgba(255,255,255,0.06)';
+    g.beginPath(); g.arc(W - 60, -20, 170, 0, Math.PI * 2); g.fill();
+    g.beginPath(); g.arc(-40, H + 20, 130, 0, Math.PI * 2); g.fill();
+    g.fillStyle = 'rgba(217,70,239,0.10)';
+    g.beginPath(); g.arc(W - 200, H + 50, 150, 0, Math.PI * 2); g.fill();
+  }
 
-  // carte d'en-tête (profil)
+  // ---- mise en page : standard ou calée sur l'image template (1774x887 -> 800x400) ----
   const PAD = 28;
-  g.fillStyle = 'rgba(0,0,0,0.28)';
-  roundRect(g, PAD, PAD, W - PAD * 2, 128, 20);
-  g.fill();
+  const head = T ? { x: 210, y: 79, w: 545, h: 95 } : { x: PAD, y: PAD, w: W - PAD * 2, h: 128 };
+  const bar = T ? { x: 56, y: 184, w: 695, h: 38 } : { x: PAD, y: PAD + 128 + 14, w: W - PAD * 2, h: 44 };
+  let boxes;
+  if (T) {
+    const cols = [[56, 224], [293, 222], [527, 224]];
+    const rows = [[237, 46], [292, 47]];
+    boxes = rows.flatMap(([y, h]) => cols.map(([x, w]) => ({ x, y, w, h })));
+  } else {
+    const gap = 12;
+    const cw = Math.floor((W - PAD * 2 - gap * 2) / 3);
+    const top = bar.y + 44 + 14;
+    boxes = range(6).map((k) => ({ x: PAD + (k % 3) * (cw + gap), y: top + Math.floor(k / 3) * (62 + 10), w: cw, h: 62 }));
+  }
+
+  if (!T) {
+    g.fillStyle = 'rgba(0,0,0,0.28)';
+    roundRect(g, head.x, head.y, head.w, head.h, 20);
+    g.fill();
+  }
 
   // avatar rond, ratio carré respecté (aucune déformation), halo lumineux
-  const AV = 96;
-  const ax = PAD + 20;
-  const ay = PAD + (128 - AV) / 2;
+  const AV = T ? 66 : 96;
+  const ax = head.x + (T ? 14 : 20);
+  const ay = head.y + (head.h - AV) / 2;
   const acx = ax + AV / 2;
   const acy = ay + AV / 2;
   g.save();
@@ -1016,7 +1040,7 @@ g.scale(SCALE, SCALE);
     g.fillStyle = '#5865F2';
     g.fillRect(ax, ay, AV, AV);
     g.fillStyle = '#fff';
-    g.font = `bold 46px ${FONT}`;
+    g.font = `bold ${T ? 32 : 46}px ${FONT}`;
     g.textAlign = 'center';
     g.textBaseline = 'middle';
     g.fillText(String(user.username || '?')[0].toUpperCase(), acx, acy + 2);
@@ -1026,36 +1050,39 @@ g.scale(SCALE, SCALE);
   g.restore();
 
   // pseudo juste à droite de l'avatar + sous-titre
-  const tx = ax + AV + 22;
-  const tmax = W - PAD - 20 - tx;
+  const tx = ax + AV + (T ? 16 : 22);
+  const tmax = head.x + head.w - (T ? 16 : 20) - tx;
   const clean = (s) => String(s || '').replace(/[\u0000-\u001F\u007F]/g, '').trim();
   const display = clean(user.globalName || user.username) || 'Joueur';
   const handle = clean(user.username);
+  const fav = st.favorite ? gameNamePlain(st.favorite) : '-';
   g.textAlign = 'left';
   g.textBaseline = 'alphabetic';
+  const nameY = T ? acy - 8 : acy - 6;
   g.fillStyle = '#FFFFFF';
-  g.font = `bold 34px ${FONT}`;
-  g.fillText(fitText(g, display, tmax), tx, acy - 6);
+  g.font = `bold ${T ? 28 : 34}px ${FONT}`;
+  g.fillText(fitText(g, display, tmax), tx, nameY);
   g.fillStyle = 'rgba(255,255,255,0.75)';
-  g.font = `18px ${FONT}`;
-  g.fillText(fitText(g, handle && handle !== display ? `@${handle}` : 'ZNK CASINO', tmax), tx, acy + 20);
+  g.font = `${T ? 16 : 18}px ${FONT}`;
+  g.fillText(fitText(g, handle && handle !== display ? `@${handle}` : 'ZNK CASINO', tmax), tx, nameY + (T ? 22 : 26));
   g.fillStyle = 'rgba(255,255,255,0.6)';
-  g.font = `15px ${FONT}`;
-  const fav = st.favorite ? gameNamePlain(st.favorite) : '-';
-  g.fillText(fitText(g, `${en ? 'Favorite' : 'Jeu favori'} : ${fav}`, tmax), tx, acy + 44);
+  g.font = `${T ? 13 : 15}px ${FONT}`;
+  g.fillText(fitText(g, `${en ? 'Favorite' : 'Jeu favori'} : ${fav}`, tmax), tx, nameY + (T ? 42 : 50));
 
   // solde (ligne dédiée, pas de chevauchement avec le pseudo)
-  const by = PAD + 128 + 14;
-  g.fillStyle = 'rgba(255,255,255,0.14)';
-  roundRect(g, PAD, by, W - PAD * 2, 44, 14);
-  g.fill();
-  g.fillStyle = 'rgba(255,255,255,0.75)';
-  g.font = `bold 15px ${FONT}`;
-  g.fillText(en ? 'BALANCE' : 'SOLDE', PAD + 18, by + 28);
+  if (!T) {
+    g.fillStyle = 'rgba(255,255,255,0.14)';
+    roundRect(g, bar.x, bar.y, bar.w, bar.h, 14);
+    g.fill();
+  }
+  const barPad = T ? 16 : 18;
+  g.fillStyle = T ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.75)';
+  g.font = `bold ${T ? 14 : 15}px ${FONT}`;
+  g.fillText(en ? 'BALANCE' : 'SOLDE', bar.x + barPad, bar.y + bar.h / 2 + 5);
   g.textAlign = 'right';
   g.fillStyle = '#FFFFFF';
-  g.font = `bold 24px ${FONT}`;
-  g.fillText(`${compact(balance)} ${COIN_PLAIN}`, W - PAD - 18, by + 31);
+  g.font = `bold ${T ? 22 : 24}px ${FONT}`;
+  g.fillText(`${compact(balance)} ${COIN_PLAIN}`, bar.x + bar.w - barPad, bar.y + bar.h / 2 + (T ? 8 : 9));
   g.textAlign = 'left';
 
   // 6 cartes de stats (grille 3x2)
@@ -1067,22 +1094,20 @@ g.scale(SCALE, SCALE);
     [en ? 'NET PROFIT' : 'PROFIT NET', `${st.net > 0 ? '+' : ''}${compact(st.net)} ${COIN_PLAIN}`, st.net >= 0 ? '#86EFAC' : '#FCA5A5'],
     [en ? 'WIN RATE' : 'TAUX DE VICTOIRE', `${st.rate} %`, '#F0ABFC'],
   ];
-  const gap = 12;
-  const cw = Math.floor((W - PAD * 2 - gap * 2) / 3);
-  const ch = 62;
-  const top = by + 44 + 14;
   cells.forEach(([label, value, color], k) => {
-    const cx = PAD + (k % 3) * (cw + gap);
-    const cy = top + Math.floor(k / 3) * (ch + 10);
-    g.fillStyle = 'rgba(0,0,0,0.28)';
-    roundRect(g, cx, cy, cw, ch, 14);
-    g.fill();
-    g.fillStyle = 'rgba(255,255,255,0.7)';
-    g.font = `bold 12px ${FONT}`;
-    g.fillText(fitText(g, label, cw - 28), cx + 14, cy + 22);
+    const b = boxes[k];
+    if (!T) {
+      g.fillStyle = 'rgba(0,0,0,0.28)';
+      roundRect(g, b.x, b.y, b.w, b.h, 14);
+      g.fill();
+    }
+    const px = T ? 14 : 14;
+    g.fillStyle = 'rgba(255,255,255,0.78)';
+    g.font = `bold ${T ? 11 : 12}px ${FONT}`;
+    g.fillText(fitText(g, label, b.w - px * 2), b.x + px, b.y + (T ? 17 : 22));
     g.fillStyle = color;
-    g.font = `bold 21px ${FONT}`;
-    g.fillText(fitText(g, value.replace(/\s/g, ' '), cw - 28), cx + 14, cy + 49);
+    g.font = `bold ${T ? 19 : 21}px ${FONT}`;
+    g.fillText(fitText(g, value.replace(/\s/g, ' '), b.w - px * 2), b.x + px, b.y + (T ? 38 : 49));
   });
 
   return cv.toBuffer('image/png');
