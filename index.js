@@ -973,18 +973,15 @@ g.scale(SCALE, SCALE);
   const tx = ax + AV + 22;
   const tmax = W - PAD - 20 - tx;
   const clean = (s) => String(s || '').replace(/[\u0000-\u001F\u007F]/g, '').trim();
+  const display = clean(user.globalName || user.username) || 'Joueur';
   const handle = clean(user.username);
-g.fillText(
-  fitText(g, handle ? `@${handle}` : 'ZNK CASINO', tmax),
-  tx,
-  acy + 20
-);
+  g.textAlign = 'left';
+  g.textBaseline = 'alphabetic';
   g.fillStyle = '#FFFFFF';
   g.font = `bold 34px ${FONT}`;
   g.fillText(fitText(g, display, tmax), tx, acy - 6);
   g.fillStyle = 'rgba(255,255,255,0.75)';
   g.font = `18px ${FONT}`;
-  const handle = clean(user.username);
   g.fillText(fitText(g, handle && handle !== display ? `@${handle}` : 'ZNK CASINO', tmax), tx, acy + 20);
   g.fillStyle = 'rgba(255,255,255,0.6)';
   g.font = `15px ${FONT}`;
@@ -1748,7 +1745,7 @@ async function playRoulette(i, bet, choiceStr) {
 
     const result = randomInt(0, 37);
     const won = choice.win(result);
-    const boost = getBoost(i.guildId);
+    const boost = getBoost(resolveGuildId(i));
     const rlMult = round2(choice.mult * coef('roulette') * (won ? boost.winMult || 1 : 1));
     const payout = won ? floor2(bet * rlMult) : 0;
     if (!won && (boost.loseMult || 1) > 1) {
@@ -3295,9 +3292,9 @@ ANIMS.scratch = (res) => {
     ]);
   const steps = [
     [[0, 0, 0], 'Le ticket est prêt'],
-    [[1, 0, 0], 'Tu gratte la première case...'],
+    [[1, 0, 0], 'Tu grattes la première case...'],
     [[2, 0, 0], `Première case : ${res.cells[0]}`],
-    [[2, 1, 0], 'Tu gratte la deuxième case...'],
+    [[2, 1, 0], 'Tu grattes la deuxième case...'],
     [[2, 2, 0], `Deuxième case : ${res.cells[1]}`],
     [[2, 2, 1], 'Dernière case...'],
     [[2, 2, 2], res.cells[0] === res.cells[1] && res.cells[1] === res.cells[2] ? 'Trois identiques : GAGNÉ !' : 'Pas de trio : perdu'],
@@ -4229,7 +4226,7 @@ async function playInstant(i, key, bet, choice) {
 
     const c = coef(key);
     const res = G.resolve(choice, c);
-    const boost = getBoost(i.guildId);
+    const boost = getBoost(resolveGuildId(i));
     const mult = res.base > 0 ? round2(res.base * c * (boost.winMult || 1)) : 0;
     const payout = mult > 0 ? floor2(bet * mult) : 0;
     let extraLoss = 0;
@@ -4456,7 +4453,7 @@ const GAME_MENU = [
   ['dicewar', 'Guerre dés', '🎲', 'Dés vs dés'],
   ['coinladder', 'Échelle pièces', '🪙', 'Pile/face en chaîne'],
   ['cardmatch', 'Match cartes', '🃏', 'Retrouve la carte'],
-  ['numguess', 'Devine nombre', '🔢', '1 à 20'],
+  ['numguess', 'Devine nombre', '🔢', '1 à 10'],
   ['bombdefuse', 'Désamorçage', '💣', 'Coupe le bon fil'],
   ['treasure', 'Trésor', '🗺️', 'Choisis la case'],
   ['highcard', 'Carte haute', '🃏', 'Au-dessus de 7'],
@@ -5854,7 +5851,7 @@ async function handleAdmin(i) {
       return i.followUp({ content: `📬 MP : **${rg.ok}** ok · **${rg.fail}** échecs.`, flags: EPH }).catch(() => {});
     }
 
-    const mm = id.match(/^modal_admin_mult_([a-z]+)$/);
+    const mm = id.match(/^modal_admin_mult_([a-z0-9]+)$/);
     if (mm) {
       const game = mm[1];
       if (!GAME_NAMES[game]) return;
@@ -7425,7 +7422,7 @@ async function runOnlineCrash(lobby, ch) {
     lobby,
     ch,
     '🚀 Crash',
-    `${potLine(lobby)}\n\n${picks}\n\nLa fusée monte. Si elle explose **avant** ta cible, tu perds. Si ta cible est sous l’explosion, tu survit et tu partages le pot.`
+    `${potLine(lobby)}\n\n${picks}\n\nLa fusée monte. Si elle explose **avant** ta cible, tu perds. Si ta cible est sous l’explosion, tu survis et tu partages le pot.`
   );
   const steps = [1];
   let m = 1;
