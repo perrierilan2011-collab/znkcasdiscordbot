@@ -9387,6 +9387,27 @@ client.on(Events.ChannelDelete, async (channel) => {
   }
 });
 
+// ============================================================
+//  TEXTE -> IMAGE : plus aucun texte "normal", tout est converti en image (voir textcard.js)
+//  Désactiver temporairement : variable Railway TEXT_CARDS=off
+// ============================================================
+if (String(process.env.TEXT_CARDS || 'on').toLowerCase() !== 'off') {
+  try {
+    require('./textcard').install({
+      client,
+      discord: require('discord.js'),
+      canvasLib,
+      FONT: STATS_FONT,
+      localImg,
+      getBg: getBgByUrl,
+      loadRemoteImage,
+      getAvatar: getAvatarCached,
+    });
+  } catch (e) {
+    console.error('[textcard] non chargé (textcard.js manquant ?) :', e?.message || e);
+  }
+}
+
 client.once(Events.ClientReady, (c) => {
   console.log(`✅ Connecté en tant que ${c.user.tag}`);
   loadMultipliers();
