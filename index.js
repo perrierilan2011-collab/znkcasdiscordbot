@@ -6322,30 +6322,77 @@ function trackAlltime(guildId, channelId, messageId) {
   alltimeBoardMessages.set(guildId, { channelId, messageId });
   saveAlltimeMsgs();
 }
-// Retrouve (ou reposte) le message du classement all-time de chaque serveur
+// Supprime TOUS les messages d'un salon sauf celui à garder (le classement)
+async function purgeChannelExcept(ch, keepId) {
+  let deleted = 0;
+  try {
+    let before;
+    for (let n = 0; n < 50; n++) {
+      const batch = await ch.messages.fetch({ limit: 100, ...(before ? { before } : {}) });
+      if (!batch.size) break;
+      before = batch.last().id;
+      const toDelete = batch.filter((m) => m.id !== keepId);
+      const recent = toDelete.filter((m) => Date.now() - m.createdTimestamp < 13 * 24 * 3600 * 1000);
+      const old = toDelete.filter((m) => !recent.has(m.id));
+      if (recent.size > 1) deleted += (await ch.bulkDelete(recent, true)).size;
+      else if (recent.size === 1) {
+        await recent.first().delete().catch(() => {});
+        deleted++;
+      }
+      for (const m of old.values()) {
+        await m.delete().catch(() => {});
+        deleted++;
+      }
+      if (batch.size < 100) break;
+    }
+  } catch (e) {
+    console.error('[alltime] purge', e?.message || e);
+  }
+  return deleted;
+}
+const alltimeCleaned = new Set(); // serveurs déjà nettoyés depuis le démarrage
+// Retrouve (ou reposte) le message du classement all-time de chaque serveur, et ne garde que lui dans le salon
 async function ensureAlltimeMessages() {
   for (const guild of client.guilds.cache.values()) {
-    if (alltimeBoardMessages.has(guild.id)) continue;
     const chId = guildChannels.get(`${guild.id}:alltime`);
     if (!chId) continue;
     try {
       const ch = await client.channels.fetch(chId).catch(() => null);
-      if (!ch) continue;
-      const recent = await ch.messages.fetch({ limit: 25 }).catch(() => null);
-      const mine = recent?.find(
-        (m) => m.author.id === client.user.id && /^Record/.test(m.embeds?.[0]?.footer?.text || '')
-      );
-      if (mine) trackAlltime(guild.id, ch.id, mine.id);
-      else {
-        const sent = await ch.send(await buildBoardPayload('alltime'));
-        await sent.pin().catch(() => {});
-        trackAlltime(guild.id, ch.id, sent.id);
+      if (!ch || !ch.messages) continue;
+      let info = alltimeBoardMessages.get(guild.id);
+      let fresh = false;
+      if (!info) {
+        fresh = true;
+        const recent = await ch.messages.fetch({ limit: 50 }).catch(() => null);
+        // le plus récent message du bot qui porte un embed ou une image (ne dépend plus du texte du footer)
+        const mine = recent?.find((m) => m.author.id === client.user.id && !m.system && (m.embeds.length || m.attachments.size));
+        if (mine) trackAlltime(guild.id, ch.id, mine.id);
+        else {
+          const sent = await ch.send(await buildBoardPayload('alltime'));
+          trackAlltime(guild.id, ch.id, sent.id);
+        }
+        info = alltimeBoardMessages.get(guild.id);
+      }
+      if (fresh || !alltimeCleaned.has(guild.id)) {
+        await purgeChannelExcept(ch, info.messageId);
+        alltimeCleaned.add(guild.id);
       }
     } catch (e) {
       console.error('[alltime] restauration', e?.message || e);
     }
   }
 }
+// Le salon all-time ne doit contenir qu'un message : on supprime tout ce que postent les membres / le système (ex. "a épinglé un message")
+client.on(Events.MessageCreate, (m) => {
+  try {
+    if (!m.guild) return;
+    if (m.channelId !== guildChannels.get(`${m.guild.id}:alltime`)) return;
+    if (m.author?.bot && !m.system) return; // le message du classement lui-même
+    m.delete().catch(() => {});
+  } catch {
+    /* ignore */
+  }
+});
 
 // ============================================================
 //  POKER MULTIJOUEUR (Texas Hold'em simplifié, max 4)
@@ -7925,9 +7972,25 @@ async function createAllTimeChannel(i) {
   const me = guild.members.me;
   const existing = await getSavedChannel(guild, 'alltime');
   if (existing) {
-    const msg = await existing.send(await buildBoardPayload('alltime'));
-    trackAlltime(guild.id, existing.id, msg.id);
-    return i.reply({ content: `✅ Salon all-time déjà présent : <#${existing.id}> (classement reposté).`, flags: EPH });
+    await i.deferReply({ flags: EPH });
+    const payload = await buildBoardPayload('alltime');
+    let keepId = null;
+    const info = alltimeBoardMessages.get(guild.id);
+    if (info && info.channelId === existing.id) {
+      const m = await existing.messages.fetch(info.messageId).catch(() => null);
+      if (m) {
+        await m.edit(editable(payload)).catch(() => {});
+        keepId = m.id;
+      }
+    }
+    if (!keepId) {
+      const msg = await existing.send(payload);
+      trackAlltime(guild.id, existing.id, msg.id);
+      keepId = msg.id;
+    }
+    const n = await purgeChannelExcept(existing, keepId);
+    alltimeCleaned.add(guild.id);
+    return i.editReply({ content: `✅ Salon all-time : <#${existing.id}> (classement modifié, ${n} message(s) supprimé(s)).` });
   }
   if (!me.permissions.has(P.ManageChannels)) return i.reply({ content: NEED_MANAGE_CHANNELS, flags: EPH });
   const channel = await guild.channels.create({
@@ -7949,8 +8012,8 @@ async function createAllTimeChannel(i) {
     ],
   });
   const msg = await channel.send(await buildBoardPayload('alltime'));
-  await msg.pin().catch(() => {});
   trackAlltime(guild.id, channel.id, msg.id);
+  alltimeCleaned.add(guild.id);
   const saved = await saveChannel(guild.id, 'alltime', channel.id);
   return i.reply({ content: `✅ Salon <#${channel.id}> créé avec le classement all-time.${saved ? '' : DB_WARN}`, flags: EPH });
 }
