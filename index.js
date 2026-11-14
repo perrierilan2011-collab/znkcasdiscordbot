@@ -35,6 +35,20 @@ try {
   console.warn('[stats] @napi-rs/canvas absent : la bannière de stats sera remplacée par un embed texte (npm i @napi-rs/canvas).');
 }
 
+// Police embarquée (dossier ./fonts) : indispensable sur les serveurs sans polices système (Railway...)
+let STATS_FONT = 'sans-serif';
+if (canvasLib && canvasLib.GlobalFonts) {
+  try {
+    const dir = path.join(__dirname, 'fonts');
+    const reg = canvasLib.GlobalFonts.registerFromPath(path.join(dir, 'DejaVuSans.ttf'), 'ZNKSans');
+    canvasLib.GlobalFonts.registerFromPath(path.join(dir, 'DejaVuSans-Bold.ttf'), 'ZNKSans');
+    if (reg) STATS_FONT = 'ZNKSans';
+    else console.warn('[stats] police ./fonts/DejaVuSans.ttf introuvable : texte de la bannière peut être invisible.');
+  } catch (e) {
+    console.warn('[stats] enregistrement de la police impossible :', e?.message || e);
+  }
+}
+
 // ============================================================
 //  CONFIG
 // ============================================================
@@ -913,7 +927,7 @@ async function renderStatsBanner(user, st, balance, lang) {
 const cv = createCanvas(W * SCALE, H * SCALE);
 const g = cv.getContext('2d');
 g.scale(SCALE, SCALE);
-  const FONT = 'sans-serif';
+  const FONT = STATS_FONT;
   const en = lang === 'en';
 
   // fond dégradé violet ZNK
