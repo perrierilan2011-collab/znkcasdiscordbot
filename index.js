@@ -799,11 +799,26 @@ async function recordResult({ guildId, user, game, bet, mult, payout, detail }) 
       .setFooter({ text: 'ZNK Casino  •  Salon des victoires' })
       .setTimestamp();
 
-    await ch.send({
+    const payload = {
       content: ping ? `<@${user.id}>` : undefined,
       embeds: [embed],
       allowedMentions: ping ? { users: [user.id] } : { parse: [] },
-    });
+    };
+    try {
+      const buf = await renderWinNotif(user, game, bet, mult, profit);
+      if (buf) {
+        const fname = `win-${Date.now()}.png`;
+        embed
+          .setDescription(`### 🏆 ${ping ? `<@${user.id}>` : `**${display}**`} remporte **${fmt(profit)}** !`)
+          .setFields()
+          .setThumbnail(null)
+          .setImage(`attachment://${fname}`);
+        payload.files = [new AttachmentBuilder(buf, { name: fname })];
+      }
+    } catch (e) {
+      console.error('[wins] image', e?.message || e);
+    }
+    await ch.send(payload);
   } catch (e) {
     console.error('[wins]', e?.message || e);
   }
@@ -6094,6 +6109,46 @@ const CHANNEL_NAMES = {
   poker: 'online', // alias rétrocompat
 };
 const alltimeBoardMessages = new Map();
+const ALLTIME_MSG_FILE = path.join(__dirname, 'data', 'alltime_msgs.json');
+function saveAlltimeMsgs() {
+  saveJson(ALLTIME_MSG_FILE, Object.fromEntries(alltimeBoardMessages));
+}
+function loadAlltimeMsgs() {
+  try {
+    const raw = JSON.parse(fs.readFileSync(ALLTIME_MSG_FILE, 'utf8'));
+    for (const [gid, v] of Object.entries(raw)) if (v?.channelId && v?.messageId) alltimeBoardMessages.set(gid, v);
+  } catch {
+    /* premier lancement */
+  }
+}
+function trackAlltime(guildId, channelId, messageId) {
+  alltimeBoardMessages.set(guildId, { channelId, messageId });
+  saveAlltimeMsgs();
+}
+// Retrouve (ou reposte) le message du classement all-time de chaque serveur
+async function ensureAlltimeMessages() {
+  for (const guild of client.guilds.cache.values()) {
+    if (alltimeBoardMessages.has(guild.id)) continue;
+    const chId = guildChannels.get(`${guild.id}:alltime`);
+    if (!chId) continue;
+    try {
+      const ch = await client.channels.fetch(chId).catch(() => null);
+      if (!ch) continue;
+      const recent = await ch.messages.fetch({ limit: 25 }).catch(() => null);
+      const mine = recent?.find(
+        (m) => m.author.id === client.user.id && /^Record/.test(m.embeds?.[0]?.footer?.text || '')
+      );
+      if (mine) trackAlltime(guild.id, ch.id, mine.id);
+      else {
+        const sent = await ch.send(await buildBoardPayload('alltime'));
+        await sent.pin().catch(() => {});
+        trackAlltime(guild.id, ch.id, sent.id);
+      }
+    } catch (e) {
+      console.error('[alltime] restauration', e?.message || e);
+    }
+  }
+}
 
 // ============================================================
 //  POKER MULTIJOUEUR (Texas Hold'em simplifié, max 4)
@@ -7640,7 +7695,7 @@ async function createAllTimeChannel(i) {
   const existing = await getSavedChannel(guild, 'alltime');
   if (existing) {
     const msg = await existing.send(await buildBoardPayload('alltime'));
-    alltimeBoardMessages.set(guild.id, { channelId: existing.id, messageId: msg.id });
+    trackAlltime(guild.id, existing.id, msg.id);
     return i.reply({ content: `✅ Salon all-time déjà présent : <#${existing.id}> (classement reposté).`, flags: EPH });
   }
   if (!me.permissions.has(P.ManageChannels)) return i.reply({ content: NEED_MANAGE_CHANNELS, flags: EPH });
@@ -7664,7 +7719,7 @@ async function createAllTimeChannel(i) {
   });
   const msg = await channel.send(await buildBoardPayload('alltime'));
   await msg.pin().catch(() => {});
-  alltimeBoardMessages.set(guild.id, { channelId: channel.id, messageId: msg.id });
+  trackAlltime(guild.id, channel.id, msg.id);
   const saved = await saveChannel(guild.id, 'alltime', channel.id);
   return i.reply({ content: `✅ Salon <#${channel.id}> créé avec le classement all-time.${saved ? '' : DB_WARN}`, flags: EPH });
 }
@@ -7919,6 +7974,7 @@ const BOARD_BG = {
   rich: String(process.env.LB_BG_URL || '').trim(),
   alltime: String(process.env.ALLTIME_BG_URL || '').trim(),
   invites: String(process.env.INVITES_BG_URL || '').trim(),
+  winNotif: String(process.env.WIN_NOTIF_BG_URL || '').trim(), // notif de victoire (image 1774x887)
   inviteNotif: String(process.env.INVITE_NOTIF_BG_URL || '').trim(), // notif "X a invité Y" (image 1600x800)
 };
 const bgByUrl = new Map(); // url -> Promise<Image|null>
@@ -8163,6 +8219,78 @@ const plainNum = (n) => num(n).replace(/\s/g, ' ');
 //    avatar invité   : centre (600, 190), diamètre 120 | pseudo centré x=600, ligne de base y=290 (largeur max 300)
 //    récompense    : centrée x=400, ligne de base y=355, zone x 150-650 / y 320-370
 // ------------------------------------------------------------
+const iconCache = new Map();
+async function loadRemoteImage(url, loadImage) {
+  if (!url) return null;
+  if (iconCache.has(url)) return iconCache.get(url);
+  try {
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), 5000);
+    const res = await fetch(url, { signal: ctl.signal });
+    clearTimeout(timer);
+    if (!res.ok) return null;
+    const img = await loadImage(Buffer.from(await res.arrayBuffer()));
+    iconCache.set(url, img);
+    return img;
+  } catch {
+    return null;
+  }
+}
+
+// Notif de victoire (image 1774x887 = même gabarit que notif_invitation.png)
+async function renderWinNotif(user, game, bet, mult, profit) {
+  if (!canvasLib) return null;
+  const { createCanvas, loadImage } = canvasLib;
+  const W = 800, H = 400, SCALE = 1.25;
+  const bgImg = await getBgByUrl(BOARD_BG.winNotif, loadImage);
+  if (!bgImg) return null; // pas de variable : on garde l'embed classique
+  const cv = createCanvas(W * SCALE, H * SCALE);
+  const g = cv.getContext('2d');
+  g.scale(SCALE, SCALE);
+  const FONT = STATS_FONT;
+  const k = Math.max(W / bgImg.width, H / bgImg.height);
+  const sw = W / k, sh = H / k;
+  g.drawImage(bgImg, (bgImg.width - sw) / 2, (bgImg.height - sh) / 2, sw, sh, 0, 0, W, H);
+
+  const circle = async (img, cx, cy, D, fallback) => {
+    g.save();
+    g.beginPath(); g.arc(cx, cy, D / 2, 0, Math.PI * 2); g.closePath(); g.clip();
+    if (img) {
+      const sq = Math.min(img.width, img.height);
+      g.drawImage(img, (img.width - sq) / 2, (img.height - sq) / 2, sq, sq, cx - D / 2, cy - D / 2, D, D);
+    } else {
+      g.fillStyle = '#5865F2'; g.fillRect(cx - D / 2, cy - D / 2, D, D);
+      g.fillStyle = '#fff'; g.font = `bold 32px ${FONT}`; g.textAlign = 'center';
+      g.fillText(fallback, cx, cy + 11);
+    }
+    g.restore();
+  };
+  const avatar = await getAvatarCached(user, loadImage);
+  const icon = await loadRemoteImage(gameIcon(game), loadImage);
+  await circle(avatar, 103, 115, 84, '?');   // gagnant
+  await circle(icon, 534, 115, 84, '*');     // icône du jeu
+
+  const name = cleanTxt(user.globalName || user.username) || 'Joueur';
+  g.textAlign = 'left'; g.textBaseline = 'alphabetic';
+  g.fillStyle = 'rgba(255,255,255,0.7)'; g.font = `bold 13px ${FONT}`;
+  g.fillText('VICTOIRE', 171, 100);
+  g.fillStyle = '#FFFFFF'; g.font = `bold 28px ${FONT}`;
+  g.fillText(fitText(g, name, 330), 171, 137);
+
+  g.fillStyle = 'rgba(255,255,255,0.9)'; g.font = `bold 14px ${FONT}`;
+  g.fillText(fitText(g, gameNamePlain(game).toUpperCase(), 230), 77, 196);
+  g.textAlign = 'right'; g.fillStyle = '#FFFFFF'; g.font = `bold 18px ${FONT}`;
+  g.fillText(fitText(g, `MISE ${plainNum(bet)} ${COIN_PLAIN}  ·  ${fx(mult)}`, 300), 627, 197);
+
+  g.textAlign = 'center';
+  g.fillStyle = 'rgba(255,255,255,0.78)'; g.font = `bold 16px ${FONT}`;
+  g.fillText('GAIN', 387, 252);
+  g.fillStyle = '#86EFAC'; g.font = `bold 52px ${FONT}`;
+  g.fillText(fitText(g, `+${plainNum(profit)} ${COIN_PLAIN}`, 500), 387, 302);
+  g.textAlign = 'left';
+  return cv.toBuffer('image/png');
+}
+
 async function renderInviteNotif(inviter, invited, lang = 'fr') {
   if (!canvasLib) return null;
   const { createCanvas, loadImage } = canvasLib;
@@ -8546,6 +8674,7 @@ async function updateLeaderboards() {
       }
     }
 
+    await ensureAlltimeMessages();
     if (alltimeBoardMessages.size > 0) {
       const allPayload = await buildBoardPayload('alltime');
       for (const [gid, info] of alltimeBoardMessages) {
@@ -8555,7 +8684,7 @@ async function updateLeaderboards() {
           const m = ch.messages.cache.get(info.messageId) || (await ch.messages.fetch(info.messageId));
           await m.edit(editable(allPayload));
         } catch (e) {
-          if ([10008, 10003, 50001, 50013].includes(e?.code)) alltimeBoardMessages.delete(gid);
+          if ([10008, 10003, 50001, 50013].includes(e?.code)) { alltimeBoardMessages.delete(gid); saveAlltimeMsgs(); }
           else console.error('[alltime] edit', e?.message || e);
         }
       }
@@ -8914,6 +9043,7 @@ client.on(Events.ChannelDelete, async (channel) => {
     if (guildChannels.get(`${gid}:${kind}`) === channel.id) {
       guildChannels.delete(`${gid}:${kind}`);
       alltimeBoardMessages.delete(gid);
+      saveAlltimeMsgs();
       await supabase.from('guild_channels').delete().eq('guild_id', gid).eq('kind', kind);
     }
   }
@@ -8924,9 +9054,9 @@ client.once(Events.ClientReady, (c) => {
   loadMultipliers();
   loadPeaks();
   for (const g of c.guilds.cache.values()) cacheInvites(g);
-  loadChannels().then(restoreChannelsByName);
+  loadAlltimeMsgs();
+  loadChannels().then(restoreChannelsByName).then(() => updateLeaderboards());
   setInterval(updateLeaderboards, LEADERBOARD_REFRESH_MS);
-  updateLeaderboards();
 });
 
 client.on(Events.Error, (e) => console.error('[client]', e));
