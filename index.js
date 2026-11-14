@@ -7962,7 +7962,19 @@ async function getAvatarCached(user, loadImage) {
 // Mise en page logique 800x900 (image finale 1000x1125). Gabarit conseillé : 1600x1800 (x2).
 const BOARD_ROW_Y = (k) => 130 + 74 * k; // 10 lignes de 66 px de haut
 
-async function renderBoardImage({ title, rows, bgUrl }) {
+// Positions calées sur les images néon classement_riches.png / classement_alltime.png
+// (1180x1327 px, rendues en 800x900). Rang, couronnes, pièces, titre et cadres sont DÉJÀ dans l'image :
+// le bot écrit seulement l'avatar, le pseudo et le montant. Coordonnées dans le repère 800x900.
+const BOARD_TPL = {
+  rowCy: [268.9, 330.3, 391.7, 451.3, 510.4, 568.7, 627.0, 685.3, 743.0, 802.0], // centre y des 10 lignes
+  avatar: { cx: 191.5, d: 47 },                          // rond d'avatar (centre x, diamètre)
+  name: { x: 243, maxW: 344, font: 24 },                 // pseudo à gauche (x 243 -> 587)
+  nameInv: { maxW: 300 },                                // top invitations : pseudo plus court (x 243 -> 543, pas de pièce dans l'image)
+  invValue: { right: 756, maxW: 200, font: 22, subFont: 13, mainDy: 3, subDy: 19 }, // top invitations : "N invités" + "+N pièces" alignés à droite
+  value: { x: 647, maxW: 109, font: 26, minFont: 14 },   // montant à droite de la pièce (x 647 -> 756)
+};
+
+async function renderBoardImage({ kind, title, rows, bgUrl }) {
   if (!canvasLib) return null;
   const { createCanvas, loadImage } = canvasLib;
   const W = 800;
@@ -7981,6 +7993,8 @@ async function renderBoardImage({ title, rows, bgUrl }) {
   g.fillRect(0, 0, W, H);
   const bgImg = await getBgByUrl(bgUrl, loadImage);
   const T = !!bgImg;
+  const TPL = T && (kind === 'rich' || kind === 'alltime' || kind === 'invites'); // image néon avec rang/titre déjà dessinés
+  const INV = kind === 'invites';
   if (T) {
     const k = Math.max(W / bgImg.width, H / bgImg.height);
     const sw = W / k;
@@ -7995,18 +8009,79 @@ async function renderBoardImage({ title, rows, bgUrl }) {
     g.fill();
   }
 
-  // titre centré dans la zone x 40-760, y 30-110
+  // titre centré dans la zone x 40-760, y 30-110 (déjà dans l'image en mode néon)
   g.textAlign = 'center';
   g.textBaseline = 'alphabetic';
-  g.fillStyle = '#FFFFFF';
-  g.font = `bold 36px ${FONT}`;
-  g.fillText(fitText(g, title, 680), W / 2, 83);
+  if (!TPL) {
+    g.fillStyle = '#FFFFFF';
+    g.font = `bold 36px ${FONT}`;
+    g.fillText(fitText(g, title, 680), W / 2, 83);
+  }
   g.textAlign = 'left';
 
   const avatars = await Promise.all(rows.map((r) => (r?.user ? getAvatarCached(r.user, loadImage) : null)));
   for (let k = 0; k < 10; k++) {
     const y = BOARD_ROW_Y(k);
     const r = rows[k];
+    if (TPL) {
+      const cy = BOARD_TPL.rowCy[k];
+      if (!r) {
+        g.fillStyle = 'rgba(255,255,255,0.35)';
+        g.font = `bold 22px ${FONT}`;
+        g.fillText('—', BOARD_TPL.name.x, cy + 8);
+        continue;
+      }
+      const D = BOARD_TPL.avatar.d;
+      const acx = BOARD_TPL.avatar.cx;
+      g.save();
+      g.beginPath();
+      g.arc(acx, cy, D / 2, 0, Math.PI * 2);
+      g.closePath();
+      g.clip();
+      const timg = avatars[k];
+      if (timg) {
+        const sq = Math.min(timg.width, timg.height);
+        g.drawImage(timg, (timg.width - sq) / 2, (timg.height - sq) / 2, sq, sq, acx - D / 2, cy - D / 2, D, D);
+      } else {
+        g.fillStyle = '#5865F2';
+        g.fillRect(acx - D / 2, cy - D / 2, D, D);
+        g.fillStyle = '#fff';
+        g.font = `bold 22px ${FONT}`;
+        g.textAlign = 'center';
+        g.fillText(String(r.name || '?')[0].toUpperCase(), acx, cy + 8);
+        g.textAlign = 'left';
+      }
+      g.restore();
+      // pseudo
+      g.fillStyle = '#FFFFFF';
+      g.font = `bold ${BOARD_TPL.name.font}px ${FONT}`;
+      g.fillText(fitText(g, r.name, INV ? BOARD_TPL.nameInv.maxW : BOARD_TPL.name.maxW), BOARD_TPL.name.x, cy + 8);
+      if (INV) {
+        const iv = BOARD_TPL.invValue;
+        g.textAlign = 'right';
+        g.fillStyle = k === 0 ? '#FACC15' : k === 1 ? '#E5E7EB' : k === 2 ? '#FB923C' : '#FFFFFF';
+        g.font = `bold ${iv.font}px ${FONT}`;
+        g.fillText(fitText(g, r.main, iv.maxW), iv.right, cy + iv.mainDy);
+        if (r.sub) {
+          g.fillStyle = 'rgba(255,255,255,0.75)';
+          g.font = `${iv.subFont}px ${FONT}`;
+          g.fillText(fitText(g, r.sub, iv.maxW), iv.right, cy + iv.subDy);
+        }
+        g.textAlign = 'left';
+        continue;
+      }
+      // montant (la pièce est déjà dans l'image) : on réduit la taille si le nombre est long
+      const vtxt = String(r.val ?? r.main);
+      let fs = BOARD_TPL.value.font;
+      g.font = `bold ${fs}px ${FONT}`;
+      while (fs > BOARD_TPL.value.minFont && g.measureText(vtxt).width > BOARD_TPL.value.maxW) {
+        fs -= 1;
+        g.font = `bold ${fs}px ${FONT}`;
+      }
+      g.fillStyle = k === 0 ? '#FACC15' : k === 1 ? '#E5E7EB' : k === 2 ? '#FB923C' : '#FFFFFF';
+      g.fillText(fitText(g, vtxt, BOARD_TPL.value.maxW), BOARD_TPL.value.x, cy + fs * 0.36);
+      continue;
+    }
     if (!T) {
       g.fillStyle = 'rgba(0,0,0,0.28)';
       roundRect(g, 40, y, 720, 66, 16);
@@ -8078,7 +8153,9 @@ const plainNum = (n) => num(n).replace(/\s/g, ' ');
 
 // ------------------------------------------------------------
 //  IMAGE DE NOTIFICATION D'INVITATION (variable Railway : INVITE_NOTIF_BG_URL)
-//  Gabarit : 1600x800 px (ratio 2:1). Repère logique 800x400 (image finale 1000x500).
+//  Image fournie : notif_invitation.png, 1774x887 px (ratio 2:1). En mode image, positions (repère 800x400) :
+//    avatar invitant (103,115) d84 | avatar invité (534,115) d84 | titre x171 y100 | pseudo invitant x171 y137
+//    barre : "A INVITÉ" x77 y196, pseudo invité aligné à droite x627 y197 | récompense centrée x387 (y252 libellé, y302 montant) Repère logique 800x400 (image finale 1000x500).
 //  Positions en dur (x2 pour ton image) :
 //    titre         : centré x=400, ligne de base y=70, zone x 100-700 / y 35-85
 //    avatar invitant : centre (200, 190), diamètre 120 | pseudo centré x=200, ligne de base y=290 (largeur max 300)
@@ -8118,6 +8195,59 @@ async function renderInviteNotif(inviter, invited, lang = 'fr') {
     g.fillStyle = 'rgba(0,0,0,0.28)';
     roundRect(g, 100, 30, 600, 60, 18); g.fill();
     roundRect(g, 150, 318, 500, 54, 18); g.fill();
+  }
+
+  // ---- mode template (notif_invitation.png, 1774x887) : positions calées sur l'image ----
+  if (T) {
+    const clean1 = (u) => (u ? cleanTxt(u.globalName || u.username) || '?' : en ? 'Unknown user' : 'Utilisateur inconnu');
+    const avatarAt = async (user, cx, cy, D) => {
+      g.save();
+      g.beginPath();
+      g.arc(cx, cy, D / 2, 0, Math.PI * 2);
+      g.closePath();
+      g.clip();
+      const im = user ? await getAvatarCached(user, loadImage) : null;
+      if (im) {
+        const sq = Math.min(im.width, im.height);
+        g.drawImage(im, (im.width - sq) / 2, (im.height - sq) / 2, sq, sq, cx - D / 2, cy - D / 2, D, D);
+      } else {
+        g.fillStyle = '#5865F2';
+        g.fillRect(cx - D / 2, cy - D / 2, D, D);
+        g.fillStyle = '#fff';
+        g.font = `bold 32px ${FONT}`;
+        g.textAlign = 'center';
+        g.fillText('?', cx, cy + 11);
+      }
+      g.restore();
+    };
+    await avatarAt(inviter, 103, 115, 84);   // avatar de l'invitant (rond de gauche)
+    await avatarAt(invited, 534, 115, 84);   // avatar de l'invité (rond de droite)
+    g.textAlign = 'left';
+    g.textBaseline = 'alphabetic';
+    g.fillStyle = 'rgba(255,255,255,0.7)';
+    g.font = `bold 13px ${FONT}`;
+    g.fillText(en ? 'NEW INVITE' : 'NOUVELLE INVITATION', 171, 100);
+    g.fillStyle = '#FFFFFF';
+    g.font = `bold 28px ${FONT}`;
+    g.fillText(fitText(g, clean1(inviter), 300), 171, 137);
+    // barre violette : "a invité" à gauche, pseudo de l'invité à droite
+    g.fillStyle = 'rgba(255,255,255,0.9)';
+    g.font = `bold 14px ${FONT}`;
+    g.fillText(en ? 'INVITED' : 'A INVITÉ', 77, 196);
+    g.textAlign = 'right';
+    g.fillStyle = '#FFFFFF';
+    g.font = `bold 18px ${FONT}`;
+    g.fillText(fitText(g, clean1(invited), 400), 627, 197);
+    // récompense au centre de la zone du bas
+    g.textAlign = 'center';
+    g.fillStyle = 'rgba(255,255,255,0.78)';
+    g.font = `bold 16px ${FONT}`;
+    g.fillText(en ? 'REWARD' : 'RÉCOMPENSE', 387, 252);
+    g.fillStyle = '#86EFAC';
+    g.font = `bold 52px ${FONT}`;
+    g.fillText(fitText(g, `+${plainNum(INVITE_REWARD)} ${COIN_PLAIN}`, 500), 387, 302);
+    g.textAlign = 'left';
+    return cv.toBuffer('image/png');
   }
 
   // titre
@@ -8252,10 +8382,10 @@ async function renderBoard(kind, { lang = 'fr', guild = null } = {}) {
         sub: `+${plainNum(d.value * INVITE_REWARD)} ${COIN_PLAIN}`,
       });
     } else {
-      rows.push({ user, name, main: `${plainNum(d.value)} ${COIN_PLAIN}` });
+      rows.push({ user, name, main: `${plainNum(d.value)} ${COIN_PLAIN}`, val: plainNum(d.value) });
     }
   }
-  const buf = await renderBoardImage({ title: BOARD_TITLES[kind][en ? 'en' : 'fr'], rows, bgUrl: BOARD_BG[kind] });
+  const buf = await renderBoardImage({ kind, title: BOARD_TITLES[kind][en ? 'en' : 'fr'], rows, bgUrl: BOARD_BG[kind] });
   const out = { sig, buf };
   boardRenderCache.set(ckey, out);
   return out;
