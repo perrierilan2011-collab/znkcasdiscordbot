@@ -928,6 +928,27 @@ function fitText(g, text, maxW) {
 const STATS_BG_URL = String(process.env.STATS_BG_URL || '').trim();
 // STATS_BG_MODE=template : l'image contient déjà les cartes (le bot n'écrit que le texte dedans)
 const STATS_BG_MODE = String(process.env.STATS_BG_MODE || '').trim().toLowerCase();
+// Mises en page calées sur les images template (1774x887 -> 800x400). STATS_BG_MODE = nom du preset.
+const STATS_PRESETS = {
+  // Avatar à gauche, logo Z à droite
+  template: {
+    head: { x: 155, y: 77, w: 448, h: 88 },
+    av: { cx: 103, cy: 114.5, d: 84, halo: false },
+    tx: 171, textRight: 585, nameY: 108,
+    bar: { x: 61, y: 175, w: 582, h: 33 }, balFont: 20,
+    cols: [[64, 198], [271, 199], [480, 230]],
+    rows: [[220, 45], [271, 45]],
+  },
+  // Logo Z à gauche, avatar dans le cadre du haut
+  'template-logo-left': {
+    head: { x: 210, y: 79, w: 545, h: 95 },
+    av: { cx: 257, cy: 126.5, d: 66, halo: true },
+    tx: 287, textRight: 739, nameY: 118.5,
+    bar: { x: 56, y: 184, w: 695, h: 38 }, balFont: 22,
+    cols: [[56, 224], [293, 222], [527, 224]],
+    rows: [[237, 46], [292, 47]],
+  },
+};
 let statsBgPromise = null;
 function getStatsBg(loadImage) {
   if (!STATS_BG_URL) return Promise.resolve(null);
@@ -973,7 +994,8 @@ async function renderStatsBanner(user, st, balance, lang) {
   g.fillRect(0, 0, W, H);
   const bgImg = await getStatsBg(loadImage);
   // Mode "template" : l'image contient déjà les cartes, on n'écrit que le texte dedans.
-  const T = !!(bgImg && STATS_BG_MODE === 'template');
+  const P = bgImg ? STATS_PRESETS[STATS_BG_MODE] || null : null;
+  const T = !!P;
   if (bgImg) {
     // recadrage "cover" centré (aucune déformation)
     const k = Math.max(W / bgImg.width, H / bgImg.height);
@@ -995,13 +1017,11 @@ async function renderStatsBanner(user, st, balance, lang) {
 
   // ---- mise en page : standard ou calée sur l'image template (1774x887 -> 800x400) ----
   const PAD = 28;
-  const head = T ? { x: 210, y: 79, w: 545, h: 95 } : { x: PAD, y: PAD, w: W - PAD * 2, h: 128 };
-  const bar = T ? { x: 56, y: 184, w: 695, h: 38 } : { x: PAD, y: PAD + 128 + 14, w: W - PAD * 2, h: 44 };
+  const head = T ? P.head : { x: PAD, y: PAD, w: W - PAD * 2, h: 128 };
+  const bar = T ? P.bar : { x: PAD, y: PAD + 128 + 14, w: W - PAD * 2, h: 44 };
   let boxes;
   if (T) {
-    const cols = [[56, 224], [293, 222], [527, 224]];
-    const rows = [[237, 46], [292, 47]];
-    boxes = rows.flatMap(([y, h]) => cols.map(([x, w]) => ({ x, y, w, h })));
+    boxes = P.rows.flatMap(([y, h]) => P.cols.map(([x, w]) => ({ x, y, w, h })));
   } else {
     const gap = 12;
     const cw = Math.floor((W - PAD * 2 - gap * 2) / 3);
@@ -1016,17 +1036,19 @@ async function renderStatsBanner(user, st, balance, lang) {
   }
 
   // avatar rond, ratio carré respecté (aucune déformation), halo lumineux
-  const AV = T ? 66 : 96;
-  const ax = head.x + (T ? 14 : 20);
-  const ay = head.y + (head.h - AV) / 2;
+  const AV = T ? P.av.d : 96;
+  const ax = T ? P.av.cx - AV / 2 : head.x + 20;
+  const ay = T ? P.av.cy - AV / 2 : head.y + (head.h - AV) / 2;
   const acx = ax + AV / 2;
   const acy = ay + AV / 2;
-  g.save();
-  g.shadowColor = 'rgba(217,70,239,0.9)';
-  g.shadowBlur = 18;
-  g.fillStyle = '#D946EF';
-  g.beginPath(); g.arc(acx, acy, AV / 2 + 3, 0, Math.PI * 2); g.fill();
-  g.restore();
+  if (!T || P.av.halo) {
+    g.save();
+    g.shadowColor = 'rgba(217,70,239,0.9)';
+    g.shadowBlur = 18;
+    g.fillStyle = '#D946EF';
+    g.beginPath(); g.arc(acx, acy, AV / 2 + 3, 0, Math.PI * 2); g.fill();
+    g.restore();
+  }
   g.save();
   g.beginPath();
   g.arc(acx, acy, AV / 2, 0, Math.PI * 2);
@@ -1050,15 +1072,15 @@ async function renderStatsBanner(user, st, balance, lang) {
   g.restore();
 
   // pseudo juste à droite de l'avatar + sous-titre
-  const tx = ax + AV + (T ? 16 : 22);
-  const tmax = head.x + head.w - (T ? 16 : 20) - tx;
+  const tx = T ? P.tx : ax + AV + 22;
+  const tmax = (T ? P.textRight : head.x + head.w - 20) - tx;
   const clean = (s) => String(s || '').replace(/[\u0000-\u001F\u007F]/g, '').trim();
   const display = clean(user.globalName || user.username) || 'Joueur';
   const handle = clean(user.username);
   const fav = st.favorite ? gameNamePlain(st.favorite) : '-';
   g.textAlign = 'left';
   g.textBaseline = 'alphabetic';
-  const nameY = T ? acy - 8 : acy - 6;
+  const nameY = T ? P.nameY : acy - 6;
   g.fillStyle = '#FFFFFF';
   g.font = `bold ${T ? 28 : 34}px ${FONT}`;
   g.fillText(fitText(g, display, tmax), tx, nameY);
@@ -1081,8 +1103,8 @@ async function renderStatsBanner(user, st, balance, lang) {
   g.fillText(en ? 'BALANCE' : 'SOLDE', bar.x + barPad, bar.y + bar.h / 2 + 5);
   g.textAlign = 'right';
   g.fillStyle = '#FFFFFF';
-  g.font = `bold ${T ? 22 : 24}px ${FONT}`;
-  g.fillText(`${compact(balance)} ${COIN_PLAIN}`, bar.x + bar.w - barPad, bar.y + bar.h / 2 + (T ? 8 : 9));
+  g.font = `bold ${T ? P.balFont : 24}px ${FONT}`;
+  g.fillText(`${compact(balance)} ${COIN_PLAIN}`, bar.x + bar.w - barPad, bar.y + bar.h / 2 + (T ? P.balFont * 0.36 : 9));
   g.textAlign = 'left';
 
   // 6 cartes de stats (grille 3x2)
@@ -5054,7 +5076,7 @@ async function handlePanelButton(i) {
     case 'panel_invites': {
       await i.deferReply({ flags: EPH });
       if (!i.guild) return i.editReply({ content: 'Les invitations se consultent depuis le serveur.' });
-      return i.editReply({ embeds: [await buildInvitesEmbed(i.guild, i.user.id)] });
+      return i.editReply(await buildInvitesPayload(i.guild, i.user.id, getLang(i.user.id)));
     }
     case 'panel_send': {
       // Envoi par pseudo : uniquement un membre du serveur
@@ -5641,11 +5663,11 @@ async function handleAdmin(i) {
     }
     if (action === 'top') {
       await i.deferReply({ flags: EPH });
-      return i.editReply({ embeds: [await buildLeaderboardEmbed('fr')] });
+      return i.editReply(await buildBoardPayload('rich', { lang: 'fr' }));
     }
     if (action === 'topall') {
       await i.deferReply({ flags: EPH });
-      return i.editReply({ embeds: [await buildAllTimeLeaderboardEmbed('fr')] });
+      return i.editReply(await buildBoardPayload('alltime', { lang: 'fr' }));
     }
     if (action === 'annonce') {
       return i.showModal(
@@ -6184,6 +6206,11 @@ try {
   /* premier lancement */
 }
 const lbLast = new Map(); // dernière description publiée par message de classement (évite les edits inutiles)
+function lbSameSig(id, sig) {
+  if (lbLast.get(id) === sig) return true;
+  lbLast.set(id, sig);
+  return false;
+}
 function lbSame(id, embed) {
   const d = embed.data?.description || '';
   if (lbLast.get(id) === d) return true;
@@ -7612,8 +7639,7 @@ async function createAllTimeChannel(i) {
   const me = guild.members.me;
   const existing = await getSavedChannel(guild, 'alltime');
   if (existing) {
-    const embed = await buildAllTimeLeaderboardEmbed();
-    const msg = await existing.send({ embeds: [embed] });
+    const msg = await existing.send(await buildBoardPayload('alltime'));
     alltimeBoardMessages.set(guild.id, { channelId: existing.id, messageId: msg.id });
     return i.reply({ content: `✅ Salon all-time déjà présent : <#${existing.id}> (classement reposté).`, flags: EPH });
   }
@@ -7636,8 +7662,7 @@ async function createAllTimeChannel(i) {
       },
     ],
   });
-  const embed = await buildAllTimeLeaderboardEmbed();
-  const msg = await channel.send({ embeds: [embed] });
+  const msg = await channel.send(await buildBoardPayload('alltime'));
   await msg.pin().catch(() => {});
   alltimeBoardMessages.set(guild.id, { channelId: channel.id, messageId: msg.id });
   const saved = await saveChannel(guild.id, 'alltime', channel.id);
@@ -7880,6 +7905,411 @@ async function cmdAdmin(msg) {
 // ============================================================
 //  CLASSEMENT (auto-actualisé toutes les minutes)
 // ============================================================
+// ============================================================
+//  CLASSEMENTS EN IMAGE (plus riches, all-time, invitations)
+//  Variables Railway (optionnelles) : LB_BG_URL, ALLTIME_BG_URL, INVITES_BG_URL
+//  Si l'URL est définie, l'image est un "template" : le bot n'écrit que le texte dedans.
+//  Gabarit : image 1600x1800 px (ratio 8:9). Positions en dur dans renderBoardImage (repère 800x900, x2 pour l'image) :
+//    titre   : centré x=400, ligne de base y=83, zone x 40-760 / y 30-110
+//    lignes  : 10 lignes, haut de la ligne k = 130 + 74*k, hauteur 66, zone x 40-760
+//    rang    : centré x=80 | avatar : centre x=144, diamètre 44 | pseudo : x 182-530
+//    valeur  : alignée à droite sur x=744 (zone x 540-744) | sous-texte invitations : même x, y_ligne+54
+// ============================================================
+const BOARD_BG = {
+  rich: String(process.env.LB_BG_URL || '').trim(),
+  alltime: String(process.env.ALLTIME_BG_URL || '').trim(),
+  invites: String(process.env.INVITES_BG_URL || '').trim(),
+  inviteNotif: String(process.env.INVITE_NOTIF_BG_URL || '').trim(), // notif "X a invité Y" (image 1600x800)
+};
+const bgByUrl = new Map(); // url -> Promise<Image|null>
+function getBgByUrl(url, loadImage) {
+  if (!url) return Promise.resolve(null);
+  if (!bgByUrl.has(url)) {
+    bgByUrl.set(
+      url,
+      (async () => {
+        const ctl = new AbortController();
+        const timer = setTimeout(() => ctl.abort(), 8000);
+        try {
+          const res = await fetch(url, { signal: ctl.signal });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          return await loadImage(Buffer.from(await res.arrayBuffer()));
+        } finally {
+          clearTimeout(timer);
+        }
+      })().catch((e) => {
+        console.warn('[classement] image de fond illisible (lien direct png/jpg requis) :', e?.message || e);
+        bgByUrl.delete(url); // réessaie au prochain affichage
+        return null;
+      })
+    );
+  }
+  return bgByUrl.get(url);
+}
+
+const avatarCache = new Map();
+async function getAvatarCached(user, loadImage) {
+  const key = `${user.id}:${user.avatar || 'none'}`;
+  if (avatarCache.has(key)) return avatarCache.get(key);
+  const img = await loadAvatarImage(user, loadImage);
+  if (img) {
+    if (avatarCache.size > 300) avatarCache.clear();
+    avatarCache.set(key, img);
+  }
+  return img;
+}
+
+// Mise en page logique 800x900 (image finale 1000x1125). Gabarit conseillé : 1600x1800 (x2).
+const BOARD_ROW_Y = (k) => 130 + 74 * k; // 10 lignes de 66 px de haut
+
+async function renderBoardImage({ title, rows, bgUrl }) {
+  if (!canvasLib) return null;
+  const { createCanvas, loadImage } = canvasLib;
+  const W = 800;
+  const H = 900;
+  const SCALE = 1.25;
+  const cv = createCanvas(W * SCALE, H * SCALE);
+  const g = cv.getContext('2d');
+  g.scale(SCALE, SCALE);
+  const FONT = STATS_FONT;
+
+  const bg = g.createLinearGradient(0, 0, W, H);
+  bg.addColorStop(0, '#2B0A3D');
+  bg.addColorStop(0.5, '#5B1A9E');
+  bg.addColorStop(1, '#A81CFD');
+  g.fillStyle = bg;
+  g.fillRect(0, 0, W, H);
+  const bgImg = await getBgByUrl(bgUrl, loadImage);
+  const T = !!bgImg;
+  if (T) {
+    const k = Math.max(W / bgImg.width, H / bgImg.height);
+    const sw = W / k;
+    const sh = H / k;
+    g.drawImage(bgImg, (bgImg.width - sw) / 2, (bgImg.height - sh) / 2, sw, sh, 0, 0, W, H);
+  } else {
+    g.fillStyle = 'rgba(255,255,255,0.06)';
+    g.beginPath(); g.arc(W - 60, -20, 190, 0, Math.PI * 2); g.fill();
+    g.beginPath(); g.arc(-40, H + 20, 160, 0, Math.PI * 2); g.fill();
+    g.fillStyle = 'rgba(0,0,0,0.28)';
+    roundRect(g, 40, 30, 720, 80, 18);
+    g.fill();
+  }
+
+  // titre centré dans la zone x 40-760, y 30-110
+  g.textAlign = 'center';
+  g.textBaseline = 'alphabetic';
+  g.fillStyle = '#FFFFFF';
+  g.font = `bold 36px ${FONT}`;
+  g.fillText(fitText(g, title, 680), W / 2, 83);
+  g.textAlign = 'left';
+
+  const avatars = await Promise.all(rows.map((r) => (r?.user ? getAvatarCached(r.user, loadImage) : null)));
+  for (let k = 0; k < 10; k++) {
+    const y = BOARD_ROW_Y(k);
+    const r = rows[k];
+    if (!T) {
+      g.fillStyle = 'rgba(0,0,0,0.28)';
+      roundRect(g, 40, y, 720, 66, 16);
+      g.fill();
+    }
+    const rankColor = k === 0 ? '#FACC15' : k === 1 ? '#E5E7EB' : k === 2 ? '#FB923C' : '#FFFFFF';
+
+    // rang (centré en x = 80)
+    g.textAlign = 'center';
+    g.fillStyle = r ? rankColor : 'rgba(255,255,255,0.35)';
+    g.font = `bold ${k < 3 ? 30 : 26}px ${FONT}`;
+    g.fillText(String(k + 1), 80, y + 43);
+    g.textAlign = 'left';
+
+    if (!r) {
+      g.fillStyle = 'rgba(255,255,255,0.35)';
+      g.font = `bold 22px ${FONT}`;
+      g.fillText('—', 182, y + 42);
+      continue;
+    }
+
+    // avatar rond (diamètre 44, x 122-166)
+    const cx = 144;
+    const cy = y + 33;
+    g.fillStyle = k < 3 ? rankColor : '#D946EF';
+    g.beginPath(); g.arc(cx, cy, 24, 0, Math.PI * 2); g.fill();
+    g.save();
+    g.beginPath();
+    g.arc(cx, cy, 22, 0, Math.PI * 2);
+    g.closePath();
+    g.clip();
+    const img = avatars[k];
+    if (img) {
+      const s = Math.min(img.width, img.height);
+      g.drawImage(img, (img.width - s) / 2, (img.height - s) / 2, s, s, cx - 22, cy - 22, 44, 44);
+    } else {
+      g.fillStyle = '#5865F2';
+      g.fillRect(cx - 22, cy - 22, 44, 44);
+      g.fillStyle = '#fff';
+      g.font = `bold 22px ${FONT}`;
+      g.textAlign = 'center';
+      g.fillText(String(r.name || '?')[0].toUpperCase(), cx, cy + 8);
+      g.textAlign = 'left';
+    }
+    g.restore();
+
+    // pseudo (x 182 -> 530)
+    g.fillStyle = '#FFFFFF';
+    g.font = `bold 24px ${FONT}`;
+    g.fillText(fitText(g, r.name, 348), 182, y + 42);
+
+    // valeur alignée à droite (x ... 744)
+    g.textAlign = 'right';
+    g.fillStyle = k < 3 ? rankColor : '#FFFFFF';
+    g.font = `bold 24px ${FONT}`;
+    g.fillText(fitText(g, r.main, 204), 744, r.sub ? y + 33 : y + 42);
+    if (r.sub) {
+      g.fillStyle = 'rgba(255,255,255,0.7)';
+      g.font = `13px ${FONT}`;
+      g.fillText(fitText(g, r.sub, 204), 744, y + 54);
+    }
+    g.textAlign = 'left';
+  }
+  return cv.toBuffer('image/png');
+}
+
+const cleanTxt = (s) => String(s || '').replace(/[\u0000-\u001F\u007F]/g, '').trim();
+const plainNum = (n) => num(n).replace(/\s/g, ' ');
+
+// ------------------------------------------------------------
+//  IMAGE DE NOTIFICATION D'INVITATION (variable Railway : INVITE_NOTIF_BG_URL)
+//  Gabarit : 1600x800 px (ratio 2:1). Repère logique 800x400 (image finale 1000x500).
+//  Positions en dur (x2 pour ton image) :
+//    titre         : centré x=400, ligne de base y=70, zone x 100-700 / y 35-85
+//    avatar invitant : centre (200, 190), diamètre 120 | pseudo centré x=200, ligne de base y=290 (largeur max 300)
+//    "a invité"    : centré x=400, ligne de base y=198 (zone x 310-490)
+//    avatar invité   : centre (600, 190), diamètre 120 | pseudo centré x=600, ligne de base y=290 (largeur max 300)
+//    récompense    : centrée x=400, ligne de base y=355, zone x 150-650 / y 320-370
+// ------------------------------------------------------------
+async function renderInviteNotif(inviter, invited, lang = 'fr') {
+  if (!canvasLib) return null;
+  const { createCanvas, loadImage } = canvasLib;
+  const W = 800;
+  const H = 400;
+  const SCALE = 1.25;
+  const cv = createCanvas(W * SCALE, H * SCALE);
+  const g = cv.getContext('2d');
+  g.scale(SCALE, SCALE);
+  const FONT = STATS_FONT;
+  const en = lang === 'en';
+
+  const bg = g.createLinearGradient(0, 0, W, H);
+  bg.addColorStop(0, '#2B0A3D');
+  bg.addColorStop(0.5, '#5B1A9E');
+  bg.addColorStop(1, '#A81CFD');
+  g.fillStyle = bg;
+  g.fillRect(0, 0, W, H);
+  const bgImg = await getBgByUrl(BOARD_BG.inviteNotif, loadImage);
+  const T = !!bgImg; // mode template : l'image contient déjà le décor, le bot n'écrit que le texte
+  if (T) {
+    const k = Math.max(W / bgImg.width, H / bgImg.height);
+    const sw = W / k;
+    const sh = H / k;
+    g.drawImage(bgImg, (bgImg.width - sw) / 2, (bgImg.height - sh) / 2, sw, sh, 0, 0, W, H);
+  } else {
+    g.fillStyle = 'rgba(255,255,255,0.06)';
+    g.beginPath(); g.arc(W - 60, -20, 170, 0, Math.PI * 2); g.fill();
+    g.beginPath(); g.arc(-40, H + 20, 130, 0, Math.PI * 2); g.fill();
+    g.fillStyle = 'rgba(0,0,0,0.28)';
+    roundRect(g, 100, 30, 600, 60, 18); g.fill();
+    roundRect(g, 150, 318, 500, 54, 18); g.fill();
+  }
+
+  // titre
+  g.textAlign = 'center';
+  g.textBaseline = 'alphabetic';
+  g.fillStyle = '#FFFFFF';
+  g.font = `bold 28px ${FONT}`;
+  g.fillText(fitText(g, en ? 'NEW INVITE' : 'NOUVELLE INVITATION', 600), 400, 70);
+
+  // deux avatars ronds (diamètre 120)
+  const drawAvatar = async (user, cx, cy, D) => {
+    if (!T) {
+      g.fillStyle = '#D946EF';
+      g.beginPath(); g.arc(cx, cy, D / 2 + 4, 0, Math.PI * 2); g.fill();
+    }
+    g.save();
+    g.beginPath();
+    g.arc(cx, cy, D / 2, 0, Math.PI * 2);
+    g.closePath();
+    g.clip();
+    const img = user ? await getAvatarCached(user, loadImage) : null;
+    if (img) {
+      const sq = Math.min(img.width, img.height);
+      g.drawImage(img, (img.width - sq) / 2, (img.height - sq) / 2, sq, sq, cx - D / 2, cy - D / 2, D, D);
+    } else {
+      g.fillStyle = '#5865F2';
+      g.fillRect(cx - D / 2, cy - D / 2, D, D);
+      g.fillStyle = '#fff';
+      g.font = `bold 52px ${FONT}`;
+      g.textAlign = 'center';
+      g.fillText('?', cx, cy + 18);
+    }
+    g.restore();
+  };
+  await drawAvatar(inviter, 200, 190, 120);
+  await drawAvatar(invited, 600, 190, 120);
+
+  const nameOf = (u) => (u ? cleanTxt(u.globalName || u.username) || '?' : en ? 'Unknown user' : 'Utilisateur inconnu');
+  g.textAlign = 'center';
+  g.fillStyle = '#FFFFFF';
+  g.font = `bold 24px ${FONT}`;
+  g.fillText(fitText(g, nameOf(inviter), 300), 200, 290);
+  g.fillText(fitText(g, nameOf(invited), 300), 600, 290);
+
+  // "a invité"
+  g.fillStyle = 'rgba(255,255,255,0.85)';
+  g.font = `bold 20px ${FONT}`;
+  g.fillText(en ? 'invited' : 'a invité', 400, 198);
+
+  // récompense
+  g.fillStyle = '#86EFAC';
+  g.font = `bold 26px ${FONT}`;
+  g.fillText(fitText(g, `${en ? 'REWARD' : 'RÉCOMPENSE'} : +${plainNum(INVITE_REWARD)} ${COIN_PLAIN}`, 480), 400, 355);
+  g.textAlign = 'left';
+
+  return cv.toBuffer('image/png');
+}
+
+async function topInviters(guildId) {
+  const counts = new Map();
+  for (let from = 0; from < 50000; from += 1000) {
+    const { data, error } = await supabase
+      .from('invite_rewards')
+      .select('inviter_id')
+      .eq('guild_id', guildId)
+      .order('invited_id', { ascending: true })
+      .range(from, from + 999);
+    if (error) throw error;
+    for (const r of data) counts.set(r.inviter_id, (counts.get(r.inviter_id) || 0) + 1);
+    if (data.length < 1000) break;
+  }
+  return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10);
+}
+
+async function getBoardData(kind, guild) {
+  if (kind === 'rich') {
+    const { data, error } = await supabase
+      .from('players')
+      .select('user_id, balance')
+      .gt('balance', 0)
+      .order('balance', { ascending: false })
+      .limit(10);
+    if (error) throw error;
+    return data.map((r) => ({ id: r.user_id, value: Number(r.balance) }));
+  }
+  if (kind === 'alltime') {
+    try {
+      const { data } = await supabase.from('players').select('user_id, balance').gt('balance', 0).limit(50);
+      if (data) for (const r of data) await touchPeak(r.user_id, Number(r.balance));
+    } catch {
+      /* ignore */
+    }
+    return [...peaks.entries()]
+      .filter(([, p]) => p > 0)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([id, value]) => ({ id, value }));
+  }
+  if (kind === 'invites') {
+    if (!guild) return [];
+    return (await topInviters(guild.id)).map(([id, value]) => ({ id, value }));
+  }
+  return [];
+}
+
+const BOARD_TITLES = {
+  rich: { fr: 'CLASSEMENT · PLUS RICHES', en: 'RICHEST PLAYERS' },
+  alltime: { fr: 'ALL-TIME · SOLDE MAX', en: 'ALL-TIME · PEAK BALANCE' },
+  invites: { fr: 'TOP INVITATIONS', en: 'TOP INVITERS' },
+};
+const boardRenderCache = new Map(); // kind:guild -> { sig, buf }
+
+// Retourne { buf, sig } (image prête) ou null si le canvas est indisponible.
+async function renderBoard(kind, { lang = 'fr', guild = null } = {}) {
+  if (!canvasLib) return null;
+  const en = lang === 'en';
+  const data = await getBoardData(kind, guild);
+  const sig = `${kind}|${guild?.id || ''}|${lang}|${BOARD_BG[kind]}|${data.map((d) => `${d.id}:${d.value}`).join(',')}`;
+  const ckey = `${kind}:${guild?.id || ''}:${lang}`;
+  const cached = boardRenderCache.get(ckey);
+  if (cached && cached.sig === sig) return cached;
+
+  const rows = [];
+  for (const d of data) {
+    const user = await client.users.fetch(d.id).catch(() => null);
+    const name = user ? cleanTxt(user.globalName || user.username) || '?' : en ? 'Unknown user' : 'Utilisateur inconnu';
+    if (kind === 'invites') {
+      rows.push({
+        user,
+        name,
+        main: en ? `${d.value} invite${d.value > 1 ? 's' : ''}` : `${d.value} invité${d.value > 1 ? 's' : ''}`,
+        sub: `+${plainNum(d.value * INVITE_REWARD)} ${COIN_PLAIN}`,
+      });
+    } else {
+      rows.push({ user, name, main: `${plainNum(d.value)} ${COIN_PLAIN}` });
+    }
+  }
+  const buf = await renderBoardImage({ title: BOARD_TITLES[kind][en ? 'en' : 'fr'], rows, bgUrl: BOARD_BG[kind] });
+  const out = { sig, buf };
+  boardRenderCache.set(ckey, out);
+  return out;
+}
+
+const boardFileName = (kind) => `board-${kind}-${Date.now()}.png`;
+
+// Payload prêt à envoyer : { embeds, files, sig }. Retombe sur l'ancien embed texte si le canvas échoue.
+async function buildBoardPayload(kind, { lang = 'fr', guild = null } = {}) {
+  const en = lang === 'en';
+  const textFallback = async () => {
+    const embed = kind === 'rich' ? await buildLeaderboardEmbed(lang) : await buildAllTimeLeaderboardEmbed(lang);
+    return { embeds: [embed], files: [], sig: embed.data?.description || '' };
+  };
+  if (!canvasLib || kind === 'invites') return textFallback();
+  try {
+    const r = await renderBoard(kind, { lang, guild });
+    if (!r?.buf) return textFallback();
+    const name = boardFileName(kind);
+    const embed = new EmbedBuilder()
+      .setColor(kind === 'rich' ? COLORS.gold : COLORS.violet)
+      .setImage(`attachment://${name}`)
+      .setFooter({
+        text:
+          kind === 'rich'
+            ? en ? 'Auto-updated every minute' : 'Mis à jour automatiquement toutes les minutes'
+            : en ? 'Record = highest balance ever reached' : 'Record = plus haut solde jamais atteint',
+      })
+      .setTimestamp();
+    return { embeds: [embed], files: [new AttachmentBuilder(r.buf, { name })], sig: r.sig };
+  } catch (e) {
+    console.error('[classement] image', e?.message || e);
+    return textFallback();
+  }
+}
+
+// Pour message.edit : remplace aussi l'ancienne pièce jointe
+const editable = (p) => ({ embeds: p.embeds, files: p.files, attachments: [] });
+
+async function buildInvitesPayload(guild, targetId, lang = 'fr') {
+  const textEmbed = await buildInvitesEmbed(guild, targetId);
+  if (!canvasLib) return { embeds: [textEmbed], files: [] };
+  try {
+    const r = await renderBoard('invites', { lang, guild });
+    if (!r?.buf) return { embeds: [textEmbed], files: [] };
+    const name = boardFileName('invites');
+    textEmbed.setColor(COLORS.violet).setImage(`attachment://${name}`);
+    return { embeds: [textEmbed], files: [new AttachmentBuilder(r.buf, { name })] };
+  } catch (e) {
+    console.error('[invitations] image', e?.message || e);
+    return { embeds: [textEmbed], files: [] };
+  }
+}
+
 async function buildLeaderboardEmbed(lang = 'fr') {
   const { data, error } = await supabase
     .from('players')
@@ -7948,7 +8378,7 @@ async function cmdLeaderboard(msg) {
     }
   }
 
-  const sent = await msg.channel.send({ embeds: [await buildLeaderboardEmbed()] });
+  const sent = await msg.channel.send(await buildBoardPayload('rich'));
   const { error } = await supabase.from('leaderboard_messages').upsert({
     guild_id: msg.guild.id,
     channel_id: msg.channel.id,
@@ -7969,13 +8399,13 @@ async function updateLeaderboards() {
     if (error) throw error;
 
     if (rows && rows.length > 0) {
-      const embed = await buildLeaderboardEmbed();
+      const lbPayload = await buildBoardPayload('rich');
       for (const row of rows) {
         try {
           const ch = await client.channels.fetch(row.channel_id);
-          if (lbSame(row.message_id, embed)) continue;
+          if (lbSameSig(row.message_id, lbPayload.sig)) continue;
           const m = ch.messages.cache.get(row.message_id) || (await ch.messages.fetch(row.message_id));
-          await m.edit({ embeds: [embed] });
+          await m.edit(editable(lbPayload));
         } catch (e) {
           if ([10008, 10003, 50001, 50013].includes(e?.code)) {
             await supabase.from('leaderboard_messages').delete().eq('guild_id', row.guild_id);
@@ -7987,13 +8417,13 @@ async function updateLeaderboards() {
     }
 
     if (alltimeBoardMessages.size > 0) {
-      const allEmbed = await buildAllTimeLeaderboardEmbed();
+      const allPayload = await buildBoardPayload('alltime');
       for (const [gid, info] of alltimeBoardMessages) {
         try {
           const ch = await client.channels.fetch(info.channelId);
-          if (lbSame(info.messageId, allEmbed)) continue;
+          if (lbSameSig(info.messageId, allPayload.sig)) continue;
           const m = ch.messages.cache.get(info.messageId) || (await ch.messages.fetch(info.messageId));
-          await m.edit({ embeds: [allEmbed] });
+          await m.edit(editable(allPayload));
         } catch (e) {
           if ([10008, 10003, 50001, 50013].includes(e?.code)) alltimeBoardMessages.delete(gid);
           else console.error('[alltime] edit', e?.message || e);
@@ -8284,9 +8714,22 @@ client.on(Events.GuildMemberAdd, async (member) => {
           iconURL: inviter?.displayAvatarURL(),
         })
         .setDescription(`📨 <@${inviterId}> a invité <@${member.id}>\n🎁 Récompense : **${fmt(INVITE_REWARD)}**`)
-        .setThumbnail(member.user.displayAvatarURL())
         .setTimestamp();
-      ch.send({ embeds: [embed] }).catch(() => {});
+      const payload = { embeds: [embed] };
+      try {
+        const buf = await renderInviteNotif(inviter, member.user, 'fr');
+        if (buf) {
+          const fname = `invite-${Date.now()}.png`;
+          embed.setImage(`attachment://${fname}`);
+          payload.files = [new AttachmentBuilder(buf, { name: fname })];
+        } else {
+          embed.setThumbnail(member.user.displayAvatarURL());
+        }
+      } catch (e) {
+        console.error('[invitations] image notif', e?.message || e);
+        embed.setThumbnail(member.user.displayAvatarURL());
+      }
+      ch.send(payload).catch(() => {});
     }
   } catch (e) {
     console.error('[invitations] arrivée', e?.message || e);
@@ -8327,7 +8770,7 @@ async function buildInvitesEmbed(guild, targetId) {
 
 async function cmdInvites(msg, args) {
   const targetId = parseUserId(args[0]) || msg.author.id;
-  return msg.reply({ embeds: [await buildInvitesEmbed(msg.guild, targetId)] });
+  return msg.reply(await buildInvitesPayload(msg.guild, targetId));
 }
 
 client.on(Events.ChannelDelete, async (channel) => {
