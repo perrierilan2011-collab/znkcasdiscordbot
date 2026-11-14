@@ -924,6 +924,31 @@ function fitText(g, text, maxW) {
   return `${t.join('')}…`;
 }
 
+// Image de fond des stats (variable Railway STATS_BG_URL). Chargée une fois puis gardée en cache.
+const STATS_BG_URL = String(process.env.STATS_BG_URL || '').trim();
+let statsBgPromise = null;
+function getStatsBg(loadImage) {
+  if (!STATS_BG_URL) return Promise.resolve(null);
+  if (!statsBgPromise) {
+    statsBgPromise = (async () => {
+      const ctl = new AbortController();
+      const timer = setTimeout(() => ctl.abort(), 8000);
+      try {
+        const res = await fetch(STATS_BG_URL, { signal: ctl.signal });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return await loadImage(Buffer.from(await res.arrayBuffer()));
+      } finally {
+        clearTimeout(timer);
+      }
+    })().catch((e) => {
+      console.warn('[stats] STATS_BG_URL illisible (utilise un lien direct png/jpg) :', e?.message || e);
+      statsBgPromise = null; // réessaie au prochain affichage
+      return null;
+    });
+  }
+  return statsBgPromise;
+}
+
 async function renderStatsBanner(user, st, balance, lang) {
   if (!canvasLib) return null;
   const { createCanvas, loadImage } = canvasLib;
@@ -944,6 +969,16 @@ g.scale(SCALE, SCALE);
   bg.addColorStop(1, '#A81CFD');
   g.fillStyle = bg;
   g.fillRect(0, 0, W, H);
+  const bgImg = await getStatsBg(loadImage);
+  if (bgImg) {
+    // recadrage "cover" centré (aucune déformation), puis voile sombre pour garder le texte lisible
+    const k = Math.max(W / bgImg.width, H / bgImg.height);
+    const sw = W / k;
+    const sh = H / k;
+    g.drawImage(bgImg, (bgImg.width - sw) / 2, (bgImg.height - sh) / 2, sw, sh, 0, 0, W, H);
+    g.fillStyle = 'rgba(15,4,30,0.45)';
+    g.fillRect(0, 0, W, H);
+  }
   g.fillStyle = 'rgba(255,255,255,0.06)';
   g.beginPath(); g.arc(W - 60, -20, 170, 0, Math.PI * 2); g.fill();
   g.beginPath(); g.arc(-40, H + 20, 130, 0, Math.PI * 2); g.fill();
@@ -1051,6 +1086,25 @@ g.scale(SCALE, SCALE);
   });
 
   return cv.toBuffer('image/png');
+}
+
+async function buildStatsPayload(user, lang, viewerNote = '') {
+  const [st, bal] = await Promise.all([getPlayerStats(user.id), getBalance(user.id)]);
+  let buf = null;
+  try {
+    buf = await renderStatsBanner(user, st, bal, lang);
+  } catch (e) {
+    console.error('[stats] bannière', e?.message || e);
+  }
+  if (buf) {
+    const attachment = new AttachmentBuilder(buf, { name: 'stats.png' });
+    const embed = new EmbedBuilder()
+      .setColor(COLORS.violet)
+      .setImage('attachment://stats.png')
+      .setFooter({ text: `ZNK Casino • ${user.globalName || user.username}${viewerNote}` });
+    return { embeds: [embed], files: [attachment] };
+  }
+  return { embeds: [statsFallbackEmbed(user, st, bal, lang)], files: [] };
 }
 
 function statsFallbackEmbed(user, st, balance, lang) {
@@ -4899,24 +4953,7 @@ async function handlePanelButton(i) {
     }
     case 'panel_stats': {
       await i.deferReply({ flags: EPH });
-      const lang = getLang(i.user.id);
-      const [st, bal] = await Promise.all([getPlayerStats(i.user.id), getBalance(i.user.id)]);
-      let buf = null;
-      try {
-        buf = await renderStatsBanner(i.user, st, bal, lang);
-      } catch (e) {
-        console.error('[stats] bannière', e?.message || e);
-      }
-      if (buf) {
-  const attachment = new AttachmentBuilder(buf, { name: 'stats.png' });
-  const embed = new EmbedBuilder()
-    .setColor(COLORS.violet)
-    .setImage('attachment://stats.png')
-    .setFooter({ text: `ZNK Casino • ${i.user.globalName || i.user.username}` });
-
-  return i.editReply({ embeds: [embed], files: [attachment] });
-}
-      return i.editReply({ embeds: [statsFallbackEmbed(i.user, st, bal, lang)] });
+      return i.editReply(await buildStatsPayload(i.user, getLang(i.user.id)));
     }
     case 'panel_clear': {
       const g = games.get(i.user.id);
@@ -5185,7 +5222,8 @@ function buildAdminPayload() {
     new ButtonBuilder().setCustomId('admin_notifchan').setLabel('Salon notifs').setEmoji('🔔').setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId('admin_pokerchan').setLabel('Salon online').setEmoji('🌐').setStyle(ButtonStyle.Success),
     new ButtonBuilder().setCustomId('admin_top').setLabel('Classement').setEmoji('🏆').setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId('admin_topall').setLabel('All-time').setEmoji('👑').setStyle(ButtonStyle.Secondary)
+    new ButtonBuilder().setCustomId('admin_topall').setLabel('All-time').setEmoji('👑').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('admin_stats').setLabel('Stats joueur').setEmoji('📊').setStyle(ButtonStyle.Primary)
   );
   return { embeds: [embed], components: [row1, row2, row3, row4] };
 }
@@ -5525,6 +5563,7 @@ const ADMIN_TITLES = {
   remove: '➖ Retirer de l’argent : choisis le membre',
   set: '🎯 Définir le solde : choisis le membre',
   view: '👀 Voir un solde : choisis le membre',
+  stats: '📊 Stats d’un joueur : choisis le membre',
 };
 
 async function handleAdmin(i) {
@@ -5697,6 +5736,13 @@ async function handleAdmin(i) {
     if (action === 'view') {
       const bal = await getBalance(userId);
       return i.update({ content: `💰 Solde de <@${userId}> : **${fmt(bal)}**`, components: [] });
+    }
+    if (action === 'stats') {
+      await i.deferUpdate();
+      const target = i.users?.get(userId) || (await client.users.fetch(userId).catch(() => null));
+      if (!target) return i.editReply({ content: '❌ Joueur introuvable.', components: [] });
+      const payload = await buildStatsPayload(target, 'fr', ' · vue admin');
+      return i.editReply({ content: `📊 Stats de <@${userId}>`, components: [], ...payload });
     }
     const titles = { add: '➕ Ajouter', remove: '➖ Retirer', set: '🎯 Définir le solde' };
     if (!titles[action]) return;
