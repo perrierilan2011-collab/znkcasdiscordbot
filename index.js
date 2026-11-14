@@ -804,21 +804,23 @@ async function recordResult({ guildId, user, game, bet, mult, payout, detail }) 
       embeds: [embed],
       allowedMentions: ping ? { users: [user.id] } : { parse: [] },
     };
+    let sent = false;
     try {
-      const buf = await renderWinNotif(user, game, bet, mult, profit);
+      const buf = await renderWinNotif(user, game, bet, mult, profit, detail);
       if (buf) {
         const fname = `win-${Date.now()}.png`;
-        embed
+        const imgEmbed = new EmbedBuilder(embed.toJSON())
           .setDescription(`### 🏆 ${ping ? `<@${user.id}>` : `**${display}**`} remporte **${fmt(profit)}** !`)
           .setFields()
           .setThumbnail(null)
           .setImage(`attachment://${fname}`);
-        payload.files = [new AttachmentBuilder(buf, { name: fname })];
+        await ch.send({ ...payload, embeds: [imgEmbed], files: [new AttachmentBuilder(buf, { name: fname })] });
+        sent = true;
       }
     } catch (e) {
-      console.error('[wins] image', e?.message || e);
+      console.error('[wins] image refusée, repli sur le texte :', e?.message || e);
     }
-    await ch.send(payload);
+    if (!sent) await ch.send(payload);
   } catch (e) {
     console.error('[wins]', e?.message || e);
   }
@@ -1409,6 +1411,7 @@ async function settleMines(game, kind, i) {
     }
 
     const payload = { embeds: [minesEmbed(game, { text, color, balance })], components: minesRows(game, true) };
+    putCard(payload, await resultCard(game.user, 'mines', game.bet, mult, round2(payout - game.bet), balance));
 
     // Suspense : la case choisie s'ouvre avant le verdict
     if (i && kind === 'lose') {
@@ -1661,12 +1664,12 @@ async function startBlackjack(i, bet) {
     await dealAnimation(i, game);
 
     if (natural) {
-      await i
-        .editReply({
-          embeds: [bjEmbed(game, { text: out.text, color: out.color, balance, revealAll: true })],
-          components: bjRows(game, true),
-        })
-        .catch(() => {});
+      const npay = {
+        embeds: [bjEmbed(game, { text: out.text, color: out.color, balance, revealAll: true })],
+        components: bjRows(game, true),
+      };
+      putCard(npay, await resultCard(i.user, 'bj', bet, round2(out.payout / bet), round2(out.payout - bet), balance));
+      await i.editReply(npay).catch(() => {});
       return;
     }
 
@@ -1756,6 +1759,7 @@ async function settleBlackjack(game, kind, i) {
       embeds: [bjEmbed(game, { text: out.text, color: out.color, balance, revealAll: true })],
       components: bjRows(game, true),
     };
+    putCard(payload, await resultCard(game.user, 'bj', game.bet, round2(out.payout / game.bet), round2(out.payout - game.bet), balance));
     if (i && !i.replied && !i.deferred) await i.update(payload);
     else await game.lastI.editReply(payload);
   } catch (e) {
@@ -1944,7 +1948,9 @@ async function playRoulette(i, bet, choiceStr) {
       new ButtonBuilder().setCustomId(`replay|rl|${bet}|${choice.key}`).setLabel('Rejouer').setEmoji('🔁').setStyle(ButtonStyle.Success),
       new ButtonBuilder().setCustomId('panel_home').setLabel('Menu ZNK').setEmoji('💜').setStyle(ButtonStyle.Primary)
     );
-    await i.editReply({ embeds: [embed], components: [row] });
+    const rlPayload = { embeds: [embed], components: [row] };
+    putCard(rlPayload, await resultCard(i.user, 'roulette', bet, won ? rlMult : 0, profit, balance));
+    await editWithCard(i, rlPayload);
 
     recordResult({
       guildId: resolveGuildId(i),
@@ -4432,7 +4438,9 @@ async function playInstant(i, key, bet, choice) {
       key
     );
 
-    await i.editReply({ embeds: [embed], components: [endGameRow(`replay|${key}|${bet}|${choice}`)] });
+    const igPayload = { embeds: [embed], components: [endGameRow(`replay|${key}|${bet}|${choice}`)] };
+    putCard(igPayload, await resultCard(i.user, key, bet, mult, profit, balance));
+    await editWithCard(i, igPayload);
 
     recordResult({
       guildId: resolveGuildId(i),
@@ -4555,7 +4563,34 @@ async function buildDmPlayPayload(userId) {
     new ButtonBuilder().setCustomId('panel_settings').setLabel(lang === 'en' ? 'Settings' : 'Paramètres').setEmoji('⚙️').setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId('panel_clearall').setLabel(lang === 'en' ? 'Clear chat' : 'Tout effacer').setEmoji('🧹').setStyle(ButtonStyle.Danger)
   );
-  return { embeds: [embed], components: [row1, row2, row3] };
+  const menuPayload = { embeds: [embed], components: [row1, row2, row3] };
+  try {
+    const mu = await client.users.fetch(userId).catch(() => null);
+    if (mu) {
+      putCard(
+        menuPayload,
+        await makeCard('menu', {
+          avatar: mu,
+          tag: lang === 'en' ? 'PRIVATE CASINO' : 'CASINO PRIVÉ',
+          headline: userName(mu),
+          sub: 'ZNK CASINO',
+          barLeft: lang === 'en' ? 'BALANCE' : 'SOLDE',
+          barRight: coinTxt(bal),
+          cells: [
+            [lang === 'en' ? 'BALANCE' : 'SOLDE', coinTxt(bal)],
+            ['DAILY', `+${coinTxt(DAILY_AMOUNT)} / ${lang === 'en' ? 'day' : 'jour'}`],
+            [lang === 'en' ? 'LANGUAGE' : 'LANGUE', lang === 'en' ? 'ENGLISH' : 'FRANÇAIS'],
+            [lang === 'en' ? 'WIN PING' : 'PING VICTOIRE', wantsWinPing(userId) ? 'ON' : 'OFF'],
+            ['ANIMATIONS', wantsSkipAnim(userId) ? 'SKIP' : 'ON'],
+            [lang === 'en' ? 'FAVORITES' : 'FAVORIS', String(getFavs(userId).size)],
+          ],
+        })
+      );
+    }
+  } catch (e) {
+    console.error('[carte menu]', e?.message || e);
+  }
+  return menuPayload;
 }
 
 const GAME_MENU = [
@@ -4969,7 +5004,7 @@ async function handlePanelButton(i) {
     case 'panel_home': {
       const payload = await buildDmPlayPayload(i.user.id);
       if (fromEphemeral(i) && (i.isButton() || i.isModalSubmit())) {
-        return i.update(payload);
+        return i.update({ ...payload, attachments: [] });
       }
       return i.reply({ ...payload, flags: EPH });
     }
@@ -5070,16 +5105,10 @@ async function handlePanelButton(i) {
     case 'panel_daily': {
       const res = await rpc('claim_daily', { p_user_id: i.user.id, p_amount: DAILY_AMOUNT });
       if (res?.balance != null) await touchPeak(i.user.id, res.balance);
-      if (res?.claimed) {
-        return i.reply({
-          content: `🎁 ${t(i.user.id, 'dailyOk')} **${fmt(DAILY_AMOUNT)}** ! ${t(i.user.id, 'newBalance')} : **${fmt(res.balance)}**`,
-          flags: EPH,
-        });
-      }
-      return i.reply({
-        content: `🎁 ${t(i.user.id, 'dailyAlready')}\n${t(i.user.id, 'yourBalance')} : **${fmt(res?.balance ?? 0)}**`,
-        flags: EPH,
-      });
+      const dtxt = res?.claimed
+        ? `🎁 ${t(i.user.id, 'dailyOk')} **${fmt(DAILY_AMOUNT)}** ! ${t(i.user.id, 'newBalance')} : **${fmt(res.balance)}**`
+        : `🎁 ${t(i.user.id, 'dailyAlready')}\n${t(i.user.id, 'yourBalance')} : **${fmt(res?.balance ?? 0)}**`;
+      return i.reply({ ...(await dailyPayload(i.user, res, dtxt)), flags: EPH });
     }
     case 'panel_rules': {
       return i.reply({ ...buildRulesPayload(i.user.id), flags: EPH });
@@ -5214,8 +5243,25 @@ async function handleModalSubmit(i) {
     const newBal = await debit(i.user.id, amount);
     if (newBal === null) return respondText(i, t(i.user.id, 'insufficient'));
     const toBal = await credit(toId, amount);
+    const toUser = await client.users.fetch(toId).catch(() => null);
+    const tcard = await makeCard('transfer', {
+      avatar: i.user,
+      tag: 'TRANSFERT',
+      headline: userName(i.user),
+      sub: `a envoyé à ${userName(toUser)}`,
+      barLeft: 'MONTANT',
+      barRight: coinTxt(amount),
+      cells: [
+        ['DE', userName(i.user)],
+        ['À', userName(toUser)],
+        ['MONTANT', coinTxt(amount), '#86EFAC'],
+        ['TON SOLDE', coinTxt(newBal)],
+        ['SOLDE DESTINATAIRE', coinTxt(toBal)],
+        ['DATE', dateFR()],
+      ],
+    });
     // Notif MP au destinataire
-    await dmUser(toId, {
+    const dmPayload = {
       embeds: [
         new EmbedBuilder()
           .setColor(COLORS.green)
@@ -5226,13 +5272,21 @@ async function handleModalSubmit(i) {
           )
           .setTimestamp(),
       ],
-    });
-    return i.reply({
+    };
+    putCard(dmPayload, tcard);
+    await dmUser(toId, dmPayload);
+    const sendReply = {
       content:
         `✅ **${fmt(amount)}** → <@${toId}>\n` +
         `💰 ${t(i.user.id, 'yourBalance')} : **${fmt(newBal)}** · Dest. : **${fmt(toBal)}**`,
       flags: EPH,
-    });
+    };
+    if (tcard) {
+      const se = new EmbedBuilder().setColor(COLORS.violet);
+      putCard(sendReply, tcard, se);
+      sendReply.embeds = [se];
+    }
+    return i.reply(sendReply);
   }
 }
 
@@ -6049,7 +6103,7 @@ async function cmdBalance(msg, args) {
 async function cmdDaily(msg) {
   const res = await rpc('claim_daily', { p_user_id: msg.author.id, p_amount: DAILY_AMOUNT });
   if (res?.balance != null) await touchPeak(msg.author.id, res.balance);
-  return msg.reply(dailyText(res));
+  return msg.reply(await dailyPayload(msg.author, res, dailyText(res)));
 }
 
 // ============================================================
@@ -6511,7 +6565,7 @@ async function createPokerChannel(i) {
       {
         id: me.id,
         type: OverwriteType.Member,
-        allow: botCan(guild, [P.ViewChannel, P.SendMessages, P.EmbedLinks, P.ReadMessageHistory, P.MentionEveryone, P.ManageMessages]),
+        allow: botCan(guild, [P.ViewChannel, P.SendMessages, P.EmbedLinks, P.AttachFiles, P.ReadMessageHistory, P.MentionEveryone, P.ManageMessages]),
       },
     ],
   });
@@ -6915,7 +6969,28 @@ async function onlineFinish(lobby, ch, embed) {
   }
   pushOnlineHistory(lobby);
   try {
-    await ch.send({ embeds: [embed] });
+    const names = winners.map((id) => cleanTxt(lobby.players.find((p) => p.id === id)?.name) || 'Joueur');
+    const wUser = winners.length ? await client.users.fetch(winners[0]).catch(() => null) : null;
+    const ocard = await makeCard('online', {
+      avatar: wUser,
+      icon: onlineIcon(lobby),
+      tag: 'JEUX EN LIGNE',
+      headline: names.length ? names.join(' · ') : 'Aucun gagnant',
+      sub: g.name,
+      barLeft: 'POT',
+      barRight: coinTxt(lobby.pot),
+      cells: [
+        ['JEU', g.name],
+        ['JOUEURS', String(lobby.players.length)],
+        ['MISE', coinTxt(lobby.stake)],
+        ['POT', coinTxt(lobby.pot)],
+        [names.length > 1 ? 'GAIN CHACUN' : 'GAIN', lobby.share ? `+${coinTxt(lobby.share)}` : '-', '#86EFAC'],
+        ['RÉSULTAT', names.length ? (names.length > 1 ? 'GAGNANTS' : 'GAGNANT') : 'AUCUN GAGNANT', names.length ? '#86EFAC' : '#E9D5FF'],
+      ],
+    });
+    const opay = { embeds: [embed] };
+    putCard(opay, ocard);
+    await ch.send(opay);
   } catch {
     /* ignore */
   }
@@ -7667,6 +7742,19 @@ async function dmUser(userId, payload) {
 /** Diffuse un MP à tous les membres non-bot du serveur (lent, rate-limit). */
 async function dmGuildEveryone(guild, payload) {
   if (!guild) return { ok: 0, fail: 0 };
+  if (
+    typeof payload !== 'string' &&
+    payload.embeds?.length &&
+    !payload.components?.length &&
+    !payload.files?.length &&
+    !payload.embeds[0].data?.image
+  ) {
+    try {
+      putCard(payload, await announceCardFor(payload.embeds[0]));
+    } catch (e) {
+      console.error('[carte annonce]', e?.message || e);
+    }
+  }
   let list;
   try {
     list = guild.members.cache.size >= Math.max(1, (guild.memberCount || 0) * 0.95) ? guild.members.cache : await guild.members.fetch();
@@ -7713,7 +7801,7 @@ async function createAllTimeChannel(i) {
       {
         id: me.id,
         type: OverwriteType.Member,
-        allow: botCan(guild, [P.ViewChannel, P.SendMessages, P.EmbedLinks, P.ReadMessageHistory, P.ManageMessages]),
+        allow: botCan(guild, [P.ViewChannel, P.SendMessages, P.EmbedLinks, P.AttachFiles, P.ReadMessageHistory, P.ManageMessages]),
       },
     ],
   });
@@ -7811,7 +7899,7 @@ async function cmdSetup(msg) {
   }
 
   if (!me.permissions.has(P.ManageChannels)) return msg.reply(NEED_MANAGE_CHANNELS);
-  const botAllow = botCan(guild, [P.ViewChannel, P.SendMessages, P.EmbedLinks, P.ReadMessageHistory, P.ManageMessages]);
+  const botAllow = botCan(guild, [P.ViewChannel, P.SendMessages, P.EmbedLinks, P.AttachFiles, P.ReadMessageHistory, P.ManageMessages]);
 
   const channel = await guild.channels.create({
     name: 'casino',
@@ -7872,7 +7960,7 @@ async function cmdWins(msg) {
       {
         id: me.id,
         type: OverwriteType.Member,
-        allow: botCan(guild, [P.ViewChannel, P.SendMessages, P.EmbedLinks, P.ReadMessageHistory, P.MentionEveryone]),
+        allow: botCan(guild, [P.ViewChannel, P.SendMessages, P.EmbedLinks, P.AttachFiles, P.ReadMessageHistory, P.MentionEveryone]),
       },
     ],
   });
@@ -7907,7 +7995,7 @@ async function cmdInvitesNotif(msg) {
       {
         id: me.id,
         type: OverwriteType.Member,
-        allow: botCan(guild, [P.ViewChannel, P.SendMessages, P.EmbedLinks, P.ReadMessageHistory]),
+        allow: botCan(guild, [P.ViewChannel, P.SendMessages, P.EmbedLinks, P.AttachFiles, P.ReadMessageHistory]),
       },
     ],
   });
@@ -7941,7 +8029,7 @@ async function cmdAdmin(msg) {
       {
         id: me.id,
         type: OverwriteType.Member,
-        allow: botCan(guild, [P.ViewChannel, P.SendMessages, P.EmbedLinks, P.ReadMessageHistory]),
+        allow: botCan(guild, [P.ViewChannel, P.SendMessages, P.EmbedLinks, P.AttachFiles, P.ReadMessageHistory]),
       },
     ],
   });
@@ -8219,6 +8307,244 @@ const plainNum = (n) => num(n).replace(/\s/g, ' ');
 //    avatar invité   : centre (600, 190), diamètre 120 | pseudo centré x=600, ligne de base y=290 (largeur max 300)
 //    récompense    : centrée x=400, ligne de base y=355, zone x 150-650 / y 320-370
 // ------------------------------------------------------------
+// ============================================================
+//  CARTES IMAGE (win, résultat, daily, transfert, annonce, online, menu, invitation)
+//  Gabarit : "carte de profil" 1774x887 (1 avatar rond, bandeau, barre, 6 cases) -> repère 800x400.
+//  Variables Railway : WIN_NOTIF_BG_URL, RESULT_BG_URL, DAILY_BG_URL, TRANSFER_BG_URL, ANNOUNCE_BG_URL,
+//                      ONLINE_BG_URL, MENU_BG_URL, INVITE_NOTIF_BG_URL   (lien direct png/jpg)
+//  Sans variable => ancien affichage texte.
+// ============================================================
+const CARD_BG = {
+  win: String(process.env.WIN_NOTIF_BG_URL || '').trim(),
+  result: String(process.env.RESULT_BG_URL || '').trim(),
+  daily: String(process.env.DAILY_BG_URL || '').trim(),
+  transfer: String(process.env.TRANSFER_BG_URL || '').trim(),
+  announce: String(process.env.ANNOUNCE_BG_URL || '').trim(),
+  online: String(process.env.ONLINE_BG_URL || '').trim(),
+  menu: String(process.env.MENU_BG_URL || '').trim(),
+  invite: String(process.env.INVITE_NOTIF_BG_URL || '').trim(),
+};
+const CARD_L = {
+  av: { cx: 103, cy: 114.5, d: 84 },
+  tx: 171,
+  bar: { x: 61, y: 175, w: 582, h: 33 },
+  cols: [[64, 198], [271, 199], [480, 230]],
+  rows: [[220, 45], [271, 45]],
+};
+// texte sans emoji (le canvas n'affiche pas les emojis) ; garde le symbole de monnaie texte
+const noEmoji = (s) => {
+  const keep = '\uE000';
+  return String(s ?? '')
+    .split(COIN).join(COIN_PLAIN)
+    .split(COIN_PLAIN).join(keep)
+    .replace(/[\p{Extended_Pictographic}\u200d\ufe0f]/gu, '')
+    .split(keep).join(COIN_PLAIN)
+    .replace(/\s+/g, ' ')
+    .trim();
+};
+const dateFR = () => new Date().toLocaleDateString('fr-FR', { timeZone: 'Europe/Paris', day: '2-digit', month: '2-digit', year: 'numeric' });
+
+function drawStar(g, cx, cy, r) {
+  g.beginPath();
+  for (let k = 0; k < 10; k++) {
+    const a = -Math.PI / 2 + (k * Math.PI) / 5;
+    const rr = k % 2 ? r * 0.42 : r;
+    const x = cx + Math.cos(a) * rr;
+    const y = cy + Math.sin(a) * rr;
+    if (k) g.lineTo(x, y);
+    else g.moveTo(x, y);
+  }
+  g.closePath();
+  g.fill();
+}
+
+// d = { avatar, icon(url), tag, headline, sub, barLeft, barRight, cells: [[label, value, color?] x6] }
+async function renderCard(kind, d) {
+  if (!canvasLib) return null;
+  const { createCanvas, loadImage } = canvasLib;
+  const bgImg = await getBgByUrl(CARD_BG[kind], loadImage);
+  if (!bgImg) return null;
+  const W = 800, H = 400, SCALE = 1.25;
+  const cv = createCanvas(W * SCALE, H * SCALE);
+  const g = cv.getContext('2d');
+  g.scale(SCALE, SCALE);
+  const FONT = STATS_FONT;
+  const S = noEmoji;
+  const k = Math.max(W / bgImg.width, H / bgImg.height);
+  const sw = W / k, sh = H / k;
+  g.drawImage(bgImg, (bgImg.width - sw) / 2, (bgImg.height - sh) / 2, sw, sh, 0, 0, W, H);
+
+  // avatar rond (dans le cadre du gabarit)
+  const A = CARD_L.av;
+  const av = d.avatar ? await getAvatarCached(d.avatar, loadImage) : null;
+  g.save();
+  g.beginPath(); g.arc(A.cx, A.cy, A.d / 2, 0, Math.PI * 2); g.closePath(); g.clip();
+  if (av) {
+    const sq = Math.min(av.width, av.height);
+    g.drawImage(av, (av.width - sq) / 2, (av.height - sq) / 2, sq, sq, A.cx - A.d / 2, A.cy - A.d / 2, A.d, A.d);
+    g.restore();
+  } else {
+    g.restore();
+    g.fillStyle = 'rgba(255,255,255,0.85)';
+    drawStar(g, A.cx, A.cy, A.d * 0.3);
+  }
+
+  // icône du jeu à droite du bandeau
+  const icon = d.icon ? await loadRemoteImage(d.icon, loadImage) : null;
+  if (icon) g.drawImage(icon, 531, 91, 62, 62);
+
+  const tx = CARD_L.tx;
+  const tmax = (icon ? 520 : 590) - tx;
+  g.textAlign = 'left'; g.textBaseline = 'alphabetic';
+  g.fillStyle = 'rgba(255,255,255,0.7)'; g.font = `bold 13px ${FONT}`;
+  g.fillText(fitText(g, S(d.tag).toUpperCase(), tmax), tx, 94);
+  g.fillStyle = '#FFFFFF'; g.font = `bold 28px ${FONT}`;
+  g.fillText(fitText(g, S(d.headline), tmax), tx, 121);
+  g.fillStyle = 'rgba(255,255,255,0.75)'; g.font = `15px ${FONT}`;
+  g.fillText(fitText(g, S(d.sub), tmax), tx, 145);
+
+  // barre : libellé à gauche, valeur à droite
+  const B = CARD_L.bar;
+  g.fillStyle = 'rgba(255,255,255,0.9)'; g.font = `bold 14px ${FONT}`;
+  g.fillText(fitText(g, S(d.barLeft).toUpperCase(), 200), B.x + 16, B.y + B.h / 2 + 5);
+  g.textAlign = 'right'; g.fillStyle = '#FFFFFF'; g.font = `bold 20px ${FONT}`;
+  g.fillText(fitText(g, S(d.barRight), 380), B.x + B.w - 16, B.y + B.h / 2 + 7);
+  g.textAlign = 'left';
+
+  // 6 cases (grille 3x2)
+  const boxes = CARD_L.rows.flatMap(([y, h]) => CARD_L.cols.map(([x, w]) => ({ x, y, w, h })));
+  (d.cells || []).slice(0, 6).forEach(([label, value, color], n) => {
+    const b = boxes[n];
+    g.fillStyle = 'rgba(255,255,255,0.78)'; g.font = `bold 11px ${FONT}`;
+    g.fillText(fitText(g, S(label).toUpperCase(), b.w - 28), b.x + 14, b.y + 17);
+    g.fillStyle = color || '#FFFFFF';
+    let fs = 19;
+    g.font = `bold ${fs}px ${FONT}`;
+    const v = S(value);
+    while (fs > 11 && g.measureText(v).width > b.w - 28) { fs -= 1; g.font = `bold ${fs}px ${FONT}`; }
+    g.fillText(fitText(g, v, b.w - 28), b.x + 14, b.y + 38);
+  });
+  return cv.toBuffer('image/png');
+}
+
+async function makeCard(kind, d) {
+  try {
+    const buf = await renderCard(kind, d);
+    if (!buf) return null;
+    const name = `${kind}-${Date.now()}-${randomInt(1000, 9999)}.png`;
+    return { name, file: new AttachmentBuilder(buf, { name }) };
+  } catch (e) {
+    console.error(`[carte ${kind}]`, e?.message || e);
+    return null;
+  }
+}
+async function editWithCard(i, payload) {
+  try {
+    return await i.editReply(payload);
+  } catch (e) {
+    if (!payload.files?.length) throw e;
+    console.error('[carte] image refusée, repli sur le texte :', e?.message || e);
+    payload.embeds.forEach((em) => em.setImage(null));
+    payload.files = [];
+    return i.editReply(payload);
+  }
+}
+function putCard(payload, card, embed) {
+  const e = embed || payload.embeds?.[0];
+  if (!card || !e) return payload;
+  e.setImage(`attachment://${card.name}`);
+  payload.files = [...(payload.files || []), card.file];
+  return payload;
+}
+const userName = (u) => cleanTxt(u?.globalName || u?.username) || 'Joueur';
+const cardColors = { win: '#86EFAC', lose: '#FCA5A5', push: '#E9D5FF' };
+const coinTxt = (n) => `${plainNum(n)} ${COIN_PLAIN}`;
+
+async function resultCard(user, game, bet, mult, profit, balance = null) {
+  const kind = profit > 0 ? 'win' : profit < 0 ? 'lose' : 'push';
+  const tag = kind === 'win' ? 'VICTOIRE' : kind === 'lose' ? 'DÉFAITE' : 'ÉGALITÉ';
+  const col = cardColors[kind];
+  const payout = Math.max(0, round2(bet + profit));
+  return makeCard('result', {
+    avatar: user,
+    icon: gameIcon(game),
+    tag,
+    headline: userName(user),
+    sub: gameNamePlain(game),
+    barLeft: balance == null ? 'RÉSULTAT' : 'SOLDE',
+    barRight: balance == null ? tag : coinTxt(balance),
+    cells: [
+      ['JEU', gameNamePlain(game)],
+      ['MISE', coinTxt(bet)],
+      ['MULTIPLICATEUR', fx(mult)],
+      ['GAIN TOTAL', coinTxt(payout)],
+      ['PROFIT', `${profit > 0 ? '+' : ''}${coinTxt(profit)}`, col],
+      ['RÉSULTAT', tag, col],
+    ],
+  });
+}
+
+async function dailyPayload(user, res, content) {
+  const payload = { content };
+  const claimed = !!res?.claimed;
+  const card = await makeCard('daily', {
+    avatar: user,
+    tag: 'RÉCOMPENSE QUOTIDIENNE',
+    headline: userName(user),
+    sub: claimed ? 'Daily récupéré' : 'Daily déjà récupéré aujourd’hui',
+    barLeft: 'SOLDE',
+    barRight: coinTxt(res?.balance ?? 0),
+    cells: [
+      ['REÇU', claimed ? `+${coinTxt(DAILY_AMOUNT)}` : '0', claimed ? '#86EFAC' : '#E9D5FF'],
+      ['STATUT', claimed ? 'RÉCUPÉRÉ' : 'DÉJÀ PRIS', claimed ? '#86EFAC' : '#FCA5A5'],
+      ['PROCHAIN DAILY', 'MINUIT (PARIS)'],
+      ['SOLDE', coinTxt(res?.balance ?? 0)],
+      ['DAILY / JOUR', coinTxt(DAILY_AMOUNT)],
+      ['DATE', dateFR()],
+    ],
+  });
+  if (card) {
+    const e = new EmbedBuilder().setColor(COLORS.violet);
+    putCard(payload, card, e);
+    payload.embeds = [e];
+  }
+  return payload;
+}
+
+// Carte « annonce » générée automatiquement depuis l'embed d'une diffusion admin
+async function announceCardFor(embed) {
+  const title = noEmoji(embed.data?.title || '');
+  const desc = String(embed.data?.description || '');
+  const bolds = [...desc.matchAll(/\*\*(.+?)\*\*/g)].map((m) => noEmoji(m[1])).filter(Boolean);
+  const actorId = (desc.match(/<@!?(\d{15,25})>/) || [])[1];
+  const actor = actorId ? await client.users.fetch(actorId).catch(() => null) : null;
+  let label = 'INFO';
+  let value = title || 'ANNONCE';
+  let color = '#FFFFFF';
+  if (/Cadeau/i.test(title)) { label = 'OFFERT À CHAQUE JOUEUR'; value = `+${bolds[0] || ''}`; color = '#86EFAC'; }
+  else if (/Multiplicateur/i.test(title)) { label = bolds[0] || 'MULTIPLICATEUR'; value = bolds[1] || title; }
+  else if (/Boost termin/i.test(title)) { label = 'ÉVÉNEMENT TERMINÉ'; value = bolds[0] || title; color = '#E9D5FF'; }
+  else if (/Boost/i.test(title)) { label = `ACTIF PENDANT ${bolds[0] || ''}`; value = title.replace(/^Boost\s*:?\s*/i, '') || title; }
+  else if (/R[ée]compense/i.test(title)) { label = bolds[1] || 'RÉCOMPENSE'; value = bolds[0] || title; color = '#FACC15'; }
+  else if (/Reset/i.test(title)) { label = 'ADMINISTRATION'; value = title; color = '#FCA5A5'; }
+  return makeCard('announce', {
+    avatar: actor,
+    tag: 'ANNONCE · ZNK CASINO',
+    headline: title,
+    sub: actor ? `Par ${userName(actor)}` : 'Administration',
+    barLeft: label,
+    barRight: value,
+    cells: [
+      ['ANNONCE', title],
+      ['PAR', actor ? userName(actor) : 'ADMIN'],
+      [label, value, color],
+      ['DÉTAIL', bolds[0] || '-'],
+      ['DÉTAIL 2', bolds[1] || '-'],
+      ['DATE', dateFR()],
+    ],
+  });
+}
+
 const iconCache = new Map();
 async function loadRemoteImage(url, loadImage) {
   if (!url) return null;
@@ -8237,61 +8563,49 @@ async function loadRemoteImage(url, loadImage) {
   }
 }
 
-// Notif de victoire (image 1774x887 = même gabarit que notif_invitation.png)
-async function renderWinNotif(user, game, bet, mult, profit) {
-  if (!canvasLib) return null;
-  const { createCanvas, loadImage } = canvasLib;
-  const W = 800, H = 400, SCALE = 1.25;
-  const bgImg = await getBgByUrl(BOARD_BG.winNotif, loadImage);
-  if (!bgImg) return null; // pas de variable : on garde l'embed classique
-  const cv = createCanvas(W * SCALE, H * SCALE);
-  const g = cv.getContext('2d');
-  g.scale(SCALE, SCALE);
-  const FONT = STATS_FONT;
-  const k = Math.max(W / bgImg.width, H / bgImg.height);
-  const sw = W / k, sh = H / k;
-  g.drawImage(bgImg, (bgImg.width - sw) / 2, (bgImg.height - sh) / 2, sw, sh, 0, 0, W, H);
-
-  const circle = async (img, cx, cy, D, fallback) => {
-    g.save();
-    g.beginPath(); g.arc(cx, cy, D / 2, 0, Math.PI * 2); g.closePath(); g.clip();
-    if (img) {
-      const sq = Math.min(img.width, img.height);
-      g.drawImage(img, (img.width - sq) / 2, (img.height - sq) / 2, sq, sq, cx - D / 2, cy - D / 2, D, D);
-    } else {
-      g.fillStyle = '#5865F2'; g.fillRect(cx - D / 2, cy - D / 2, D, D);
-      g.fillStyle = '#fff'; g.font = `bold 32px ${FONT}`; g.textAlign = 'center';
-      g.fillText(fallback, cx, cy + 11);
-    }
-    g.restore();
-  };
-  const avatar = await getAvatarCached(user, loadImage);
-  const icon = await loadRemoteImage(gameIcon(game), loadImage);
-  await circle(avatar, 103, 115, 84, '?');   // gagnant
-  await circle(icon, 534, 115, 84, '*');     // icône du jeu
-
-  const name = cleanTxt(user.globalName || user.username) || 'Joueur';
-  g.textAlign = 'left'; g.textBaseline = 'alphabetic';
-  g.fillStyle = 'rgba(255,255,255,0.7)'; g.font = `bold 13px ${FONT}`;
-  g.fillText('VICTOIRE', 171, 100);
-  g.fillStyle = '#FFFFFF'; g.font = `bold 28px ${FONT}`;
-  g.fillText(fitText(g, name, 330), 171, 137);
-
-  g.fillStyle = 'rgba(255,255,255,0.9)'; g.font = `bold 14px ${FONT}`;
-  g.fillText(fitText(g, gameNamePlain(game).toUpperCase(), 230), 77, 196);
-  g.textAlign = 'right'; g.fillStyle = '#FFFFFF'; g.font = `bold 18px ${FONT}`;
-  g.fillText(fitText(g, `MISE ${plainNum(bet)} ${COIN_PLAIN}  ·  ${fx(mult)}`, 300), 627, 197);
-
-  g.textAlign = 'center';
-  g.fillStyle = 'rgba(255,255,255,0.78)'; g.font = `bold 16px ${FONT}`;
-  g.fillText('GAIN', 387, 252);
-  g.fillStyle = '#86EFAC'; g.font = `bold 52px ${FONT}`;
-  g.fillText(fitText(g, `+${plainNum(profit)} ${COIN_PLAIN}`, 500), 387, 302);
-  g.textAlign = 'left';
-  return cv.toBuffer('image/png');
+// Notif de victoire du salon wins (gabarit carte de profil)
+async function renderWinNotif(user, game, bet, mult, profit, detail = '') {
+  const payout = round2(bet + profit);
+  return renderCard('win', {
+    avatar: user,
+    icon: gameIcon(game),
+    tag: 'VICTOIRE',
+    headline: userName(user),
+    sub: gameNamePlain(game),
+    barLeft: 'GAIN',
+    barRight: `+${coinTxt(profit)}`,
+    cells: [
+      ['JEU', gameNamePlain(game)],
+      ['MISE', coinTxt(bet)],
+      ['MULTIPLICATEUR', fx(mult)],
+      ['GAIN TOTAL', coinTxt(payout)],
+      ['PROFIT', `+${coinTxt(profit)}`, '#86EFAC'],
+      ['DÉTAIL', detail || '-'],
+    ],
+  });
 }
 
 async function renderInviteNotif(inviter, invited, lang = 'fr') {
+  {
+    const en0 = lang === 'en';
+    const newCard = await renderCard('invite', {
+      avatar: inviter,
+      tag: en0 ? 'NEW INVITE' : 'NOUVELLE INVITATION',
+      headline: userName(inviter),
+      sub: `${en0 ? 'invited' : 'a invité'} ${userName(invited)}`,
+      barLeft: en0 ? 'REWARD' : 'RÉCOMPENSE',
+      barRight: `+${coinTxt(INVITE_REWARD)}`,
+      cells: [
+        [en0 ? 'INVITER' : 'INVITANT', userName(inviter)],
+        [en0 ? 'INVITED' : 'INVITÉ', userName(invited)],
+        [en0 ? 'REWARD' : 'RÉCOMPENSE', `+${coinTxt(INVITE_REWARD)}`, '#86EFAC'],
+        ['STATUT', en0 ? 'VALIDATED' : 'VALIDÉE', '#86EFAC'],
+        ['DATE', dateFR()],
+        ['SERVEUR', 'ZNK CASINO'],
+      ],
+    });
+    if (newCard) return newCard;
+  }
   if (!canvasLib) return null;
   const { createCanvas, loadImage } = canvasLib;
   const W = 800;
