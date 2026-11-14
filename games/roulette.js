@@ -1,41 +1,61 @@
 'use strict';
 const D = require('./draw');
 
-const CELL_W = 48;
-const CELL_H = 58;
-const PITCH = 54;
+const CELL_W = 58;
+const CELL_H = 84;
+const PITCH = 66;
 const STEPS = [8, 7, 6, 5, 4, 3, 2, 1, 1]; // 37 crans = un tour complet
 
+const theme = { c0: '#3A0E3E', c1: '#12041F', rim: 'rgba(253,230,138,0.85)', spot: 'rgba(253,230,138,0.18)', pattern: 'lines' };
+
 function numColor(n, reds) {
-  if (n === 0) return ['#059669', '#34D399'];
-  return reds.has(n) ? ['#BE123C', '#FB7185'] : ['#1B1233', '#8B5CF6'];
+  if (n === 0) return ['#047857', '#34D399'];
+  return reds.has(n) ? ['#9F1239', '#FB7185'] : ['#150B2B', '#7C5CE0'];
 }
 const colorName = (n, reds) => (n === 0 ? 'VERT' : reds.has(n) ? 'ROUGE' : 'NOIR');
 
-function drawStrip(g, cx, cy, order, pos, reds, blur) {
+// bande de cases façon « cylindre » : les cases s'écrasent et s'assombrissent vers les bords
+function drawStrip(g, cx, cy, order, pos, reds, blur, hot) {
   const N = order.length;
-  for (let d = -7; d <= 7; d++) {
+  for (let d = -6; d <= 6; d++) {
     const i = (((Math.round(pos) + d) % N) + N) % N;
     const num = order[i];
-    const x = cx + d * PITCH;
-    const near = Math.abs(d) <= 1 ? 1 : 1 - Math.min(1, (Math.abs(d) - 1) * 0.14);
+    const t = Math.min(1, Math.abs(d) / 6);
+    const sc = Math.cos(t * 1.05);
+    const x = cx + Math.sign(d) * Math.sin(t * 1.05) * 6 * PITCH * 0.98;
+    const wv = CELL_W * sc;
+    const hv = CELL_H * (0.62 + 0.38 * sc);
     const [c0, c1] = numColor(num, reds);
+    const centre = d === 0;
     g.save();
-    g.globalAlpha = Math.max(0.2, near) * (blur ? 0.85 : 1);
-    D.rr(g, x - CELL_W / 2, cy - CELL_H / 2, CELL_W, CELL_H, 9);
-    const gr = g.createLinearGradient(0, cy - CELL_H / 2, 0, cy + CELL_H / 2);
+    g.globalAlpha = Math.max(0.25, sc) * (blur && !centre ? 0.9 : 1);
+    D.rr(g, x - wv / 2, cy - hv / 2, wv, hv, 10 * sc);
+    const gr = g.createLinearGradient(0, cy - hv / 2, 0, cy + hv / 2);
     gr.addColorStop(0, c1);
     gr.addColorStop(1, c0);
     g.fillStyle = gr;
+    if (centre && hot) {
+      g.shadowColor = hot;
+      g.shadowBlur = 20;
+    }
     g.fill();
-    g.lineWidth = 1.3;
-    g.strokeStyle = 'rgba(233,213,255,0.55)';
+    g.shadowBlur = 0;
+    g.lineWidth = centre ? 2 : 1.2;
+    g.strokeStyle = 'rgba(233,213,255,0.6)';
     g.stroke();
+    D.rr(g, x - wv / 2 + 2, cy - hv / 2 + 2, wv - 4, hv * 0.34, 8 * sc);
+    g.fillStyle = 'rgba(255,255,255,0.12)';
+    g.fill();
     g.restore();
-    D.text(g, num, x, cy + 1, { size: 21, alpha: Math.max(0.25, near) });
-    if (blur) {
-      g.fillStyle = 'rgba(192,132,252,0.12)';
-      g.fillRect(x - CELL_W / 2 - 8, cy - CELL_H / 2, 8, CELL_H);
+    D.text(g, num, x, cy + 1, { size: 15 + 13 * sc, alpha: Math.max(0.3, sc) });
+    if (blur && !centre) {
+      g.save();
+      g.globalAlpha = 0.5 * sc;
+      for (let s = 1; s <= 3; s++) {
+        g.fillStyle = `rgba(192,132,252,${0.13 / s})`;
+        g.fillRect(x - wv / 2 - s * 7, cy - hv / 2, 7, hv);
+      }
+      g.restore();
     }
   }
 }
@@ -70,40 +90,46 @@ function build(res, ctx) {
       draw(S) {
         const { g, w, h, cx } = S;
         const cy = h / 2 + 4;
+        // rail lumineux
+        D.floorGlow(g, cx, cy + CELL_H / 2 + 8, 300, 20, 'rgba(253,230,138,0.22)');
         g.save();
         g.beginPath();
-        g.rect(150, 0, w - 300, h);
+        g.rect(116, 0, w - 232, h);
         g.clip();
-        drawStrip(g, cx, cy, order, p0, reds, fast);
+        drawStrip(g, cx, cy, order, p0, reds, fast, last ? S.accent || '#FDE68A' : null);
         g.restore();
-        // cadre du numéro central + repère
+        // cadre du numéro central + repères
         g.save();
-        D.rr(g, cx - CELL_W / 2 - 4, cy - CELL_H / 2 - 4, CELL_W + 8, CELL_H + 8, 12);
-        g.lineWidth = 2.6;
-        g.strokeStyle = last ? S.accent || '#FDE68A' : '#FDE68A';
-        g.shadowColor = last ? S.accent || '#FDE68A' : '#FDE68A';
-        g.shadowBlur = 14;
+        D.rr(g, cx - CELL_W / 2 - 5, cy - CELL_H / 2 - 5, CELL_W + 10, CELL_H + 10, 13);
+        g.lineWidth = 3;
+        const hl = last ? S.accent || '#FDE68A' : '#FDE68A';
+        g.strokeStyle = hl;
+        g.shadowColor = hl;
+        g.shadowBlur = 16;
         g.stroke();
         g.restore();
-        g.fillStyle = '#FDE68A';
-        g.beginPath();
-        g.moveTo(cx, cy - CELL_H / 2 - 5);
-        g.lineTo(cx - 7, cy - CELL_H / 2 - 16);
-        g.lineTo(cx + 7, cy - CELL_H / 2 - 16);
-        g.fill();
-        // fondu sur les bords
-        for (const [x0, x1] of [[150, 215], [w - 150, w - 215]]) {
-          const fg = g.createLinearGradient(x0, 0, x1, 0);
-          fg.addColorStop(0, 'rgba(10,2,26,1)');
-          fg.addColorStop(1, 'rgba(10,2,26,0)');
-          g.fillStyle = fg;
-          g.fillRect(Math.min(x0, x1), 0, 65, h);
+        for (const dir of [-1, 1]) {
+          g.fillStyle = '#FDE68A';
+          g.shadowColor = '#FDE68A';
+          g.shadowBlur = 10;
+          g.beginPath();
+          const py = dir < 0 ? cy - CELL_H / 2 - 8 : cy + CELL_H / 2 + 8;
+          g.moveTo(cx, py);
+          g.lineTo(cx - 8, py + dir * -13);
+          g.lineTo(cx + 8, py + dir * -13);
+          g.fill();
+          g.shadowBlur = 0;
         }
-        D.chip(g, 14, (h - 42) / 2, 126, 42, 'Ton pari', ctx.pickLabel || '-');
-        D.chip(g, w - 140, (h - 42) / 2, 126, 42, 'Numéro', last ? `${result} ${colorName(result, reds)}` : '?', {
+        // infos
+        D.hud(g, 12, (h - 52) / 2, 96, 52, 'Ton pari', String(ctx.pickLabel || '-').slice(0, 11), { size: 13 });
+        D.hud(g, w - 108, (h - 52) / 2, 96, 52, 'Numéro', last ? `${result} ${colorName(result, reds)}` : '?', {
+          size: 13,
           color: last ? S.accent || '#fff' : 'rgba(233,213,255,0.6)',
           line: last ? S.accent || undefined : undefined,
+          glow: last ? S.accent : undefined,
         });
+        D.bulbs(g, 130, w - 130, 9, 22, k);
+        D.bulbs(g, 130, w - 130, h - 9, 22, k + 1);
       },
     };
   });
@@ -112,9 +138,6 @@ function build(res, ctx) {
 
 function emblem(S, cx, cy) {
   const { g, p } = S;
-  const data = S.data || {};
-  const reds = new Set(data.reds || []);
-  const order = data.order || [];
   const rot = S.last ? 0 : (1 - p) * 7;
   g.save();
   g.rotate(rot);
@@ -132,7 +155,6 @@ function emblem(S, cx, cy) {
   g.fillStyle = '#E9D5FF';
   g.fill();
   g.restore();
-  // bille
   const ba = S.last ? -0.9 : -rot * 1.7;
   g.beginPath();
   g.arc(Math.cos(ba) * 28, Math.sin(ba) * 28, 3.6, 0, D.TAU);
@@ -140,8 +162,6 @@ function emblem(S, cx, cy) {
   g.shadowColor = '#fff';
   g.shadowBlur = 6;
   g.fill();
-  void reds;
-  void order;
 }
 
-module.exports = { key: 'roulette', title: 'Roulette', build, emblem };
+module.exports = { key: 'roulette', title: 'Roulette', theme, build, emblem };

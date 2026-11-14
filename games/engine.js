@@ -17,7 +17,8 @@ const D = require('./draw');
 const W = 800;
 const H = 400;
 const SC = 1.25;
-const STAGE = { x: 64, y: 219, w: 646, h: 98 }; // = les 6 cases du gabarit
+// scène agrandie : recouvre les 6 cases du gabarit et utilise toute la moitié basse de la carte
+const STAGE = { x: 36, y: 214, w: 728, h: 172 };
 const AV = { cx: 103, cy: 114.5, d: 84 };
 const MED = { cx: 702, cy: 112, r: 50 }; // médaillon (en haut à droite)
 const BAR = { x: 61, y: 175, w: 582, h: 33 };
@@ -135,28 +136,35 @@ function create(deps, GAMES) {
     g.stroke();
     g.restore();
 
-    // ----- scène du jeu (dans le cadre « 6 cases » du gabarit)
+    // ----- scène du jeu (table de jeu thématique)
     g.save();
     g.translate(STAGE.x, STAGE.y);
-    D.stagePanel(g, STAGE.w, STAGE.h, accent ? accent : undefined);
+    // ombre portée sous la table
     g.save();
-    D.rr(g, 0, 0, STAGE.w, STAGE.h, 14);
+    D.rr(g, 0, 0, STAGE.w, STAGE.h, 18);
+    g.shadowColor = 'rgba(0,0,0,0.6)';
+    g.shadowBlur = 18;
+    g.shadowOffsetY = 4;
+    g.fillStyle = '#10042A';
+    g.fill();
+    g.restore();
+    D.stage(g, STAGE.w, STAGE.h, game.theme || {});
+    g.save();
+    D.rr(g, 0, 0, STAGE.w, STAGE.h, 18);
     g.clip();
     const rnd = D.mulberry(seed + k * 977 + 13);
     frame.draw({
       g, w: STAGE.w, h: STAGE.h, cx: STAGE.w / 2, cy: STAGE.h / 2,
       p, k, n, last, res: ctx.res, ctx, data: ctx.data || {}, rnd, outcome, accent,
     });
-    if (last && outcome === 'win') D.sparkles(g, D.mulberry(seed + 5), STAGE.w, STAGE.h, 16);
-    g.restore();
-    if (accent) {
-      D.rr(g, 0, 0, STAGE.w, STAGE.h, 14);
-      g.lineWidth = 2;
-      g.strokeStyle = accent;
-      g.shadowColor = accent;
-      g.shadowBlur = 14;
-      g.stroke();
+    if (last && outcome === 'win') {
+      D.confetti(g, D.mulberry(seed + 9), STAGE.w, STAGE.h, 34);
+      D.sparkles(g, D.mulberry(seed + 5), STAGE.w, STAGE.h, 14);
+    } else if (last && outcome === 'lose') {
+      D.vignette(g, STAGE.w, STAGE.h, 'rgba(120,10,40,0.38)', 0.3);
     }
+    g.restore();
+    D.stageRim(g, STAGE.w, STAGE.h, accent || (game.theme && game.theme.rim) || 'rgba(192,132,252,0.85)', accent ? 16 : 10);
     g.restore();
     return cv.toBuffer('image/jpeg', 90);
   }
