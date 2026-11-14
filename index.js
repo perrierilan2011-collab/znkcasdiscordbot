@@ -5586,29 +5586,130 @@ function compareScores(a, b) {
   return 0;
 }
 
+// ---------- Multijoueur : historique, classement, journal d'activité ----------
+const ONLINE_HIST_FILE = path.join(__dirname, 'data', 'online_history.json');
+let onlineHistory = [];
+try {
+  const raw = JSON.parse(fs.readFileSync(ONLINE_HIST_FILE, 'utf8'));
+  if (Array.isArray(raw)) onlineHistory = raw.slice(-200);
+} catch {
+  /* premier lancement */
+}
+const lbLast = new Map(); // dernière description publiée par message de classement (évite les edits inutiles)
+function lbSame(id, embed) {
+  const d = embed.data?.description || '';
+  if (lbLast.get(id) === d) return true;
+  lbLast.set(id, d);
+  return false;
+}
+function pushLobbyLog(lobby, text) {
+  if (!lobby.log) lobby.log = [];
+  lobby.log.push(text);
+  if (lobby.log.length > 4) lobby.log.shift();
+}
+function pushOnlineHistory(lobby) {
+  onlineHistory.push({
+    t: Date.now(),
+    guildId: lobby.guildId,
+    game: lobby.game,
+    stake: lobby.stake,
+    pot: lobby.pot,
+    players: lobby.players.map((p) => p.id),
+    winners: lobby.winnerIds || [],
+    share: lobby.share || 0,
+  });
+  if (onlineHistory.length > 200) onlineHistory = onlineHistory.slice(-200);
+  saveJson(ONLINE_HIST_FILE, onlineHistory);
+}
+const onlineIcon = (lobby) => {
+  const g = ONLINE_GAMES[lobby.game];
+  return g ? `https://cdn.jsdelivr.net/gh/jdecked/twemoji@15.0.3/assets/72x72/${emojiCode(g.emoji)}.png` : null;
+};
+const ONLINE_CHOICE_LABEL = {
+  rouge: '🔴 Rouge', noir: '⚫ Noir', pile: '🪙 Pile', face: '🪙 Face',
+  h1: '🐎 Cheval 1', h2: '🐎 Cheval 2', h3: '🐎 Cheval 3', h4: '🐎 Cheval 4',
+  x15: '🚀 x1.5', x2: '🚀 x2', x3: '🚀 x3', x5: '🚀 x5',
+};
+
+function onlineLeaderboardEmbed(guildId) {
+  const agg = new Map();
+  for (const h of onlineHistory) {
+    if (h.guildId !== guildId) continue;
+    for (const id of h.players) {
+      const a = agg.get(id) || { g: 0, w: 0, net: 0 };
+      a.g++;
+      if (h.winners.includes(id)) {
+        a.w++;
+        a.net += h.share - h.stake;
+      } else if (h.winners.length) a.net -= h.stake;
+      agg.set(id, a);
+    }
+  }
+  const medals = ['🥇', '🥈', '🥉'];
+  const top = [...agg.entries()].sort((a, b) => b[1].w - a[1].w || b[1].net - a[1].net).slice(0, 10);
+  const lines = top.map(
+    ([id, a], k) => `${medals[k] ?? `**${k + 1}.**`} <@${id}> · **${a.w}** V / ${a.g} · ${Math.round((a.w / a.g) * 100)} % · ${signed(round2(a.net))}`
+  );
+  return new EmbedBuilder()
+    .setColor(COLORS.violet)
+    .setAuthor({ name: 'ZNK CASINO  •  JEUX EN LIGNE', iconURL: ZNK_LOGO })
+    .setTitle('🏆 Classement multijoueur')
+    .setDescription(lines.length ? lines.join('\n') : 'Aucune partie en ligne terminée pour le moment.')
+    .setFooter({ text: 'ZNK Casino  •  200 dernières parties' })
+    .setTimestamp();
+}
+
+function onlineHistoryEmbed(guildId) {
+  const rows = onlineHistory.filter((h) => h.guildId === guildId).slice(-8).reverse();
+  const lines = rows.map((h) => {
+    const g = ONLINE_GAMES[h.game] || ONLINE_GAMES.poker;
+    const res = h.winners.length ? `🏆 ${h.winners.map((id) => `<@${id}>`).join(' ')} **${signed(round2(h.share - h.stake))}**` : '🤝 sans gagnant';
+    return `${g.emoji} **${g.name}** · ${h.players.length} joueur(s) · mise ${fmt(h.stake)}\n└ ${res} · <t:${Math.floor(h.t / 1000)}:R>`;
+  });
+  return new EmbedBuilder()
+    .setColor(COLORS.violet)
+    .setAuthor({ name: 'ZNK CASINO  •  JEUX EN LIGNE', iconURL: ZNK_LOGO })
+    .setTitle('📜 Dernières parties en ligne')
+    .setDescription(lines.length ? lines.join('\n\n') : 'Aucune partie terminée pour le moment.')
+    .setFooter({ text: 'ZNK Casino  •  Historique du serveur' })
+    .setTimestamp();
+}
+
 function pokerLobbyEmbed(lobby) {
   const g = ONLINE_GAMES[lobby.game] || ONLINE_GAMES.poker;
   const max = lobby.maxPlayers || g.max || POKER_MAX;
-  const spots = lobby.players.map((p, i) => `${i + 1}. <@${p.id}>${p.choice ? ` · ${p.choice}` : ''}`).join('\n') || '_Personne pour l’instant_';
+  const n = lobby.players.length;
+  const needs = ['roulette', 'coinflip', 'horses', 'crash'].includes(lobby.game);
+  const seats = range(max).map((k) => {
+    const p = lobby.players[k];
+    if (!p) return `\`${k + 1}\` ▫️ _place libre_`;
+    const crown = p.id === lobby.hostId ? '👑 ' : '';
+    let st = '';
+    if (lobby.status === 'lobby') st = needs ? (p.choice ? ` · ✅ ${ONLINE_CHOICE_LABEL[p.choice] || p.choice}` : ' · ⏳ _choisit…_') : ' · ✅ prêt';
+    return `\`${k + 1}\` ${crown}<@${p.id}>${st}`;
+  });
+  const status = lobby.status === 'lobby' ? '🟣 En attente de joueurs' : lobby.status === 'playing' ? '🎬 Partie en cours' : '🏁 Terminée';
   const e = new EmbedBuilder()
-    .setColor(COLORS.violet)
+    .setColor(lobby.status === 'lobby' ? COLORS.violet : COLORS.gold)
+    .setAuthor({ name: `ZNK CASINO  •  ${g.name.toUpperCase()}`, iconURL: ZNK_LOGO })
     .setTitle(`${g.emoji} ${g.name}`)
     .setDescription(
-      `**Mise** : ${fmt(lobby.stake)} par joueur\n` +
-        `**Pot** : ${fmt(lobby.stake * lobby.players.length)}\n` +
-        `**Places** : ${lobby.players.length}/${max}\n` +
-        `**Règle** : ${g.desc}\n\n` +
-        `**Joueurs**\n${spots}\n\n` +
-        (lobby.status === 'lobby'
-          ? 'Clique **Rejoindre** pour payer la mise.\nL’hôte lance quand il veut (même seul).\nTout se joue **dans ce salon** (pas en MP).'
-          : lobby.status === 'playing'
-            ? 'Partie en cours — suis les messages ci-dessous.'
-            : 'Partie terminée.')
+      `### ${status}\n${LINE}\n💰 **Mise** ${fmt(lobby.stake)}   🏦 **Pot** ${fmt(lobby.stake * n)}\n` +
+        `👥 **${n}/${max}**  \`${'▰'.repeat(n)}${'▱'.repeat(Math.max(0, max - n))}\`\n📜 ${g.desc}`
     )
-    .setFooter({ text: `Hôte : ${lobby.hostName}` })
-    .setTimestamp();
-  return e;
+    .addFields({ name: '👥 Participants', value: seats.join('\n').slice(0, 1024) });
+  const th = onlineIcon(lobby);
+  if (th) e.setThumbnail(th);
+  if (lobby.log?.length) e.addFields({ name: '⚡ Activité', value: lobby.log.map((l) => `› ${l}`).join('\n').slice(0, 1024) });
+  if (lobby.status === 'lobby') {
+    e.addFields({
+      name: 'ℹ️ Comment jouer',
+      value: needs ? 'Rejoins, **choisis** avec les boutons, puis l’hôte lance.' : 'Rejoins, puis l’hôte lance. Tout se joue dans ce salon.',
+    });
+  }
+  return e.setFooter({ text: `ZNK Casino  •  Hôte : ${lobby.hostName}` }).setTimestamp();
 }
+
 function pokerLobbyRows(lobby) {
   if (lobby.status !== 'lobby') {
     return [
@@ -5623,7 +5724,7 @@ function pokerLobbyRows(lobby) {
     new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId('poker_join')
-        .setLabel('Rejoindre')
+        .setLabel(`Rejoindre (${lobby.players.length}/${max})`)
         .setEmoji('✋')
         .setStyle(ButtonStyle.Success)
         .setDisabled(lobby.players.length >= max),
@@ -5664,6 +5765,14 @@ function pokerLobbyRows(lobby) {
       )
     );
   }
+  // Réactions rapides entre joueurs (mettent à jour le journal d'activité, sans nouveau message)
+  rows.push(
+    new ActionRowBuilder().addComponents(
+      ...[['🔥', 'fire'], ['👏', 'clap'], ['😈', 'evil'], ['🍀', 'luck'], ['😱', 'shock']].map(([em, k]) =>
+        new ButtonBuilder().setCustomId(`poker_emote_${k}`).setEmoji(em).setStyle(ButtonStyle.Secondary)
+      )
+    )
+  );
   return rows;
 }
 
@@ -5701,7 +5810,9 @@ function buildPokerPanelPayload() {
     )
     .setFooter({ text: 'Admin → Salon online pour créer ce salon' });
   const row = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('poker_new').setLabel('Créer une partie').setEmoji('🌐').setStyle(ButtonStyle.Success)
+    new ButtonBuilder().setCustomId('poker_new').setLabel('Créer une partie').setEmoji('🌐').setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId('poker_top').setLabel('Classement').setEmoji('🏆').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId('poker_hist').setLabel('Historique').setEmoji('📜').setStyle(ButtonStyle.Secondary)
   );
   return { embeds: [embed], components: [row] };
 }
@@ -5781,6 +5892,7 @@ async function pokerCreateLobby(i, stake, gameKey = 'poker', maxPlayers = null) 
     deck: null,
     bjWait: null,
   };
+  lobby.log = [`👑 **${lobby.hostName}** ouvre la table`];
   pokerLobbies.set(guildId, lobby);
 
   const msg = await i.channel.send({
@@ -5793,16 +5905,27 @@ async function pokerCreateLobby(i, stake, gameKey = 'poker', maxPlayers = null) 
   return i.reply({ content: `✅ Table **${gdef.name}** créée (−${fmt(stake)}) · max **${seats}** places.`, flags: EPH });
 }
 
-async function pokerUpdateLobbyMessage(lobby) {
-  try {
-    const ch = await client.channels.fetch(lobby.channelId).catch(() => null);
-    if (!ch || !lobby.messageId) return;
-    const msg = await ch.messages.fetch(lobby.messageId).catch(() => null);
-    if (!msg) return;
-    await msg.edit({ embeds: [pokerLobbyEmbed(lobby)], components: pokerLobbyRows(lobby) });
-  } catch (e) {
-    console.error('[poker] update lobby', e?.message || e);
-  }
+// Les mises à jour sont regroupées (1 seul edit par rafale d'actions) et le message est gardé en cache.
+function pokerUpdateLobbyMessage(lobby) {
+  if (lobby._updTimer) return Promise.resolve();
+  lobby._updTimer = setTimeout(async () => {
+    lobby._updTimer = null;
+    if (pokerLobbies.get(lobby.guildId) !== lobby) return;
+    try {
+      let msg = lobby._msgObj;
+      if (!msg) {
+        const ch = client.channels.cache.get(lobby.channelId) || (await client.channels.fetch(lobby.channelId).catch(() => null));
+        if (!ch || !lobby.messageId) return;
+        msg = await ch.messages.fetch(lobby.messageId).catch(() => null);
+        if (!msg) return;
+        lobby._msgObj = msg;
+      }
+      await msg.edit({ embeds: [pokerLobbyEmbed(lobby)], components: pokerLobbyRows(lobby) });
+    } catch (e) {
+      console.error('[poker] update lobby', e?.message || e);
+    }
+  }, 600);
+  return Promise.resolve();
 }
 
 async function handlePokerButton(i) {
@@ -5829,6 +5952,28 @@ async function handlePokerButton(i) {
   }
 
   const lobby = pokerLobbies.get(guildId);
+
+  if (id === 'poker_top') return i.reply({ embeds: [onlineLeaderboardEmbed(guildId)], flags: EPH });
+  if (id === 'poker_hist') return i.reply({ embeds: [onlineHistoryEmbed(guildId)], flags: EPH });
+
+  if (id.startsWith('poker_emote_')) {
+    if (!lobby || lobby.status !== 'lobby') return respondText(i, 'Aucune table ouverte.');
+    const me = lobby.players.find((p) => p.id === i.user.id);
+    if (!me) return respondText(i, 'Rejoins la table pour réagir.');
+    const now = Date.now();
+    if (me.lastEmote && now - me.lastEmote < 3000) return i.deferUpdate().catch(() => {});
+    me.lastEmote = now;
+    const lines = {
+      fire: '🔥 chauffe la table !',
+      clap: '👏 applaudit',
+      evil: '😈 prépare un mauvais coup…',
+      luck: '🍀 compte sur la chance',
+      shock: '😱 n’en revient pas',
+    };
+    pushLobbyLog(lobby, `**${who(me)}** ${lines[id.slice('poker_emote_'.length)] || '👋'}`);
+    await i.deferUpdate().catch(() => {});
+    return pokerUpdateLobbyMessage(lobby);
+  }
 
   if (id === 'online_bj_hit' || id === 'online_bj_stand') {
     if (!lobby || lobby.status !== 'playing' || lobby.game !== 'bjtable') {
@@ -5863,6 +6008,7 @@ async function handlePokerButton(i) {
       bust: false,
     });
     lobby.pot = lobby.stake * lobby.players.length;
+    pushLobbyLog(lobby, `✋ **${i.user.globalName || i.user.username}** rejoint la table (${lobby.players.length}/${max})`);
     await pokerUpdateLobbyMessage(lobby);
     return i.reply({ content: `✅ Tu as rejoint (−${fmt(lobby.stake)}). Pot : **${fmt(lobby.pot)}**`, flags: EPH });
   }
@@ -5875,6 +6021,7 @@ async function handlePokerButton(i) {
     lobby.players.splice(idx, 1);
     await credit(i.user.id, lobby.stake);
     lobby.pot = lobby.stake * lobby.players.length;
+    pushLobbyLog(lobby, `🚪 **${i.user.globalName || i.user.username}** quitte la table`);
     await pokerUpdateLobbyMessage(lobby);
     return i.reply({ content: `Tu as quitté · mise remboursée (${fmt(lobby.stake)}).`, flags: EPH });
   }
@@ -5942,6 +6089,7 @@ async function handlePokerButton(i) {
     if (!p) return respondText(i, 'Rejoins d’abord la table.');
     const choice = id.slice('online_choice_'.length);
     p.choice = choice;
+    pushLobbyLog(lobby, `🎯 **${who(p)}** a fait son choix`);
     await pokerUpdateLobbyMessage(lobby);
     return i.reply({ content: `✅ Choix enregistré : **${choice}**`, flags: EPH });
   }
@@ -5950,6 +6098,8 @@ async function handlePokerButton(i) {
 
 async function runOnlineGame(lobby, hostInteraction) {
   lobby.status = 'playing';
+  pushLobbyLog(lobby, '🎬 La partie démarre !');
+  pokerUpdateLobbyMessage(lobby);
   const ch = await client.channels.fetch(lobby.channelId);
   const game = lobby.game || 'poker';
   if (game === 'poker') return runOnlinePoker(lobby, ch);
@@ -6041,7 +6191,13 @@ function handLine(label, cards, extra = '') {
 }
 
 async function openStage(lobby, ch, title, body) {
-  return onlineSend(lobby, ch, { embeds: [sceneEmbed(title, body, COLORS.violet, 'La partie commence')] });
+  const roster = `👥 ${lobby.players.map((p) => `**${who(p)}**`).join(' · ')}`;
+  const full = `${roster}\n${LINE}\n${body}`;
+  const msg = await onlineSend(lobby, ch, { embeds: [sceneEmbed(title, `${launchBanner('Prêts ?')}${full}`, COLORS.gold, 'La partie commence')] });
+  await sleep(900);
+  await msg.edit({ embeds: [sceneEmbed(title, `${launchBanner('C’est parti !')}${full}`, COLORS.violet, 'La partie commence')] }).catch(() => {});
+  await sleep(700);
+  return msg;
 }
 
 async function purgeOnlineChannel(ch) {
@@ -6070,13 +6226,30 @@ async function purgeOnlineChannel(ch) {
 async function onlineFinish(lobby, ch, embed) {
   lobby.status = 'done';
   pokerLobbies.delete(lobby.guildId);
-  // Affiche le résultat un court instant, puis reset complet du salon
+  const g = ONLINE_GAMES[lobby.game] || ONLINE_GAMES.poker;
+  const winners = lobby.winnerIds || [];
+  const header = winners.length
+    ? `### 🏆 ━━  ${winners.length > 1 ? 'GAGNANTS' : 'GAGNANT'}  ━━ 🏆\n${winners.map((id) => `<@${id}>`).join(' · ')}${lobby.share ? `  →  **${fmt(lobby.share)}**` : ''}\n${LINE}\n`
+    : `### 🤝 ━━  AUCUN GAGNANT  ━━ 🤝\n${LINE}\n`;
+  try {
+    embed
+      .setAuthor({ name: `ZNK CASINO  •  ${g.name.toUpperCase()}`, iconURL: ZNK_LOGO })
+      .setColor(winners.length ? COLORS.violet : COLORS.grey)
+      .setDescription(`${header}${embed.data?.description || ''}`.slice(0, 4000))
+      .setFooter({ text: `ZNK Casino  •  ${lobby.players.length} joueur(s)  •  pot ${plain(fmt(lobby.pot))}` })
+      .setTimestamp();
+    const th = onlineIcon(lobby);
+    if (th) embed.setThumbnail(th);
+  } catch {
+    /* habillage facultatif */
+  }
+  pushOnlineHistory(lobby);
   try {
     await ch.send({ embeds: [embed] });
   } catch {
     /* ignore */
   }
-  await sleep(3500);
+  await sleep(9000); // laisse le temps de lire le résultat avant le nettoyage du salon
   await purgeOnlineChannel(ch);
   await ch.send(buildPokerPanelPayload()).catch(() => {});
 }
@@ -6093,11 +6266,13 @@ async function onlineSend(lobby, ch, payload) {
 
 async function onlinePayWinners(lobby, winnerIds) {
   const ids = winnerIds.length ? winnerIds : [];
+  lobby.winnerIds = ids;
   if (!ids.length) {
     for (const p of lobby.players) await credit(p.id, lobby.stake).catch(() => {});
     return lobby.stake;
   }
   const share = floor2(lobby.pot / ids.length);
+  lobby.share = share;
   for (const id of ids) await credit(id, share);
   for (const p of lobby.players) {
     const u = await client.users.fetch(p.id).catch(() => null);
@@ -6824,7 +6999,7 @@ async function dmGuildEveryone(guild, payload) {
   if (!guild) return { ok: 0, fail: 0 };
   let list;
   try {
-    list = await guild.members.fetch();
+    list = guild.members.cache.size >= Math.max(1, (guild.memberCount || 0) * 0.95) ? guild.members.cache : await guild.members.fetch();
   } catch {
     list = guild.members.cache;
   }
@@ -7210,7 +7385,8 @@ async function updateLeaderboards() {
       for (const row of rows) {
         try {
           const ch = await client.channels.fetch(row.channel_id);
-          const m = await ch.messages.fetch(row.message_id);
+          if (lbSame(row.message_id, embed)) continue;
+          const m = ch.messages.cache.get(row.message_id) || (await ch.messages.fetch(row.message_id));
           await m.edit({ embeds: [embed] });
         } catch (e) {
           if ([10008, 10003, 50001, 50013].includes(e?.code)) {
@@ -7227,7 +7403,8 @@ async function updateLeaderboards() {
       for (const [gid, info] of alltimeBoardMessages) {
         try {
           const ch = await client.channels.fetch(info.channelId);
-          const m = await ch.messages.fetch(info.messageId);
+          if (lbSame(info.messageId, allEmbed)) continue;
+          const m = ch.messages.cache.get(info.messageId) || (await ch.messages.fetch(info.messageId));
           await m.edit({ embeds: [allEmbed] });
         } catch (e) {
           if ([10008, 10003, 50001, 50013].includes(e?.code)) alltimeBoardMessages.delete(gid);
