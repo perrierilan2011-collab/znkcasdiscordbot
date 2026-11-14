@@ -27,6 +27,44 @@ const { createClient } = require('@supabase/supabase-js');
 const fs = require('fs');
 const path = require('path');
 
+// Images de fond : dossier ./images à côté de index.js (les variables Railway *_BG_URL restent prioritaires)
+const IMG_DIR = path.join(__dirname, 'images');
+const localImg = (file) => {
+  try {
+    const p = path.join(IMG_DIR, file);
+    return fs.existsSync(p) ? p : '';
+  } catch {
+    return '';
+  }
+};
+// Bannière de fond (image sans texte) au-dessus d'un panneau : images/panel_*.png (ignorée si le fichier n'existe pas)
+function withBanner(payload, file) {
+  try {
+    const p = localImg(file);
+    const e = payload.embeds?.[0];
+    if (!p || !e) return payload;
+    e.setImage(`attachment://${file}`);
+    payload.files = [...(payload.files || []), new AttachmentBuilder(p, { name: file })];
+  } catch {
+    /* bannière facultative */
+  }
+  return payload;
+}
+const bgSource = (envName, file) => String(process.env[envName] || '').trim() || localImg(file);
+// Charge une image depuis une URL http(s) ou un fichier local
+async function readImageSource(src, loadImage, timeoutMs = 8000) {
+  if (!/^https?:\/\//i.test(src)) return loadImage(fs.readFileSync(src));
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), timeoutMs);
+  try {
+    const res = await fetch(src, { signal: ctl.signal });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await loadImage(Buffer.from(await res.arrayBuffer()));
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 // Bannière de stats : npm i @napi-rs/canvas  (optionnel, sinon repli en embed texte)
 let canvasLib = null;
 try {
@@ -236,6 +274,9 @@ function resolveGuildId(i) {
 //  OUTILS
 // ============================================================
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+// Abandonne une opération trop lente (ex. génération d'image) pour ne jamais bloquer une réponse Discord
+const withTimeout = (p, ms, fallback = null) =>
+  Promise.race([Promise.resolve(p).catch(() => fallback), new Promise((r) => setTimeout(() => r(fallback), ms))]);
 const range = (n) => Array.from({ length: n }, (_, i) => i);
 const round2 = (n) => Math.round(n * 100) / 100;
 const floor2 = (n) => Math.floor(n * 100 + 1e-9) / 100;
@@ -942,9 +983,9 @@ function fitText(g, text, maxW) {
 }
 
 // Image de fond des stats (variable Railway STATS_BG_URL). Chargée une fois puis gardée en cache.
-const STATS_BG_URL = String(process.env.STATS_BG_URL || '').trim();
+const STATS_BG_URL = bgSource('STATS_BG_URL', 'stats_card.png');
 // STATS_BG_MODE=template : l'image contient déjà les cartes (le bot n'écrit que le texte dedans)
-const STATS_BG_MODE = String(process.env.STATS_BG_MODE || '').trim().toLowerCase();
+const STATS_BG_MODE = String(process.env.STATS_BG_MODE || (STATS_BG_URL && !String(process.env.STATS_BG_URL || '').trim() ? 'template' : '')).trim().toLowerCase();
 // Mises en page calées sur les images template (1774x887 -> 800x400). STATS_BG_MODE = nom du preset.
 const STATS_PRESETS = {
   // Avatar à gauche, logo Z à droite
@@ -970,17 +1011,7 @@ let statsBgPromise = null;
 function getStatsBg(loadImage) {
   if (!STATS_BG_URL) return Promise.resolve(null);
   if (!statsBgPromise) {
-    statsBgPromise = (async () => {
-      const ctl = new AbortController();
-      const timer = setTimeout(() => ctl.abort(), 8000);
-      try {
-        const res = await fetch(STATS_BG_URL, { signal: ctl.signal });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return await loadImage(Buffer.from(await res.arrayBuffer()));
-      } finally {
-        clearTimeout(timer);
-      }
-    })().catch((e) => {
+    statsBgPromise = readImageSource(STATS_BG_URL, loadImage).catch((e) => {
       console.warn('[stats] STATS_BG_URL illisible (utilise un lien direct png/jpg) :', e?.message || e);
       statsBgPromise = null; // réessaie au prochain affichage
       return null;
@@ -1358,7 +1389,26 @@ async function settleMines(game, kind, i) {
   if (game.finished) return;
   game.finished = true;
   clearTimeout(game.timer);
+  const t0 = Date.now();
+  let held = false;
   try {
+    // 1) On répond à Discord IMMÉDIATEMENT (3 s max), sinon « l'application n'a pas répondu ».
+    if (i && !i.deferred && !i.replied) {
+      if (kind === 'lose') {
+        const rows = minesRows(game, false);
+        rows.forEach((r) => r.components.forEach((b) => b.setDisabled(true)));
+        const hold = new EmbedBuilder()
+          .setTitle(`💣 Mines · ${LEVELS[game.level].emoji} ${LEVELS[game.level].name}`)
+          .setColor(COLORS.gold)
+          .setDescription(code(['  La case s\'ouvre...', '', '      . . .']))
+          .setFooter({ text: 'Verdict dans un instant' });
+        await i.update({ embeds: [hold], components: rows });
+        held = true;
+      } else {
+        await i.deferUpdate();
+      }
+    }
+    // 2) Ensuite seulement : calcul, base de données, image
     const picks = game.revealed.size;
     let payout = 0;
     let mult = 0;
@@ -1411,27 +1461,29 @@ async function settleMines(game, kind, i) {
     }
 
     const payload = { embeds: [minesEmbed(game, { text, color, balance })], components: minesRows(game, true) };
-    putCard(payload, await resultCard(game.user, 'mines', game.bet, mult, round2(payout - game.bet), balance));
+    putCard(payload, await withTimeout(resultCard(game.user, 'mines', game.bet, mult, round2(payout - game.bet), balance), 4000, null));
 
-    // Suspense : la case choisie s'ouvre avant le verdict
-    if (i && kind === 'lose') {
-      const rows = minesRows(game, false);
-      rows.forEach((r) => r.components.forEach((b) => b.setDisabled(true)));
-      const hold = new EmbedBuilder()
-        .setTitle(`💣 Mines · ${LEVELS[game.level].emoji} ${LEVELS[game.level].name}`)
-        .setColor(COLORS.gold)
-        .setDescription(code(['  La case s\'ouvre...', '', '      . . .']))
-        .setFooter({ text: 'Verdict dans un instant' });
-      await i.update({ embeds: [hold], components: rows });
-      await sleep(900);
-      await i.editReply(payload);
-    } else if (i) {
-      await i.update(payload);
+    if (i) {
+      if (held) {
+        const wait = 900 - (Date.now() - t0); // suspense : la case s'ouvre avant le verdict
+        if (wait > 0) await sleep(wait);
+      }
+      await editWithCard(i, payload);
     } else {
       await game.lastI.editReply(payload);
     }
   } catch (e) {
     console.error('[mines] settle', e?.message || e);
+    try {
+      const target = i || game.lastI;
+      const bal = await getBalance(game.userId).catch(() => 0);
+      await target.editReply({
+        embeds: [minesEmbed(game, { text: '⚠️ Petit souci d’affichage, ta partie est bien terminée.', color: COLORS.grey, balance: bal })],
+        components: minesRows(game, true),
+      });
+    } catch {
+      /* ignore */
+    }
   } finally {
     games.delete(game.userId);
   }
@@ -1930,16 +1982,7 @@ async function playRoulette(i, bet, choiceStr) {
         .addFields(
           { name: '🎯 Ton pari', value: choice.label, inline: true },
           { name: '💰 Mise', value: fmt(bet), inline: true },
-          { name: '👛 Solde', value: fmt(balance), inline: true },
-          {
-            name: '🧾 Reçu',
-            value: receipt([
-              ['Mise', fmt(bet)],
-              ['Multiplicateur', won ? fx(rlMult) : 'x0.00'],
-              ['Gain', fmt(payout)],
-              ['Profit', signed(profit)],
-            ]),
-          }
+          { name: '👛 Solde', value: fmt(balance), inline: true }
         ),
       'roulette'
     );
@@ -4424,16 +4467,7 @@ async function playInstant(i, key, bet, choice) {
         .addFields(
           { name: '🎯 Ton pari', value: res.pick, inline: true },
           { name: '💰 Mise', value: fmt(bet), inline: true },
-          { name: '👛 Solde', value: fmt(balance), inline: true },
-          {
-            name: '🧾 Reçu',
-            value: receipt([
-              ['Mise', fmt(bet)],
-              ['Multiplicateur', fx(mult)],
-              ['Gain', fmt(payout)],
-              ['Profit', signed(profit)],
-            ]),
-          }
+          { name: '👛 Solde', value: fmt(balance), inline: true }
         ),
       key
     );
@@ -4511,7 +4545,7 @@ function buildPanelPayload() {
     new ButtonBuilder().setCustomId('panel_rules').setLabel('Règles').setEmoji('📖').setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId('panel_invites').setLabel('Invites').setEmoji('📨').setStyle(ButtonStyle.Secondary)
   );
-  return { content: `${COIN} **Salon de jeu**`, embeds: [panel], components: [row] };
+  return withBanner({ content: `${COIN} **Salon de jeu**`, embeds: [panel], components: [row] }, 'panel_salon.png');
 }
 
 async function buildDmPlayPayload(userId) {
@@ -5341,7 +5375,7 @@ function buildAdminPayload() {
     new ButtonBuilder().setCustomId('admin_topall').setLabel('All-time').setEmoji('👑').setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId('admin_stats').setLabel('Stats joueur').setEmoji('📊').setStyle(ButtonStyle.Primary)
   );
-  return { embeds: [embed], components: [row1, row2, row3, row4] };
+  return withBanner({ embeds: [embed], components: [row1, row2, row3, row4] }, 'panel_admin.png');
 }
 
 // ---------- Événements (claim, giveaway, boosts) ----------
@@ -6538,7 +6572,7 @@ function buildPokerPanelPayload() {
     new ButtonBuilder().setCustomId('poker_top').setLabel('Classement').setEmoji('🏆').setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId('poker_hist').setLabel('Historique').setEmoji('📜').setStyle(ButtonStyle.Secondary)
   );
-  return { embeds: [embed], components: [row] };
+  return withBanner({ embeds: [embed], components: [row] }, 'panel_online.png');
 }
 
 async function createPokerChannel(i) {
@@ -8059,11 +8093,11 @@ async function cmdAdmin(msg) {
 //    valeur  : alignée à droite sur x=744 (zone x 540-744) | sous-texte invitations : même x, y_ligne+54
 // ============================================================
 const BOARD_BG = {
-  rich: String(process.env.LB_BG_URL || '').trim(),
-  alltime: String(process.env.ALLTIME_BG_URL || '').trim(),
-  invites: String(process.env.INVITES_BG_URL || '').trim(),
-  winNotif: String(process.env.WIN_NOTIF_BG_URL || '').trim(), // notif de victoire (image 1774x887)
-  inviteNotif: String(process.env.INVITE_NOTIF_BG_URL || '').trim(), // notif "X a invité Y" (image 1600x800)
+  rich: bgSource('LB_BG_URL', 'richest_leaderboard.png'),
+  alltime: bgSource('ALLTIME_BG_URL', 'alltime_leaderboard.png'),
+  invites: bgSource('INVITES_BG_URL', 'top_inviters_leaderboard.png'),
+  winNotif: bgSource('WIN_NOTIF_BG_URL', 'win_notification.png'), // notif de victoire (image 1774x887)
+  inviteNotif: bgSource('INVITE_NOTIF_BG_URL', 'invite_notification.png'), // notif "X a invité Y" (image 1600x800)
 };
 const bgByUrl = new Map(); // url -> Promise<Image|null>
 function getBgByUrl(url, loadImage) {
@@ -8071,17 +8105,7 @@ function getBgByUrl(url, loadImage) {
   if (!bgByUrl.has(url)) {
     bgByUrl.set(
       url,
-      (async () => {
-        const ctl = new AbortController();
-        const timer = setTimeout(() => ctl.abort(), 8000);
-        try {
-          const res = await fetch(url, { signal: ctl.signal });
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          return await loadImage(Buffer.from(await res.arrayBuffer()));
-        } finally {
-          clearTimeout(timer);
-        }
-      })().catch((e) => {
+      readImageSource(url, loadImage).catch((e) => {
         console.warn('[classement] image de fond illisible (lien direct png/jpg requis) :', e?.message || e);
         bgByUrl.delete(url); // réessaie au prochain affichage
         return null;
@@ -8315,14 +8339,14 @@ const plainNum = (n) => num(n).replace(/\s/g, ' ');
 //  Sans variable => ancien affichage texte.
 // ============================================================
 const CARD_BG = {
-  win: String(process.env.WIN_NOTIF_BG_URL || '').trim(),
-  result: String(process.env.RESULT_BG_URL || '').trim(),
-  daily: String(process.env.DAILY_BG_URL || '').trim(),
-  transfer: String(process.env.TRANSFER_BG_URL || '').trim(),
-  announce: String(process.env.ANNOUNCE_BG_URL || '').trim(),
-  online: String(process.env.ONLINE_BG_URL || '').trim(),
-  menu: String(process.env.MENU_BG_URL || '').trim(),
-  invite: String(process.env.INVITE_NOTIF_BG_URL || '').trim(),
+  win: bgSource('WIN_NOTIF_BG_URL', 'win_notification.png'),
+  result: bgSource('RESULT_BG_URL', 'game_result.png'),
+  daily: bgSource('DAILY_BG_URL', 'daily_reward.png'),
+  transfer: bgSource('TRANSFER_BG_URL', 'transfer.png'),
+  announce: bgSource('ANNOUNCE_BG_URL', 'announcement.png'),
+  online: bgSource('ONLINE_BG_URL', 'online_games.png'),
+  menu: bgSource('MENU_BG_URL', 'casino_menu.png'),
+  invite: bgSource('INVITE_NOTIF_BG_URL', 'invite_notification.png'),
 };
 const CARD_L = {
   av: { cx: 103, cy: 114.5, d: 84 },
