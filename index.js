@@ -82,12 +82,13 @@ const client = new Client({
 });
 
 const COLORS = {
-  green: 0x2ecc71,
-  red: 0xe74c3c,
-  grey: 0x95a5a6,
-  blue: 0x8B5CF6,
-  gold: 0xA855F7,
-  violet: 0x7C3AED,
+  green: 0xA81CFD, // victoire = violet ZNK
+  red: 0x2B0A3D, // défaite = violet très sombre
+  grey: 0x6B5B7B, // égalité / neutre
+  blue: 0x7C3AED,
+  gold: 0xD946EF,
+  violet: 0xA81CFD,
+  black: 0x0B0614,
 };
 
 // ============================================================
@@ -264,30 +265,37 @@ const CROWN_ONLY = '👑 Seul le propriétaire du serveur (celui qui a la couron
 //  MOTEUR D'ANIMATION
 //  Une frame = { art, caption, ms }. Tout est dessiné en caractères (bloc de code).
 // ============================================================
-const ANIM_PALETTE = [COLORS.violet, COLORS.gold, COLORS.blue, 0xE879F9, 0xC026D3];
+const ANIM_PALETTE = [0x1A0B2E, 0x3B0F66, 0x6D28D9, 0x8B1FE0, 0xA81CFD, 0xC026D3, 0xD946EF];
+const gradientColor = (idx, n) =>
+  ANIM_PALETTE[Math.min(ANIM_PALETTE.length - 1, Math.round((idx / Math.max(1, n - 1)) * (ANIM_PALETTE.length - 1)))];
 
-async function animate(i, frames, title, head = '') {
+async function animate(i, frames, title, head = '', key = null) {
   if (!frames || !frames.length) return;
-  // Skip animations if user prefers
-  if (i.user && wantsSkipAnim(i.user.id)) {
-    const f = typeof frames[frames.length - 1] === 'string' ? { art: frames[frames.length - 1] } : frames[frames.length - 1];
-    const embed = new EmbedBuilder()
+  const mk = (f, idx, n, footer) => {
+    const e = new EmbedBuilder()
       .setTitle(title)
-      .setColor(ANIM_PALETTE[ANIM_PALETTE.length - 1])
-      .setDescription(`${head}${f.art}${f.caption ? `\n**${f.caption}**` : ''}`)
-      .setFooter({ text: 'Animations désactivées' });
-    await i.editReply({ embeds: [embed], components: [] }).catch(() => {});
+      .setColor(gradientColor(idx, n))
+      .setDescription(`${head}${f.art}${f.caption ? `\n### ✦ ${f.caption}` : ''}`)
+      .setFooter({ text: footer });
+    if (key && gameIcon(key)) e.setThumbnail(gameIcon(key));
+    return e;
+  };
+  // Animations désactivées par le joueur : résultat direct
+  if (i.user && wantsSkipAnim(i.user.id)) {
+    const last = frames[frames.length - 1];
+    const f = typeof last === 'string' ? { art: last } : last;
+    await i.editReply({ embeds: [mk(f, frames.length - 1, frames.length, 'ZNK Casino  •  Animations désactivées')], components: [] }).catch(() => {});
     return;
   }
   const n = frames.length;
   for (let idx = 0; idx < n; idx++) {
     const f = typeof frames[idx] === 'string' ? { art: frames[idx] } : frames[idx];
-    const embed = new EmbedBuilder()
-      .setTitle(title)
-      .setColor(ANIM_PALETTE[idx % ANIM_PALETTE.length])
-      .setDescription(`${head}${f.art}${f.caption ? `\n**${f.caption}**` : ''}`)
-      .setFooter({ text: `[${'='.repeat(idx + 1)}${'-'.repeat(n - idx - 1)}]` });
-    await i.editReply({ embeds: [embed], components: [] }).catch(() => {});
+    await i
+      .editReply({
+        embeds: [mk(f, idx, n, `ZNK CASINO  ${'▰'.repeat(idx + 1)}${'▱'.repeat(n - idx - 1)}`)],
+        components: [],
+      })
+      .catch(() => {});
     await sleep(Math.max(750, f.ms || 900));
   }
 }
@@ -464,7 +472,7 @@ const respondText = (i, text) => i.reply({ content: text, flags: EPH });
 function endGameRow(replayCustomId) {
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId(replayCustomId).setLabel('Rejouer').setEmoji('🔁').setStyle(ButtonStyle.Success),
-    new ButtonBuilder().setCustomId('panel_home').setLabel('Changer de mode').setEmoji('🏠').setStyle(ButtonStyle.Primary)
+    new ButtonBuilder().setCustomId('panel_home').setLabel('Menu ZNK').setEmoji('💜').setStyle(ButtonStyle.Primary)
   );
 }
 
@@ -597,6 +605,37 @@ const GAME_NAMES = {
 const gameNamePlain = (g) => (GAME_NAMES[g] ? GAME_NAMES[g].replace(/^\S+\s/, '') : g);
 
 // ============================================================
+//  IDENTITÉ VISUELLE ZNK
+// ============================================================
+const ZNK_LOGO = process.env.ZNK_LOGO_URL || undefined; // optionnel (Railway > Variables)
+const emojiCode = (e) =>
+  [...String(e)].map((c) => c.codePointAt(0)).filter((cp) => cp !== 0xfe0f).map((cp) => cp.toString(16)).join('-');
+// Illustration de chaque jeu = son emoji en grand (Twemoji) : aucune image à héberger
+const gameIcon = (key) => {
+  const n = GAME_NAMES[key];
+  if (!n) return null;
+  return `https://cdn.jsdelivr.net/gh/jdecked/twemoji@15.0.3/assets/72x72/${emojiCode(n.split(' ')[0])}.png`;
+};
+
+function brand(embed, key, footer) {
+  embed.setAuthor({ name: `ZNK CASINO  •  ${gameNamePlain(key).toUpperCase()}`, iconURL: ZNK_LOGO });
+  const ic = gameIcon(key);
+  if (ic) embed.setThumbnail(ic);
+  embed.setFooter({ text: footer || 'ZNK Casino  •  Partie privée' });
+  return embed;
+}
+
+const LINE = '▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰';
+function outcomeBanner(kind, amount) {
+  const amt = Number.isFinite(amount) ? `**${signed(amount)}**` : '';
+  if (kind === 'win') return `### 🏆 ━━  VICTOIRE  ━━ 🏆\n💜✨ ${amt || 'Bien joué !'} ✨💜\n${LINE}\n`;
+  if (kind === 'lose') return `### 💀 ━━  DÉFAITE  ━━ 💀\n🖤 ${amt || 'Pas de chance…'} 🖤\n${LINE}\n`;
+  return `### 🤝 ━━  ÉGALITÉ  ━━ 🤝\n💜 Mise récupérée\n${LINE}\n`;
+}
+const outcomeColor = (kind) => (kind === 'win' ? COLORS.violet : kind === 'lose' ? COLORS.red : COLORS.grey);
+const launchBanner = (txt) => `### ✦ ${txt}\n\`${'▱'.repeat(16)}\`\n`;
+
+// ============================================================
 //  MULTIPLICATEURS RÉGLABLES
 // ============================================================
 const MULT_MIN = 0.5;
@@ -726,16 +765,19 @@ async function recordResult({ guildId, user, game, bet, mult, payout, detail }) 
     const ping = wantsWinPing(user.id);
     const display = escapeMarkdown(user.globalName || user.username);
     const embed = new EmbedBuilder()
-      .setColor(COLORS.green)
+      .setColor(COLORS.violet)
       .setAuthor({ name: `${display} a gagné !`, iconURL: user.displayAvatarURL() })
-      .setDescription(`🎉 ${ping ? `<@${user.id}>` : `**${display}**`} remporte **${fmt(profit)}** au jeu ${GAME_NAMES[game] || game}`)
+      .setThumbnail(gameIcon(game) || user.displayAvatarURL())
+      .setDescription(`### 🏆 ${ping ? `<@${user.id}>` : `**${display}**`} remporte **${fmt(profit)}** !\n${LINE}`)
       .addFields(
-        { name: 'Jeu', value: GAME_NAMES[game] || game, inline: true },
-        { name: 'Mise', value: fmt(bet), inline: true },
-        { name: 'Multiplicateur', value: fx(mult), inline: true },
-        { name: 'Gain', value: `**${signed(profit)}**`, inline: true }
+        { name: '🎮 Jeu', value: GAME_NAMES[game] || game, inline: true },
+        { name: '💰 Mise', value: fmt(bet), inline: true },
+        { name: '✖️ Multi', value: fx(mult), inline: true },
+        { name: '💜 Gain', value: `**${signed(profit)}**`, inline: true }
       )
+      .setFooter({ text: 'ZNK Casino  •  Salon des victoires' })
       .setTimestamp();
+
     await ch.send({
       content: ping ? `<@${user.id}>` : undefined,
       embeds: [embed],
@@ -1023,7 +1065,7 @@ function minesRows(game, over) {
       } else if (over) {
         b.setEmoji('💎').setStyle(ButtonStyle.Secondary).setDisabled(true);
       } else {
-        b.setLabel('?').setStyle(ButtonStyle.Secondary);
+        b.setEmoji('🟪').setStyle(ButtonStyle.Secondary);
       }
       row.addComponents(b);
     }
@@ -1037,8 +1079,8 @@ function minesRows(game, over) {
             .setStyle(ButtonStyle.Success),
           new ButtonBuilder()
             .setCustomId('panel_home')
-            .setLabel('Changer de mode')
-            .setEmoji('🏠')
+            .setLabel('Menu ZNK')
+            .setEmoji('💜')
             .setStyle(ButtonStyle.Primary)
         );
       } else {
@@ -1048,7 +1090,7 @@ function minesRows(game, over) {
             .setCustomId('mines_cash')
             .setLabel(`Encaisser ${num(gain)}`)
             .setEmoji('💰')
-            .setStyle(ButtonStyle.Primary)
+            .setStyle(ButtonStyle.Success)
             .setDisabled(game.revealed.size === 0)
         );
       }
@@ -1073,17 +1115,18 @@ function minesEmbed(game, end) {
       { name: 'Gain actuel', value: fmt(floor2(game.bet * mult)), inline: true }
     );
   if (end) {
-    e.setColor(end.color).setDescription(`${code([track])}${end.text}`);
-    e.addFields({ name: 'Solde', value: fmt(end.balance), inline: true });
+    const kind = end.color === COLORS.green ? 'win' : end.color === COLORS.red ? 'lose' : 'push';
+    e.setColor(outcomeColor(kind)).setDescription(`${outcomeBanner(kind)}${code([track])}${end.text}`);
+    e.addFields({ name: '👛 Solde', value: fmt(end.balance), inline: true });
   } else {
-    e.setColor(COLORS.blue).setDescription(
+    e.setColor(COLORS.violet).setDescription(
       `${code([track])}Clique sur les cases. Évite les 💣 et encaisse quand tu veux !`
     );
     if (picks < safeTotal) {
-      e.addFields({ name: 'Prochain 💎', value: fx(minesMultiplier(picks + 1, game.mines)), inline: true });
+      e.addFields({ name: '💎 Prochain', value: fx(minesMultiplier(picks + 1, game.mines)), inline: true });
     }
   }
-  return e;
+  return brand(e, 'mines');
 }
 
 async function startMines(i, level, bet) {
@@ -1278,13 +1321,14 @@ function bjTable(player, dealer, dealerHidden) {
 }
 
 function bjEmbed(g, end) {
-  const e = new EmbedBuilder().setTitle('🃏 Blackjack');
+  const e = brand(new EmbedBuilder().setTitle('🃏 Blackjack'), 'bj');
   const pInfo = handInfo(g.player);
   const showAll = !!(end && (end.revealAll || end.balance != null || end.revealing));
   const table = bjTable(g.player, g.dealer, !showAll);
 
   if (end && end.balance != null) {
-    e.setColor(end.color).setDescription(`${table}${end.text}`);
+    const kind = end.color === COLORS.green ? 'win' : end.color === COLORS.red ? 'lose' : 'push';
+    e.setColor(outcomeColor(kind)).setDescription(`${outcomeBanner(kind)}${table}${end.text}`);
     e.addFields({ name: 'Mise', value: fmt(g.bet), inline: true }, { name: 'Solde', value: fmt(end.balance), inline: true });
   } else if (end?.revealing) {
     e.setColor(COLORS.violet).setDescription(`${table}${end.text || '🃏 Tour du croupier...'}`);
@@ -1304,7 +1348,7 @@ function bjRows(g, over) {
     return [
       new ActionRowBuilder().addComponents(
         new ButtonBuilder().setCustomId(`replay|bj|${g.baseBet}`).setLabel('Rejouer').setEmoji('🔁').setStyle(ButtonStyle.Success),
-        new ButtonBuilder().setCustomId('panel_home').setLabel('Changer de mode').setEmoji('🏠').setStyle(ButtonStyle.Primary)
+        new ButtonBuilder().setCustomId('panel_home').setLabel('Menu ZNK').setEmoji('💜').setStyle(ButtonStyle.Primary)
       ),
     ];
   }
@@ -1365,7 +1409,7 @@ async function dealAnimation(i, game) {
     caption: s.cap,
     ms: 850,
   }));
-  await animate(i, frames, '🃏 Blackjack', '');
+  await animate(i, frames, '🃏 Blackjack', '', 'bj');
 }
 
 async function startBlackjack(i, bet) {
@@ -1684,38 +1728,42 @@ async function playRoulette(i, bet, choiceStr) {
 
     const balance = payout > 0 ? await credit(uid, payout) : await getBalance(uid);
 
-    await animate(i, rouletteFrames(result, choice), '🎡 Roulette', `Mise **${fmt(bet)}**\n`);
+    await animate(i, rouletteFrames(result, choice), '🎡 Roulette', `Mise **${fmt(bet)}**\n`, 'roulette');
 
     const profit = round2(payout - bet);
-    const embed = new EmbedBuilder()
-      .setTitle('🎡 Roulette')
-      .setColor(won ? COLORS.green : COLORS.red)
-      .setDescription(
-        code([
-          `  Numéro sorti :  ${result}  (${colorOf(result)}) ${colorEmoji[colorOf(result)]}`,
-          `  Ton pari     :  ${choice.label}`,
-        ]) +
-          (won
-            ? `🎉 Gagné ! Tu empoches **${fmt(payout)}** (${fx(rlMult)}), profit : **${signed(profit)}**.`
-            : `😬 Perdu, tu laisses **${fmt(bet)}**.`)
-      )
-      .addFields(
-        { name: 'Ton pari', value: choice.label, inline: true },
-        { name: 'Mise', value: fmt(bet), inline: true },
-        { name: 'Solde', value: fmt(balance), inline: true },
-        {
-          name: 'Reçu',
-          value: receipt([
-            ['Mise', fmt(bet)],
-            ['Multiplicateur', won ? fx(rlMult) : 'x0.00'],
-            ['Gain', fmt(payout)],
-            ['Profit', signed(profit)],
-          ]),
-        }
-      );
+    const kind = won ? 'win' : 'lose';
+    const embed = brand(
+      new EmbedBuilder()
+        .setTitle('🎡 Roulette')
+        .setColor(outcomeColor(kind))
+        .setDescription(
+          outcomeBanner(kind, profit) +
+            code([
+              `  Numéro sorti :  ${result}  (${colorOf(result)}) ${colorEmoji[colorOf(result)]}`,
+              `  Ton pari     :  ${choice.label}`,
+            ]) +
+            (won ? `Tu empoches **${fmt(payout)}** (${fx(rlMult)}).` : `Tu laisses **${fmt(bet)}**.`)
+        )
+        .addFields(
+          { name: '🎯 Ton pari', value: choice.label, inline: true },
+          { name: '💰 Mise', value: fmt(bet), inline: true },
+          { name: '👛 Solde', value: fmt(balance), inline: true },
+          {
+            name: '🧾 Reçu',
+            value: receipt([
+              ['Mise', fmt(bet)],
+              ['Multiplicateur', won ? fx(rlMult) : 'x0.00'],
+              ['Gain', fmt(payout)],
+              ['Profit', signed(profit)],
+            ]),
+          }
+        ),
+      'roulette'
+    );
+
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId(`replay|rl|${bet}|${choice.key}`).setLabel('Rejouer').setEmoji('🔁').setStyle(ButtonStyle.Success),
-      new ButtonBuilder().setCustomId('panel_home').setLabel('Changer de mode').setEmoji('🏠').setStyle(ButtonStyle.Primary)
+      new ButtonBuilder().setCustomId('panel_home').setLabel('Menu ZNK').setEmoji('💜').setStyle(ButtonStyle.Primary)
     );
     await i.editReply({ embeds: [embed], components: [row] });
 
@@ -1780,7 +1828,7 @@ const chunk = (arr, n) => Array.from({ length: Math.ceil(arr.length / n) }, (_, 
 function choicePicker(key, title, desc, choices) {
   const buttons = choices.map(([id, label, emoji, style]) => igButton(key, id, label, emoji, style || ButtonStyle.Primary));
   return {
-    embeds: [new EmbedBuilder().setTitle(title).setColor(COLORS.blue).setDescription(desc)],
+    embeds: [new EmbedBuilder().setTitle(title).setColor(COLORS.violet).setDescription(`${desc}\n${LINE}`)],
     components: chunk(buttons, 5).map((r) => new ActionRowBuilder().addComponents(...r)),
   };
 }
@@ -2811,7 +2859,7 @@ Object.assign(INSTANT, {
     choices: ['stay', 'run'],
     spinText: 'L\'orage arrive...',
     info: (c) => `rester ${fx(2.5 * c)} · fuir (remboursé si éclair)`,
-    picker: (c) => choicePicker('lightning', '⚡ Éclair', 'Rester sous l\'orage (**${fx(2.5 * c)}** si tu survis) ou fuir.', [['stay', 'Rester', '⚡'], ['run', 'Fuir', '🏃']]),
+    picker: (c) => choicePicker('lightning', '⚡ Éclair', `Rester sous l’orage (**${fx(2.5 * c)}**) si tu survis, ou fuir.`, [['stay', 'Rester', '⚡'], ['run', 'Fuir', '🏃']]),
     resolve(choice) {
       const strike = Math.random() < 0.4;
       if (choice === 'stay') return { base: strike ? 0 : 2.5, pick: 'Rester', headline: strike ? '⚡ Foudroyé !' : 'Tu as survécu à l\'orage !', detail: 'stay', strike };
@@ -3642,11 +3690,12 @@ ANIMS.spincolor = (res) => {
       picker: (c) =>
         choicePicker(
           key,
+          `${emoji} ${name}`,
+          `${desc}\nGain ~ **${fx(winMult * c)}** si bon.`,
           [
             [c1, c1, '✅', ButtonStyle.Success],
             [c2, c2, '❌', ButtonStyle.Danger],
-          ],
-          `**${emoji} ${name}**\n${desc}\nGain ~ **${fx(winMult * c)}** si bon.`
+          ]
         ),
       resolve: (choice) => {
         // 50/50 bias adjusted by winMult: P(win) ≈ 0.96/winMult
@@ -3704,9 +3753,11 @@ async function playInstant(i, key, bet, choice) {
         embeds: [
           new EmbedBuilder()
             .setTitle(G.title)
-            .setColor(COLORS.violet)
+            .setThumbnail(gameIcon(key) || null)
+            .setAuthor({ name: `ZNK CASINO  •  ${gameNamePlain(key).toUpperCase()}`, iconURL: ZNK_LOGO })
+            .setColor(COLORS.gold)
             .setDescription(
-              `${G.spinText}\nMise **${fmt(bet)}** · ${res.pick}` + (boost.label ? `\n⚡ Boost actif : **${boost.label}**` : '')
+              launchBanner('C’est parti !') + `${G.spinText}\nMise **${fmt(bet)}** · ${res.pick}` + (boost.label ? `\n⚡ Boost actif : **${boost.label}**` : '')
             ),
         ],
         components: [],
@@ -3724,42 +3775,38 @@ async function playInstant(i, key, bet, choice) {
     } catch (animErr) {
       console.error('[anim]', key, animErr?.message || animErr);
     }
-    await animate(i, frames, G.title, `Mise **${fmt(bet)}** · ${res.pick || ''}\n`);
+    await animate(i, frames, G.title, `Mise **${fmt(bet)}** · ${res.pick || ''}\n`, key);
 
-    let text;
-    let color;
-    if (payout === 0) {
-      text = `😬 Perdu, tu laisses **${fmt(bet)}**.`;
-      color = COLORS.red;
-    } else if (profit > 0) {
-      text = `🎉 Gagné ! Tu empoches **${fmt(payout)}** (${fx(mult)}), profit : **${signed(profit)}**.`;
-      color = COLORS.green;
-    } else if (profit === 0) {
-      text = `🤝 Mise remboursée (${fx(mult)}).`;
-      color = COLORS.grey;
-    } else {
-      text = `😐 Tu récupères **${fmt(payout)}** (${fx(mult)}), perte : **${signed(profit)}**.`;
-      color = COLORS.grey;
-    }
+    const kind = profit > 0 ? 'win' : profit < 0 ? 'lose' : 'push';
+    const text =
+      payout === 0
+        ? `Tu laisses **${fmt(bet)}**.`
+        : kind === 'win'
+          ? `Tu empoches **${fmt(payout)}** (${fx(mult)}).`
+          : `Tu récupères **${fmt(payout)}** (${fx(mult)}).`;
 
-    const embed = new EmbedBuilder()
-      .setTitle(G.title)
-      .setColor(color)
-      .setDescription(`${res.headline}\n\n${text}`)
-      .addFields(
-        { name: 'Ton pari', value: res.pick, inline: true },
-        { name: 'Mise', value: fmt(bet), inline: true },
-        { name: 'Solde', value: fmt(balance), inline: true },
-        {
-          name: 'Reçu',
-          value: receipt([
-            ['Mise', fmt(bet)],
-            ['Multiplicateur', fx(mult)],
-            ['Gain', fmt(payout)],
-            ['Profit', signed(profit)],
-          ]),
-        }
-      );
+    const embed = brand(
+      new EmbedBuilder()
+        .setTitle(G.title)
+        .setColor(outcomeColor(kind))
+        .setDescription(`${outcomeBanner(kind, kind === 'push' ? NaN : profit)}${res.headline}\n\n${text}`)
+        .addFields(
+          { name: '🎯 Ton pari', value: res.pick, inline: true },
+          { name: '💰 Mise', value: fmt(bet), inline: true },
+          { name: '👛 Solde', value: fmt(balance), inline: true },
+          {
+            name: '🧾 Reçu',
+            value: receipt([
+              ['Mise', fmt(bet)],
+              ['Multiplicateur', fx(mult)],
+              ['Gain', fmt(payout)],
+              ['Profit', signed(profit)],
+            ]),
+          }
+        ),
+      key
+    );
+
     await i.editReply({ embeds: [embed], components: [endGameRow(`replay|${key}|${bet}|${choice}`)] });
 
     recordResult({
@@ -4250,6 +4297,7 @@ async function handlePanelButton(i) {
   const instantKey = i.customId.slice('panel_'.length);
   if (INSTANT[instantKey]) {
     const payload = INSTANT[instantKey].picker(coef(instantKey));
+    payload.embeds.forEach((e) => brand(e, instantKey, 'ZNK Casino  •  Choisis, puis mise'));
     // Ajoute bouton favori
     const favOn = getFavs(i.user.id).has(instantKey);
     const favRow = new ActionRowBuilder().addComponents(
@@ -4389,14 +4437,20 @@ async function handlePanelButton(i) {
         flags: EPH,
       });
     }
-    case 'panel_mines':
-      return i.reply({ ...minesPickerPayload(), flags: EPH });
+    case 'panel_mines': {
+      const pl = minesPickerPayload();
+      pl.embeds.forEach((e) => brand(e, 'mines', 'ZNK Casino  •  Choisis ta difficulté'));
+      return i.reply({ ...pl, flags: EPH });
+    }
     case 'panel_bj': {
       const bal = await getBalance(i.user.id);
       return i.showModal(blackjackModal(bal));
     }
-    case 'panel_roulette':
-      return i.reply({ ...roulettePickerPayload(), flags: EPH });
+    case 'panel_roulette': {
+      const pl = roulettePickerPayload();
+      pl.embeds.forEach((e) => brand(e, 'roulette', 'ZNK Casino  •  Choisis ton pari'));
+      return i.reply({ ...pl, flags: EPH });
+    }
     case 'panel_daily': {
       const res = await rpc('claim_daily', { p_user_id: i.user.id, p_amount: DAILY_AMOUNT });
       if (res?.balance != null) await touchPeak(i.user.id, res.balance);
@@ -5913,9 +5967,10 @@ async function runOnlineGame(lobby, hostInteraction) {
 function sceneEmbed(title, body, color, footer) {
   return new EmbedBuilder()
     .setColor(color ?? COLORS.violet)
+    .setAuthor({ name: 'ZNK CASINO  •  TABLE EN DIRECT', iconURL: ZNK_LOGO })
     .setTitle(String(title).slice(0, 256))
     .setDescription(String(body).slice(0, 4000))
-    .setFooter({ text: String(footer || 'Table en direct').slice(0, 200) });
+    .setFooter({ text: `ZNK Casino  •  ${String(footer || 'Table en direct')}`.slice(0, 200) });
 }
 
 /** Une seule carte qui s’anime : chaque frame remplace la précédente. */
@@ -7570,4 +7625,3 @@ async function start() {
   }
 }
 start();
-
