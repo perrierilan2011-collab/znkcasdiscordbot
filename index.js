@@ -909,8 +909,10 @@ async function renderStatsBanner(user, st, balance, lang) {
   // Format 2:1 fixe (800x400) : Discord le met à l'échelle sans rogner, net sur mobile comme sur PC.
   const W = 800;
   const H = 400;
-  const cv = createCanvas(W, H);
-  const g = cv.getContext('2d');
+  const SCALE = 1.25;
+const cv = createCanvas(W * SCALE, H * SCALE);
+const g = cv.getContext('2d');
+g.scale(SCALE, SCALE);
   const FONT = 'sans-serif';
   const en = lang === 'en';
 
@@ -971,7 +973,12 @@ async function renderStatsBanner(user, st, balance, lang) {
   const tx = ax + AV + 22;
   const tmax = W - PAD - 20 - tx;
   const clean = (s) => String(s || '').replace(/[\u0000-\u001F\u007F]/g, '').trim();
-  const display = clean(user.globalName) || clean(user.username) || '?';
+  const handle = clean(user.username);
+g.fillText(
+  fitText(g, handle ? `@${handle}` : 'ZNK CASINO', tmax),
+  tx,
+  acy + 20
+);
   g.fillStyle = '#FFFFFF';
   g.font = `bold 34px ${FONT}`;
   g.fillText(fitText(g, display, tmax), tx, acy - 6);
@@ -4882,7 +4889,15 @@ async function handlePanelButton(i) {
       } catch (e) {
         console.error('[stats] bannière', e?.message || e);
       }
-      if (buf) return i.editReply({ files: [new AttachmentBuilder(buf, { name: 'stats.png' })] });
+      if (buf) {
+  const attachment = new AttachmentBuilder(buf, { name: 'stats.png' });
+  const embed = new EmbedBuilder()
+    .setColor(COLORS.violet)
+    .setImage('attachment://stats.png')
+    .setFooter({ text: `ZNK Casino • ${i.user.globalName || i.user.username}` });
+
+  return i.editReply({ embeds: [embed], files: [attachment] });
+}
       return i.editReply({ embeds: [statsFallbackEmbed(i.user, st, bal, lang)] });
     }
     case 'panel_clear': {
