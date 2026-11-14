@@ -308,13 +308,13 @@ function receipt(rows) {
 const PIPS = { 1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] };
 function dieLines(n) {
   const on = new Set(PIPS[Math.max(1, Math.min(6, n))]);
-  const c = (k) => (on.has(k) ? 'o' : ' ');
+  const c = (k) => (on.has(k) ? '●' : ' ');
   return [
-    '+-------+',
-    `| ${c(0)} ${c(1)} ${c(2)} |`,
-    `| ${c(3)} ${c(4)} ${c(5)} |`,
-    `| ${c(6)} ${c(7)} ${c(8)} |`,
-    '+-------+',
+    '╭───────╮',
+    `│ ${c(0)} ${c(1)} ${c(2)} │`,
+    `│ ${c(3)} ${c(4)} ${c(5)} │`,
+    `│ ${c(6)} ${c(7)} ${c(8)} │`,
+    '╰───────╯',
   ];
 }
 const DICE_FACES = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
@@ -326,8 +326,8 @@ const RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K']
 const newDeck = () => shuffle(SUITS.flatMap((s) => RANKS.map((r) => ({ r, s }))));
 const cardStr = (c) => `\`${c.r}${c.s}\``;
 function cardLines(c, hidden) {
-  if (hidden || !c) return ['+-----+', '|/////|', '|/////|', '|/////|', '+-----+'];
-  return ['+-----+', `|${padR(c.r, 2)}   |`, `|  ${c.s}  |`, `|   ${padL(c.r, 2)}|`, '+-----+'];
+  if (hidden || !c) return ['╭─────╮', '│░▒░▒░│', '│▒ZNK▒│', '│░▒░▒░│', '╰─────╯'];
+  return ['╭─────╮', `│${padR(c.r, 2)}   │`, `│  ${c.s}  │`, `│   ${padL(c.r, 2)}│`, '╰─────╯'];
 }
 function handArt(cards, hiddenExtra = 0) {
   const blocks = cards.map((c) => cardLines(c, false));
@@ -871,120 +871,158 @@ function roundRect(g, x, y, w, h, r) {
   g.closePath();
 }
 
+// Charge l'avatar Discord : PNG statique (gère GIF/WebP animés), puis avatar par défaut, jamais d'exception.
+async function loadAvatarImage(user, loadImage) {
+  const urls = [];
+  try { urls.push(user.displayAvatarURL({ extension: 'png', size: 256, forceStatic: true })); } catch { /* ignore */ }
+  try { urls.push(user.defaultAvatarURL); } catch { /* ignore */ }
+  try {
+    const idx = Number((BigInt(user.id) >> 22n) % 6n);
+    urls.push(`https://cdn.discordapp.com/embed/avatars/${idx}.png`);
+  } catch { /* ignore */ }
+  for (const url of urls.filter(Boolean)) {
+    try {
+      const ctl = new AbortController();
+      const timer = setTimeout(() => ctl.abort(), 5000);
+      const res = await fetch(url, { signal: ctl.signal });
+      clearTimeout(timer);
+      if (!res.ok) continue;
+      return await loadImage(Buffer.from(await res.arrayBuffer()));
+    } catch {
+      /* essaie la source suivante */
+    }
+  }
+  return null;
+}
+
+// Tronque un texte avec « … » pour qu'il tienne dans maxW pixels.
+function fitText(g, text, maxW) {
+  if (g.measureText(text).width <= maxW) return text;
+  let t = Array.from(text);
+  while (t.length > 1 && g.measureText(`${t.join('')}…`).width > maxW) t.pop();
+  return `${t.join('')}…`;
+}
+
 async function renderStatsBanner(user, st, balance, lang) {
   if (!canvasLib) return null;
   const { createCanvas, loadImage } = canvasLib;
-  const W = 680;
-  const H = 240;
+  // Format 2:1 fixe (800x400) : Discord le met à l'échelle sans rogner, net sur mobile comme sur PC.
+  const W = 800;
+  const H = 400;
   const cv = createCanvas(W, H);
   const g = cv.getContext('2d');
   const FONT = 'sans-serif';
   const en = lang === 'en';
 
-  // fond violet #A81CFD
-  g.fillStyle = '#A81CFD';
+  // fond dégradé violet ZNK
+  const bg = g.createLinearGradient(0, 0, W, H);
+  bg.addColorStop(0, '#2B0A3D');
+  bg.addColorStop(0.5, '#5B1A9E');
+  bg.addColorStop(1, '#A81CFD');
+  g.fillStyle = bg;
   g.fillRect(0, 0, W, H);
-  // décor discret
-  g.fillStyle = 'rgba(255,255,255,0.08)';
-  g.beginPath();
-  g.arc(W - 40, -10, 120, 0, Math.PI * 2);
-  g.fill();
-  g.beginPath();
-  g.arc(-30, H + 10, 90, 0, Math.PI * 2);
-  g.fill();
-  g.fillStyle = 'rgba(0,0,0,0.10)';
-  g.beginPath();
-  g.arc(W - 150, H + 40, 110, 0, Math.PI * 2);
+  g.fillStyle = 'rgba(255,255,255,0.06)';
+  g.beginPath(); g.arc(W - 60, -20, 170, 0, Math.PI * 2); g.fill();
+  g.beginPath(); g.arc(-40, H + 20, 130, 0, Math.PI * 2); g.fill();
+  g.fillStyle = 'rgba(217,70,239,0.10)';
+  g.beginPath(); g.arc(W - 200, H + 50, 150, 0, Math.PI * 2); g.fill();
+
+  // carte d'en-tête (profil)
+  const PAD = 28;
+  g.fillStyle = 'rgba(0,0,0,0.28)';
+  roundRect(g, PAD, PAD, W - PAD * 2, 128, 20);
   g.fill();
 
-  // avatar rond
-  const AV = 72;
-  const ax = 24;
-  const ay = 20;
+  // avatar rond, ratio carré respecté (aucune déformation), halo lumineux
+  const AV = 96;
+  const ax = PAD + 20;
+  const ay = PAD + (128 - AV) / 2;
+  const acx = ax + AV / 2;
+  const acy = ay + AV / 2;
+  g.save();
+  g.shadowColor = 'rgba(217,70,239,0.9)';
+  g.shadowBlur = 18;
+  g.fillStyle = '#D946EF';
+  g.beginPath(); g.arc(acx, acy, AV / 2 + 3, 0, Math.PI * 2); g.fill();
+  g.restore();
   g.save();
   g.beginPath();
-  g.arc(ax + AV / 2, ay + AV / 2, AV / 2, 0, Math.PI * 2);
+  g.arc(acx, acy, AV / 2, 0, Math.PI * 2);
   g.closePath();
   g.clip();
-  let drawn = false;
-  try {
-    const url = user.displayAvatarURL({ extension: 'png', size: 128, forceStatic: true });
-    const res = await fetch(url);
-    if (res.ok) {
-      const img = await loadImage(Buffer.from(await res.arrayBuffer()));
-      g.drawImage(img, ax, ay, AV, AV);
-      drawn = true;
-    }
-  } catch {
-    /* avatar indisponible */
-  }
-  if (!drawn) {
-    g.fillStyle = 'rgba(0,0,0,0.3)';
+  const img = await loadAvatarImage(user, loadImage);
+  if (img) {
+    const s = Math.min(img.width, img.height); // recadrage carré centré
+    g.drawImage(img, (img.width - s) / 2, (img.height - s) / 2, s, s, ax, ay, AV, AV);
+  } else {
+    g.fillStyle = '#5865F2';
     g.fillRect(ax, ay, AV, AV);
     g.fillStyle = '#fff';
-    g.font = `bold 34px ${FONT}`;
+    g.font = `bold 46px ${FONT}`;
     g.textAlign = 'center';
-    g.fillText(String(user.username || '?')[0].toUpperCase(), ax + AV / 2, ay + AV / 2 + 12);
+    g.textBaseline = 'middle';
+    g.fillText(String(user.username || '?')[0].toUpperCase(), acx, acy + 2);
     g.textAlign = 'left';
+    g.textBaseline = 'alphabetic';
   }
   g.restore();
-  g.lineWidth = 3;
-  g.strokeStyle = 'rgba(255,255,255,0.9)';
-  g.beginPath();
-  g.arc(ax + AV / 2, ay + AV / 2, AV / 2, 0, Math.PI * 2);
-  g.stroke();
 
-  // pseudo + sous-titre
-  let name = String(user.globalName || user.username || '?');
+  // pseudo juste à droite de l'avatar + sous-titre
+  const tx = ax + AV + 22;
+  const tmax = W - PAD - 20 - tx;
+  const clean = (s) => String(s || '').replace(/[\u0000-\u001F\u007F]/g, '').trim();
+  const display = clean(user.globalName) || clean(user.username) || '?';
   g.fillStyle = '#FFFFFF';
-  let size = 30;
-  g.font = `bold ${size}px ${FONT}`;
-  while (g.measureText(name).width > 330 && size > 16) {
-    size -= 2;
-    g.font = `bold ${size}px ${FONT}`;
-  }
-  g.fillText(name, 112, 54);
-  g.fillStyle = 'rgba(255,255,255,0.8)';
+  g.font = `bold 34px ${FONT}`;
+  g.fillText(fitText(g, display, tmax), tx, acy - 6);
+  g.fillStyle = 'rgba(255,255,255,0.75)';
+  g.font = `18px ${FONT}`;
+  const handle = clean(user.username);
+  g.fillText(fitText(g, handle && handle !== display ? `@${handle}` : 'ZNK CASINO', tmax), tx, acy + 20);
+  g.fillStyle = 'rgba(255,255,255,0.6)';
   g.font = `15px ${FONT}`;
   const fav = st.favorite ? gameNamePlain(st.favorite) : '-';
-  g.fillText(`ZNK CASINO  |  ${en ? 'Favorite' : 'Jeu favori'} : ${fav}`, 112, 80);
+  g.fillText(fitText(g, `${en ? 'Favorite' : 'Jeu favori'} : ${fav}`, tmax), tx, acy + 44);
 
-  // solde en haut à droite
+  // solde (ligne dédiée, pas de chevauchement avec le pseudo)
+  const by = PAD + 128 + 14;
+  g.fillStyle = 'rgba(255,255,255,0.14)';
+  roundRect(g, PAD, by, W - PAD * 2, 44, 14);
+  g.fill();
+  g.fillStyle = 'rgba(255,255,255,0.75)';
+  g.font = `bold 15px ${FONT}`;
+  g.fillText(en ? 'BALANCE' : 'SOLDE', PAD + 18, by + 28);
   g.textAlign = 'right';
-  g.fillStyle = 'rgba(255,255,255,0.8)';
-  g.font = `13px ${FONT}`;
-  g.fillText(en ? 'BALANCE' : 'SOLDE', W - 24, 36);
   g.fillStyle = '#FFFFFF';
-  g.font = `bold 26px ${FONT}`;
-  g.fillText(`${compact(balance)} ${COIN_PLAIN}`, W - 24, 66);
+  g.font = `bold 24px ${FONT}`;
+  g.fillText(`${compact(balance)} ${COIN_PLAIN}`, W - PAD - 18, by + 31);
   g.textAlign = 'left';
 
-  // 6 cartes de stats
+  // 6 cartes de stats (grille 3x2)
   const cells = [
-    [en ? 'GAMES PLAYED' : 'PARTIES JOUÉES', String(st.games)],
-    [en ? 'TOTAL WAGERED' : 'TOTAL MISÉ', `${compact(st.wagered)} ${COIN_PLAIN}`],
-    [en ? 'TOTAL WON' : 'TOTAL GAGNÉ', `${compact(st.won)} ${COIN_PLAIN}`],
-    [en ? 'TOTAL LOST' : 'TOTAL PERDU', `${compact(st.lost)} ${COIN_PLAIN}`],
-    [en ? 'NET PROFIT' : 'PROFIT NET', `${st.net > 0 ? '+' : ''}${compact(st.net)} ${COIN_PLAIN}`],
-    [en ? 'WIN RATE' : 'TAUX DE VICTOIRE', `${st.rate} %`],
+    [en ? 'GAMES PLAYED' : 'PARTIES JOUÉES', String(st.games), '#FFFFFF'],
+    [en ? 'TOTAL WAGERED' : 'TOTAL MISÉ', `${compact(st.wagered)} ${COIN_PLAIN}`, '#FFFFFF'],
+    [en ? 'TOTAL WON' : 'TOTAL GAGNÉ', `${compact(st.won)} ${COIN_PLAIN}`, '#86EFAC'],
+    [en ? 'TOTAL LOST' : 'TOTAL PERDU', `${compact(st.lost)} ${COIN_PLAIN}`, '#FCA5A5'],
+    [en ? 'NET PROFIT' : 'PROFIT NET', `${st.net > 0 ? '+' : ''}${compact(st.net)} ${COIN_PLAIN}`, st.net >= 0 ? '#86EFAC' : '#FCA5A5'],
+    [en ? 'WIN RATE' : 'TAUX DE VICTOIRE', `${st.rate} %`, '#F0ABFC'],
   ];
-  const mx = 24;
   const gap = 12;
-  const cw = Math.floor((W - mx * 2 - gap * 2) / 3);
-  const ch = 56;
-  const top = 110;
-  cells.forEach(([label, value], k) => {
-    const cx = mx + (k % 3) * (cw + gap);
-    const cy = top + Math.floor(k / 3) * (ch + 8);
-    g.fillStyle = 'rgba(0,0,0,0.25)';
-    roundRect(g, cx, cy, cw, ch, 10);
+  const cw = Math.floor((W - PAD * 2 - gap * 2) / 3);
+  const ch = 62;
+  const top = by + 44 + 14;
+  cells.forEach(([label, value, color], k) => {
+    const cx = PAD + (k % 3) * (cw + gap);
+    const cy = top + Math.floor(k / 3) * (ch + 10);
+    g.fillStyle = 'rgba(0,0,0,0.28)';
+    roundRect(g, cx, cy, cw, ch, 14);
     g.fill();
-    g.fillStyle = 'rgba(255,255,255,0.75)';
-    g.font = `bold 11px ${FONT}`;
-    g.fillText(label, cx + 12, cy + 20);
-    g.fillStyle = '#FFFFFF';
-    g.font = `bold 20px ${FONT}`;
-    g.fillText(value.replace(/\s/g, ' '), cx + 12, cy + 44);
+    g.fillStyle = 'rgba(255,255,255,0.7)';
+    g.font = `bold 12px ${FONT}`;
+    g.fillText(fitText(g, label, cw - 28), cx + 14, cy + 22);
+    g.fillStyle = color;
+    g.font = `bold 21px ${FONT}`;
+    g.fillText(fitText(g, value.replace(/\s/g, ' '), cw - 28), cx + 14, cy + 49);
   });
 
   return cv.toBuffer('image/png');
@@ -3677,6 +3715,455 @@ ANIMS.spincolor = (res) => {
 };
 
 
+// ============================================================
+//  ZNK VISUELS v2  (affichage uniquement : aucune proba, aucun gain, aucun Z-Token touché)
+//  Scènes immersives en emojis / blocs de code. Les anciennes ANIMS ci-dessus
+//  sont remplacées ici par des versions illustrées (mêmes champs `res` lus).
+// ============================================================
+const vhash = (a, b) => (((a | 0) * 73856093) ^ ((b | 0) * 19349663)) >>> 0;
+const vBG = '⬛';
+const vRank = (v) => RANKS[Math.max(1, Math.min(13, Number(v) || 1)) - 1];
+const vCard = (v, salt = 0) => ({ r: vRank(v), s: SUITS[(Number(v) + salt + 4) % 4] });
+const vBar = (ratio, n = 10) => {
+  const f = Math.max(0, Math.min(n, Math.round(ratio * n)));
+  return '▰'.repeat(f) + '▱'.repeat(n - f);
+};
+
+// ---------- Espace : décor étoilé, planètes, fusée, flammes, traînée ----------
+function spaceScene({ cols = 9, rows = 7, scroll = 0, rocket = null, planets = [], ground = false, boom = false, smoke = false, flame = false, sparks = false }) {
+  const g = range(rows).map(() => Array(cols).fill(vBG));
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const h = vhash(r - scroll, c + 3);
+      if (h % 11 === 0) g[r][c] = '✨';
+      else if (h % 29 === 1) g[r][c] = '🌟';
+    }
+  }
+  for (const p of planets) {
+    const r = p.y + scroll;
+    if (r >= 0 && r < rows && p.c >= 0 && p.c < cols) g[r][p.c] = p.e;
+  }
+  if (ground) for (let c = 0; c < cols; c++) g[rows - 1][c] = '🟪';
+  if (rocket) {
+    const { r, c } = rocket;
+    if (boom) {
+      g[r][c] = '💥';
+      for (const [dr, dc] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+        const rr = r + dr, cc = c + dc;
+        if (rr >= 0 && rr < rows && cc >= 0 && cc < cols) g[rr][cc] = sparks ? '✨' : '🔥';
+      }
+      if (sparks) for (const [dr, dc] of [[-1, -1], [-1, 1], [1, -1], [1, 1]]) {
+        const rr = r + dr, cc = c + dc;
+        if (rr >= 0 && rr < rows && cc >= 0 && cc < cols) g[rr][cc] = '☄️';
+      }
+    } else {
+      g[r][c] = '🚀';
+      if (flame) {
+        ['🔥', '🟠', '🟣'].forEach((e, i) => {
+          const rr = r + 1 + i, cc = c - 1 - i;
+          if (rr < rows && cc >= 0 && !(ground && rr === rows - 1 && i > 0)) g[rr][cc] = e;
+        });
+      }
+    }
+    if (smoke) for (const dc of [-1, 1]) if (c + dc >= 0 && c + dc < cols && r + 1 < rows) g[r + 1][c + dc] = '☁️';
+  }
+  return g.map((row) => row.join('')).join('\n') + '\n';
+}
+
+const V_PLANETS = [
+  { e: '🪐', c: 7, y: -1 }, { e: '🌕', c: 1, y: -4 }, { e: '☄️', c: 6, y: -7 },
+  { e: '🌍', c: 2, y: -10 }, { e: '🪐', c: 0, y: -13 }, { e: '🌠', c: 7, y: -16 },
+];
+
+// Montée d'une fusée avec multiplicateur. Purement visuel : les valeurs viennent de `res`.
+function rocketFrames({ peak, target = null, N = 8, endTitle, endCap, success, finalMoon = false }) {
+  const COLS = 9, ROWS = 7;
+  const P = Math.max(1.01, Math.min(Number(peak) || 1.01, 1000));
+  const T = target && target > 1 ? target : null;
+  const mAt = (k) => Math.max(1, Math.round(Math.pow(P, k / N) * 100) / 100);
+  const pos = (k) => {
+    const p = k / N;
+    return { r: Math.round(ROWS - 2 - (ROWS - 3) * Math.min(1, p / 0.55)), c: 1 + Math.round(p * (COLS - 3)) };
+  };
+  const targetLine = (m) => {
+    if (!T) return '';
+    const ok = m >= T;
+    return `\n${ok ? '✅' : '🎯'} Cible **x${T}**  ${vBar(Math.log(Math.max(1, m)) / Math.log(T))}`;
+  };
+  const frames = [];
+  const pad = { r: ROWS - 2, c: 1 };
+  ['3️⃣', '2️⃣', '1️⃣'].forEach((n, i) => {
+    frames.push({
+      art: spaceScene({ cols: COLS, rows: ROWS, rocket: pad, ground: true, smoke: i >= 1 }) + `## ${n} …${targetLine(1)}`,
+      caption: i === 0 ? 'Compte à rebours' : i === 1 ? 'Les moteurs s’allument' : 'Allumage',
+      ms: 900,
+    });
+  });
+  frames.push({
+    art: spaceScene({ cols: COLS, rows: ROWS, rocket: pad, ground: true, smoke: true, flame: true }) + `## 🔥 DÉCOLLAGE !${targetLine(1)}`,
+    caption: 'Décollage',
+    ms: 850,
+  });
+  let hit = false;
+  for (let k = 1; k <= N; k++) {
+    const m = mAt(k);
+    let cap = `Multiplicateur : x${m.toFixed(2)}`;
+    if (!hit && T && m >= T && P >= T) {
+      hit = true;
+      cap = `Cible x${T} atteinte ! (x${m.toFixed(2)})`;
+    }
+    const last = k === N;
+    if (last && finalMoon) break;
+    frames.push({
+      art: spaceScene({ cols: COLS, rows: ROWS, scroll: k, rocket: pos(k), planets: V_PLANETS, flame: true }) + `## 🚀 x${m.toFixed(2)}${targetLine(m)}`,
+      caption: cap,
+      ms: 750,
+    });
+  }
+  const end = pos(finalMoon ? N - 1 : N);
+  if (finalMoon) {
+    const g = spaceScene({ cols: COLS, rows: ROWS, scroll: N, rocket: { r: 1, c: COLS - 3 }, planets: [{ e: '🌕', c: COLS - 2, y: -N }], flame: true, boom: !success, sparks: !success });
+    frames.push({ art: g + `## ${success ? '🌙 ATTERRISSAGE !' : '💥 ÉCHEC'}`, caption: endCap, ms: 1300 });
+    return frames;
+  }
+  frames.push({ art: spaceScene({ cols: COLS, rows: ROWS, scroll: N, rocket: end, planets: V_PLANETS, boom: true }) + `## 💥 BOOM x${P.toFixed(2)}${targetLine(P)}`, caption: 'Explosion !', ms: 900 });
+  frames.push({ art: spaceScene({ cols: COLS, rows: ROWS, scroll: N + 1, rocket: end, planets: V_PLANETS, boom: true, sparks: true }) + `## ${endTitle}${targetLine(P)}`, caption: endCap, ms: 1300 });
+  return frames;
+}
+
+ANIMS.crash = (res) =>
+  rocketFrames({
+    peak: res.crash,
+    target: res.target,
+    endTitle: `💀 CRASH à ${fx(Math.min(res.crash, 1000))}`,
+    endCap: res.crash >= res.target ? `Explosion à ${fx(Math.min(res.crash, 1000))} : tu avais encaissé x${res.target}` : `Explosion à ${fx(Math.min(res.crash, 1000))} : trop tôt pour ta cible`,
+  });
+ANIMS.limbo = (res) =>
+  rocketFrames({
+    peak: res.peak,
+    target: res.target,
+    N: 8,
+    endTitle: `PIC x${Math.min(res.peak, 1000).toFixed(2)}`,
+    endCap: res.peak >= res.target ? 'Cible validée !' : 'Trop bas',
+  });
+ANIMS.rocket2 = (res) =>
+  rocketFrames({
+    peak: Math.min(res.peak, 100),
+    target: res.t,
+    N: 8,
+    endTitle: `PIC x${Math.min(res.peak, 500).toFixed(2)}`,
+    endCap: res.peak >= res.t ? 'Cible OK' : 'Trop bas',
+  });
+ANIMS.moonshot = (res) =>
+  rocketFrames({ peak: 12, N: 7, finalMoon: true, success: !!res.ok, endCap: res.ok ? 'Objectif atteint : la Lune !' : 'La fusée n’a pas tenu' });
+
+// ---------- Machines à sous : rouleaux colorés, lumières clignotantes ----------
+const slotEmoji = (s) => (SLOT_SYMBOLS.find((x) => x.s === s) || {}).e || '❔';
+function slotBoard({ cols, locked, f, lights = null, text = '' }) {
+  const lamp = (n) => {
+    if (lights) return lights.repeat(n + 2);
+    const pat = f % 2 ? ['🟡', '🟣'] : ['🟣', '🟡'];
+    return range(n + 2).map((k) => pat[k % 2]).join('');
+  };
+  const n = cols.length;
+  const row = (r, mid) => (mid ? '▶️' : '🟪') + cols.map((c) => c[r]).join('') + (mid ? '◀️' : '🟪');
+  const st = '🟪' + locked.map((l) => (l ? '🔒' : '🌀')).join('') + '🟪';
+  return [lamp(n), row(0, false), row(1, true), row(2, false), st, lamp(n)].join('\n') + '\n' + text;
+}
+function slotFrames(finals, pool, kind) {
+  const rnd = () => pool[randomInt(0, pool.length)];
+  const around = finals.map(() => [rnd(), rnd()]);
+  const stopAt = [3, 5, 7];
+  const caps = { 1: 'Les rouleaux démarrent', 2: 'Ils tournent à pleine vitesse', 3: 'Rouleau 1 verrouillé', 4: 'Les deux autres tournent encore', 5: 'Rouleau 2 verrouillé', 6: 'Dernier rouleau...', 7: 'Rouleau 3 verrouillé' };
+  const frames = [];
+  for (let f = 1; f <= 7; f++) {
+    const locked = [0, 1, 2].map((k) => f >= stopAt[k]);
+    const cols = [0, 1, 2].map((k) => (locked[k] ? [around[k][0], finals[k], around[k][1]] : [rnd(), rnd(), rnd()]));
+    frames.push({ art: slotBoard({ cols, locked, f, text: f >= 6 ? '## 🎰 …' : '## 🎰 ✦ ✦ ✦' }), caption: caps[f], ms: 800 });
+  }
+  const cols = [0, 1, 2].map((k) => [around[k][0], finals[k], around[k][1]]);
+  frames.push({ art: slotBoard({ cols, locked: [true, true, true], f: 0, lights: kind.lights, text: kind.text }), caption: kind.cap, ms: 1200 });
+  return frames;
+}
+ANIMS.slots = (res) => {
+  const pool = SLOT_SYMBOLS.map((x) => x.e);
+  const finals = res.reels.map((r) => slotEmoji(r.s));
+  const raw = res.reels.map((r) => r.s);
+  const triple = raw[0] === raw[1] && raw[1] === raw[2];
+  const two = raw.filter((s) => s === 'CER').length === 2;
+  const jack = triple && raw[0] === ' 7 ';
+  return slotFrames(finals, pool, {
+    lights: triple || two ? '🟡' : '🟣',
+    text: jack ? '## 🎆 JACKPOT 7️⃣7️⃣7️⃣ 🎆' : triple ? '## 🎉 TROIS IDENTIQUES 🎉' : two ? '## 🍒🍒 DEUX CERISES' : '## 🌑 Aucun gain',
+    cap: triple ? (jack ? 'JACKPOT !' : 'Combinaison gagnante !') : two ? 'Deux cerises !' : 'Pas de combinaison',
+  });
+};
+ANIMS.jackpot = (res) => {
+  const pool = ['🍒', '🍋', '💎', '7️⃣', '⭐'];
+  const f = [res.a, res.b, res.c];
+  const win = f[0] === f[1] && f[1] === f[2];
+  return slotFrames(f, pool, { lights: win ? '🟡' : '🟣', text: win ? '## 🎆 JACKPOT 🎆' : '## 🌑 Rien cette fois', cap: win ? 'Jackpot !' : 'Résultat' });
+};
+ANIMS.fruitmatch = (res) => {
+  const pool = ['🍎', '🍌', '🍇', '🍊', '🍓'];
+  const f = [res.a, res.b, res.c];
+  const win = new Set(f).size < 3;
+  return slotFrames(f, pool, { lights: win ? '🟡' : '🟣', text: win ? '## 🍓 FRUITS ASSORTIS 🍓' : '## 🌑 Pas d’assortiment', cap: win ? 'Fruits assortis !' : 'Résultat' });
+};
+
+// ---------- Cartes illustrées + distribution ----------
+const vFlip = () => ['  ╭─╮  ', '  │▒│  ', '  │▒│  ', '  │▒│  ', '  ╰─╯  '];
+const vPad = (lines, n) => lines.map((l) => ' '.repeat(n) + l);
+// states : tableau de 'hidden' | 'flip' | carte {r,s}
+function cardRow(states, gap = ' ') {
+  const blocks = states.map((s) => (s === 'hidden' ? cardLines(null, true) : s === 'flip' ? vFlip() : cardLines(s, false)));
+  return sideBySide(blocks, gap);
+}
+// Distribution (glisse depuis la droite) puis retournement des cartes une à une.
+function dealAndReveal(cards, { labels = null, caps = {}, endCap = '', gap = ' ', extra = [] } = {}) {
+  const n = cards.length;
+  const label = labels ? [labels.map((l) => padR(l, 7)).join(gap)] : [];
+  const frame = (states, cap, ms, pad = 0) => ({ art: code([...vPad([...label, ...cardRow(states, gap)], pad), ...extra]), caption: cap, ms });
+  const frames = [
+    frame(range(n).map(() => 'hidden'), caps.shuffle || 'Le croupier bat le jeu', 800, 14),
+    frame(range(n).map(() => 'hidden'), caps.deal || 'Distribution des cartes', 800, 7),
+    frame(range(n).map(() => 'hidden'), caps.table || 'Les cartes sont posées', 850, 0),
+  ];
+  const st = range(n).map(() => 'hidden');
+  for (let k = 0; k < n; k++) {
+    st[k] = 'flip';
+    frames.push(frame([...st], caps.flip || 'Retournement...', 700));
+    st[k] = cards[k];
+    const last = k === n - 1;
+    frames.push(frame([...st], last ? endCap : (caps.reveal ? caps.reveal(k, cards[k]) : `Carte ${k + 1} : ${cards[k].r}${cards[k].s}`), last ? 1200 : 900));
+  }
+  return frames;
+}
+
+ANIMS.duel = (res) => {
+  const f = dealAndReveal([res.me, res.dealer], {
+    labels: ['  TOI  ', ' BANQUE'],
+    gap: '     ',
+    caps: { reveal: (k, c) => (k === 0 ? `Ta carte : ${c.r}${c.s}` : '') },
+    endCap: res.me.v > res.dealer.v ? 'Ta carte est plus haute : VICTOIRE' : res.me.v === res.dealer.v ? 'Égalité : perdu' : 'La carte du croupier est plus haute : DÉFAITE',
+  });
+  return f;
+};
+ANIMS.war = (res) =>
+  dealAndReveal([vCard(res.me, 1), vCard(res.dealer, 2)], {
+    labels: ['  TOI  ', ' BANQUE'],
+    gap: '     ',
+    caps: { reveal: (k, c) => (k === 0 ? `Ta carte : ${c.r}` : '') },
+    endCap: res.me > res.dealer ? 'Ta carte l’emporte' : res.me === res.dealer ? 'Bataille : égalité' : 'La carte du croupier l’emporte',
+  });
+ANIMS.higher = (res) =>
+  dealAndReveal([vCard(res.a, 0), vCard(res.b, 2)], {
+    labels: [' REF   ', ' SUIV. '],
+    gap: '  ',
+    caps: { reveal: (k, c) => `Référence : ${c.r}` },
+    endCap: `Suivante : ${vRank(res.b)}`,
+  });
+ANIMS.hilo = (res) =>
+  dealAndReveal(res.cards.slice(0, 3).map((v, k) => vCard(v, k)), {
+    caps: { reveal: (k, c) => `Carte ${k + 1}/3 : ${c.r}` },
+    endCap: 'Les 3 cartes sont retournées',
+  });
+ANIMS.highcard = (res) => dealAndReveal([vCard(res.v, 1)], { endCap: `Carte : ${vRank(res.v)}` });
+ANIMS.lowcard = ANIMS.highcard;
+ANIMS.pairmatch = (res) =>
+  dealAndReveal([vCard(res.a, 0), vCard(res.b, 1)], {
+    caps: { reveal: () => 'Première carte' },
+    endCap: res.a === res.b ? 'Une paire !' : 'Deuxième carte',
+  });
+ANIMS.pokerhand = (res) =>
+  dealAndReveal(res.ranks.slice(0, 3).map((v, k) => vCard(v, k)), {
+    caps: { reveal: (k, c) => `Carte ${k + 1} : ${c.r}` },
+    endCap: res.max >= 3 ? 'Brelan !' : res.max >= 2 ? 'Paire' : 'Rien',
+  });
+ANIMS.redblack = (res) => {
+  const card = res.col === 'red' ? { r: RANKS[randomInt(0, 13)], s: randomInt(0, 2) ? '♥' : '♦' } : { r: RANKS[randomInt(0, 13)], s: randomInt(0, 2) ? '♠' : '♣' };
+  return dealAndReveal([card], { extra: [], endCap: res.col === 'red' ? '🔴 ROUGE' : '⚫ NOIR' });
+};
+ANIMS.cardmatch = (res) =>
+  dealAndReveal([res.secret, res.pickCard], {
+    labels: ['SECRETE', ' TIREE '],
+    gap: '  ',
+    caps: { reveal: (k, c) => `Carte secrète : ${c.r}${c.s}` },
+    endCap: `Ta carte : ${res.pickCard.r}${res.pickCard.s}`,
+  });
+ANIMS.memory = (res) => {
+  const [a, b] = String(res.detail).split('-').map((x) => (Number(x) === 1 ? { r: 'A', s: '♥' } : { r: 'K', s: '♠' }));
+  const hid = ['hidden', 'hidden', 'hidden', 'hidden'];
+  const mk = (states, cap, ms) => ({ art: code(cardRow(states, ' ')), caption: cap, ms });
+  return [
+    mk(hid, 'Quatre cartes, deux paires', 850),
+    mk(['flip', 'hidden', 'hidden', 'hidden'], 'Tu retournes la première...', 750),
+    mk([a, 'hidden', 'hidden', 'hidden'], `Première carte : ${a.r}`, 900),
+    mk([a, 'flip', 'hidden', 'hidden'], 'Puis la seconde...', 750),
+    mk([a, b, 'hidden', 'hidden'], res.ok ? 'Paire !' : 'Pas de paire', 1200),
+  ];
+};
+ANIMS.suit = (res, ctx) => {
+  const order = SUITS;
+  const cell = (s, center) => (center ? `[ ${s} ]` : `  ${s}  `);
+  const pos = stripPositions(order.indexOf(res.card.s), [4, 3, 3, 2, 1, 1]);
+  const want = SUIT_CHOICES[ctx.choice];
+  const frames = pos.map((p, k) => ({
+    art: code([...stripArt(order, p, cell, 3), '', `Ton choix : ${want}`]),
+    caption: ['Le croupier mélange le jeu', 'Les enseignes défilent', 'Ça ralentit', 'Presque...', 'Encore un cran', `L'enseigne tirée : ${res.card.s}`][k] || '...',
+    ms: 800 + k * 80,
+  }));
+  frames.push({ art: code([...vPad(cardLines(null, true), 4), '', `Ton choix : ${want}`]), caption: 'La carte est posée face cachée', ms: 900 });
+  frames.push({ art: code([...vPad(vFlip(), 4), '', `Ton choix : ${want}`]), caption: 'Elle se retourne...', ms: 700 });
+  frames.push({ art: code([...vPad(cardLines(res.card, false), 4), '', `Ton choix : ${want}`]), caption: `Carte retournée : ${res.card.r}${res.card.s}`, ms: 1200 });
+  return frames;
+};
+
+// ---------- Autres jeux : scènes à thème ----------
+const vRow = (e, n) => e.repeat(n);
+const vScene = (lines) => lines.join('\n') + '\n';
+
+ANIMS.stardrop = (res) => {
+  const sky = (r, c, e) => range(5).map((y) => range(7).map((x) => (y === r && x === c ? e : (vhash(y, x) % 5 === 0 ? '✨' : vBG))).join('')).join('\n') + '\n';
+  return [
+    { art: sky(0, 5, '🌠') + '## 🌠 Une étoile filante…', caption: 'Étoile filante', ms: 800 },
+    { art: sky(1, 4, '⭐') + '## ⭐ Elle file dans la nuit', caption: 'Elle traverse', ms: 800 },
+    { art: sky(3, 2, '⭐') + '## ⭐ Elle descend…', caption: 'Elle approche', ms: 800 },
+    { art: sky(4, 2, res.falls ? '🌟' : '💨') + (res.falls ? '## 🌟 Attrapée !' : '## 💨 Elle s’est évanouie'), caption: res.falls ? 'Elle est tombée' : 'Elle continue', ms: 1200 },
+  ];
+};
+ANIMS.volcano = (res) => [
+  { art: vScene(['☁️☁️🌫️☁️☁️', '⬛⬛🌋⬛⬛', '🟫🟫🟫🟫🟫']) + '## 🌋 Le volcan gronde', caption: 'Le volcan gronde', ms: 800 },
+  { art: vScene(['⬛⬛💨⬛⬛', '⬛🔥🌋🔥⬛', '🟫🟧🟧🟧🟫']) + '## 🔥 Ça chauffe', caption: 'Ça chauffe', ms: 800 },
+  { art: vScene(['⬛🔥💥🔥⬛', '🔥🌋🌋🌋🔥', '🟧🟧🟧🟧🟧']) + `## 🌋 ÉRUPTION zone ${res.eruption}`, caption: `Éruption zone ${res.eruption}`, ms: 1200 },
+];
+ANIMS.lightning = (res) => [
+  { art: vScene(['⬛☁️⬛☁️⬛', '⬛⬛⬛⬛⬛', '🟦🟦🟦🟦🟦']) + '## ☁️ Les nuages s’amassent', caption: 'Nuages', ms: 800 },
+  { art: vScene(['☁️☁️🌩️☁️☁️', '⬛⬛💧⬛⬛', '🟦🟦🟦🟦🟦']) + '## 🌩️ L’orage gronde', caption: 'Orage proche', ms: 800 },
+  { art: res.strike ? vScene(['☁️☁️🌩️☁️☁️', '⬛⬛⚡⬛⬛', '🟨🟨💥🟨🟨']) + '## ⚡ FOUDRE !' : vScene(['⬛☁️☁️☁️⬛', '⬛⬛⬛⬛⬛', '🟦🟦🟦🟦🟦']) + '## 🌤️ L’orage passe', caption: res.strike ? 'Éclair !' : 'L\'orage passe', ms: 1200 },
+];
+ANIMS.bombdefuse = (res) => {
+  const ok = res.good === res.want;
+  return [
+    { art: vScene(['🟥🟥🟥🟥🟥', '🟥💣⏱️3🟥', '🟥🟥🟥🟥🟥']).replace('⏱️3', '3️⃣') + '## ✂️ Choisis un fil…', caption: 'Compte à rebours', ms: 800 },
+    { art: vScene(['🟧🟧🟧🟧🟧', '🟧💣2️⃣🟧🟧', '🟧🟧🟧🟧🟧']) + '## ⏱️ Le temps presse', caption: 'Compte à rebours', ms: 800 },
+    { art: vScene(['🟨🟨🟨🟨🟨', '🟨💣1️⃣🟨🟨', '🟨🟨🟨🟨🟨']) + '## ✂️ Clic !', caption: 'Compte à rebours', ms: 800 },
+    { art: ok ? vScene(['🟩🟩🟩🟩🟩', '🟩✅💣✅🟩', '🟩🟩🟩🟩🟩']) + '## ✅ DÉSAMORCÉ' : vScene(['🔥🔥🔥🔥🔥', '🔥💥💥💥🔥', '🔥🔥🔥🔥🔥']) + '## 💥 BOOM', caption: ok ? 'Bon fil !' : `Mauvais fil (bon = ${res.good})`, ms: 1300 },
+  ];
+};
+ANIMS.freefall = (res) => {
+  const col = (r, e) => range(6).map((y) => (y === r ? `⬛⬛${e}⬛⬛` : `${vBG}${vBG}${vBG}${vBG}${vBG}`)).join('\n') + '\n';
+  return [
+    { art: col(0, '🪂') + '🟩🟩🟩🟩🟩\n## 🪂 Saut !', caption: 'Saut !', ms: 800 },
+    { art: col(2, '🪂') + '🟩🟩🟩🟩🟩\n## ☁️ Chute libre', caption: 'Chute...', ms: 800 },
+    { art: col(4, '🪂') + '🟩🟩🟩🟩🟩\n## 🌍 Le sol approche', caption: 'Approche du sol', ms: 800 },
+    { art: (res.ok ? col(5, '🧍') : col(5, '💥')) + '🟩🟩🟩🟩🟩\n' + (res.ok ? '## ✅ Atterrissage parfait' : '## 💥 Crash'), caption: res.ok ? 'Zone atteinte' : 'Raté', ms: 1200 },
+  ];
+};
+ANIMS.balloon = (res) => {
+  const frames = [];
+  for (let k = 1; k <= res.need; k++) {
+    frames.push({ art: vScene([vRow('🎈', Math.min(9, k + 1)), '', `Niveau ${k}  ${vBar(k / Math.max(1, res.need))}`]) + '## 🎈 Gonflage…', caption: 'Gonflage...', ms: 700 });
+  }
+  frames.push({ art: vScene([res.ok ? '🎈🎈🎈🎈🎈' : '💥💥💥💥💥']) + (res.ok ? '## 🎈 Intact !' : '## 💥 POP !'), caption: res.ok ? 'Succès' : 'Trop gonflé', ms: 1200 });
+  return frames;
+};
+ANIMS.treasure = (res) => {
+  const frames = [];
+  for (let k = 1; k <= 5; k++) {
+    const row = range(5).map((j) => (j + 1 < k ? '🕳️' : j + 1 === k ? (k === res.win ? '💎' : '🕳️') : '🟫')).join('');
+    frames.push({ art: vScene(['🏝️🌴🏝️🌴🏝️', row]) + `## ⛏️ Case ${k}`, caption: 'Fouille', ms: 600 });
+  }
+  frames.push({ art: vScene(range(1).map(() => range(5).map((j) => (j + 1 === res.win ? '💎' : '🕳️')).join(''))) + `## 💎 Trésor en case ${res.win}`, caption: 'Résultat', ms: 1200 });
+  return frames;
+};
+ANIMS.gemhunt = (res) => {
+  const frames = [];
+  for (let k = 1; k <= 6; k++) {
+    const row = range(6).map((j) => (j + 1 < k ? '🪨' : j + 1 === k ? (k === res.win ? '💎' : '🪨') : '⛰️')).join('');
+    frames.push({ art: vScene(['⛏️✨⛏️✨⛏️✨', row]) + `## ⛏️ Roche ${k}`, caption: 'Fouille', ms: 550 });
+  }
+  frames.push({ art: vScene([range(6).map((j) => (j + 1 === res.win ? '💎' : '🪨')).join('')]) + `## 💎 Gemme en roche ${res.win}`, caption: 'Trouvée', ms: 1200 });
+  return frames;
+};
+ANIMS.numguess = (res) => {
+  const frames = [];
+  for (let k = 0; k < 6; k++) frames.push({ art: vScene(['🔮✨🔮✨🔮']) + `## 🔮 [ ${randomInt(1, 11)} ]`, caption: 'Les nombres défilent', ms: 550 });
+  frames.push({ art: vScene(['🌟🔮🔮🔮🌟']) + `## 🎯 [ ${res.n} ]`, caption: `Tirage : ${res.n}`, ms: 1200 });
+  return frames;
+};
+ANIMS.target = (res) => [
+  { art: vScene(['🏹⬛⬛⬛🎯']) + '## 🏹 Visée…', caption: 'Visée', ms: 700 },
+  { art: vScene(['⬛⬛➳⬛🎯']) + '## 💨 Tir !', caption: 'Lancer', ms: 700 },
+  { art: vScene(['⬛⬛⬛➳🎯']) + '## 💨 En vol', caption: 'Vol', ms: 700 },
+  { art: vScene(['⬛⬛⬛⬛💥']) + `## 🎯 Impact : ${res.hit}`, caption: 'Résultat', ms: 1200 },
+];
+ANIMS.sequence = (res) => [
+  { art: vScene(['🟪🟪🟪🟪🟪']) + `## 🔢 ${res.a}  ❔  ❔`, caption: 'Premier chiffre', ms: 800 },
+  { art: vScene(['🟪🟪🟪🟪🟪']) + `## 🔢 ${res.a}  ${res.b}  ❔`, caption: 'Deuxième', ms: 800 },
+  { art: vScene([res.ok ? '🟩🟩🟩🟩🟩' : '🟥🟥🟥🟥🟥']) + `## 🔢 ${res.a}  ${res.b}  ${res.c}`, caption: res.ok ? 'SUITE !' : 'Pas de suite', ms: 1200 },
+];
+ANIMS.animalrace = (res) => {
+  const animals = ['🐰', '🦊', '🐺', '🦅'];
+  const lane = (e, p) => '🏁' + '▫️'.repeat(Math.max(0, 6 - p)) + e + '▫️'.repeat(Math.max(0, p)) + '🚩';
+  const frames = [];
+  const pos = [0, 0, 0, 0];
+  for (let k = 0; k < 5; k++) {
+    for (let a = 0; a < 4; a++) pos[a] = Math.min(5, pos[a] + randomInt(0, 2));
+    frames.push({ art: vScene(animals.map((e, a) => lane(e, pos[a]))) + '## 🏃 Course en cours', caption: 'Course en cours', ms: 700 });
+  }
+  frames.push({ art: vScene(animals.map((e) => lane(e, 0))) + `## 🏆 Gagnant : ${res.winner.name}`, caption: 'Arrivée', ms: 1300 });
+  return frames;
+};
+ANIMS.bingo = (res) => {
+  const frames = [];
+  const cells = (on) => range(5).map((j) => (j + 1 === on ? '🔴' : '⚪')).join('');
+  for (let k = 0; k < 5; k++) frames.push({ art: vScene(['🎱✨🎱✨🎱', cells(randomInt(1, 6))]) + '## 🎰 La bille tourne…', caption: 'La bille tourne...', ms: 600 });
+  frames.push({ art: vScene(['🎱🎱🎱🎱🎱', cells(res.n)]) + `## 🎱 Case ${res.n}`, caption: `Bille dans la case ${res.n}`, ms: 1200 });
+  return frames;
+};
+ANIMS.colorswipe = (res) => {
+  const cols = ['🔴', '🟠', '🟡', '🟢', '🔵', '🟣'];
+  const em = { red: '🔴', orange: '🟠', yellow: '🟡', green: '🟢', blue: '🔵', purple: '🟣' };
+  const frames = cols.map((e, k) => ({ art: vScene([cols.map((_, j) => (j === k ? e : '⚫')).join('')]) + '## 🌈 Arc-en-ciel', caption: 'Arc-en-ciel', ms: 500 }));
+  frames.push({ art: vScene([vRow(em[res.out], 6)]) + `## ${em[res.out]} Couleur tirée`, caption: 'Couleur tirée', ms: 1200 });
+  return frames;
+};
+ANIMS.spincolor = (res) => {
+  const cols = ['🔴', '🔵', '🟢', '🟡', '🟣', '🟠'];
+  const em = { red: '🔴', blue: '🔵', green: '🟢', yellow: '🟡', purple: '🟣', orange: '🟠' };
+  const wheel = (k) => cols.map((e, j) => (j === k % 6 ? '👉' + e : '⚪')).join('');
+  const frames = [];
+  for (let k = 0; k < 8; k++) frames.push({ art: vScene(['🎡✨🎡✨🎡✨🎡', wheel(k)]) + '## 🎨 La roue tourne', caption: 'La roue tourne', ms: 500 });
+  frames.push({ art: vScene(['🎆' + vRow(em[res.out], 5) + '🎆']) + `## ${em[res.out]} Arrêt`, caption: 'Arrêt', ms: 1200 });
+  return frames;
+};
+ANIMS.multiplier = (res) => {
+  const frames = [];
+  for (let k = 0; k < 6; k++) frames.push({ art: vScene(['💠✨💠✨💠']) + `## 💠 x${[1.5, 2, 3, 5][randomInt(0, 4)]}`, caption: 'Multiplicateurs', ms: 600 });
+  frames.push({ art: vScene([res.ok ? '🟩🟩🟩🟩🟩' : '🟥🟥🟥🟥🟥']) + `## 💠 Cible ${res.pick}`, caption: res.ok ? 'Validé !' : 'Raté', ms: 1200 });
+  return frames;
+};
+ANIMS.oddseven = (res) => {
+  const r = () => randomInt(1, 7);
+  return [
+    { art: code(dieLines(r())), caption: 'Le dé roule', ms: 700 },
+    { art: code(dieLines(r())), caption: 'Rebond', ms: 700 },
+    { art: code(dieLines(res.n)), caption: `Résultat : ${res.n}`, ms: 1200 },
+  ];
+};
+
+// Bandeau de jeux « génériques » (≈ 40 mini-jeux) : scène à thème par emoji du jeu
+function genericFrames(emoji, res) {
+  const glow = res.ok ? '🟣' : '⚫';
+  const line = (e) => `${e}✨${e}✨${e}✨${e}`;
+  return [
+    { art: vScene([line(emoji), `${vRow('🟪', 7)}`, line('✨')]) + `## ${emoji} Tirage en cours…`, caption: 'Tirage', ms: 750 },
+    { art: vScene([line('💫'), `🟪🟪🌀🌀🌀🟪🟪`, line('💫')]) + `## 🌀 Ça tourne…`, caption: 'Suspense', ms: 750 },
+    { art: vScene([vRow(res.ok ? '🟩' : '🟥', 7), `${glow}${vRow(emoji, 5)}${glow}`, vRow(res.ok ? '🟩' : '🟥', 7)]) + `## ${res.ok ? '✅' : '❌'} ${res.detail}`, caption: res.ok ? 'Gagné' : 'Perdu', ms: 1100 },
+  ];
+}
+
 // ---------- Jeux bulk (pour atteindre ~100) ----------
 (function registerBulkGames() {
   const bulk = [['coin2', 'Double pile', '🪙', 'Encore pile ou face', 'pile', 'face', 2], ['dice7', 'Dés 7+', '🎲', 'Somme >= 7', 'over', 'under', 2], ['lucky7', 'Lucky 7', '7️⃣', 'Exactement 7', 'yes', 'no', 5], ['evenodd2', 'Pair/Impair 2', '🔢', 'Dé pair ou impair', 'even', 'odd', 2], ['redblack2', 'Rouge Noir 2', '🔴', 'Carte rouge/noire', 'red', 'black', 2], ['highlow2', 'Haut Bas', '⬆️', 'Carte haute ou basse', 'high', 'low', 2], ['triple', 'Triple chance', '🎯', '1 sur 3', 'a', 'b', 2.8], ['quad', 'Quad', '4️⃣', '1 sur 4', 'a', 'b', 3.5], ['penta', 'Penta', '5️⃣', '1 sur 5', 'a', 'b', 4.5], ['coin3', 'Triple pile', '🪙', "3 piles d\'affilée", 'yes', 'no', 7], ['snake', 'Snake eyes', '🐍', 'Double 1', 'yes', 'no', 30], ['boxcars', 'Boxcars', '🎲', 'Double 6', 'yes', 'no', 30], ['anydouble', 'Double quelconque', '🎲', 'Deux dés égaux', 'yes', 'no', 5.5], ['acehigh', 'As haut', '🃏', 'As sort', 'yes', 'no', 12], ['facecard', 'Figure', '🃏', 'J Q ou K', 'yes', 'no', 3.5], ['suitspade', 'Pique', '♠️', 'Enseigne pique', 'yes', 'no', 3.8], ['suithr', 'Coeur', '♥️', 'Enseigne coeur', 'yes', 'no', 3.8], ['suitdi', 'Carreau', '♦️', 'Enseigne carreau', 'yes', 'no', 3.8], ['suitcl', 'Trèfle', '♣️', 'Enseigne trèfle', 'yes', 'no', 3.8], ['blast', 'Blast', '💥', 'Explosion ou pas', 'safe', 'boom', 1.9], ['freeze', 'Freeze', '❄️', 'Gel ou chaleur', 'ice', 'fire', 2], ['shadow', 'Ombre', '🌑', 'Ombre ou lumière', 'shadow', 'light', 2], ['pulse', 'Pulse', '💓', 'Rythme fort/faible', 'high', 'low', 2], ['orbit', 'Orbite', '🪐', 'Reste en orbite', 'in', 'out', 2.2], ['spark', 'Étincelle', '✨', 'Étincelle allumée', 'on', 'off', 2], ['wave', 'Vague', '🌊', 'Vague haute/basse', 'high', 'low', 2], ['mirror', 'Miroir', '🪞', 'Miroir cassé ou non', 'ok', 'break', 1.95], ['portal', 'Portail', '🌀', 'Portail ouvert', 'open', 'closed', 2.1], ['rune', 'Rune', '🔮', 'Bonne rune', 'yes', 'no', 3], ['totem', 'Totem', '🗿', 'Totem stable', 'yes', 'no', 2.4], ['cactus', 'Cactus', '🌵', 'Évite les épines', 'safe', 'ouch', 1.9], ['pearl', 'Perle', '🦪', 'Trouve la perle', 'yes', 'no', 4], ['compass', 'Boussole', '🧭', 'Bonne direction', 'n', 's', 2], ['anchor', 'Ancre', '⚓', 'Ancre levée', 'up', 'down', 2], ['torch', 'Torche', '🔥', 'Torche allumée', 'on', 'off', 2], ['keylock', 'Clé', '🔑', 'Bonne clé', 'yes', 'no', 3.5], ['hourglass', 'Sablier', '⏳', 'Temps restant', 'ok', 'out', 2.2], ['balloon2', 'Ballon 2', '🎈', 'Gonflé ou éclaté', 'ok', 'pop', 2], ['dicehi', 'Dé haut', '🎲', 'Dé >= 4', 'yes', 'no', 1.9], ['dicelo', 'Dé bas', '🎲', 'Dé <= 3', 'yes', 'no', 1.9], ['coinrush', 'Ruée pièces', '🪙', 'Plus de piles', 'yes', 'no', 2.5], ['starfall', "Pluie d\'étoiles", '🌟', 'Attrape 1 étoile', 'yes', 'no', 3], ['meteor', 'Météore', '☄️', 'Évite le météore', 'dodge', 'hit', 1.85], ['rainbow', 'Arc', '🌈', 'Couleur chanceuse', 'yes', 'no', 5], ['clover', 'Trèfle chance', '🍀', 'Trèfle trouvé', 'yes', 'no', 6]];
@@ -3712,10 +4199,7 @@ ANIMS.spincolor = (res) => {
         };
       },
     };
-    ANIMS[key] = (res) => [
-      { art: code(['  ...']), caption: 'Tirage', ms: 700 },
-      { art: code([`  ${res.detail}`]), caption: res.ok ? 'Gagné' : 'Perdu', ms: 1000 },
-    ];
+    ANIMS[key] = (res) => genericFrames(emoji, res);
   }
 })();
 
@@ -3789,7 +4273,7 @@ async function playInstant(i, key, bet, choice) {
       new EmbedBuilder()
         .setTitle(G.title)
         .setColor(outcomeColor(kind))
-        .setDescription(`${outcomeBanner(kind, kind === 'push' ? NaN : profit)}${res.headline}\n\n${text}`)
+        .setDescription(`${outcomeBanner(kind, kind === 'push' ? NaN : profit)}${res.headline}\n\n${text}\n${kind === 'win' ? '💜✨💜✨💜✨💜✨💜' : kind === 'lose' ? '🖤🌑🖤🌑🖤🌑🖤🌑🖤' : '💜🤍💜🤍💜🤍💜🤍💜'}`)
         .addFields(
           { name: '🎯 Ton pari', value: res.pick, inline: true },
           { name: '💰 Mise', value: fmt(bet), inline: true },
@@ -5502,8 +5986,8 @@ function newPokerDeck() {
 }
 const pokerCardStr = (c) => (c ? `\`${c.r}${c.s}\`` : '`??`');
 function pokerCardLines(c, hidden = false) {
-  if (hidden || !c) return ['+-----+', '|/////|', '|/////|', '|/////|', '+-----+'];
-  return ['+-----+', `|${padR(c.r, 2)}   |`, `|  ${c.s}  |`, `|   ${padL(c.r, 2)}|`, '+-----+'];
+  if (hidden || !c) return ['╭─────╮', '│░▒░▒░│', '│▒ZNK▒│', '│░▒░▒░│', '╰─────╯'];
+  return ['╭─────╮', `│${padR(c.r, 2)}   │`, `│  ${c.s}  │`, `│   ${padL(c.r, 2)}│`, '╰─────╯'];
 }
 function pokerHandArt(cards, hiddenExtra = 0) {
   const blocks = cards.map((c) => pokerCardLines(c, false));
