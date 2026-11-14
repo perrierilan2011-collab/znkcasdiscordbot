@@ -108,7 +108,7 @@ const COIN_PLAIN = String(process.env.COIN_TEXT || COIN).trim() || COIN;
 const plain = (s) => String(s).split(COIN).join(COIN_PLAIN);
 console.log(`[coin] ${COIN} (texte : ${COIN_PLAIN})`);
 
-const DAILY_AMOUNT = 30;
+const DAILY_AMOUNT = 4;
 const INVITE_REWARD = 1;
 const LEADERBOARD_REFRESH_MS = 60_000;
 const IDLE_MS = 90_000;
@@ -1289,30 +1289,43 @@ function statsFallbackEmbed(user, st, balance, lang) {
 const MINES_CELLS = 24;
 const MINES_EDGE = 0.97;
 const MINES_MAX_MULT = 1000;
+// Difficulté relevée : plus de mines = moins de cases sûres = beaucoup plus dur
 const LEVELS = {
-  easy: { name: 'Easy', emoji: '🟢', mines: 3, style: ButtonStyle.Success },
-  medium: { name: 'Medium', emoji: '🟡', mines: 6, style: ButtonStyle.Primary },
-  hard: { name: 'Hard', emoji: '🟠', mines: 10, style: ButtonStyle.Secondary },
-  impossible: { name: 'Impossible', emoji: '🔴', mines: 15, style: ButtonStyle.Danger },
+  easy: { name: 'Easy', emoji: '🟢', mines: 5, style: ButtonStyle.Success }, //  19 💎
+  medium: { name: 'Medium', emoji: '🟡', mines: 8, style: ButtonStyle.Primary }, //  16 💎
+  hard: { name: 'Hard', emoji: '🟠', mines: 12, style: ButtonStyle.Secondary }, //  12 💎
+  impossible: { name: 'Impossible', emoji: '🔴', mines: 18, style: ButtonStyle.Danger }, //   6 💎
 };
 
+// Multiplicateur « de base » (cotes réelles × avantage de la maison × coefficient du jeu)
 function minesMultiplier(picks, mines) {
   if (picks <= 0) return 1;
   let m = 1;
   for (let k = 0; k < picks; k++) m *= (MINES_CELLS - k) / (MINES_CELLS - mines - k);
   return Math.min(MINES_MAX_MULT, Math.max(0.01, Math.floor(m * MINES_EDGE * coef('mines') * 100) / 100));
 }
+// Multiplicateur réellement payé (boost du serveur inclus) : le même partout (affichage, bouton, paiement)
+function minesMult(game, picks) {
+  let m = minesMultiplier(picks, game.mines);
+  if (picks > 0) {
+    const boost = getBoost(game.guildId);
+    if ((boost.winMult || 1) !== 1) m = round2(m * boost.winMult);
+  }
+  return m;
+}
+// Risque de tomber sur une mine au prochain clic
+const minesRisk = (game, picks) => Math.round((game.mines / (MINES_CELLS - picks)) * 100);
 
 function minesPickerPayload() {
   const lines = Object.values(LEVELS).map(
     (Lv) =>
-      `${Lv.emoji} **${Lv.name}** : ${Lv.mines} 💣 · ${MINES_CELLS - Lv.mines} 💎 · 1er diamant **${fx(minesMultiplier(1, Lv.mines))}**`
+      `${Lv.emoji} **${Lv.name}** : ${Lv.mines} 💣 · ${MINES_CELLS - Lv.mines} 💎 · 1er diamant **${fx(minesMultiplier(1, Lv.mines))}** · risque **${Math.round((Lv.mines / MINES_CELLS) * 100)} %**`
   );
   const embed = new EmbedBuilder()
     .setTitle('💣 Mines : choisis ta difficulté')
     .setColor(COLORS.blue)
     .setDescription(
-      `${lines.join('\n')}\n\nPlus il y a de mines, plus le multiplicateur grimpe vite (max ${fx(MINES_MAX_MULT)}).`
+      `${lines.join('\n')}\n\nPlus il y a de mines, plus le multiplicateur grimpe vite… et plus le risque est grand (max ${fx(MINES_MAX_MULT)}).`
     );
   const row = new ActionRowBuilder().addComponents(
     ...Object.entries(LEVELS).map(([key, Lv]) =>
@@ -1322,6 +1335,7 @@ function minesPickerPayload() {
   return { embeds: [embed], components: [row] };
 }
 
+// 5 rangées : 4 × 5 cases + 1 rangée de 4 cases + bouton Encaisser (= 24 cases, 5 composants max par rangée)
 function minesRows(game, over) {
   const rows = [];
   for (let r = 0; r < 5; r++) {
@@ -1358,7 +1372,7 @@ function minesRows(game, over) {
             .setStyle(ButtonStyle.Primary)
         );
       } else {
-        const gain = floor2(game.bet * minesMultiplier(game.revealed.size, game.mines));
+        const gain = floor2(game.bet * minesMult(game, game.revealed.size));
         row.addComponents(
           new ButtonBuilder()
             .setCustomId('mines_cash')
@@ -1378,7 +1392,7 @@ function minesEmbed(game, end) {
   const Lv = LEVELS[game.level];
   const picks = game.revealed.size;
   const safeTotal = MINES_CELLS - game.mines;
-  const mult = minesMultiplier(picks, game.mines);
+  const mult = minesMult(game, picks);
   const track = `[${'#'.repeat(picks)}${'.'.repeat(safeTotal - picks)}] ${picks}/${safeTotal}`;
   const e = new EmbedBuilder()
     .setTitle(`💣 Mines · ${Lv.emoji} ${Lv.name}`)
@@ -1397,7 +1411,10 @@ function minesEmbed(game, end) {
       `${code([track])}Clique sur les cases. Évite les 💣 et encaisse quand tu veux !`
     );
     if (picks < safeTotal) {
-      e.addFields({ name: '💎 Prochain', value: fx(minesMultiplier(picks + 1, game.mines)), inline: true });
+      e.addFields(
+        { name: '💎 Prochain', value: fx(minesMult(game, picks + 1)), inline: true },
+        { name: '☠️ Risque', value: `${minesRisk(game, picks)} %`, inline: true }
+      );
     }
   }
   return brand(e, 'mines');
@@ -1430,7 +1447,9 @@ async function startMines(i, level, bet) {
       lastI: i,
       timer: null,
       finished: false,
+      starting: true, // tant que le message n'est pas envoyé, les clics sont ignorés (et non rejetés)
     };
+    games.set(uid, game); // remplace le verrou : plus de fenêtre où un clic tombe sur « partie plus active »
 
     try {
       await openGame(i, { embeds: [minesEmbed(game)], components: minesRows(game, false) });
@@ -1439,7 +1458,7 @@ async function startMines(i, level, bet) {
       await credit(uid, bet).catch(() => {});
       throw e;
     }
-    games.set(uid, game);
+    game.starting = false;
     started = true;
     armTimer(game);
   } finally {
@@ -1488,9 +1507,8 @@ async function settleMines(game, kind, i) {
       text = '⏱️ Partie abandonnée, mise remboursée.';
       color = COLORS.grey;
     } else {
-      mult = minesMultiplier(picks, game.mines);
       const boost = getBoost(game.guildId);
-      if ((boost.winMult || 1) !== 1) mult = round2(mult * boost.winMult);
+      mult = minesMult(game, picks); // boost déjà inclus (même valeur que celle affichée sur le bouton)
       payout = floor2(game.bet * mult);
       color = COLORS.green;
       text =
@@ -1545,7 +1563,7 @@ async function settleMines(game, kind, i) {
       }
       await editWithCard(i, payload);
     } else {
-      await game.lastI.editReply(payload);
+      await editWithCard(game.lastI, payload);
     }
   } catch (e) {
     console.error('[mines] settle', e?.message || e);
@@ -1555,18 +1573,25 @@ async function settleMines(game, kind, i) {
       await target.editReply({
         embeds: [minesEmbed(game, { text: '⚠️ Petit souci d’affichage, ta partie est bien terminée.', color: COLORS.grey, balance: bal })],
         components: minesRows(game, true),
+        files: [],
+        attachments: [],
       });
     } catch {
       /* ignore */
     }
   } finally {
+    clearTimeout(game.timer);
     games.delete(game.userId);
   }
 }
 
 async function handleMinesButton(i) {
   const game = games.get(i.user.id);
-  if (!game || game.starting || game.type !== 'mines' || game.messageId !== i.message?.id) {
+  if (!game || game.type !== 'mines') {
+    return respondText(i, 'Cette partie n’est plus active. Lance-en une nouvelle depuis le panneau.');
+  }
+  if (game.starting) return i.deferUpdate().catch(() => {}); // message pas encore prêt : on ignore le clic
+  if (game.messageId !== i.message?.id) {
     return respondText(i, 'Cette partie n’est plus active. Lance-en une nouvelle depuis le panneau.');
   }
   if (game.finished) return i.deferUpdate().catch(() => {});
@@ -1621,23 +1646,293 @@ function handInfo(hand) {
   return { total, low, isSoft, label };
 }
 
+// ---------- Table de blackjack en IMAGE : grosses cartes, rien d'autre ----------
+function bjRoundRect(g, x, y, w, h, r) {
+  g.beginPath();
+  g.moveTo(x + r, y);
+  g.lineTo(x + w - r, y);
+  g.quadraticCurveTo(x + w, y, x + w, y + r);
+  g.lineTo(x + w, y + h - r);
+  g.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  g.lineTo(x + r, y + h);
+  g.quadraticCurveTo(x, y + h, x, y + h - r);
+  g.lineTo(x, y + r);
+  g.quadraticCurveTo(x, y, x + r, y);
+  g.closePath();
+}
+// Symboles dessinés en vectoriel (aucune dépendance à la police : pas de carrés « tofu » sur Railway)
+function bjDrawSuit(g, suit, cx, cy, s) {
+  g.beginPath();
+  if (suit === '♥') {
+    g.moveTo(cx, cy + s * 0.95);
+    g.bezierCurveTo(cx - s * 1.4, cy + s * 0.1, cx - s * 1.05, cy - s * 0.95, cx, cy - s * 0.35);
+    g.bezierCurveTo(cx + s * 1.05, cy - s * 0.95, cx + s * 1.4, cy + s * 0.1, cx, cy + s * 0.95);
+    g.fill();
+  } else if (suit === '♦') {
+    g.moveTo(cx, cy - s * 1.05);
+    g.lineTo(cx + s * 0.78, cy);
+    g.lineTo(cx, cy + s * 1.05);
+    g.lineTo(cx - s * 0.78, cy);
+    g.closePath();
+    g.fill();
+  } else if (suit === '♠') {
+    g.moveTo(cx, cy - s * 1.0);
+    g.bezierCurveTo(cx - s * 1.4, cy - s * 0.1, cx - s * 1.05, cy + s * 0.95, cx, cy + s * 0.35);
+    g.bezierCurveTo(cx + s * 1.05, cy + s * 0.95, cx + s * 1.4, cy - s * 0.1, cx, cy - s * 1.0);
+    g.fill();
+    g.beginPath();
+    g.moveTo(cx, cy + s * 0.1);
+    g.lineTo(cx - s * 0.38, cy + s * 1.05);
+    g.lineTo(cx + s * 0.38, cy + s * 1.05);
+    g.closePath();
+    g.fill();
+  } else {
+    // ♣
+    for (const [dx, dy] of [[0, -0.5], [-0.55, 0.2], [0.55, 0.2]]) {
+      g.beginPath();
+      g.arc(cx + s * dx, cy + s * dy, s * 0.46, 0, Math.PI * 2);
+      g.fill();
+    }
+    g.beginPath();
+    g.moveTo(cx, cy);
+    g.lineTo(cx - s * 0.38, cy + s * 1.05);
+    g.lineTo(cx + s * 0.38, cy + s * 1.05);
+    g.closePath();
+    g.fill();
+  }
+}
+function bjDrawCorner(g, x, y, card, color, font) {
+  g.fillStyle = color;
+  g.font = `bold 52px ${font}`;
+  g.textAlign = 'center';
+  g.textBaseline = 'top';
+  g.fillText(card.r, x + 36, y + 10);
+  bjDrawSuit(g, card.s, x + 36, y + 96, 15);
+}
+function bjDrawCard(g, x, y, w, h, card, font) {
+  const red = card.s === '♥' || card.s === '♦';
+  const color = red ? '#DC2646' : '#1B1030';
+  g.save();
+  g.shadowColor = 'rgba(0,0,0,0.6)';
+  g.shadowBlur = 20;
+  g.shadowOffsetY = 7;
+  bjRoundRect(g, x, y, w, h, 16);
+  const fill = g.createLinearGradient(x, y, x, y + h);
+  fill.addColorStop(0, '#FFFFFF');
+  fill.addColorStop(1, '#EFE7FF');
+  g.fillStyle = fill;
+  g.fill();
+  g.restore();
+  bjRoundRect(g, x, y, w, h, 16);
+  g.lineWidth = 2;
+  g.strokeStyle = 'rgba(168,28,253,0.55)';
+  g.stroke();
+  bjDrawCorner(g, x, y, card, color, font);
+  // grand symbole central
+  g.fillStyle = color;
+  bjDrawSuit(g, card.s, x + w / 2 + 14, y + h / 2 + 4, 40);
+  // coin opposé (retourné)
+  g.save();
+  g.translate(x + w / 2, y + h / 2);
+  g.rotate(Math.PI);
+  g.translate(-(x + w / 2), -(y + h / 2));
+  bjDrawCorner(g, x, y, card, color, font);
+  g.restore();
+}
+function bjDrawBack(g, x, y, w, h) {
+  g.save();
+  g.shadowColor = 'rgba(0,0,0,0.6)';
+  g.shadowBlur = 20;
+  g.shadowOffsetY = 7;
+  bjRoundRect(g, x, y, w, h, 16);
+  const fill = g.createLinearGradient(x, y, x + w, y + h);
+  fill.addColorStop(0, '#7C3AED');
+  fill.addColorStop(1, '#2B0A3D');
+  g.fillStyle = fill;
+  g.fill();
+  g.restore();
+  g.save();
+  bjRoundRect(g, x, y, w, h, 16);
+  g.clip();
+  g.strokeStyle = 'rgba(255,255,255,0.14)';
+  g.lineWidth = 2;
+  for (let k = -h; k < w; k += 30) {
+    g.beginPath();
+    g.moveTo(x + k, y);
+    g.lineTo(x + k + h, y + h);
+    g.moveTo(x + k + h, y);
+    g.lineTo(x + k, y + h);
+    g.stroke();
+  }
+  g.restore();
+  bjRoundRect(g, x + 10, y + 10, w - 20, h - 20, 10);
+  g.lineWidth = 3;
+  g.strokeStyle = '#D946EF';
+  g.stroke();
+  g.fillStyle = '#D946EF';
+  g.beginPath();
+  g.moveTo(x + w / 2, y + h / 2 - 34);
+  g.lineTo(x + w / 2 + 24, y + h / 2);
+  g.lineTo(x + w / 2, y + h / 2 + 34);
+  g.lineTo(x + w / 2 - 24, y + h / 2);
+  g.closePath();
+  g.fill();
+}
+function bjDrawHand(g, cards, extraHidden, W, y, cw, ch, font) {
+  const n = cards.length + (extraHidden ? 1 : 0);
+  if (!n) {
+    bjRoundRect(g, (W - cw) / 2, y, cw, ch, 16);
+    g.save();
+    g.setLineDash([14, 10]);
+    g.lineWidth = 3;
+    g.strokeStyle = 'rgba(217,70,239,0.35)';
+    g.stroke();
+    g.restore();
+    return;
+  }
+  const pad = 40;
+  const step = n === 1 ? 0 : Math.min(cw + 22, (W - 2 * pad - cw) / (n - 1));
+  let x = (W - (cw + step * (n - 1))) / 2;
+  for (const c of cards) {
+    bjDrawCard(g, x, y, cw, ch, c, font);
+    x += step;
+  }
+  if (extraHidden) bjDrawBack(g, x, y, cw, ch);
+}
+function bjDrawLabel(g, text, badgeText, badgeKind, y, font) {
+  g.font = `bold 30px ${font}`;
+  g.textAlign = 'left';
+  g.textBaseline = 'middle';
+  g.fillStyle = '#E9D5FF';
+  g.fillText(text, 40, y);
+  if (!badgeText) return;
+  const x = 40 + g.measureText(text).width + 18;
+  g.font = `bold 28px ${font}`;
+  const w = g.measureText(badgeText).width + 34;
+  bjRoundRect(g, x, y - 21, w, 42, 21);
+  g.fillStyle = badgeKind === 'bust' ? '#EF4444' : badgeKind === 'bj' ? '#FACC15' : '#A81CFD';
+  g.fill();
+  g.fillStyle = badgeKind === 'bj' ? '#2B0A3D' : '#FFFFFF';
+  g.textAlign = 'center';
+  g.fillText(badgeText, x + w / 2, y + 1);
+}
+function bjBadge(cards, hiddenDealer) {
+  if (!cards.length) return { text: '', kind: 'n' };
+  const info = handInfo(cards);
+  if (hiddenDealer) return { text: `${info.label} + ?`, kind: 'n' };
+  if (info.total > 21) return { text: `${info.total} · BUST`, kind: 'bust' };
+  if (info.total === 21) return { text: cards.length === 2 ? '21 · BLACKJACK' : '21', kind: 'bj' };
+  return { text: info.label, kind: 'n' };
+}
+
+// Rend la table (croupier en haut, toi en bas). hidden = 2e carte du croupier face cachée. kind = win | lose | push (fin de partie)
+async function bjTableImage({ player, dealer, hidden, kind }) {
+  if (!canvasLib) return null;
+  const { createCanvas } = canvasLib;
+  const W = 900;
+  const H = 700;
+  const SCALE = 1.25;
+  const CW = 180;
+  const CH = 250;
+  const font = STATS_FONT;
+  const cv = createCanvas(W * SCALE, H * SCALE);
+  const g = cv.getContext('2d');
+  g.scale(SCALE, SCALE);
+
+  const bg = g.createLinearGradient(0, 0, 0, H);
+  bg.addColorStop(0, '#1F0838');
+  bg.addColorStop(1, '#0B0614');
+  g.fillStyle = bg;
+  g.fillRect(0, 0, W, H);
+  const glow = g.createRadialGradient(W / 2, H / 2, 40, W / 2, H / 2, 520);
+  glow.addColorStop(0, 'rgba(124,58,237,0.38)');
+  glow.addColorStop(1, 'rgba(124,58,237,0)');
+  g.fillStyle = glow;
+  g.fillRect(0, 0, W, H);
+  bjRoundRect(g, 8, 8, W - 16, H - 16, 26);
+  g.lineWidth = 3;
+  g.strokeStyle = 'rgba(168,28,253,0.7)';
+  g.stroke();
+
+  const visibleDealer = hidden ? dealer.slice(0, 1) : dealer;
+  const db = bjBadge(visibleDealer, hidden && dealer.length > 0);
+  const pb = bjBadge(player, false);
+
+  bjDrawLabel(g, 'CROUPIER', db.text, db.kind, 42, font);
+  bjDrawHand(g, visibleDealer, hidden && dealer.length > 0, W, 72, CW, CH, font);
+
+  // séparateur / bandeau de résultat
+  const midY = 352;
+  if (kind) {
+    const label = kind === 'win' ? 'VICTOIRE' : kind === 'lose' ? 'DÉFAITE' : 'ÉGALITÉ';
+    const col = kind === 'win' ? '#A81CFD' : kind === 'lose' ? '#991B1B' : '#6B5B7B';
+    bjRoundRect(g, W / 2 - 190, midY - 28, 380, 56, 28);
+    g.fillStyle = col;
+    g.fill();
+    g.lineWidth = 3;
+    g.strokeStyle = kind === 'win' ? '#FACC15' : 'rgba(255,255,255,0.35)';
+    g.stroke();
+    g.fillStyle = '#FFFFFF';
+    g.font = `bold 34px ${font}`;
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.fillText(label, W / 2, midY + 2);
+  } else {
+    g.strokeStyle = 'rgba(217,70,239,0.35)';
+    g.lineWidth = 2;
+    g.beginPath();
+    g.moveTo(60, midY);
+    g.lineTo(W - 60, midY);
+    g.stroke();
+  }
+
+  bjDrawLabel(g, 'TOI', pb.text, pb.kind, 392, font);
+  bjDrawHand(g, player, false, W, 422, CW, CH, font);
+
+  const buf = cv.toBuffer('image/png');
+  const name = `bj-${Date.now()}-${randomInt(1000, 9999)}.png`;
+  return { name, file: new AttachmentBuilder(buf, { name }) };
+}
+
+// Message complet (embed + image + boutons) : l'image remplace l'ancien tableau en texte
+async function bjView(g, end, components) {
+  const showAll = !!(end && (end.revealAll || end.balance != null || end.revealing));
+  let img = null;
+  try {
+    const kind =
+      end && end.balance != null ? (end.color === COLORS.green ? 'win' : end.color === COLORS.red ? 'lose' : 'push') : null;
+    img = await bjTableImage({ player: g.player, dealer: g.dealer, hidden: !showAll, kind });
+  } catch (e) {
+    console.error('[blackjack] image', e?.message || e);
+  }
+  return { embeds: [bjEmbed(g, end, img)], components, files: img ? [img.file] : [], attachments: [] };
+}
+// Carte résultat (gain, solde...) sous la table, dans un 2e embed pour ne pas masquer les cartes
+function bjAddResultCard(payload, card) {
+  if (!card) return payload;
+  const e2 = new EmbedBuilder().setColor(payload.embeds[0]?.data?.color ?? COLORS.violet);
+  payload.embeds.push(e2);
+  return putCard(payload, card, e2);
+}
+
 function bjTable(player, dealer, dealerHidden) {
-  const d = dealerHidden ? handArt(dealer, 1) : handArt(dealer);
+  const shown = dealerHidden ? dealer.slice(0, 1) : dealer; // 2e carte cachée : on ne montre QUE la première
+  const d = dealerHidden && dealer.length ? handArt(shown, 1) : handArt(shown);
   const p = handArt(player);
-  const dv = dealer.length ? (dealerHidden ? handInfo(dealer).label + ' + ?' : handInfo(dealer).label) : '-';
+  const dv = dealer.length ? (dealerHidden ? handInfo(shown).label + ' + ?' : handInfo(dealer).label) : '-';
   const pv = player.length ? handInfo(player).label : '-';
   return code([`CROUPIER  [${dv}]`, ...d, '', `TOI  [${pv}]`, ...p]);
 }
 
-function bjEmbed(g, end) {
+function bjEmbed(g, end, img) {
   const e = brand(new EmbedBuilder().setTitle('🃏 Blackjack'), 'bj');
   const pInfo = handInfo(g.player);
   const showAll = !!(end && (end.revealAll || end.balance != null || end.revealing));
-  const table = bjTable(g.player, g.dealer, !showAll);
+  const table = img ? '' : bjTable(g.player, g.dealer, !showAll); // avec l'image, plus de tableau en texte
 
   if (end && end.balance != null) {
     const kind = end.color === COLORS.green ? 'win' : end.color === COLORS.red ? 'lose' : 'push';
-    e.setColor(outcomeColor(kind)).setDescription(`${outcomeBanner(kind)}${table}${end.text}`);
+    e.setColor(outcomeColor(kind)).setDescription(`${img ? '' : outcomeBanner(kind)}${table}${end.text}`);
     e.addFields({ name: 'Mise', value: fmt(g.bet), inline: true }, { name: 'Solde', value: fmt(end.balance), inline: true });
   } else if (end?.revealing) {
     e.setColor(COLORS.violet).setDescription(`${table}${end.text || '🃏 Tour du croupier...'}`);
@@ -1648,6 +1943,10 @@ function bjEmbed(g, end) {
         (pInfo.isSoft ? `\n💡 Ton As te donne **${pInfo.low}** ou **${pInfo.total}**.` : '')
     );
     e.addFields({ name: 'Mise', value: fmt(g.bet), inline: true });
+  }
+  if (img) {
+    e.setImage(`attachment://${img.name}`);
+    e.setThumbnail(null); // pas de vignette : l'image de la table prend toute la place
   }
   return e;
 }
@@ -1727,6 +2026,23 @@ async function dealAnimation(i, game) {
     pv: s.p.length ? handValue(s.p) : null,
     dv: s.d.length ? handValue(s.d) : null,
   }));
+  if (canvasLib && !wantsSkipAnim(game.userId)) {
+    try {
+      for (const st of steps) {
+        const img = await bjTableImage({ player: st.p, dealer: st.d, hidden: st.hidden, kind: null });
+        const emb = new EmbedBuilder()
+          .setTitle('🃏 Blackjack')
+          .setColor(COLORS.violet)
+          .setImage(`attachment://${img.name}`)
+          .setFooter({ text: st.cap });
+        await i.editReply({ embeds: [emb], components: [], files: [img.file], attachments: [] });
+        await sleep(850);
+      }
+      return;
+    } catch (e) {
+      console.error('[blackjack] animation image', e?.message || e);
+    }
+  }
   const bjDone = await playGameImages(i, 'bj', null, {
     user: game.user,
     bet: game.bet,
@@ -1806,16 +2122,13 @@ async function startBlackjack(i, bet) {
     await dealAnimation(i, game);
 
     if (natural) {
-      const npay = {
-        embeds: [bjEmbed(game, { text: out.text, color: out.color, balance, revealAll: true })],
-        components: bjRows(game, true),
-      };
-      putCard(npay, await resultCard(i.user, 'bj', bet, round2(out.payout / bet), round2(out.payout - bet), balance));
+      const npay = await bjView(game, { text: out.text, color: out.color, balance, revealAll: true }, bjRows(game, true));
+      bjAddResultCard(npay, await resultCard(i.user, 'bj', bet, round2(out.payout / bet), round2(out.payout - bet), balance));
       await i.editReply(npay).catch(() => {});
       return;
     }
 
-    await i.editReply({ embeds: [bjEmbed(game)], components: bjRows(game, false) }).catch(() => {});
+    await i.editReply(await bjView(game, undefined, bjRows(game, false))).catch(() => {});
     games.set(uid, game);
     started = true;
     armTimer(game);
@@ -1839,38 +2152,34 @@ async function settleBlackjack(game, kind, i) {
 
   try {
     if (kind === 'stand') {
-      await pushBoard(
-        { embeds: [bjEmbed(game, { revealing: true, text: '🃏 Le croupier **retourne** sa deuxième carte...' })], components: [] },
-        i
-      );
+      await pushBoard(await bjView(game, { revealing: true, text: '🃏 Le croupier **retourne** sa deuxième carte...' }, []), i);
       i = null;
       await sleep(1100);
 
       while (handValue(game.dealer) < 17) {
         game.dealer.push(game.deck.pop());
         const d = handInfo(game.dealer);
-        await game.lastI.editReply({
-          embeds: [
-            bjEmbed(game, {
-              revealing: true,
-              text: `🃏 Le croupier tire une carte... total **${d.label}**${d.isSoft ? ' (As soft)' : ''}`,
-            }),
-          ],
-          components: [],
-        });
+        await game.lastI.editReply(
+          await bjView(
+            game,
+            { revealing: true, text: `🃏 Le croupier tire une carte... total **${d.label}**${d.isSoft ? ' (As soft)' : ''}` },
+            []
+          )
+        );
         await sleep(1100);
       }
 
       const dFinal = handInfo(game.dealer);
-      await game.lastI.editReply({
-        embeds: [
-          bjEmbed(game, {
+      await game.lastI.editReply(
+        await bjView(
+          game,
+          {
             revealing: true,
             text: dFinal.total > 21 ? `💥 Le croupier dépasse (**${dFinal.label}**) !` : `🛑 Le croupier s’arrête à **${dFinal.label}**.`,
-          }),
-        ],
-        components: [],
-      });
+          },
+          []
+        )
+      );
       await sleep(900);
     }
 
@@ -1897,11 +2206,8 @@ async function settleBlackjack(game, kind, i) {
       payout: out.payout,
       detail: `${pL} vs ${dL}`,
     });
-    const payload = {
-      embeds: [bjEmbed(game, { text: out.text, color: out.color, balance, revealAll: true })],
-      components: bjRows(game, true),
-    };
-    putCard(payload, await resultCard(game.user, 'bj', game.bet, round2(out.payout / game.bet), round2(out.payout - game.bet), balance));
+    const payload = await bjView(game, { text: out.text, color: out.color, balance, revealAll: true }, bjRows(game, true));
+    bjAddResultCard(payload, await resultCard(game.user, 'bj', game.bet, round2(out.payout / game.bet), round2(out.payout - game.bet), balance));
     if (i && !i.replied && !i.deferred) await i.update(payload);
     else await game.lastI.editReply(payload);
   } catch (e) {
@@ -1925,7 +2231,7 @@ async function handleBlackjackButton(i) {
     const v = handValue(game.player);
     if (v > 21) return settleBlackjack(game, 'bust', i);
     if (v === 21) return settleBlackjack(game, 'stand', i);
-    return i.update({ embeds: [bjEmbed(game)], components: bjRows(game, false) });
+    return i.update(await bjView(game, undefined, bjRows(game, false)));
   }
 
   if (i.customId === 'bj_stand') return settleBlackjack(game, 'stand', i);
