@@ -6719,7 +6719,7 @@ try {
   console.error('[web] blackjack en ligne non démarré (dossier web/ manquant ?) :', e?.message || e);
 }
 
-// Récap d'une manche en ligne (blackjack / roulette) envoyé dans le salon des victoires
+// Récap d'une manche en ligne (blackjack / poker / roulette) envoyé dans le salon des victoires
 const SPOT_FR = { red: 'Rouge', black: 'Noir', even: 'Pair', odd: 'Impair', low: '1-18', high: '19-36', d1: '1re 12', d2: '2e 12', d3: '3e 12', c1: 'Col. 1', c2: 'Col. 2', c3: 'Col. 3' };
 const spotFr = (k) => SPOT_FR[k] || `N°${String(k).slice(1)}`;
 async function postOnlineRecap(guildId, r) {
@@ -6742,6 +6742,9 @@ async function postOnlineRecap(guildId, r) {
     const d = r.dealer;
     title = '🃏 Blackjack en ligne — victoires';
     head = `🎩 Croupier : **${d.cards.join(' ')} → ${d.bj ? 'Blackjack' : d.bust ? `bust (${d.total})` : d.total}**\n`;
+  } else if (r.game === 'poker') {
+    title = '♠️ Poker en ligne — victoires';
+    head = r.board && r.board.length ? `🃏 Board : **${r.board.join(' ')}**\n` : '';
   } else if (r.game === 'roulette') {
     const dot = r.color === 'rouge' ? '🔴' : r.color === 'noir' ? '⚫' : '🟢';
     title = '🎰 Roulette en ligne — victoires';
@@ -6784,7 +6787,7 @@ async function createPokerChannel(i) {
   const channel = await guild.channels.create({
     name: 'online',
     type: ChannelType.GuildText,
-    topic: 'Casino en ligne 🃏🎰 — blackjack et roulette multijoueurs sur le site du casino',
+    topic: 'Casino en ligne 🃏🎰 — blackjack, poker et roulette multijoueurs sur le site du casino',
     permissionOverwrites: [
       {
         id: guild.roles.everyone.id,
