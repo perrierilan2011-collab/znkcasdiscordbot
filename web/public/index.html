@@ -389,7 +389,7 @@ th{color:var(--mut);font-size:12px}
 .ln{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-weight:900;color:#fff;background:var(--hc);box-shadow:0 0 0 2px rgba(255,255,255,.25)}
 .ls{position:relative;height:42px;border-radius:8px;border-left:4px solid var(--hc);overflow:hidden;background:repeating-linear-gradient(90deg,rgba(255,255,255,.05) 0 2px,transparent 2px 38px),linear-gradient(180deg,#1b3a2b,#0f2a1e)}
 .ls::after{content:'';position:absolute;right:0;top:0;bottom:0;width:10px;background:repeating-conic-gradient(#fff 0 25%,#111 0 50%) 0 0/10px 10px}
-.horse{position:absolute;top:1px;left:0;width:34px;font-size:30px;line-height:40px;text-align:center;transform:scaleX(-1);will-change:left,transform;left:calc((100% - 44px) * 0)}
+.horse{position:absolute;top:1px;left:0;width:34px;color:var(--hc,#fff);display:grid;place-items:center;height:40px;transform:scaleX(-1);will-change:left,transform;left:calc((100% - 44px) * 0)}
 .horse.lead{filter:drop-shadow(0 0 7px #fbbf24)}
 .lo{text-align:right;font-weight:800;color:var(--gold);font-variant-numeric:tabular-nums;line-height:1.1}.lo small{display:block;color:var(--mut);font-size:11px;font-weight:600}
 .lane.win .ls{box-shadow:0 0 0 2px #86efac,0 0 18px rgba(34,197,94,.55)}
@@ -467,6 +467,15 @@ td .pav{margin-right:8px;width:24px;height:24px}
 .cpop{position:fixed;right:12px;bottom:66px;max-width:300px;z-index:16;background:#0a0a0a;border:1px solid #525252;border-radius:12px;padding:9px 12px;font-size:13px;box-shadow:0 10px 30px rgba(0,0,0,.6);cursor:pointer;animation:cpin .25s ease;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .cpop b{margin-right:6px}
 @keyframes cpin{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.tdot.hot{background:#ef4444;animation:hotp 1s ease-in-out infinite}
+.tarrow.alert{border-color:#ef4444;color:#ef4444}
+@keyframes hotp{50%{transform:scale(1.8)}}
+svg.ic{display:block;flex:none}
+.btn svg.ic{display:inline-block;vertical-align:-3px;margin-right:4px}
+.cic{color:var(--gold);margin-right:6px;display:inline-block;vertical-align:-2px}
+.cpop .cic{color:#fff}.nic{color:var(--gold);display:grid;place-items:center}
+#mePanel .btn{display:flex;align-items:center;justify-content:center;gap:6px}
+#mePanel .btn svg.ic{margin:0}
 /* ---------- sélecteur de tables ---------- */
 .tbar{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;align-items:center;padding:6px 10px 0}
 .tbtn{display:inline-flex;align-items:center;gap:7px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);border-radius:999px;padding:6px 14px;font-weight:700;font-size:13px;color:#fff}
@@ -635,22 +644,21 @@ body.fs.vpk #pkInfo{font-size:12px}
       </div>
       <div class="msep"></div>
       <button class="mitem" data-g="top">Classement</button>
-      <button class="mitem" data-act="gift">Envoyer des ZTKN</button>
     </div>
   </div>
   <div class="sp"></div>
-  <button class="hb ico hide" id="bTop" title="Top gains de ce jeu">🏆</button>
-  <button class="hb ico hide" id="bRules" title="Règles">📖</button>
-  <button class="hb ico" id="bSnd" title="Son">🔊</button>
-  <button class="hb ico" id="bFs" title="Plein écran">⛶</button>
-  <button class="hb ico" id="bSet" title="Paramètres">⚙</button>
+  <button class="hb ico hide" id="bTop" title="Top gains de ce jeu" data-ic="trophy"></button>
+  <button class="hb ico hide" id="bRules" title="Règles" data-ic="book"></button>
+  <button class="hb ico" id="bSnd" title="Son" data-ic="volOn"></button>
+  <button class="hb ico" id="bFs" title="Plein écran" data-ic="full"></button>
+  <button class="hb ico" id="bSet" title="Paramètres" data-ic="sliders"></button>
   <div class="pop" id="bellWrap">
-    <button class="hb ico" id="bBell" title="Notifications" aria-haspopup="true">🔔<span id="bBadge"></span></button>
+    <button class="hb ico" id="bBell" title="Notifications" aria-haspopup="true" data-ic="bell"><span id="bBadge"></span></button>
     <div class="ppanel" id="nPanel"><h3>Notifications</h3><div id="nList"></div></div>
   </div>
   <div class="pop" id="meWrap">
     <div class="me" id="me" role="button" tabindex="0" aria-haspopup="true"><div class="av" id="meAv">?</div><div id="meName" style="font-weight:700;font-size:12px">…</div><span class="car">▾</span></div>
-    <div class="ppanel" id="mePanel"><div class="mpn"><span>Solde</span><b id="meBal">—</b></div><button class="btn" id="bLogout">⏻ Déconnexion</button></div>
+    <div class="ppanel" id="mePanel"><div class="mpn"><span>Solde</span><b id="meBal">—</b></div><button class="btn" id="bGift" data-ic="gift"> Envoyer des ZTKN</button><button class="btn" id="bLogout" data-ic="power"> Déconnexion</button></div>
   </div>
 </header>
 <div id="conn">Reconnexion…</div>
@@ -743,7 +751,7 @@ body.fs.vpk #pkInfo{font-size:12px}
       <div class="row" id="chipRow"></div>
       <div class="row" style="margin-top:8px">
         <button class="btn" id="bHalf">½</button>
-        <div class="amt"><input id="amt" inputmode="decimal" autocomplete="off" placeholder="Montant" aria-label="Montant de la mise"><span id="coin">🪙</span></div>
+        <div class="amt"><input id="amt" inputmode="decimal" autocomplete="off" placeholder="Montant" aria-label="Montant de la mise"><span id="coin">ZTKN</span></div>
         <button class="btn" id="bDouble">×2</button>
         <button class="btn" id="bMax">Tapis</button>
         <button class="btn" id="bLast">Dernière mise</button>
@@ -780,7 +788,7 @@ body.fs.vpk #pkInfo{font-size:12px}
   <section class="dockp" id="pkDock">
     <div id="pkJoin" class="row" style="display:none">
       <button class="btn" id="bPBuyMin">Cave min</button>
-      <div class="amt"><input id="pBuyAmt" inputmode="decimal" autocomplete="off" placeholder="Ta cave" aria-label="Montant de ta cave"><span class="pcoin">🪙</span></div>
+      <div class="amt"><input id="pBuyAmt" inputmode="decimal" autocomplete="off" placeholder="Ta cave" aria-label="Montant de ta cave"><span class="pcoin">ZTKN</span></div>
       <button class="btn" id="bPBuy100">100 BB</button>
       <button class="btn" id="bPBuyMax">Max</button>
     </div>
@@ -794,7 +802,7 @@ body.fs.vpk #pkInfo{font-size:12px}
         <button class="btn" id="bPHalf">½ pot</button>
         <button class="btn" id="bP34">¾ pot</button>
         <button class="btn" id="bPPot">Pot</button>
-        <div class="amt"><input id="pRaiseAmt" inputmode="decimal" autocomplete="off" placeholder="Relancer à" aria-label="Relancer à"><span class="pcoin">🪙</span></div>
+        <div class="amt"><input id="pRaiseAmt" inputmode="decimal" autocomplete="off" placeholder="Relancer à" aria-label="Relancer à"><span class="pcoin">ZTKN</span></div>
         <button class="btn go" id="bPRaise">Relancer</button>
         <button class="btn std" id="bPAll">Tapis</button>
       </div>
@@ -802,7 +810,7 @@ body.fs.vpk #pkInfo{font-size:12px}
     <div id="pkTop" style="display:none">
       <div class="row">
         <span class="note">Ajouter des jetons (entre deux mains)</span>
-        <div class="amt"><input id="pTopAmt" inputmode="decimal" autocomplete="off" placeholder="Montant" aria-label="Jetons à ajouter"><span class="pcoin">🪙</span></div>
+        <div class="amt"><input id="pTopAmt" inputmode="decimal" autocomplete="off" placeholder="Montant" aria-label="Jetons à ajouter"><span class="pcoin">ZTKN</span></div>
         <button class="btn" id="bPTopMax">Max</button>
         <button class="btn" id="bPTop">Ajouter</button>
       </div>
@@ -848,7 +856,7 @@ body.fs.vpk #pkInfo{font-size:12px}
   </div>
 </main>
 <div id="rFocus" aria-hidden="true">
-  <button class="btn" id="rShrink">Réduire ✕</button>
+  <button class="btn" id="rShrink">Réduire</button>
   <div id="rBigBox"><canvas id="rCanvasBig"></canvas></div>
   <div id="rFMsg"></div>
 </div>
@@ -912,12 +920,32 @@ try { if (TOKEN) localStorage.setItem('znk_t', TOKEN); else TOKEN = localStorage
 if (params.get('t')) history.replaceState(null, '', location.pathname);
 if (!TOKEN) { $('#gate').classList.add('on'); return; }
 
-let me = null, S = null, offset = 0, COIN = '🪙', seatsN = 5;
+let me = null, S = null, offset = 0, COIN = 'ZTKN', seatsN = 5;
 const BJT = new Map(); // tid -> snapshot (blackjack)
 let timerTotal = 1, lastDeadline = 0, lastTurnKey = '';
 const cardEls = new Map(), shown = new Set();
 const seatEls = [];
 const num = (n) => Number(n).toLocaleString('fr-FR', { maximumFractionDigits: 2 });
+// ---- icônes (SVG) : remplacent les emoji
+const IC = {
+  trophy: '<path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4zM17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/>',
+  book: '<path d="M12 6c-2-1.5-5-2-8-2v14c3 0 6 .5 8 2 2-1.5 5-2 8-2V4c-3 0-6 .5-8 2zM12 6v14"/>',
+  volOn: '<path d="M11 5 6 9H3v6h3l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/>',
+  volOff: '<path d="M11 5 6 9H3v6h3l5 4V5z"/><path d="M16 9l5 6M21 9l-5 6"/>',
+  full: '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>',
+  fullOff: '<path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/>',
+  sliders: '<path d="M4 6h16M4 12h16M4 18h16"/><circle cx="15" cy="6" r="2.4" fill="currentColor"/><circle cx="8" cy="12" r="2.4" fill="currentColor"/><circle cx="16" cy="18" r="2.4" fill="currentColor"/>',
+  bell: '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.9 1.9 0 0 0 3.4 0"/>',
+  power: '<path d="M12 3v9M6.4 6.6a8 8 0 1 0 11.2 0"/>',
+  gift: '<path d="M20 12v9H4v-9M2 7h20v5H2zM12 21V7M12 7H8a2.5 2.5 0 1 1 0-5c3 0 4 5 4 5zM12 7h4a2.5 2.5 0 1 0 0-5c-3 0-4 5-4 5z"/>',
+  chat: '<path d="M21 12a8 8 0 0 1-11.6 7.1L3 21l1.9-5.4A8 8 0 1 1 21 12z"/>',
+  cards: '<rect x="5" y="3" width="11" height="16" rx="2"/><path d="M19 7v12a2 2 0 0 1-2 2H9"/>',
+};
+const icon = (n, s = 18) => '<svg class="ic" viewBox="0 0 24 24" width="' + s + '" height="' + s + '" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + IC[n] + '</svg>';
+const EMO = /[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{FE0F}]/gu;
+const noEmo = (t) => String(t).replace(EMO, '').replace(/\s{2,}/g, ' ').trim();
+document.querySelectorAll('[data-ic]').forEach((b) => b.insertAdjacentHTML('afterbegin', icon(b.dataset.ic, b.classList.contains('ico') ? 19 : 17)));
+
 const nowS = () => Date.now() + offset;
 const isRed = (s) => s === '♥' || s === '♦';
 
@@ -981,7 +1009,7 @@ function parseAmt(s, allVal) {
 function setAmt(n) { n = Math.max(0, Math.floor(n * 100) / 100); $('#amt').value = n ? String(n) : ''; }
 
 // ------------------------------------------------------------- réseau
-function toast(t) { const x = $('#toast'); x.textContent = t; x.classList.add('on'); clearTimeout(toast.t); toast.t = setTimeout(() => x.classList.remove('on'), 2600); }
+function toast(t) { const x = $('#toast'); x.textContent = noEmo(t); x.classList.add('on'); clearTimeout(toast.t); toast.t = setTimeout(() => x.classList.remove('on'), 2600); }
 const BJ_ACTS = new Set(['sit', 'leave', 'bet', 'clear', 'hit', 'stand', 'double', 'split', 'emote', 'sync']);
 async function send(action, extra = {}) {
   try {
@@ -998,7 +1026,7 @@ function showGate(t) { $('#gatemsg').textContent = t; $('#gate').classList.add('
 let es;
 function connect() {
   es = new EventSource('/api/stream?t=' + encodeURIComponent(TOKEN));
-  es.addEventListener('hello', (e) => { const d = JSON.parse(e.data); me = d; COIN = d.coin || COIN; seatsN = d.seats || 5; $('#coin').textContent = COIN;
+  es.addEventListener('hello', (e) => { const d = JSON.parse(e.data); me = d; COIN = d.coin && d.coin !== '🪙' ? d.coin : 'ZTKN'; seatsN = d.seats || 5; $('#coin').textContent = COIN;
     $('#meName').textContent = d.name; setAvatar($('#meAv'), d.avatar, d.name); $('#conn').style.display = 'none'; BJT.clear(); P.tables.clear(); rOnHello(d); pOnHello(d); });
   es.addEventListener('roulette', (e) => { const st = JSON.parse(e.data); offset = st.now - Date.now(); rRender(st); });
   es.addEventListener('poker', (e) => { const st = JSON.parse(e.data); offset = st.now - Date.now(); pUpdate(st); });
@@ -1031,7 +1059,10 @@ function fillCard(d, c) {
   if (d.dataset.shown) return;
   const inner = d.firstChild; inner.innerHTML = faceHTML(c); d.dataset.shown = '1';
 }
+let QUIET = false;
+function quiet(fn) { const was = sndOn; QUIET = true; sndOn = false; try { fn(); } finally { QUIET = false; sndOn = was; } }
 function flyFrom(d, from, delay = 0) {
+  if (QUIET) return;
   const r = d.getBoundingClientRect(), s = from.getBoundingClientRect();
   const dx = s.left + s.width / 2 - (r.left + r.width / 2), dy = s.top + s.height / 2 - (r.top + r.height / 2);
   d.animate([{ transform: `translate(${dx}px,${dy}px) rotate(-20deg) scale(.55)`, opacity: .25 }, { transform: 'none', opacity: 1 }], { duration: 500, delay, easing: 'cubic-bezier(.2,.9,.25,1)', fill: 'backwards' });
@@ -1160,7 +1191,7 @@ function render(st) {
   // solde en-tête
   const ms = mySeat(); $('#meBal').textContent = ms ? num(ms.bal) + ' ' + COIN : 'Spectateur';
   // flux
-  const feed = $('#feed'); feed.textContent = ''; st.feed.slice(-4).forEach((f) => feed.append(el('div', '', f.text)));
+  const feed = $('#feed'); feed.textContent = ''; st.feed.slice(-4).forEach((f) => feed.append(el('div', '', noEmo(f.text))));
   updateCenter(st); updateDock(st, mi, myTurn);
 }
 
@@ -1263,7 +1294,7 @@ $('#bTop').onclick = async () => {
     box.textContent = ''; box.append(t);
   } catch { box.textContent = 'Classement indisponible.'; }
 };
-const sndBtn = $('#bSnd'); const refreshSnd = () => { sndBtn.textContent = sndOn ? '🔊' : '🔇'; sndBtn.title = sndOn ? 'Son' : 'Muet'; }; refreshSnd();
+const sndBtn = $('#bSnd'); const refreshSnd = () => { sndBtn.innerHTML = icon(sndOn ? 'volOn' : 'volOff', 19); sndBtn.title = sndOn ? 'Son' : 'Muet'; }; refreshSnd();
 sndBtn.onclick = () => { sndOn = !sndOn; try { localStorage.setItem('znk_snd', sndOn ? '1' : '0'); } catch {} refreshSnd(); if (sndOn) SFX.chip(); };
 document.addEventListener('pointerdown', () => ac(), { once: true });
 // retour sur l'onglet : resynchronise le solde
@@ -1280,7 +1311,7 @@ const cRoom = () => (W.view === 'top' ? 'hub' : W.view);
 function cLine(m) {
   if (m.sys === 'win') { // annonce automatique d'une victoire (tous les jeux du site)
     const d = el('div', 'cm win' + (me && m.uid === me.uid ? ' mine' : '')), t = new Date(m.t);
-    d.append(document.createTextNode('🏆 '), el('b', 'cn', m.name), document.createTextNode(' a gagné '), el('b', 'cg', '+' + num(m.net) + ' ' + COIN),
+    d.append((() => { const s = el('span', 'cic'); s.innerHTML = icon('trophy', 14); return s; })(), el('b', 'cn', m.name), document.createTextNode(' a gagné '), el('b', 'cg', '+' + num(m.net) + ' ' + COIN),
       document.createTextNode(' à ' + (GLAB[m.game] || 'un jeu') + (m.mult ? ' · x' + m.mult : '') + (m.detail ? ' · ' + m.detail : '') + ' · mise ' + num(m.bet)),
       el('small', '', String(t.getHours()).padStart(2, '0') + ':' + String(t.getMinutes()).padStart(2, '0')));
     return d;
@@ -1309,7 +1340,7 @@ function cOnMsg(m) {
 }
 function cNotify(m) { // petite bulle (avec ou sans son selon les paramètres)
   document.querySelectorAll('.cpop').forEach((x) => x.remove());
-  const p = el('div', 'cpop'); p.append(el('b', '', '💬 ' + m.name), document.createTextNode(m.text.slice(0, 80)));
+  const p = el('div', 'cpop'); const ci = el('span', 'cic'); ci.innerHTML = icon('chat', 14); p.append(ci, el('b', '', m.name), document.createTextNode(m.text.slice(0, 80)));
   p.onclick = () => { p.remove(); if (!C.open) $('#chatHead').click(); };
   document.body.append(p); setTimeout(() => p.remove(), 4000);
   if (SET.chatNotif === 'sound') { const was = sndOn; sndOn = true; try { tone(880, .09, 'sine', .07); tone(1175, .12, 'sine', .06, .09); } finally { sndOn = was; } }
@@ -1420,7 +1451,8 @@ function pHub() {
 function tabsRender(box, tables, cur, pick, extra, onNew) {
   const ids = [...tables.keys()].sort((a, b) => a - b);
   const mineOf = (s) => !!(s && me && s.seats.some((p) => p && p.uid === me.uid));
-  const sig = ids.map((t) => t + ':' + tables.get(t).seats.filter(Boolean).length + ':' + (mineOf(tables.get(t)) ? 1 : 0)).join('|') + '#' + cur;
+  const hot = (s) => !!(s && me && s.turn != null && s.seats[s.turn] && s.seats[s.turn].uid === me.uid); // c'est mon tour à cette table
+  const sig = ids.map((t) => t + ':' + tables.get(t).seats.filter(Boolean).length + ':' + (mineOf(tables.get(t)) ? 1 : 0) + (hot(tables.get(t)) ? 'h' : '')).join('|') + '#' + cur;
   if (box.dataset.sig === sig) return; box.dataset.sig = sig;
   const prevCur = box.dataset.cur; box.dataset.cur = String(cur);
   const dir = Number(box.dataset.dir || 0); box.dataset.dir = '0';
@@ -1435,14 +1467,15 @@ function tabsRender(box, tables, cur, pick, extra, onNew) {
   };
   const n = st ? st.seats.filter(Boolean).length : 0, N = st ? st.seats.length : 0, full = N > 0 && n >= N;
   const nav = el('div', 'tnav');
-  const l = el('button', 'tarrow l', '‹'), r = el('button', 'tarrow r', '›');
+  const alert = ids.some((t) => t !== cur && hot(tables.get(t))) ? ' alert' : '';
+  const l = el('button', 'tarrow l' + alert, '‹'), r = el('button', 'tarrow r' + alert, '›');
   l.title = 'Table précédente'; r.title = 'Table suivante'; l.onclick = () => go(-1); r.onclick = () => go(1);
   const lab = el('div', 'tlabel' + (mineOf(st) ? ' mine' : '') + (full ? ' full' : '') + (dir && String(cur) !== prevCur ? (dir > 0 ? ' inR' : ' inL') : ''), 'Table ' + cur);
   lab.append(el('small', '', full ? 'pleine' : n + '/' + N));
   nav.append(l, lab, r); box.append(nav);
   if (ids.length > 1) {
     const dots = el('div', 'tdots');
-    ids.forEach((t, k) => { const d = el('button', 'tdot' + (t === cur ? ' on' : '') + (mineOf(tables.get(t)) ? ' mine' : '')); d.title = 'Table ' + t; d.onclick = () => go(k - i); dots.append(d); });
+    ids.forEach((t, k) => { const d = el('button', 'tdot' + (t === cur ? ' on' : '') + (mineOf(tables.get(t)) ? ' mine' : '') + (hot(tables.get(t)) ? ' hot' : '')); d.title = 'Table ' + t; d.onclick = () => go(k - i); dots.append(d); });
     box.append(dots);
   }
   if (onNew) { const b = el('button', 'tbtn new', '＋ Nouvelle table'); b.onclick = onNew; box.append(b); }
@@ -1452,11 +1485,11 @@ function tabsRender(box, tables, cur, pick, extra, onNew) {
 async function newTable(game) {
   const ok = await send('tnew', { game }), t = send.last && send.last.tid;
   if (!ok || !t) return;
-  if (game === 'bj') { W.btid = t; W.bman = true; bjReset(); if (BJT.has(t)) render(BJT.get(t)); bjTabs(); }
-  else { P.cur = t; P.man = true; pReset(); if (P.tables.has(t)) pRender(P.tables.get(t)); pTabs(); pHub(); }
+  if (game === 'bj') bjSwitch(t, true); else pSwitch(t, true);
 }
 function chooseTable(tables, cur, manual) {
-  for (const [t, st] of tables) if (me && st.seats.some((p) => p && p.uid === me.uid)) return t; // ma place passe avant tout
+  if (manual && cur && tables.has(cur)) return cur; // le joueur a choisi à la main (flèches) : on ne le ramène plus de force à sa table
+  for (const [t, st] of tables) if (me && st.seats.some((p) => p && p.uid === me.uid)) return t; // sinon : ma place passe avant tout
   if (cur && tables.has(cur) && (manual || !tables.get(cur).seats.every(Boolean))) return cur;
   const free = [...tables.entries()].sort((a, b) => a[0] - b[0]).find(([, st]) => !st.seats.every(Boolean));
   return free ? free[0] : tables.has(cur) ? cur : [...tables.keys()][0];
@@ -1466,44 +1499,46 @@ function bjReset() {
   $('#dcards').textContent = '';
   seatEls.forEach((se) => { se.hands.textContent = ''; se.hEls = []; se.bet.textContent = ''; se.bet.dataset.k = ''; });
 }
-function bjTabs() { tabsRender($('#bjTabs'), BJT, W.btid, (t) => { W.btid = t; W.bman = true; bjReset(); render(BJT.get(t)); bjTabs(); }, null, () => newTable('bj')); }
+function bjTabs() { tabsRender($('#bjTabs'), BJT, W.btid, (t) => bjSwitch(t, true), null, () => newTable('bj')); }
 function bjUpdate(st) {
   BJT.set(st.tid, st);
   const want = chooseTable(BJT, W.btid, W.bman), changed = want !== W.btid;
-  if (changed) { W.btid = want; bjReset(); }
+  if (changed) { bjSwitch(want, false); return; }
   bjTabs();
-  if (changed || st.tid === W.btid) render(BJT.get(W.btid));
+  if (st.tid === W.btid) render(BJT.get(W.btid));
 }
+function pSwitch(t, man) { P.cur = t; if (man) P.man = true; quiet(() => { pReset(); if (P.tables.has(t)) pRender(P.tables.get(t)); }); pTabs(); pHub(); }
+function bjSwitch(t, man) { W.btid = t; if (man) W.bman = true; quiet(() => { bjReset(); if (BJT.has(t)) render(BJT.get(t)); }); bjTabs(); }
 function pReset() {
   P.cardEls.forEach((d) => d.remove()); P.cardEls.clear(); P.lastDeadline = 0; P.lastTurnKey = ''; P.raiseKey = '';
   $('#pBoard').textContent = '';
   P.seats.forEach((se) => { se.cards.textContent = ''; se.hname.textContent = ''; se.bet.textContent = ''; se.bet.dataset.k = ''; se.plate.textContent = ''; delete se.plate.dataset.uid; if (se.res) { se.res.remove(); se.res = null; } });
 }
 function pTabs() {
-  tabsRender($('#pkTabs'), P.tables, P.cur, (t) => { P.cur = t; P.man = true; pReset(); pRender(P.tables.get(t)); pTabs(); pHub(); },
-    () => { const b = el('button', 'tbtn hands', '🃏 Mains'); b.onclick = () => $('#mPHands').classList.add('on'); return b; }, () => newTable('poker'));
+  tabsRender($('#pkTabs'), P.tables, P.cur, (t) => pSwitch(t, true),
+    () => { const b = el('button', 'tbtn hands'); b.innerHTML = icon('cards', 15) + ' Mains'; b.onclick = () => $('#mPHands').classList.add('on'); return b; }, () => newTable('poker'));
 }
 function pUpdate(st) {
   P.tables.set(st.tid, st);
   const want = chooseTable(P.tables, P.cur, P.man), changed = want !== P.cur;
-  if (changed) { P.cur = want; pReset(); }
+  if (changed) { pSwitch(want, false); return; }
   pTabs(); pHub();
-  if (changed || st.tid === P.cur) pRender(P.tables.get(P.cur));
+  if (st.tid === P.cur) pRender(P.tables.get(P.cur));
 }
 function tableDel(d) {
   if (d.game === 'bj') {
     BJT.delete(d.tid);
-    if (BJT.size) { const w = chooseTable(BJT, W.btid, W.bman); if (w !== W.btid) { W.btid = w; bjReset(); render(BJT.get(w)); } }
+    if (BJT.size) { const w = chooseTable(BJT, W.btid, W.bman); if (w !== W.btid) bjSwitch(w, false); }
     const b = $('#bjTabs'); if (b) b.dataset.sig = ''; bjTabs();
   } else {
     P.tables.delete(d.tid);
-    if (P.tables.size) { const w = chooseTable(P.tables, P.cur, P.man); if (w !== P.cur) { P.cur = w; pReset(); pRender(P.tables.get(w)); } }
+    if (P.tables.size) { const w = chooseTable(P.tables, P.cur, P.man); if (w !== P.cur) pSwitch(w, false); }
     const b = $('#pkTabs'); if (b) b.dataset.sig = ''; pTabs(); pHub();
   }
 }
 
 // ---- plein écran (API native, sinon plein écran « simulé » sur iPhone)
-function fsUpd() { setTimeout(pFitSoon, 0); const on = !!document.fullscreenElement || !!document.webkitFullscreenElement || document.body.classList.contains('pfs'); document.body.classList.toggle('fs', on); $('#bFs').textContent = on ? '🗗' : '⛶'; $('#bFs').title = on ? 'Quitter le plein écran' : 'Plein écran'; }
+function fsUpd() { setTimeout(pFitSoon, 0); const on = !!document.fullscreenElement || !!document.webkitFullscreenElement || document.body.classList.contains('pfs'); document.body.classList.toggle('fs', on); $('#bFs').innerHTML = icon(on ? 'fullOff' : 'full', 19); $('#bFs').title = on ? 'Quitter le plein écran' : 'Plein écran'; }
 $('#bFs').onclick = async () => {
   const d = document.documentElement, b = document.body;
   try {
@@ -1614,7 +1649,7 @@ function pRender(st) {
         se.res = el('div', 'res ' + (p.net > 0 ? 'win' : 'push'), p.net > 0 ? 'GAGNÉ +' + num(p.net) : 'ÉGALITÉ');
         se.hand.append(se.res);
       }
-      const rk = st.round + ':' + i;
+      const rk = st.tid + ':' + st.round + ':' + i;
       if (!P.shown.has(rk)) {
         P.shown.add(rk);
         floatText(se.root, (p.net > 0 ? '+' : '') + num(p.net), p.net > 0 ? 'pos' : p.net < 0 ? 'neg' : 'neu');
@@ -1629,7 +1664,7 @@ function pRender(st) {
   P.lastTurnKey = tk;
   pHeader();
   if (mi < 0) $('#pMyHand').textContent = '';
-  const feed = $('#pFeed'); feed.textContent = ''; st.feed.slice(-4).forEach((f) => feed.append(el('div', '', f.text)));
+  const feed = $('#pFeed'); feed.textContent = ''; st.feed.slice(-4).forEach((f) => feed.append(el('div', '', noEmo(f.text))));
   $('#pMsg').textContent = pMsgText(st, mi, myTurn);
   pDock(st, mi, myTurn);
 }
@@ -1881,7 +1916,7 @@ function rRender(st) {
     if (p.net != null && p.total > 0) { const s = el('small', p.net > 0 ? 'pos' : p.net < 0 ? 'neg' : '', (p.net > 0 ? '+' : '') + num(p.net)); rt.append(s); }
     row.append(av, mid, rt); box.append(row);
   }
-  $('#rFeed').replaceChildren(...st.feed.slice(-4).map((f) => el('div', '', f.text)));
+  $('#rFeed').replaceChildren(...st.feed.slice(-4).map((f) => el('div', '', noEmo(f.text))));
   if (mine) { setTxt($('#meBal'), num(mine.bal) + ' ' + COIN); W.bal = mine.bal; }
   $('#rRebet').disabled = !betting || !W.joined; $('#rClear').disabled = !betting || !W.joined || !(mine && mine.total > 0);
   // sons et gain à l'ouverture d'un tour / d'un résultat
@@ -2381,7 +2416,7 @@ function ofBuildInst(b) {
     b.innerHTML = '<div class="hz" id="oTrack"><div class="hban" id="oBan"></div></div>' + foot; const tr = $('#oTrack');
     HM.forEach((m, i) => {
       const l = el('div', 'lane' + (String(i + 1) === O.pick.horses ? ' sel' : '')); l.style.setProperty('--hc', HCOL[i]);
-      l.innerHTML = '<span class="ln">' + (i + 1) + '</span><div class="ls"><span class="horse">🐎</span></div><span class="lo">x' + m + '<small>' + HP[i] + ' %</small></span>';
+      l.innerHTML = '<span class="ln">' + (i + 1) + '</span><div class="ls"><span class="horse"><svg viewBox="0 0 40 24" width="34" height="22"><path d="M2 12 15 2v6h23v8H15v6z" fill="currentColor"/></svg></span></div><span class="lo">x' + m + '<small>' + HP[i] + ' %</small></span>';
       l.onclick = () => { if (O.anim) return; SFX.chip(); O.pick.horses = String(i + 1); ofSel(); }; tr.append(l);
     });
   } else { b.innerHTML = '<div class="sc"><div class="rus"><div class="hmr"></div>' + cylSVG() + '</div><div class="flash" id="oFlash"></div></div>' + foot; rusPre(); }
@@ -2436,7 +2471,7 @@ async function aHorses(st, tok) {
     requestAnimationFrame(step);
   });
   if (!alive(tok)) return;
-  hs.forEach((h) => h.classList.remove('lead')); lanes[st.winner].classList.add('win'); say('🏁 Cheval n°' + (st.winner + 1) + ' !'); SFX.bj();
+  hs.forEach((h) => h.classList.remove('lead')); lanes[st.winner].classList.add('win'); say('Cheval n°' + (st.winner + 1) + ' gagne !'); SFX.bj();
   await wait(1100); if (alive(tok)) ban.textContent = '';
 }
 async function aRussian(st, tok) {
@@ -2466,7 +2501,7 @@ requestAnimationFrame(ofLoop);
 
 
 // ============================================================= PARAMÈTRES (langue)
-const EN_DICT = {"Casino": "Casino", "Connecte-toi avec ton compte Discord pour jouer avec ton solde du casino.": "Log in with your Discord account to play with your casino balance.", "Se connecter avec Discord": "Log in with Discord", "Menu": "Menu", "Accueil": "Home", "Online": "Online", "Offline": "Offline", "Blackjack": "Blackjack", "Poker": "Poker", "Roulette": "Roulette", "Fusé": "Crash", "Mine": "Mines", "Mines": "Mines", "Pile ou Face": "Coin Flip", "Dés": "Dice", "Chevaux": "Horses", "Roulette russe": "Russian Roulette", "Classement": "Leaderboard", "Top gains": "Top wins", "Règles": "Rules", "Son": "Sound", "Muet": "Muted", "Muet": "Muted", "Plein écran": "Fullscreen", "Reconnexion…": "Reconnecting…", "Connexion…": "Connecting…", "Tables partagées avec tous les joueurs du serveur.": "Tables shared with every player on the server.", "Table à 5 places · mise libre · blackjack payé 3:2": "5-seat table · free bet · blackjack pays 3:2", "Jouer": "Play", "Texas Hold'em No-Limit · 5 places · relances libres et tapis": "Texas Hold'em No-Limit · 5 seats · free raises and all-in", "Roulette européenne · rouge, noir, pair, impair, numéros pleins": "European roulette · red, black, even, odd, straight numbers", "Jouables directement en MP Discord, et aussi sur le site.": "Playable in Discord DMs, and on the site too.", "Parties solo contre le croupier": "Solo games against the dealer", "Encaisse avant que la fusée explose": "Cash out before the rocket explodes", "Évite les mines, encaisse quand tu veux": "Avoid the mines, cash out whenever you want", "Une chance sur deux, gain x1.95": "50/50 chance, win x1.95", "Parie sur la somme de 2 dés": "Bet on the sum of 2 dice", "Course à 5 chevaux, jusqu’à x15.8": "5-horse race, up to x15.8", "Survis au barillet, plus de balles = plus de gain": "Survive the cylinder, more bullets = bigger win", "Les plus gros joueurs du casino.": "The biggest players of the casino.", "Classement actuel": "Current ranking", "Soldes actuels, du plus riche au moins riche": "Current balances, richest first", "Classement all-time": "All-time ranking", "Plus haut solde jamais atteint": "Highest balance ever reached", "CROUPIER": "DEALER", "TOI": "YOU", "Blackjack paie 3 pour 2 · le croupier tient sur 17": "Blackjack pays 3 to 2 · dealer stands on 17", "Tapis": "All-in", "Dernière mise": "Last bet", "Miser": "Bet", "Retirer la mise": "Remove bet", "Tirer": "Hit", "Rester": "Stand", "Doubler": "Double", "Séparer": "Split", "Quitter la table": "Leave table", "Cave min": "Min buy-in", "Max": "Max", "Se coucher": "Fold", "Check": "Check", "Min": "Min", "½ pot": "½ pot", "¾ pot": "¾ pot", "Pot": "Pot", "Relancer": "Raise", "Suivre": "Call", "Ajouter des jetons (entre deux mains)": "Add chips (between hands)", "Ajouter": "Add", "Rejouer mes mises": "Rebet", "Retirer mes mises": "Clear my bets", "Joueurs": "Players", "Réduire ✕": "Collapse ✕", "Fermer": "Close", "Annuler": "Cancel", "Chat": "Chat", "Victoires des autres joueurs": "Other players’ wins", "Mes victoires": "My wins", "Afficher": "Show", "Masquer": "Hide", "Notification de message": "Message notification", "Aucune": "None", "Silencieuse": "Silent", "Avec son": "With sound", "Aucun message. Lance la discussion.": "No messages. Start the conversation.", "Notifications": "Notifications", "Aucune notification.": "No notifications.", "t’a envoyé": "sent you", "Solde": "Balance", "⏻ Déconnexion": "⏻ Log out", "a gagné": "won", "Envoyer": "Send", "Règles du blackjack": "Blackjack rules", "Règles du poker (Texas Hold'em No-Limit)": "Poker rules (Texas Hold'em No-Limit)", "Classement des mains au poker": "Poker hand rankings", "Classement du blackjack (gains nets)": "Blackjack ranking (net winnings)", "Classement du poker (gains nets)": "Poker ranking (net winnings)", "Du plus fort (1) au plus faible (10). Les cartes éclairées forment la combinaison.": "Strongest (1) to weakest (10). Highlighted cards form the hand.", "Joueur": "Player", "Gains nets": "Net winnings", "Manches": "Rounds", "Victoires": "Wins", "Personne n’a encore terminé de manche.": "Nobody has finished a round yet.", "Classement indisponible.": "Leaderboard unavailable.", "Aucun joueur pour le moment.": "No players yet.", "Paramètres": "Settings", "⚙ Paramètres": "⚙ Settings", "Langue": "Language", "Envoyer des ZTKN": "Send ZTKN", "Chercher un joueur…": "Search a player…", "Montant": "Amount", "Aucun joueur trouvé.": "No player found.", "Destinataire : ": "Recipient: ", "Choisis un joueur.": "Pick a player.", "Montant invalide.": "Invalid amount.", "Solde insuffisant.": "Insufficient balance.", "Connexion perdue…": "Connection lost…", "Doucement 🙂": "Easy there 🙂", "Table libre": "Table free", "pleine": "full", "Une partie est déjà en cours.": "A game is already in progress.", "Aucune partie en cours.": "No game in progress.", "Cette table n’existe plus.": "This table no longer exists.", "Action inconnue.": "Unknown action.", "Tu ne peux pas t’envoyer de pièces à toi-même.": "You can't send coins to yourself.", "Montant minimum : 1.": "Minimum amount: 1.", "Ce joueur n’est pas sur le serveur.": "This player isn't on the server.", "Envoi impossible, réessaie.": "Couldn't send, try again.", "Nouvelle table": "New table", "＋ Nouvelle table": "＋ New table", "🃏 Mains": "🃏 Hands", "Table précédente": "Previous table", "Table suivante": "Next table", "Ton solde": "Your balance", "Mise": "Bet", "Mise :": "Bet:", "Distribuer": "Deal", "Encaisser": "Cash out", "Lancer": "Start", "Pile": "Heads", "Face": "Tails", "Moins de 7": "Under 7", "Plus de 7": "Over 7", "Exactement 7": "Exactly 7", "À toi de jouer": "Your turn", "Choisis ta mise puis distribue": "Pick your bet then deal", "Montant de la mise": "Bet amount", "Mise par clic": "Bet per click", "Écrire un message": "Write a message", "Message": "Message", "Agrandir la roue": "Enlarge the wheel", "Top gains de ce jeu": "Top wins of this game"};
+const EN_DICT = {"Casino": "Casino", "Connecte-toi avec ton compte Discord pour jouer avec ton solde du casino.": "Log in with your Discord account to play with your casino balance.", "Se connecter avec Discord": "Log in with Discord", "Menu": "Menu", "Accueil": "Home", "Online": "Online", "Offline": "Offline", "Blackjack": "Blackjack", "Poker": "Poker", "Roulette": "Roulette", "Fusé": "Crash", "Mine": "Mines", "Mines": "Mines", "Pile ou Face": "Coin Flip", "Dés": "Dice", "Chevaux": "Horses", "Roulette russe": "Russian Roulette", "Classement": "Leaderboard", "Top gains": "Top wins", "Règles": "Rules", "Son": "Sound", "Muet": "Muted", "Muet": "Muted", "Plein écran": "Fullscreen", "Reconnexion…": "Reconnecting…", "Connexion…": "Connecting…", "Tables partagées avec tous les joueurs du serveur.": "Tables shared with every player on the server.", "Table à 5 places · mise libre · blackjack payé 3:2": "5-seat table · free bet · blackjack pays 3:2", "Jouer": "Play", "Texas Hold'em No-Limit · 5 places · relances libres et tapis": "Texas Hold'em No-Limit · 5 seats · free raises and all-in", "Roulette européenne · rouge, noir, pair, impair, numéros pleins": "European roulette · red, black, even, odd, straight numbers", "Jouables directement en MP Discord, et aussi sur le site.": "Playable in Discord DMs, and on the site too.", "Parties solo contre le croupier": "Solo games against the dealer", "Encaisse avant que la fusée explose": "Cash out before the rocket explodes", "Évite les mines, encaisse quand tu veux": "Avoid the mines, cash out whenever you want", "Une chance sur deux, gain x1.95": "50/50 chance, win x1.95", "Parie sur la somme de 2 dés": "Bet on the sum of 2 dice", "Course à 5 chevaux, jusqu’à x15.8": "5-horse race, up to x15.8", "Survis au barillet, plus de balles = plus de gain": "Survive the cylinder, more bullets = bigger win", "Les plus gros joueurs du casino.": "The biggest players of the casino.", "Classement actuel": "Current ranking", "Soldes actuels, du plus riche au moins riche": "Current balances, richest first", "Classement all-time": "All-time ranking", "Plus haut solde jamais atteint": "Highest balance ever reached", "CROUPIER": "DEALER", "TOI": "YOU", "Blackjack paie 3 pour 2 · le croupier tient sur 17": "Blackjack pays 3 to 2 · dealer stands on 17", "Tapis": "All-in", "Dernière mise": "Last bet", "Miser": "Bet", "Retirer la mise": "Remove bet", "Tirer": "Hit", "Rester": "Stand", "Doubler": "Double", "Séparer": "Split", "Quitter la table": "Leave table", "Cave min": "Min buy-in", "Max": "Max", "Se coucher": "Fold", "Check": "Check", "Min": "Min", "½ pot": "½ pot", "¾ pot": "¾ pot", "Pot": "Pot", "Relancer": "Raise", "Suivre": "Call", "Ajouter des jetons (entre deux mains)": "Add chips (between hands)", "Ajouter": "Add", "Rejouer mes mises": "Rebet", "Retirer mes mises": "Clear my bets", "Joueurs": "Players", "Réduire": "Collapse", "Fermer": "Close", "Annuler": "Cancel", "Chat": "Chat", "Victoires des autres joueurs": "Other players’ wins", "Mes victoires": "My wins", "Afficher": "Show", "Masquer": "Hide", "Notification de message": "Message notification", "Aucune": "None", "Silencieuse": "Silent", "Avec son": "With sound", "Aucun message. Lance la discussion.": "No messages. Start the conversation.", "Notifications": "Notifications", "Aucune notification.": "No notifications.", "t’a envoyé": "sent you", "Solde": "Balance", "Déconnexion": "Log out", "a gagné": "won", "Envoyer": "Send", "Règles du blackjack": "Blackjack rules", "Règles du poker (Texas Hold'em No-Limit)": "Poker rules (Texas Hold'em No-Limit)", "Classement des mains au poker": "Poker hand rankings", "Classement du blackjack (gains nets)": "Blackjack ranking (net winnings)", "Classement du poker (gains nets)": "Poker ranking (net winnings)", "Du plus fort (1) au plus faible (10). Les cartes éclairées forment la combinaison.": "Strongest (1) to weakest (10). Highlighted cards form the hand.", "Joueur": "Player", "Gains nets": "Net winnings", "Manches": "Rounds", "Victoires": "Wins", "Personne n’a encore terminé de manche.": "Nobody has finished a round yet.", "Classement indisponible.": "Leaderboard unavailable.", "Aucun joueur pour le moment.": "No players yet.", "Paramètres": "Settings", "Paramètres": "Settings", "Langue": "Language", "Envoyer des ZTKN": "Send ZTKN", "Chercher un joueur…": "Search a player…", "Montant": "Amount", "Aucun joueur trouvé.": "No player found.", "Destinataire : ": "Recipient: ", "Choisis un joueur.": "Pick a player.", "Montant invalide.": "Invalid amount.", "Solde insuffisant.": "Insufficient balance.", "Connexion perdue…": "Connection lost…", "Doucement.": "Easy there.", "Table libre": "Table free", "pleine": "full", "Une partie est déjà en cours.": "A game is already in progress.", "Aucune partie en cours.": "No game in progress.", "Cette table n’existe plus.": "This table no longer exists.", "Action inconnue.": "Unknown action.", "Tu ne peux pas t’envoyer de pièces à toi-même.": "You can't send coins to yourself.", "Montant minimum : 1.": "Minimum amount: 1.", "Ce joueur n’est pas sur le serveur.": "This player isn't on the server.", "Envoi impossible, réessaie.": "Couldn't send, try again.", "Nouvelle table": "New table", "＋ Nouvelle table": "＋ New table", "Mains": "Hands", "Table précédente": "Previous table", "Table suivante": "Next table", "Ton solde": "Your balance", "Mise": "Bet", "Mise :": "Bet:", "Distribuer": "Deal", "Encaisser": "Cash out", "Lancer": "Start", "Pile": "Heads", "Face": "Tails", "Moins de 7": "Under 7", "Plus de 7": "Over 7", "Exactement 7": "Exactly 7", "À toi de jouer": "Your turn", "Choisis ta mise puis distribue": "Pick your bet then deal", "Montant de la mise": "Bet amount", "Mise par clic": "Bet per click", "Écrire un message": "Write a message", "Message": "Message", "Agrandir la roue": "Enlarge the wheel", "Top gains de ce jeu": "Top wins of this game"};
 const EN_RE = [["^Table (\\d+)$", "Table $1"], ["^Mis à jour à (.+)$", "Updated at $1"], ["^Chat · (.+)$", "@Chat · $1"], ["^(\\d+) joueurs? à table$", "$1 player(s) at the table"], ["^🎁 (.+) t’a envoyé (.+)$", "🎁 $1 sent you $2"], ["^Mise minimale : (.+)$", "Minimum bet: $1"], ["^Mise maximale : (.+)$", "Maximum bet: $1"], ["^Tu es déjà assis à la table (\\d+) : quitte-la d’abord\\.$", "You're already seated at table $1: leave it first."], ["^Maximum (\\d+) tables\\.$", "Maximum $1 tables."], ["^à (.+?) · mise (.+)$", "@at $1 · bet $2"], ["^blinds (.+)$", "blinds $1"], ["^Ta session a expiré : reconnecte-toi avec Discord\\.$", "Your session expired: log in with Discord again."]].map(([a, b]) => [new RegExp(a), b]);
 let LANG = 'fr'; try { LANG = localStorage.getItem('znk_lang') === 'en' ? 'en' : 'fr'; } catch {}
 const trWords = (s) => {
@@ -2526,7 +2561,7 @@ async function gSearch() {
   } catch { box.textContent = ''; }
 }
 function gOpen() { menuClose(); G.to = null; $('#gQ').value = ''; $('#gAmt').value = ''; $('#mGift').classList.add('on'); gSel(); gSearch(); setTimeout(() => $('#gQ').focus(), 50); }
-document.querySelector('.mitem[data-act="gift"]').onclick = gOpen;
+$('#bGift').onclick = () => { popClose(); gOpen(); };
 $('#gQ').oninput = () => { clearTimeout(G.t); G.t = setTimeout(gSearch, 250); };
 document.querySelectorAll('#mGift [data-q]').forEach((b) => (b.onclick = () => { $('#gAmt').value = b.dataset.q; }));
 $('#gSend').onclick = async () => {
@@ -2536,7 +2571,7 @@ $('#gSend').onclick = async () => {
   const ok = await send('gift', { to: G.to.uid, amount: amt });
   $('#gSend').disabled = false;
   if (!ok) return;
-  SFX.chip(); $('#mGift').classList.remove('on'); toast('✅ ' + num(amt) + ' ' + COIN + ' → ' + G.to.name);
+  SFX.chip(); $('#mGift').classList.remove('on'); toast(num(amt) + ' ' + COIN + ' → ' + G.to.name);
   if (W.bal != null && !O.hold) $('#meBal').textContent = num(W.bal) + ' ' + COIN;
 };
 
@@ -2555,7 +2590,7 @@ function nRender() {
     const r = el('div', 'nit' + (n.t > N.seen ? ' new' : '')), b = el('div'), t = new Date(n.t), p = (x) => String(x).padStart(2, '0');
     b.append(el('b', '', n.from), document.createTextNode(' t’a envoyé '), el('b', 'cg', num(n.amount) + ' ' + COIN),
       el('small', '', p(t.getDate()) + '/' + p(t.getMonth() + 1) + ' · ' + p(t.getHours()) + ':' + p(t.getMinutes())));
-    r.append(el('span', 'nic', '🎁'), b); box.append(r);
+    const ni = el('span', 'nic'); ni.innerHTML = icon('gift', 20); r.append(ni, b); box.append(r);
   });
 }
 function nSet(list, live) {
@@ -2566,7 +2601,7 @@ function nSet(list, live) {
 }
 function nAdd(n) {
   N.list.unshift(n); N.list.length = Math.min(N.list.length, 30);
-  SFX.win(); toast('🎁 ' + n.from + ' t’a envoyé ' + num(n.amount) + ' ' + COIN);
+  SFX.win(); toast(n.from + ' t’a envoyé ' + num(n.amount) + ' ' + COIN);
   if ($('#bellWrap').classList.contains('open')) { nRender(); nMarkSeen(); } else { nRender(); nBadge(); }
 }
 function nMarkSeen() {
