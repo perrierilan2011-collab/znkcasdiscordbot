@@ -118,6 +118,23 @@ function init(deps) {
   })();
 
   // ---------- rangs (gains cumulés) + ELO ----------
+  // ---------- événements du casino : notifs communes à tout le serveur (boîte de réception de chaque joueur) ----------
+  const EVENTS_FILE = path.join(DATA_DIR, 'events.json');
+  const guildEvents = readJson(EVENTS_FILE, {}); // guildId -> [notif]
+  const EVENT_KEEP = 30, EVENT_TTL_MS = 7 * 24 * 3600 * 1000;
+  let eventsTimer = null;
+  const eventsOf = (guildId) => (guildEvents[guildId] || []).filter((n) => Date.now() - n.t < EVENT_TTL_MS);
+  function pushEvent(guildId, n) {
+    const notif = { id: crypto.randomBytes(6).toString('hex'), t: Date.now(), type: 'event', kind: String(n.kind || 'event'), title: String(n.title || 'Événement').slice(0, 80), text: String(n.text || '').slice(0, 240), eventId: n.eventId ? String(n.eventId) : '', amount: Number(n.amount) || 0, expiresAt: Number(n.expiresAt) || 0 };
+    const list = eventsOf(String(guildId));
+    list.unshift(notif);
+    guildEvents[String(guildId)] = list.slice(0, EVENT_KEEP);
+    clearTimeout(eventsTimer);
+    eventsTimer = setTimeout(() => saveJson(EVENTS_FILE, guildEvents), 1500);
+    const entry = rooms.get(String(guildId));
+    if (entry) entry.broadcast(`event: notif\ndata: ${JSON.stringify(notif)}\n\n`);
+    return notif;
+  }
   const avatarMap = new Map(); // uid -> avatar (affiché dans les classements)
   const rankApi = createRank(path.join(DATA_DIR, 'rank.json'));
 
@@ -406,6 +423,7 @@ function init(deps) {
     let walBal; // solde du portefeuille renvoyé après une action de poker
     let created; // numéro de la table créée par un joueur (action tnew)
     let daily; // résultat du daily (action daily)
+    let evMsg; // message de confirmation d'un événement (claim / giveaway)
     try {
       if (String(d.action).startsWith('o')) return json(res, 200, { ok: true, ...(await offline.handle(user, d)) });
       switch (d.action) {
@@ -456,6 +474,39 @@ function init(deps) {
               c.write(`event: notif\ndata: ${JSON.stringify(notif)}\n\n`);
               if (rb !== null) c.write(`event: bal\ndata: ${JSON.stringify({ bal: rb })}\n\n`);
             } catch { /* fermée */ }
+          }
+          break;
+        }
+        // ---- admin : lancer un événement (mêmes événements que le bot Discord) → MP + notif dans la boîte de réception
+        case 'adminevent': {
+          if (!deps.isAdmin || !(await deps.isAdmin(user.uid))) throw new Error('Action réservée à l’administrateur.');
+          const kind = String(d.kind || '');
+          let r;
+          if (kind === 'claim' || kind === 'giveaway') {
+            if (!deps.launchEvent) throw new Error('Événements indisponibles.');
+            r = await deps.launchEvent(user.guildId, user.uid, kind, d.amount, d.winners, d.minutes);
+          } else {
+            if (!deps.launchBoost) throw new Error('Événements indisponibles.');
+            r = await deps.launchBoost(user.guildId, user.uid, kind, d.minutes);
+          }
+          console.log(`[web] ADMIN ${user.name} (${user.uid}) lance l'événement ${kind}`);
+          created = undefined;
+          break;
+        }
+        // ---- participer à un événement (claim / giveaway) depuis la notification
+        case 'evclaim':
+        case 'evjoin': {
+          const fn = d.action === 'evclaim' ? deps.eventClaim : deps.eventJoin;
+          if (!fn) throw new Error('Événements indisponibles.');
+          const r = await fn(user.uid, user.guildId, String(d.eid || ''));
+          if (!r || !r.ok) throw new Error((r && r.msg) || 'Événement indisponible.');
+          evMsg = r.msg;
+          if (r.balance != null) {
+            walBal = r.balance;
+            for (const c of entry.clients) {
+              if (c.uid !== user.uid) continue;
+              try { c.write(`event: bal\ndata: ${JSON.stringify({ bal: r.balance })}\n\n`); } catch { /* fermée */ }
+            }
           }
           break;
         }
@@ -613,7 +664,7 @@ function init(deps) {
           return json(res, 400, { ok: false, error: 'Action inconnue.' });
       }
       entry.syncTables();
-      return json(res, 200, { ok: true, tid: created, daily, rbal: walBal ?? roulette.players.get(user.uid)?.bal });
+      return json(res, 200, { ok: true, tid: created, daily, msg: evMsg, rbal: walBal ?? roulette.players.get(user.uid)?.bal });
     } catch (e) {
       return json(res, 200, { ok: false, error: String(e?.message || e).slice(0, 160), rbal: walBal ?? roulette.players.get(user.uid)?.bal });
     }
@@ -653,7 +704,7 @@ function init(deps) {
     entry.roulette.setPresence(user.uid, true);
     res.write(`event: roulette\ndata: ${JSON.stringify(entry.roulette.snapshot())}\n\n`);
     res.write(`event: chathist\ndata: ${JSON.stringify(Object.fromEntries(entry.chat))}\n\n`);
-    res.write(`event: inbox\ndata: ${JSON.stringify(inbox[user.uid] || [])}\n\n`);
+    res.write(`event: inbox\ndata: ${JSON.stringify([...(inbox[user.uid] || []), ...eventsOf(user.guildId)].sort((a, b) => b.t - a.t).slice(0, 30))}\n\n`);
     const hb = setInterval(() => {
       try {
         res.write(': ping\n\n');
@@ -724,7 +775,7 @@ function init(deps) {
   server.listen(port, '0.0.0.0', () => console.log(`[web] blackjack + poker + roulette en ligne → ${PUBLIC_URL} (port ${port})`));
   server.on('error', (e) => console.error('[web] serveur :', e?.message || e));
 
-  return { makeLink, enabled: true, rooms, server, publicUrl: PUBLIC_URL, oauth: oauthOn };
+  return { makeLink, pushEvent, enabled: true, rooms, server, publicUrl: PUBLIC_URL, oauth: oauthOn };
 }
 
 module.exports = { init };

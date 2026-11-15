@@ -2,9 +2,9 @@
 /*
  * web/rank.js — rangs (gains cumulés) + ELO du casino ZNK.
  *
- * RANG  : basé sur le TOTAL des gains accumulés, jamais sur le solde. Les pertes ne font jamais descendre :
+ * RANG  : basé sur le TOTAL des gains accumulés EN LIGNE (poker, blackjack, roulette), jamais sur le solde. Les pertes ne font jamais descendre :
  *         tu as gagné 100, tu perds tout, tu regagnes 10 => 110 de gains cumulés.
- *         Chaque manche gagnée (profit net > 0, tous les jeux du site) s'ajoute au total.
+ *         Chaque manche en ligne gagnée (profit net > 0) s'ajoute au total.
  * ELO   : duel « implicite » entre les joueurs d'une même manche (poker, blackjack, roulette en ligne).
  *         Les joueurs d'une manche sont comparés deux à deux (celui qui a fait le meilleur résultat « bat » l'autre).
  *         Les jeux solo n'ont pas d'adversaire : ils comptent pour le rang mais pas pour l'ELO.
@@ -14,24 +14,22 @@
 const fs = require('fs');
 const path = require('path');
 
+const ONLINE = new Set(['poker', 'blackjack', 'roulette']); // seuls les jeux EN LIGNE (multijoueur) comptent pour le rang
 const ROMAN = ['III', 'II', 'I']; // III = bas de palier, I = haut de palier
 
 // fam : nom · c1/c2 : dégradé du logo · sym : emblème · mins : seuils de gains cumulés (1 valeur = palier unique, 3 = III / II / I)
 const FAMILIES = [
-  { fam: 'Bronze',      c1: '#e0a06a', c2: '#8a4b14', sym: 'chev',  mins: [0, 250, 1000] },
-  { fam: 'Argent',      c1: '#f3f4f6', c2: '#8b94a3', sym: 'chev',  mins: [2500, 6000, 15000] },
-  { fam: 'Or',          c1: '#fde68a', c2: '#d97706', sym: 'star',  mins: [40000, 100000, 250000] },
-  { fam: 'Platine',     c1: '#a5f3fc', c2: '#3b82a6', sym: 'star',  mins: [600000, 1500000, 4000000] },
-  { fam: 'Émeraude',    c1: '#86efac', c2: '#047857', sym: 'gem',   mins: [10e6, 25e6, 60e6] },
-  { fam: 'Diamant',     c1: '#bae6fd', c2: '#6366f1', sym: 'gem',   mins: [150e6, 400e6, 1e9] },
-  { fam: 'Rubis',       c1: '#fda4af', c2: '#9f1239', sym: 'gem',   mins: [2.5e9, 6e9, 15e9] },
-  { fam: 'Obsidienne',  c1: '#a78bfa', c2: '#1e1b4b', sym: 'flame', mins: [40e9, 100e9, 250e9] },
-  { fam: 'Maître',      c1: '#fcd34d', c2: '#b45309', sym: 'crown', mins: [600e9] },
-  { fam: 'Grand Maître', c1: '#f9a8d4', c2: '#be185d', sym: 'crown', mins: [2e12] },
-  { fam: 'Champion',    c1: '#67e8f9', c2: '#0e7490', sym: 'crown', mins: [6e12] },
-  { fam: 'Légende',     c1: '#fb923c', c2: '#b91c1c', sym: 'wings', mins: [20e12] },
-  { fam: 'Mythique',    c1: '#e879f9', c2: '#6d28d9', sym: 'wings', mins: [75e12] },
-  { fam: 'Immortel ZNK', c1: '#fff7ad', c2: '#f59e0b', sym: 'wings', mins: [250e12] },
+  { fam: 'Bronze',      c1: '#e0a06a', c2: '#8a4b14', sym: 'chev',  mins: [0, 30, 80] },
+  { fam: 'Argent',      c1: '#f3f4f6', c2: '#8b94a3', sym: 'chev',  mins: [150, 300, 600] },
+  { fam: 'Or',          c1: '#fde68a', c2: '#d97706', sym: 'star',  mins: [1000, 2000, 4000] },
+  { fam: 'Platine',     c1: '#a5f3fc', c2: '#3b82a6', sym: 'star',  mins: [7000, 12000, 20000] },
+  { fam: 'Rubis',       c1: '#fda4af', c2: '#9f1239', sym: 'gem',   mins: [35000, 60000, 100000] },
+  { fam: 'Maître',      c1: '#fcd34d', c2: '#b45309', sym: 'crown', mins: [200000] },
+  { fam: 'Grand Maître', c1: '#f9a8d4', c2: '#be185d', sym: 'crown', mins: [400000] },
+  { fam: 'Champion',    c1: '#67e8f9', c2: '#0e7490', sym: 'crown', mins: [800000] },
+  { fam: 'Légende',     c1: '#fb923c', c2: '#b91c1c', sym: 'wings', mins: [1.5e6] },
+  { fam: 'Mythique',    c1: '#e879f9', c2: '#6d28d9', sym: 'wings', mins: [3e6] },
+  { fam: 'Immortel ZNK', c1: '#fff7ad', c2: '#f59e0b', sym: 'wings', mins: [7e6] },
 ];
 
 const LADDER = [];
@@ -84,6 +82,7 @@ function create(file) {
 
   /** une manche terminée : cumule les gains de chaque gagnant, puis met à jour l'ELO */
   function record(r, avatarOf) {
+    if (!r || !ONLINE.has(r.game)) return; // jeux offline / solo : ni rang ni ELO
     const players = (r && r.players || []).filter((p) => p && p.uid);
     for (const p of players) {
       const u = get(String(p.uid), p.name, avatarOf && avatarOf(String(p.uid)));
