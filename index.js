@@ -6761,21 +6761,11 @@ async function postOnlineRecap(guildId, r) {
 function buildPokerPanelPayload() {
   const embed = new EmbedBuilder()
     .setColor(0x7c3aed)
-    .setTitle('🃏🎰 Casino en ligne')
-    .setDescription(
-      [
-        'Des jeux **multijoueurs en direct**, sur une page web animée (ton solde du casino est utilisé).',
-        '',
-        '🃏 **Blackjack** — table à 5 places, **mise libre**, tu vois les cartes de tous, blackjack payé **3:2**',
-        '🎰 **Roulette** — **une seule roulette pour tout le monde, sans limite de joueurs** : rouge/noir, pair/impair, douzaines, colonnes ou numéro plein (x36). Tu vois **qui joue et qui a misé quoi** en direct, puis la roue tourne pour tous en même temps',
-        '',
-        'Clique sur un bouton : tu reçois ton lien personnel (valable 12 h).',
-      ].join('\n')
-    )
+    .setTitle('🎮 Casino en ligne')
+    .setDescription('Clique sur **Play Online** : le site s’ouvre et tu choisis ton jeu (ton solde du casino est utilisé).')
     .setFooter({ text: 'Admin → Salon online pour créer ce salon' });
   const row = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('online_play').setLabel('Blackjack').setEmoji('🃏').setStyle(ButtonStyle.Success),
-    new ButtonBuilder().setCustomId('online_roulette').setLabel('Roulette').setEmoji('🎰').setStyle(ButtonStyle.Primary)
+    new ButtonBuilder().setCustomId('online_play').setLabel('Play Online').setEmoji('🎮').setStyle(ButtonStyle.Success)
   );
   return withBanner({ embeds: [embed], components: [row] }, 'panel_online.png');
 }
@@ -6812,7 +6802,7 @@ async function createPokerChannel(i) {
   await panelMsg.pin().catch(() => {});
   const saved = await saveChannel(guild.id, 'online', channel.id);
   return i.reply({
-    content: `✅ Salon <#${channel.id}> créé (blackjack + roulette en ligne).${saved ? '' : DB_WARN}`,
+    content: `✅ Salon <#${channel.id}> créé (bouton Play Online).${saved ? '' : DB_WARN}`,
     flags: EPH,
   });
 }
@@ -6822,35 +6812,25 @@ async function createPokerChannel(i) {
 async function handlePokerButton(i) {
   if (!i.guild) return respondText(i, 'Utilise ce bouton dans le serveur.');
   if (!webApp.enabled) return respondText(i, '⚠️ Les jeux en ligne sont désactivés pour le moment.');
-  const isWheel = i.customId === 'online_roulette' || i.customId === 'online_wheel'; // (nom conservé : = roulette)
-  const url = webApp.makeLink(
-    {
-      id: i.user.id,
-      name: i.member?.displayName || i.user.globalName || i.user.username,
-      avatar: i.user.displayAvatarURL({ extension: 'png', size: 128 }),
-    },
-    i.guild.id,
-    isWheel ? 'roulette' : undefined
-  );
+  // Un seul lien pour tous les boutons (y compris ceux des anciens panneaux) : il ouvre la page d'accueil des jeux.
+  const url = webApp.makeLink({
+    id: i.user.id,
+    name: i.member?.displayName || i.user.globalName || i.user.username,
+    avatar: i.user.displayAvatarURL({ extension: 'png', size: 128 }),
+  }, i.guild.id);
   if (!url) return respondText(i, '⚠️ Lien indisponible, réessaie dans un instant.');
   const bal = await getBalance(i.user.id).catch(() => null);
   const embed = new EmbedBuilder()
     .setColor(COLORS.violet)
-    .setAuthor({ name: isWheel ? 'ZNK CASINO  •  ROULETTE EN LIGNE' : 'ZNK CASINO  •  BLACKJACK EN LIGNE', iconURL: ZNK_LOGO })
-    .setTitle(isWheel ? '🎰 La roulette t’attend' : '🃏 Ta table t’attend')
+    .setAuthor({ name: 'ZNK CASINO  •  JEUX EN LIGNE', iconURL: ZNK_LOGO })
+    .setTitle('🎮 Les jeux t’attendent')
     .setDescription(
-      (isWheel
-        ? `Clique sur le bouton pour ouvrir la roulette.\n` +
-          `Mise **ce que tu veux** sur rouge/noir, pair/impair, douzaines, colonnes ou un numéro${bal !== null ? ` (solde : **${fmt(bal)}**)` : ''} : tu vois en direct qui joue et qui a misé quoi, puis la roulette tourne pour tout le monde.\n\n`
-        : `Clique sur le bouton pour ouvrir la table.\n` +
-          `Prends une place, mise **ce que tu veux**${bal !== null ? ` (solde : **${fmt(bal)}**)` : ''} et joue à ton tour.\n\n`) +
+      `Clique sur le bouton pour ouvrir le site, puis choisis ton jeu${bal !== null ? ` (solde : **${fmt(bal)}**)` : ''}.\n\n` +
         `🔒 Ce lien est **personnel** (il te connecte à ton compte) : ne le partage pas. Valable 12 h.`
     );
   return i.reply({
     embeds: [embed],
-    components: [
-      new ActionRowBuilder().addComponents(new ButtonBuilder().setLabel(isWheel ? 'Ouvrir la roulette' : 'Ouvrir la table').setEmoji(isWheel ? '🎰' : '🃏').setStyle(ButtonStyle.Link).setURL(url)),
-    ],
+    components: [new ActionRowBuilder().addComponents(new ButtonBuilder().setLabel('Play Online').setEmoji('🎮').setStyle(ButtonStyle.Link).setURL(url))],
     flags: EPH,
   });
 }
