@@ -327,13 +327,51 @@ main{padding-bottom:56px!important}
 #chatForm{display:flex;gap:6px;padding:8px;border-top:1px solid #262626}
 #chatIn{flex:1;min-width:0;background:#0f0f0f;border:1px solid #3a3a3a;border-radius:8px;color:#fff;padding:8px 10px;font:inherit;outline:0}
 #chatIn:focus{border-color:#a3a3a3}
+
+/* ---------- POKER : même tapis / mêmes places que le blackjack ---------- */
+.ftable.pk{--cw:clamp(36px,4.8vw,68px);--ch:calc(var(--cw)*1.42);padding:12px 8px 62px}
+.ftable.pk>*{position:relative;z-index:1}
+.ftable.pk>.shoe{position:absolute;right:4%;top:12px;z-index:1}
+.ftable.pk>.rule{position:absolute}
+#pMid{display:flex;flex-direction:column;align-items:center;gap:8px;margin-top:2px;width:100%}
+#pStreet{font-size:11px;letter-spacing:.3em;color:rgba(255,255,255,.55);font-weight:700;text-transform:uppercase;min-height:14px}
+#pPot{min-height:26px}
+.pbox{position:relative;display:flex;gap:calc(var(--cw)*.14);min-height:var(--ch)}
+.pslot{width:var(--cw);height:var(--ch);border:2px dashed rgba(255,255,255,.16);border-radius:calc(var(--cw)*.13);flex:none}
+#pBoard{position:absolute;inset:0;display:flex;gap:calc(var(--cw)*.14)}
+#pCenter{text-align:center;pointer-events:none;width:min(92%,520px)}
+#pMsg{display:inline-block;background:rgba(0,0,0,0.72);border:1px solid rgba(255,255,255,0.12);padding:7px 18px;border-radius:999px;font-weight:700;font-size:clamp(12px,1.6vw,16px);backdrop-filter:blur(3px)}
+#pCd{display:block;margin:4px auto 0;min-height:36px;font-size:30px;font-weight:900;color:var(--gold);text-shadow:0 0 16px rgba(251,191,36,.7);font-variant-numeric:tabular-nums}
+#pSeats{width:100%;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;align-items:end;padding:0 4px}
+.hole{--cw:clamp(28px,3.6vw,52px);--ch:calc(var(--cw)*1.42)}
+.hole.cards .card+.card{margin-left:calc(var(--cw)*-.22)}
+.hand.fold{opacity:.38;filter:grayscale(.55)}
+.lact{min-height:20px;font-size:11px;font-weight:800;letter-spacing:.04em;padding:2px 9px;border-radius:999px;background:rgba(0,0,0,.62);border:1px solid rgba(255,255,255,.2);white-space:nowrap;color:#e2e8f0}
+.lact:empty{visibility:hidden}
+.lact.fold{color:#94a3b8}.lact.raise,.lact.allin{color:#fcd34d;border-color:#fbbf24}
+.ptags{display:flex;gap:4px;min-height:18px;justify-content:center}
+.ptag{font-size:10px;font-weight:900;border-radius:999px;padding:1px 7px;background:#334155;color:#fff;border:1px solid #94a3b8}
+.ptag.d{background:#fbbf24;border-color:#fde68a;color:#3a2300}
+#pFeed{position:absolute;left:14px;top:14px;max-width:26%;font-size:11px;color:rgba(255,255,255,.6);display:flex;flex-direction:column;gap:2px;pointer-events:none;z-index:2}
+#pFeed div{background:rgba(0,0,0,.35);padding:1px 8px;border-radius:8px;width:fit-content;max-width:100%}
+#pkDock{max-width:none;margin-bottom:10px}
+#pkAct,#pkTop{display:flex;flex-direction:column;gap:8px;align-items:center}
+@media(max-width:760px){
+  .ftable.pk{--cw:clamp(32px,9.5vw,46px);--ch:calc(var(--cw)*1.42);min-height:640px;border-width:10px;padding-bottom:34px;justify-content:flex-start;gap:6px;border-radius:26px 26px 44px 44px/26px 26px 44px 44px}
+  .ftable.pk::after{inset:6px;border-radius:20px 20px 36px 36px/20px 20px 36px 36px}
+  .ftable.pk::before{font-size:min(24vw,118px)}
+  #pSeats{grid-template-columns:repeat(3,minmax(0,1fr));row-gap:14px;margin-top:auto}
+  .hole{--cw:clamp(26px,7.2vw,38px)}
+  #pFeed{display:none}
+  #pCd{font-size:24px;min-height:30px}
+}
 </style>
 </head>
 <body>
 <div id="gate"><div><h1>Casino</h1><p id="gatemsg">Ouvre ce jeu depuis Discord : clique sur le bouton <b>Play Online</b> du salon « online » pour recevoir ton lien personnel.</p></div></div>
 <header>
   <div class="logo hide"><small id="subtitle"></small></div>
-  <nav id="tabs"><button class="tab on" data-g="hub">Jeux</button><button class="tab" data-g="bj">Blackjack</button><button class="tab" data-g="roulette">Roulette</button></nav>
+  <nav id="tabs"><button class="tab on" data-g="hub">Jeux</button><button class="tab" data-g="bj">Blackjack</button><button class="tab" data-g="poker">Poker</button><button class="tab" data-g="roulette">Roulette</button></nav>
   <div class="sp"></div>
   <button class="hb hide" id="bTop" title="Classement">Classement</button>
   <button class="hb hide" id="bRules" title="Règles">Règles</button>
@@ -350,6 +388,11 @@ main{padding-bottom:56px!important}
         <span class="gname">Blackjack</span>
         <span class="gdesc">Table à 5 places · mise libre · blackjack payé 3:2</span>
         <span class="glive" id="gBjLive"></span><span class="gplay">Jouer</span>
+      </button>
+      <button class="gcard" data-go="poker" id="gcPoker">
+        <span class="gname">Poker</span>
+        <span class="gdesc">Texas Hold'em No-Limit · 5 places · relances libres et tapis</span>
+        <span class="glive" id="gPkLive"></span><span class="gplay">Jouer</span>
       </button>
       <button class="gcard" data-go="roulette" id="gcRoulette">
         <span class="gname">Roulette</span>
@@ -415,6 +458,53 @@ main{padding-bottom:56px!important}
     <div class="row"><button class="btn" id="bLeave" style="display:none;padding:6px 12px;font-size:12px">Quitter la table</button></div>
   </section>
 </main>
+<main id="pkView" class="hide">
+  <section class="ftable pk" id="pTable">
+    <div id="pMid">
+      <div id="pStreet"></div>
+      <div id="pPot"></div>
+      <div class="pbox"><span class="pslot"></span><span class="pslot"></span><span class="pslot"></span><span class="pslot"></span><span class="pslot"></span><div id="pBoard"></div></div>
+      <div id="pCenter"><div id="pMsg">Connexion…</div><span id="pCd"></span></div>
+    </div>
+    <div class="shoe" id="pDeck"></div>
+    <div class="rule">Texas Hold'em No-Limit · <span id="pBlinds"></span></div>
+    <div id="pSeats"></div>
+    <div id="pFeed"></div>
+  </section>
+  <section class="dockp" id="pkDock">
+    <div id="pkJoin" class="row" style="display:none">
+      <button class="btn" id="bPBuyMin">Cave min</button>
+      <div class="amt"><input id="pBuyAmt" inputmode="decimal" autocomplete="off" placeholder="Ta cave" aria-label="Montant de ta cave"><span class="pcoin">🪙</span></div>
+      <button class="btn" id="bPBuy100">100 BB</button>
+      <button class="btn" id="bPBuyMax">Max</button>
+    </div>
+    <div id="pkAct" style="display:none">
+      <div class="row">
+        <button class="btn big dbl" id="bPFold">Se coucher<kbd>F</kbd></button>
+        <button class="btn big hit" id="bPCall">Check<kbd>C</kbd></button>
+      </div>
+      <div class="row">
+        <button class="btn" id="bPMin">Min</button>
+        <button class="btn" id="bPHalf">½ pot</button>
+        <button class="btn" id="bP34">¾ pot</button>
+        <button class="btn" id="bPPot">Pot</button>
+        <div class="amt"><input id="pRaiseAmt" inputmode="decimal" autocomplete="off" placeholder="Relancer à" aria-label="Relancer à"><span class="pcoin">🪙</span></div>
+        <button class="btn go" id="bPRaise">Relancer</button>
+        <button class="btn std" id="bPAll">Tapis</button>
+      </div>
+    </div>
+    <div id="pkTop" style="display:none">
+      <div class="row">
+        <span class="note">Ajouter des jetons (entre deux mains)</span>
+        <div class="amt"><input id="pTopAmt" inputmode="decimal" autocomplete="off" placeholder="Montant" aria-label="Jetons à ajouter"><span class="pcoin">🪙</span></div>
+        <button class="btn" id="bPTopMax">Max</button>
+        <button class="btn" id="bPTop">Ajouter</button>
+      </div>
+    </div>
+    <div id="pkInfo" class="note"></div>
+    <div class="row"><button class="btn" id="pkLeave" style="display:none;padding:6px 12px;font-size:12px">Quitter la table</button></div>
+  </section>
+</main>
 <main id="ofView" class="hide"><section class="ftable of" id="ofTable"></section><section class="dockp" id="ofDock"></section></main>
 <main id="rlView" class="hide">
   <div id="rGrid">
@@ -465,7 +555,18 @@ main{padding-bottom:56px!important}
 <li>Quitter la table avant le tour rembourse tes mises.</li>
 <li>La roue est réduite pendant les mises pour bien voir la table (bouton ⤢ pour l’agrandir). Quand ton tour part, elle s’ouvre en grand toute seule, puis la table revient après le résultat.</li>
 </ul><p style="text-align:right"><button class="btn" data-close>Fermer</button></p></div></div>
-<div class="modal" id="mTop"><div class="box"><h2>Classement du blackjack (gains nets)</h2><div id="topBody">…</div><p style="text-align:right"><button class="btn" data-close>Fermer</button></p></div></div>
+<div class="modal" id="mPRules"><div class="box"><h2>Règles du poker (Texas Hold'em No-Limit)</h2><ul>
+<li>Chaque joueur reçoit <b>2 cartes privées</b> (toi seul les vois). 5 cartes communes sont retournées : <b>flop</b> (3), <b>turn</b> (1), <b>river</b> (1). Ta main = les 5 meilleures cartes parmi tes 2 cartes et les 5 du board.</li>
+<li><b>Cave</b> : en t'asseyant, tu choisis ta cave (min/max affichés). Elle est débitée de ton solde et devient ton stack à la table. Tu récupères ton stack en quittant la table ; tu peux en rajouter entre deux mains.</li>
+<li><b>Blinds</b> : petite et grosse blind obligatoires, le bouton (D) tourne à chaque main. À deux joueurs, le bouton est petite blind.</li>
+<li>Actions : <b>Se coucher</b>, <b>Check</b> (si personne n'a misé), <b>Suivre</b>, <b>Relancer</b> (montant « à », au moins la relance précédente) ou <b>Tapis</b>. Tu as 25 s par décision (sinon check, ou tu te couches).</li>
+<li><b>Tapis</b> et pots annexes : si tu es à tapis pour moins que les autres, tu ne peux gagner que la part du pot à laquelle tu as participé.</li>
+<li>Meilleure main : quinte flush &gt; carré &gt; full &gt; couleur &gt; quinte &gt; brelan &gt; double paire &gt; paire &gt; carte haute. Égalité : le pot est partagé.</li>
+<li>Si tout le monde se couche, le dernier joueur gagne sans montrer ses cartes.</li>
+<li>Si tu quittes en pleine main, tu te couches et ton stack t'est rendu à la fin de la main. Si le bot redémarre, tes jetons en jeu te sont remboursés.</li>
+<li>Raccourcis : <kbd>F</kbd> se coucher · <kbd>C</kbd> check / suivre.</li>
+</ul><p style="text-align:right"><button class="btn" data-close>Fermer</button></p></div></div>
+<div class="modal" id="mTop"><div class="box"><h2 id="topTitle">Classement du blackjack (gains nets)</h2><div id="topBody">…</div><p style="text-align:right"><button class="btn" data-close>Fermer</button></p></div></div>
 <div class="modal" id="mRules"><div class="box"><h2>Règles du blackjack</h2><ul>
 <li>Bats le croupier sans dépasser <b>21</b>. Figures = 10, As = 1 ou 11.</li>
 <li><b>Mise libre</b> : tape le montant que tu veux (ex. <code>250</code>, <code>1.5k</code>, <code>2m</code>) ou clique sur les jetons. « Tapis » = tout ton solde.</li>
@@ -548,10 +649,10 @@ const chipRow = $('#chipRow');
 });
 const emo = $('#emotes');
 
-function parseAmt(s) {
+function parseAmt(s, allVal) {
   s = String(s || '').trim().toLowerCase().replace(/\s/g, '').replace(',', '.');
   if (!s) return 0;
-  if (s === 'all' || s === 'max' || s === 'tapis') return Math.floor((W.view === 'roulette' ? rBal() : mySeat() ? mySeat().bal : 0) * 100) / 100;
+  if (s === 'all' || s === 'max' || s === 'tapis') return allVal != null ? Math.floor(allVal * 100) / 100 : Math.floor((W.view === 'roulette' ? rBal() : mySeat() ? mySeat().bal : 0) * 100) / 100;
   const m = s.match(/^(\d*\.?\d+)([kmb]?)$/); if (!m) return NaN;
   const mult = { '': 1, k: 1e3, m: 1e6, b: 1e9 }[m[2]];
   return Math.floor(Number(m[1]) * mult * 100 + 1e-6) / 100;
@@ -575,8 +676,10 @@ let es;
 function connect() {
   es = new EventSource('/api/stream?t=' + encodeURIComponent(TOKEN));
   es.addEventListener('hello', (e) => { const d = JSON.parse(e.data); me = d; COIN = d.coin || COIN; seatsN = d.seats || 5; $('#coin').textContent = COIN;
-    $('#meName').textContent = d.name; setAvatar($('#meAv'), d.avatar, d.name); $('#conn').style.display = 'none'; rOnHello(d); });
+    $('#meName').textContent = d.name; setAvatar($('#meAv'), d.avatar, d.name); $('#conn').style.display = 'none'; rOnHello(d); pOnHello(d); });
   es.addEventListener('roulette', (e) => { const st = JSON.parse(e.data); offset = st.now - Date.now(); rRender(st); });
+  es.addEventListener('poker', (e) => { const st = JSON.parse(e.data); offset = st.now - Date.now(); pRender(st); });
+  es.addEventListener('bal', (e) => { W.bal = JSON.parse(e.data).bal; pHeader(); });
   es.addEventListener('chathist', (e) => { C.msgs = JSON.parse(e.data); cRender(); });
   es.addEventListener('chat', (e) => cOnMsg(JSON.parse(e.data)));
   es.addEventListener('state', (e) => { $('#conn').style.display = 'none'; const st = JSON.parse(e.data); offset = st.now - Date.now(); render(st); });
@@ -607,12 +710,13 @@ function flyFrom(d, from, delay = 0) {
   const dx = s.left + s.width / 2 - (r.left + r.width / 2), dy = s.top + s.height / 2 - (r.top + r.height / 2);
   d.animate([{ transform: `translate(${dx}px,${dy}px) rotate(-20deg) scale(.55)`, opacity: .25 }, { transform: 'none', opacity: 1 }], { duration: 500, delay, easing: 'cubic-bezier(.2,.9,.25,1)', fill: 'backwards' });
 }
-function syncCards(container, cards) {
+function syncCards(container, cards, map = cardEls, src = '#shoe') {
+  let nNew = 0;
   for (const c of cards) {
-    let d = cardEls.get(c.id);
+    let d = map.get(c.id);
     if (!d) {
-      d = makeCard(c); cardEls.set(c.id, d); container.append(d);
-      flyFrom(d, $('#shoe')); SFX.deal();
+      d = makeCard(c); map.set(c.id, d); container.append(d);
+      flyFrom(d, $(src), (nNew++) * 110); SFX.deal();
       if (c.r) requestAnimationFrame(() => requestAnimationFrame(() => d.classList.remove('down')));
     } else {
       if (d.parentNode !== container) container.append(d);
@@ -621,10 +725,10 @@ function syncCards(container, cards) {
     }
   }
 }
-function sweep(live) {
-  for (const [id, d] of cardEls) if (!live.has(id)) {
-    cardEls.delete(id);
-    const r = d.getBoundingClientRect(), s = $('#shoe').getBoundingClientRect();
+function sweep(live, map = cardEls, src = '#shoe') {
+  for (const [id, d] of map) if (!live.has(id)) {
+    map.delete(id);
+    const r = d.getBoundingClientRect(), s = $(src).getBoundingClientRect();
     const dx = s.left - r.left, dy = s.top - r.top;
     d.style.pointerEvents = 'none';
     const a = d.animate([{ transform: 'none', opacity: 1 }, { transform: `translate(${dx}px,${dy}px) rotate(25deg) scale(.5)`, opacity: 0 }], { duration: 480, easing: 'ease-in', fill: 'forwards' });
@@ -791,6 +895,7 @@ function tick() {
     else cd.textContent = '';
     if (S.turn) { const b = seatEls[S.turn.seat].root.querySelector('.bar i'); if (b) b.style.width = Math.max(0, Math.min(100, (rem / timerTotal) * 100)) + '%'; }
   }
+  pTick();
   requestAnimationFrame(tick);
 }
 
@@ -814,7 +919,7 @@ $('#bLeave').onclick = () => { if (confirm('Quitter la table ? (ta mise éventue
 document.addEventListener('keydown', (e) => {
   if (e.target.tagName === 'INPUT' || e.ctrlKey || e.metaKey || e.altKey) return;
   const k = e.key.toLowerCase(), map = { h: '#bHit', s: '#bStand', d: '#bDbl', p: '#bSplit' };
-  if (map[k] && $('#pPlay').style.display !== 'none') { const b = $(map[k]); if (!b.disabled) b.click(); }
+  if (map[k] && W.view === 'bj' && $('#pPlay').style.display !== 'none') { const b = $(map[k]); if (!b.disabled) b.click(); }
 });
 // modales
 document.querySelectorAll('[data-close]').forEach((b) => (b.onclick = () => b.closest('.modal').classList.remove('on')));
@@ -823,7 +928,8 @@ $('#bRules').onclick = () => $('#mRules').classList.add('on');
 $('#bTop').onclick = async () => {
   $('#mTop').classList.add('on'); const box = $('#topBody'); box.textContent = '…';
   try {
-    const d = await (await fetch('/api/top')).json();
+    const pk = W.view === 'poker'; $('#topTitle').textContent = pk ? 'Classement du poker (gains nets)' : 'Classement du blackjack (gains nets)';
+    const d = await (await fetch('/api/top' + (pk ? '?g=poker' : ''))).json();
     if (!d.top.length) { box.textContent = 'Personne n’a encore terminé de manche.'; return; }
     const t = el('table'); t.innerHTML = '<tr><th>#</th><th>Joueur</th><th>Gains nets</th><th>Manches</th><th>Victoires</th></tr>';
     d.top.forEach((r, i) => { const tr = el('tr'); const c = (x, cl) => { const td = el('td', cl, x); tr.append(td); };
@@ -835,11 +941,11 @@ const sndBtn = $('#bSnd'); const refreshSnd = () => (sndBtn.textContent = sndOn 
 sndBtn.onclick = () => { sndOn = !sndOn; try { localStorage.setItem('znk_snd', sndOn ? '1' : '0'); } catch {} refreshSnd(); if (sndOn) SFX.chip(); };
 document.addEventListener('pointerdown', () => ac(), { once: true });
 // retour sur l'onglet : resynchronise le solde
-document.addEventListener('visibilitychange', () => { if (!document.hidden && mySeat()) send('sync'); if (!document.hidden && W.view === 'roulette' && W.joined) send('rsync'); });
+document.addEventListener('visibilitychange', () => { if (!document.hidden && mySeat()) send('sync'); if (!document.hidden && W.view === 'roulette' && W.joined) send('rsync'); if (!document.hidden && W.view === 'poker') pSend('psync'); });
 
 // ============================================================= CHAT EN DIRECT (un salon par jeu)
 const C = { msgs: {}, open: false, unread: 0 };
-const CNAME = { hub: 'Accueil', bj: 'Blackjack', roulette: 'Roulette', 'off-bj': 'Blackjack solo', 'off-fuse': 'Fusé', 'off-mine': 'Mine' };
+const CNAME = { hub: 'Accueil', bj: 'Blackjack', poker: 'Poker', roulette: 'Roulette', 'off-bj': 'Blackjack solo', 'off-fuse': 'Fusé', 'off-mine': 'Mine' };
 const cRoom = () => W.view;
 function cLine(m) {
   const d = el('div', 'cm' + (me && m.uid === me.uid ? ' mine' : '')), t = new Date(m.t);
@@ -927,6 +1033,239 @@ $('#rClear').onclick = () => { ac(); send('rclear'); };
 function rEnter() { if (!me || W.joined || !W.info) return; W.joined = true; send('rjoin'); }
 function rLeaveNow() { if (W.joined) { W.joined = false; send('rleave'); } }
 
+// ============================================================= POKER (Texas Hold'em No-Limit — même table que le blackjack)
+const P = { S: null, info: null, timerTotal: 1, lastDeadline: 0, lastTurnKey: '', raiseKey: '', rule: null, cardEls: new Map(), shown: new Set(), seats: [] };
+const r2 = (n) => Math.round(n * 100) / 100;
+const P_STREET = { dealing: 'Distribution', preflop: 'Pré-flop', flop: 'Flop', turn: 'Turn', river: 'River', showdown: 'Abattage', result: 'Résultat' };
+{
+  const box = $('#pSeats');
+  for (let i = 0; i < 5; i++) {
+    const root = el('div', 'seat'); root.dataset.i = i;
+    const lact = el('div', 'lact');
+    const hand = el('div', 'hand'), cards = el('div', 'cards hole'), hname = el('div');
+    hand.append(cards, hname);
+    const bet = el('div', 'betspot'), tags = el('div', 'ptags'), plate = el('div', 'plate'), holder = el('div');
+    root.append(el('div', 'num', 'PLACE ' + (i + 1)), lact, hand, bet, tags, plate, holder);
+    box.append(root);
+    P.seats.push({ root, lact, hand, cards, hname, bet, tags, plate, holder, res: null });
+  }
+}
+const pMyIdx = () => (P.S && me ? P.S.seats.findIndex((p) => p && p.uid === me.uid) : -1);
+const pMe = () => { const i = pMyIdx(); return i >= 0 ? P.S.seats[i] : null; };
+function pHeader() { if (W.view === 'poker') $('#meBal').textContent = W.bal != null ? num(W.bal) + ' ' + COIN : 'Casino'; }
+async function pSend(a, x) { const ok = await send(a, x); pHeader(); return ok; }
+function pOnHello(d) {
+  P.info = d.poker || null;
+  document.querySelectorAll('.pcoin').forEach((n) => (n.textContent = COIN));
+  if (P.info) $('#pBlinds').textContent = 'blinds ' + num(P.info.sb) + ' / ' + num(P.info.bb);
+  hubPoker(!!P.info);
+}
+function hubPoker(ok) { const g = $('#gcPoker'); if (g) g.disabled = !ok; const t = document.querySelector('.tab[data-g="poker"]'); if (t) t.disabled = !ok; }
+function pHub() {
+  const w = $('#gPkLive'); if (!w) return;
+  if (!P.info) { w.textContent = 'Indisponible'; return; }
+  const n = P.S ? P.S.seats.filter(Boolean).length : null;
+  w.textContent = n == null ? '' : n ? n + ' joueur' + (n > 1 ? 's' : '') + ' à table' : 'Table libre';
+}
+
+function pRender(st) {
+  P.S = st;
+  if (W.view !== 'poker') return; // le rendu complet se fait à l'entrée dans la vue (évite sons et animations hors-champ)
+  if (st.deadline !== P.lastDeadline) { P.lastDeadline = st.deadline; P.timerTotal = Math.max(1, st.deadline - st.now); }
+  const live = new Set();
+  st.board.forEach((c) => live.add(c.id));
+  syncCards($('#pBoard'), st.board, P.cardEls, '#pDeck');
+  $('#pStreet').textContent = P_STREET[st.phase] || '';
+  const potBox = $('#pPot'); potBox.textContent = '';
+  if (st.pot > 0) potBox.append(el('span', 'pill bj', 'Pot : ' + num(st.pot) + ' ' + COIN));
+  const mi = pMyIdx();
+  const myTurn = !!(st.turn != null && mi >= 0 && st.turn === mi);
+  st.seats.forEach((p, i) => {
+    const se = P.seats[i];
+    se.root.classList.toggle('mine', !!p && !!me && p.uid === me.uid);
+    se.root.classList.toggle('turn', st.turn === i);
+    if (!p) {
+      se.lact.className = 'lact'; se.lact.textContent = ''; se.hname.textContent = ''; se.bet.textContent = ''; se.bet.dataset.k = ''; se.tags.textContent = '';
+      se.hand.classList.remove('fold'); se.plate.style.display = 'none'; se.holder.textContent = '';
+      if (se.res) { se.res.remove(); se.res = null; }
+      if (mi < 0) { const b = el('button', 'sitbtn', 'Prendre place'); b.onclick = () => pSit(i); se.holder.append(b); }
+      else se.holder.append(el('div', 'empty', 'Place libre'));
+      return;
+    }
+    const mine = !!me && p.uid === me.uid;
+    se.holder.textContent = ''; se.plate.style.display = '';
+    if (!se.plate.firstChild || se.plate.dataset.uid !== p.uid) {
+      se.plate.textContent = ''; se.plate.dataset.uid = p.uid;
+      const av = el('div', 'av'); setAvatar(av, p.avatar, p.name);
+      const tx = el('div'); tx.append(el('div', 'nm'), el('div', 'bl'));
+      const dot = el('div', 'dot'); const bar = el('div', 'bar'); bar.append(el('i'));
+      se.plate.append(av, tx, dot, bar);
+    }
+    se.plate.querySelector('.nm').textContent = p.name + (p.leaving ? ' (part)' : '');
+    se.plate.querySelector('.bl').textContent = num(p.stack) + ' ' + COIN;
+    se.plate.querySelector('.dot').className = 'dot' + (p.online ? '' : ' off');
+    // bouton du donneur + blinds
+    se.tags.textContent = '';
+    if (st.button === i && st.phase !== 'waiting') se.tags.append(el('span', 'ptag d', 'D'));
+    if (p.inHand && st.sb === i) se.tags.append(el('span', 'ptag', 'SB'));
+    if (p.inHand && st.bb === i) se.tags.append(el('span', 'ptag', 'BB'));
+    // cartes privées (les tiennes sont visibles, celles des autres sont face cachée jusqu'à l'abattage)
+    p.cards.forEach((c) => live.add(c.id));
+    syncCards(se.cards, p.cards, P.cardEls, '#pDeck');
+    se.hand.classList.toggle('fold', !!p.folded);
+    se.hname.textContent = '';
+    if (p.hand && !p.folded) se.hname.append(el('span', 'pill t21', p.hand));
+    // dernière action
+    let t = '', c = '';
+    if (p.folded) { t = 'Couché'; c = 'fold'; }
+    else if (p.last) {
+      c = p.last.a;
+      t = p.last.a === 'check' ? 'Check' : p.last.a === 'call' ? 'Suit ' + num(p.last.v) : p.last.a === 'raise' ? 'Relance ' + num(p.last.v) : p.last.a === 'allin' ? 'TAPIS ' + num(p.last.v) : '';
+    } else if (p.allin && p.inHand) { t = 'TAPIS'; c = 'allin'; }
+    se.lact.className = 'lact ' + c; se.lact.textContent = t;
+    // mise de la rue devant le joueur
+    const k = String(p.bet);
+    if (se.bet.dataset.k !== k) {
+      const grew = Number(se.bet.dataset.k || 0) < p.bet;
+      se.bet.dataset.k = k; se.bet.textContent = '';
+      if (p.bet > 0) { const ch = el('div', 'chips'); ch.innerHTML = chipsHTML(p.bet); se.bet.append(ch, el('div', 'betamt', num(p.bet))); if (grew) SFX.chip(); }
+    }
+    // résultat de la main
+    if (st.phase === 'result' && p.inHand && p.net != null) {
+      if (!se.res && p.won > 0) {
+        se.res = el('div', 'res ' + (p.net > 0 ? 'win' : 'push'), p.net > 0 ? 'GAGNÉ +' + num(p.net) : 'ÉGALITÉ');
+        se.hand.append(se.res);
+      }
+      const rk = st.round + ':' + i;
+      if (!P.shown.has(rk)) {
+        P.shown.add(rk);
+        floatText(se.root, (p.net > 0 ? '+' : '') + num(p.net), p.net > 0 ? 'pos' : p.net < 0 ? 'neg' : 'neu');
+        if (mine) (p.net > 0 ? SFX.win : p.net < 0 ? SFX.lose : SFX.push)();
+      }
+    } else if (se.res) { se.res.remove(); se.res = null; }
+  });
+  sweep(live, P.cardEls, '#pDeck');
+  // son du tour
+  const tk = st.turn != null ? st.round + ':' + st.phase + ':' + st.turn : '';
+  if (tk && tk !== P.lastTurnKey && myTurn) { SFX.turn(); try { navigator.vibrate && navigator.vibrate(120); } catch {} }
+  P.lastTurnKey = tk;
+  pHeader();
+  const feed = $('#pFeed'); feed.textContent = ''; st.feed.slice(-4).forEach((f) => feed.append(el('div', '', f.text)));
+  $('#pMsg').textContent = pMsgText(st, mi, myTurn);
+  pDock(st, mi, myTurn);
+}
+
+function pMsgText(st, mi, myTurn) {
+  const nm = (i) => (st.seats[i] ? st.seats[i].name : '');
+  switch (st.phase) {
+    case 'waiting': return st.seats.filter(Boolean).length < 2 ? 'En attente d’un adversaire (2 joueurs minimum)' : 'La main démarre dans un instant';
+    case 'dealing': return 'Distribution des cartes…';
+    case 'preflop': case 'flop': case 'turn': case 'river': return st.turn == null ? '…' : myTurn ? 'À toi de parler' : 'Parole à ' + nm(st.turn);
+    case 'showdown': return 'Abattage des mains…';
+    case 'result': {
+      const w = st.seats.filter((p) => p && p.net > 0);
+      return w.length ? w.map((p) => p.name + ' +' + num(p.net)).join(' · ') : 'Main terminée';
+    }
+  }
+  return '';
+}
+
+function pBuyDefault() {
+  const inp = $('#pBuyAmt');
+  if (inp.value || document.activeElement === inp || !P.S) return;
+  const lim = Math.min(P.S.max, W.bal != null ? W.bal : P.S.max);
+  const want = Math.min(100 * P.S.blinds.bb, lim);
+  if (want >= P.S.min) inp.value = String(Math.floor(want * 100) / 100);
+}
+
+function pDock(st, mi, myTurn) {
+  const ms = mi >= 0 ? st.seats[mi] : null;
+  const handNow = !!ms && ms.inHand && st.phase !== 'waiting' && st.phase !== 'result';
+  $('#pkJoin').style.display = ms ? 'none' : '';
+  $('#pkAct').style.display = myTurn ? '' : 'none';
+  $('#pkTop').style.display = ms && ms.stack < st.max && !handNow ? '' : 'none';
+  $('#pkLeave').style.display = ms ? '' : 'none';
+  const info = $('#pkInfo');
+  if (!ms) {
+    info.innerHTML = `Blinds <b>${num(st.blinds.sb)} / ${num(st.blinds.bb)}</b> · cave de ${num(st.min)} à ${num(st.max)} ${COIN}. <b>Prends une place</b> avec ta cave.`;
+    pBuyDefault();
+  } else if (myTurn) info.textContent = '';
+  else if (ms.leaving) info.textContent = 'Tu quittes la table à la fin de la main.';
+  else if (handNow && ms.folded) info.textContent = 'Tu t’es couché : attends la fin de la main.';
+  else if (handNow) info.textContent = 'Les autres jouent… tes cartes ne sont visibles que par toi.';
+  else if (st.phase === 'waiting') info.textContent = st.seats.filter(Boolean).length < 2 ? 'Il faut au moins 2 joueurs pour lancer une main.' : '';
+  else if (st.phase === 'result') info.textContent = '';
+  else info.textContent = 'Tu rejoindras la table à la prochaine main.';
+  if (myTurn) {
+    const toCall = Math.max(0, r2(st.currentBet - ms.bet));
+    const maxTo = r2(ms.bet + ms.stack);
+    const minTo = Math.min(maxTo, r2(st.currentBet + st.minRaise));
+    P.rule = { toCall, minTo, maxTo, pot: st.pot, cur: st.currentBet, stack: ms.stack };
+    $('#bPCall').firstChild.textContent = toCall <= 0 ? 'Check' : ms.stack <= toCall ? 'Tapis ' + num(ms.stack) : 'Suivre ' + num(toCall);
+    $('#bPRaise').textContent = st.currentBet > 0 ? 'Relancer' : 'Miser';
+    $('#bPAll').textContent = 'Tapis ' + num(ms.stack);
+    const canRaise = !ms.noRaise && ms.stack > toCall;
+    ['#bPMin', '#bPHalf', '#bP34', '#bPPot', '#bPRaise', '#bPAll'].forEach((q) => ($(q).disabled = !canRaise));
+    $('#pRaiseAmt').disabled = !canRaise;
+    const key = st.round + ':' + st.phase + ':' + st.turn;
+    if (P.raiseKey !== key) { P.raiseKey = key; $('#pRaiseAmt').dataset.touched = ''; $('#pRaiseAmt').value = String(minTo); }
+  }
+}
+const pPreset = (f) => {
+  const r = P.rule; if (!r) return;
+  const to = Math.min(r.maxTo, Math.max(r.minTo, r2(r.cur + f * (r.pot + r.toCall))));
+  $('#pRaiseAmt').dataset.touched = '1'; $('#pRaiseAmt').value = String(to);
+};
+
+async function pSit(i) {
+  ac();
+  const a = parseAmt($('#pBuyAmt').value, Math.min(W.bal != null ? W.bal : 0, P.S ? P.S.max : 0));
+  if (!(a > 0)) return toast('Entre ta cave (ex. 500, 1.5k).');
+  await pSend('psit', { seat: i, amount: a });
+}
+
+// ---- contrôles
+$('#bPBuyMin').onclick = () => { if (P.S) { $('#pBuyAmt').value = String(P.S.min); } };
+$('#bPBuy100').onclick = () => { if (P.S) { $('#pBuyAmt').value = String(Math.min(P.S.max, 100 * P.S.blinds.bb)); } };
+$('#bPBuyMax').onclick = () => { if (P.S) { $('#pBuyAmt').value = String(Math.floor(Math.min(P.S.max, W.bal != null ? W.bal : P.S.max) * 100) / 100); } };
+$('#pBuyAmt').addEventListener('keydown', (e) => { if (e.key === 'Enter') { const f = P.S && P.S.seats.findIndex((p) => !p); if (f >= 0) pSit(f); } });
+$('#bPFold').onclick = () => pSend('pfold');
+$('#bPCall').onclick = () => pSend(P.rule && P.rule.toCall <= 0 ? 'pcheck' : 'pcall');
+$('#bPMin').onclick = () => { if (P.rule) { $('#pRaiseAmt').dataset.touched = '1'; $('#pRaiseAmt').value = String(P.rule.minTo); } };
+$('#bPHalf').onclick = () => pPreset(0.5);
+$('#bP34').onclick = () => pPreset(0.75);
+$('#bPPot').onclick = () => pPreset(1);
+$('#pRaiseAmt').addEventListener('input', () => { $('#pRaiseAmt').dataset.touched = '1'; });
+$('#bPRaise').onclick = () => {
+  ac(); const a = parseAmt($('#pRaiseAmt').value, P.rule ? P.rule.maxTo : 0);
+  if (!(a > 0)) return toast('Entre un montant valide (ex. 120, 1.5k).');
+  pSend('praise', { amount: a });
+};
+$('#pRaiseAmt').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#bPRaise').click(); });
+$('#bPAll').onclick = () => pSend('pallin');
+$('#bPTopMax').onclick = () => { const m = pMe(); if (m && P.S) $('#pTopAmt').value = String(Math.max(0, Math.floor(Math.min(P.S.max - m.stack, W.bal != null ? W.bal : 0) * 100) / 100)); };
+$('#bPTop').onclick = async () => {
+  const m = pMe(); const a = parseAmt($('#pTopAmt').value, m && P.S ? Math.min(P.S.max - m.stack, W.bal || 0) : 0);
+  if (!(a > 0)) return toast('Entre le montant à ajouter.');
+  if (await pSend('pbuy', { amount: a })) { $('#pTopAmt').value = ''; SFX.chip(); }
+};
+$('#pkLeave').onclick = () => { if (confirm('Quitter la table ? Si une main est en cours, tu te couches ; ton stack te sera rendu.')) pSend('pleave'); };
+document.addEventListener('keydown', (e) => {
+  if (W.view !== 'poker' || e.target.tagName === 'INPUT' || e.ctrlKey || e.metaKey || e.altKey) return;
+  if ($('#pkAct').style.display === 'none') return;
+  const k = e.key.toLowerCase();
+  if (k === 'f') $('#bPFold').click(); else if (k === 'c') $('#bPCall').click();
+});
+function pTick() {
+  const st = P.S; if (!st || W.view !== 'poker') return;
+  const rem = st.deadline ? st.deadline - nowS() : 0;
+  const cd = $('#pCd');
+  const show = rem > 0 && ((st.phase === 'waiting' && st.seats.filter(Boolean).length >= 2) || st.turn != null);
+  const txt = show ? String(Math.ceil(rem / 1000)) : '';
+  if (cd.textContent !== txt) cd.textContent = txt;
+  if (st.turn != null) { const b = P.seats[st.turn].root.querySelector('.bar i'); if (b) b.style.width = Math.max(0, Math.min(100, (rem / P.timerTotal) * 100)) + '%'; }
+}
+
 // ---- vues
 function setView(v) {
   if (v === W.view) return;
@@ -937,20 +1276,29 @@ function setView(v) {
     if (W.S && W.S.phase === 'betting' && p && p.total > 0 && !confirm('Quitter la roulette ? Tes mises en cours seront remboursées.')) return;
     rLeaveNow();
   }
+  if (W.view === 'poker' && v !== 'poker') {
+    const pm = pMe();
+    if (pm) {
+      if (!confirm('Quitter la table de poker ? Tu seras couché et ton stack te sera rendu.')) return;
+      pSend('pleave');
+    }
+  }
   W.view = v;
   $('#hubView').classList.toggle('hide', v !== 'hub');
   $('#bjView').classList.toggle('hide', v !== 'bj');
+  $('#pkView').classList.toggle('hide', v !== 'poker');
   $('#rlView').classList.toggle('hide', v !== 'roulette');
   $('#ofView').classList.toggle('hide', !v.startsWith('off-'));
   document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('on', t.dataset.g === v));
-  document.title = v.startsWith('off-') ? 'Casino · Jeux offline' : v === 'roulette' ? 'Casino · Roulette' : v === 'bj' ? 'Casino · Blackjack' : 'Casino · Jeux';
-  $('#bTop').classList.toggle('hide', v !== 'bj');
+  document.title = v.startsWith('off-') ? 'Casino · Jeux offline' : v === 'roulette' ? 'Casino · Roulette' : v === 'bj' ? 'Casino · Blackjack' : v === 'poker' ? 'Casino · Poker' : 'Casino · Jeux';
+  $('#bTop').classList.toggle('hide', v !== 'bj' && v !== 'poker');
   $('#bRules').classList.toggle('hide', v === 'hub' || v.startsWith('off-'));
   try { sessionStorage.setItem('znk_v', v); } catch {}
   C.unread = 0; cRender();
   if (v.startsWith('off-')) ofOpen(v);
+  if (v === 'poker') { pSend('psync'); if (P.S) pRender(P.S); }
   if (v === 'roulette') { rEnter(); if (W.S) rRender(W.S); else $('#meBal').textContent = num(rBal()) + ' ' + COIN; }
-  else { const m = mySeat(); $('#meBal').textContent = m ? num(m.bal) + ' ' + COIN : v === 'bj' ? 'Spectateur' : (W.bal != null ? num(W.bal) + ' ' + COIN : 'Casino'); }
+  else { const m = v === 'poker' ? null : mySeat(); $('#meBal').textContent = m ? num(m.bal) + ' ' + COIN : v === 'bj' ? 'Spectateur' : (W.bal != null ? num(W.bal) + ' ' + COIN : 'Casino'); }
 }
 document.querySelectorAll('.gcard').forEach((c) => (c.onclick = () => { ac(); setView(c.dataset.go); }));
 $('.logo').onclick = () => { ac(); setView('hub'); };
@@ -964,9 +1312,9 @@ function updHub() {
   const m = W.S ? W.S.players.length : null;
   w.textContent = m == null ? '' : m ? plural(m, 'joueur') + ' en jeu' : 'Table ouverte';
 }
-hubRoulette(false); setInterval(updHub, 1000); updHub();
+hubRoulette(false); hubPoker(false); setInterval(() => { updHub(); pHub(); }, 1000); updHub();
 document.querySelectorAll('.tab').forEach((t) => (t.onclick = () => { ac(); setView(t.dataset.g); }));
-$('#bRules').onclick = () => $(W.view === 'roulette' ? '#mRRules' : '#mRules').classList.add('on');
+$('#bRules').onclick = () => $(W.view === 'roulette' ? '#mRRules' : W.view === 'poker' ? '#mPRules' : '#mRules').classList.add('on');
 function rOnHello(d) { W.info = d.roulette; W.joined = false; if (W.info) rBuild(); if (W.view === 'roulette') rEnter(); hubRoulette(!!W.info); updHub(); }
 
 // ---- rendu de l'état
