@@ -296,7 +296,7 @@ const COIN_PLAIN = String(process.env.COIN_TEXT || COIN).trim() || COIN;
 const plain = (s) => String(s).split(COIN).join(COIN_PLAIN);
 console.log(`[coin] ${COIN} (texte : ${COIN_PLAIN})`);
 
-const DAILY_AMOUNT = 35;
+const DAILY_AMOUNT = 4;
 const INVITE_REWARD = 1;
 const LEADERBOARD_REFRESH_MS = 60_000;
 const IDLE_MS = 90_000;
@@ -6821,6 +6821,7 @@ async function handlePokerButton(i) {
     id: i.user.id,
     name: i.member?.displayName || i.user.globalName || i.user.username,
     avatar: i.user.displayAvatarURL({ extension: 'png', size: 128 }),
+    role: (() => { const r = i.member?.roles?.highest; return r && r.id !== i.guild.id ? r.name : ''; })(), // rôle Discord le plus haut (affiché dans le chat)
   }, i.guild.id);
   if (!url) return respondText(i, '⚠️ Lien indisponible, réessaie dans un instant.');
   const bal = await getBalance(i.user.id).catch(() => null);
