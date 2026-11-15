@@ -54,6 +54,19 @@ function withBanner(payload, file) {
   }
   return payload;
 }
+// Panneau / menu sans image : on lui met la bannière animée générique (images/generic_text_card.gif).
+// attachments: [] retire l'ancienne bannière quand le panneau est mis à jour (sinon elle s'afficherait en double).
+function animPanel(payload) {
+  try {
+    const e = payload.embeds?.[0];
+    if (!e || e.data?.image || payload.files?.length) return payload;
+    withBanner(payload, 'generic_text_card.png');
+    payload.attachments = [];
+  } catch {
+    /* bannière facultative */
+  }
+  return payload;
+}
 const bgSource = (envName, file) => String(process.env[envName] || '').trim() || localImg(file);
 // Charge une image depuis une URL http(s) ou un fichier local
 async function readImageSource(src, loadImage, timeoutMs = 8000) {
@@ -1310,8 +1323,6 @@ function statsFallbackEmbed(user, st, balance, lang) {
 // ============================================================
 const MINES_CELLS = 24;
 const MINES_EDGE = 0.96;
-// 1er diamant : paie MOINS que la mise (il faut au moins 2 diamants pour être rentable)
-const MINES_FIRST_MULT = 0.9;
 const MINES_MAX_MULT = 1000;
 const LEVELS = {
   easy: { name: 'Easy', emoji: '🟢', mines: 4, style: ButtonStyle.Success },
@@ -1322,7 +1333,6 @@ const LEVELS = {
 
 function minesMultiplier(picks, mines) {
   if (picks <= 0) return 1;
-  if (picks === 1) return Math.max(0.01, Math.floor(MINES_FIRST_MULT * coef('mines') * 100) / 100);
   let m = 1;
   for (let k = 0; k < picks; k++) m *= (MINES_CELLS - k) / (MINES_CELLS - mines - k);
   return Math.min(MINES_MAX_MULT, Math.max(0.01, Math.floor(m * MINES_EDGE * coef('mines') * 100) / 100));
@@ -1337,14 +1347,14 @@ function minesPickerPayload() {
     .setTitle('💣 Mines : choisis ta difficulté')
     .setColor(COLORS.blue)
     .setDescription(
-      `${lines.join('\n')}\n\nPlus il y a de mines, plus le multiplicateur grimpe vite (max ${fx(MINES_MAX_MULT)}).\n⚠️ Le 1er 💎 paie moins que ta mise : il en faut **2** pour être rentable.`
+      `${lines.join('\n')}\n\nPlus il y a de mines, plus le multiplicateur grimpe vite (max ${fx(MINES_MAX_MULT)}).`
     );
   const row = new ActionRowBuilder().addComponents(
     ...Object.entries(LEVELS).map(([key, Lv]) =>
       new ButtonBuilder().setCustomId(`mines_lvl_${key}`).setLabel(Lv.name).setEmoji(Lv.emoji).setStyle(Lv.style)
     )
   );
-  return { embeds: [embed], components: [row] };
+  return animPanel({ embeds: [embed], components: [row] });
 }
 
 function minesRows(game, over) {
@@ -1523,7 +1533,7 @@ async function settleMines(game, kind, i) {
           ? `⏱️ Temps écoulé, encaissement automatique : **${fmt(payout)}** (${fx(mult)})`
           : payout > game.bet
             ? `✅ Bien joué ! Tu encaisses **${fmt(payout)}** (${fx(mult)}), profit : **${signed(round2(payout - game.bet))}**.`
-            : `💰 Tu encaisses trop tôt : **${fmt(payout)}** (${fx(mult)}), il faut 2 💎 pour être rentable (${signed(round2(payout - game.bet))}).`;
+            : `💰 Tu encaisses : **${fmt(payout)}** (${fx(mult)}), ${signed(round2(payout - game.bet))}.`;
       if (boost.label) text += `\n⚡ Boost **${boost.label}**`;
     }
 
@@ -1736,13 +1746,22 @@ const bjState = (p, d, hidden, cap) => {
   const vis = hidden ? d.slice(0, 1) : d.slice();
   return { p: p.slice(), d: vis, hidden, cap, ms: 850, pv: p.length ? handValue(p) : null, dv: vis.length ? handValue(vis) : null };
 };
-// Texte sous le GIF
-const bjLiveEmbed = (game, text) =>
+// Mains écrites SOUS l'image (le pied d'une intégration s'affiche sous l'image, la description au-dessus)
+const bjCards = (cards) => cards.map((c) => `${c.r}${c.s}`).join(' ');
+function bjHandFooter(game, revealDealer = false) {
+  const p = `Ta main : ${bjCards(game.player)} (${handInfo(game.player).label})`;
+  if (!game.dealer.length) return p;
+  const d = revealDealer ? `Croupier : ${bjCards(game.dealer)} (${handInfo(game.dealer).label})` : `Croupier : ${bjCards(game.dealer.slice(0, 1))} ?`;
+  return `${p}   ·   ${d}`;
+}
+// Texte au-dessus du GIF + mains en dessous
+const bjLiveEmbed = (game, text, revealDealer = false) =>
   new EmbedBuilder()
     .setColor(COLORS.violet)
     .setImage(`attachment://${game.gifName}`)
     .setDescription(text)
-    .addFields({ name: 'Mise', value: fmt(game.bet), inline: true });
+    .addFields({ name: 'Mise', value: fmt(game.bet), inline: true })
+    .setFooter({ text: bjHandFooter(game, revealDealer) });
 const bjTurnText = (game) => {
   const pInfo = handInfo(game.player);
   return `À toi : **Tirer**, **Rester**${game.player.length === 2 ? ' ou **Doubler**' : ''}.` + (pInfo.isSoft ? `\n💡 Ton As te donne **${pInfo.low}** ou **${pInfo.total}**.` : '');
@@ -1766,11 +1785,9 @@ async function bjAnimate(game, deliver, steps, o = {}) {
   if (ok && ctx.gifName) {
     game.gifName = ctx.gifName;
     game.gifUrl = ctx.gifUrl;
-    game.fsRow = ctx.fullscreenRow || null;
   } else {
     game.gifName = null; // plus de GIF à l'écran : les mises à jour repassent par le texte
     game.gifUrl = null;
-    game.fsRow = null;
   }
   return ctx;
 }
@@ -1891,8 +1908,8 @@ async function startBlackjack(i, bet) {
       if (game.gifName) {
         // le GIF reste affiché : on ajoute seulement le résultat sous l'image
         const kindN = out.color === COLORS.green ? 'win' : out.color === COLORS.red ? 'lose' : 'push';
-        const e = bjLiveEmbed(game, `${outcomeBanner(kindN)}${out.text}`).setColor(outcomeColor(kindN)).addFields({ name: 'Solde', value: fmt(balance), inline: true });
-        await i.editReply({ embeds: [e], components: [...bjRows(game, true), ...(game.fsRow ? [game.fsRow] : [])] }).catch(() => {});
+        const e = bjLiveEmbed(game, `${outcomeBanner(kindN)}${out.text}`, true).setColor(outcomeColor(kindN)).addFields({ name: 'Solde', value: fmt(balance), inline: true });
+        await i.editReply({ embeds: [e], components: bjRows(game, true) }).catch(() => {});
         return;
       }
       putCard(npay, await resultCard(i.user, 'bj', bet, round2(out.payout / bet), round2(out.payout - bet), balance));
@@ -1901,7 +1918,7 @@ async function startBlackjack(i, bet) {
     }
 
     if (game.gifName) {
-      await i.editReply({ embeds: [bjLiveEmbed(game, bjTurnText(game))], components: [...bjRows(game, false), ...(game.fsRow ? [game.fsRow] : [])] }).catch(() => {});
+      await i.editReply({ embeds: [bjLiveEmbed(game, bjTurnText(game))], components: bjRows(game, false) }).catch(() => {});
     } else {
       await i.editReply({ embeds: [bjEmbed(game)], components: bjRows(game, false) }).catch(() => {});
     }
@@ -1987,15 +2004,15 @@ async function settleBlackjack(game, kind, i) {
         components: [],
         outcome: rk,
         resultText: animResultText(rk, mult),
-        decorate: (e) => e.setDescription(kind === 'stand' ? '🃏 Le croupier joue...' : '🃏 Tu dépasses...'),
+        decorate: (e) => e.setDescription(kind === 'stand' ? '🃏 Le croupier joue...' : '🃏 Tu dépasses...').setFooter({ text: `Ta main : ${bjCards(game.player)} (${handInfo(game.player).label})` }),
       });
     }
 
     if (played && game.gifName) {
-      const e = bjLiveEmbed(game, `${outcomeBanner(rk)}${out.text}`)
+      const e = bjLiveEmbed(game, `${outcomeBanner(rk)}${out.text}`, true)
         .setColor(outcomeColor(rk))
         .addFields({ name: 'Solde', value: fmt(balance), inline: true });
-      await game.lastI.editReply({ embeds: [e], components: [...bjRows(game, true), ...(game.fsRow ? [game.fsRow] : [])] });
+      await game.lastI.editReply({ embeds: [e], components: bjRows(game, true) });
       return;
     }
 
@@ -2062,7 +2079,7 @@ async function handleBlackjackButton(i) {
           noShuffle: true,
           noWait: true,
           components: bjRows(game, false),
-          decorate: (e) => e.setDescription(bjTurnText(game)).addFields({ name: 'Mise', value: fmt(game.bet), inline: true }),
+          decorate: (e) => e.setDescription(bjTurnText(game)).addFields({ name: 'Mise', value: fmt(game.bet), inline: true }).setFooter({ text: bjHandFooter(game) }),
         });
         if (!ctx.played || !game.gifName) {
           // GIF impossible : retour à l'affichage texte
@@ -2143,7 +2160,7 @@ function roulettePickerPayload() {
     new ButtonBuilder().setCustomId('rl_vert').setLabel('Vert (0)').setEmoji('🟢').setStyle(ButtonStyle.Success),
     new ButtonBuilder().setCustomId('rl_num').setLabel('Un numéro').setEmoji('🔢').setStyle(ButtonStyle.Secondary)
   );
-  return { embeds: [embed], components: [row1, row2] };
+  return animPanel({ embeds: [embed], components: [row1, row2] });
 }
 
 function rouletteFrames(result, choice) {
@@ -2249,9 +2266,9 @@ async function playRoulette(i, bet, choiceStr) {
       new ButtonBuilder().setCustomId(`replay|rl|${bet}|${choice.key}`).setLabel('Rejouer').setEmoji('🔁').setStyle(ButtonStyle.Success),
       new ButtonBuilder().setCustomId('panel_home').setLabel('Menu ZNK').setEmoji('💜').setStyle(ButtonStyle.Primary)
     );
-    const rlPayload = { embeds: [embed], components: [row, ...(rlCtx.fullscreenRow ? [rlCtx.fullscreenRow] : [])] }; // 🖥️ Plein écran = lien vers le GIF
+    const rlPayload = { embeds: [embed], components: [row] };
     if (rlCtx.gifName) {
-      // le GIF reste affiché (sa dernière image montre le résultat) : le lien « Plein écran » reste valable
+      // le GIF reste affiché (sa dernière image montre le résultat)
       embed.setImage(`attachment://${rlCtx.gifName}`);
       await i.editReply(rlPayload);
     } else {
@@ -2319,10 +2336,10 @@ const chunk = (arr, n) => Array.from({ length: Math.ceil(arr.length / n) }, (_, 
 
 function choicePicker(key, title, desc, choices) {
   const buttons = choices.map(([id, label, emoji, style]) => igButton(key, id, label, emoji, style || ButtonStyle.Primary));
-  return {
+  return animPanel({
     embeds: [new EmbedBuilder().setTitle(title).setColor(COLORS.violet).setDescription(`${desc}\n${LINE}`)],
     components: chunk(buttons, 5).map((r) => new ActionRowBuilder().addComponents(...r)),
-  };
+  });
 }
 
 const DUEL_MULT = 2.1;
@@ -4764,7 +4781,7 @@ async function playInstant(i, key, bet, choice) {
       key
     );
 
-    const igPayload = { embeds: [embed], components: [endGameRow(`replay|${key}|${bet}|${choice}`), ...(gCtx.fullscreenRow ? [gCtx.fullscreenRow] : [])] }; // 🖥️ Plein écran = lien vers le GIF
+    const igPayload = { embeds: [embed], components: [endGameRow(`replay|${key}|${bet}|${choice}`)] };
     if (gCtx.gifName) {
       embed.setImage(`attachment://${gCtx.gifName}`);
       await i.editReply(igPayload);
@@ -4812,28 +4829,8 @@ function buildPanelPayload() {
   const panel = new EmbedBuilder()
     .setColor(0x7C3AED)
     .setTitle('✦ Salon de jeu')
-    .setDescription(
-      [
-        'Bienvenue dans le salon de jeu.',
-        '',
-        `🎁 **Daily** · **${DAILY_AMOUNT}** ${COIN} par jour (minuit Paris)`,
-        '',
-        '▶️ **Start** : ouvre ton casino privé en message privé',
-        '⚙️ **Paramètres** : langue et notifications de victoire',
-        '📊 **Stats** : ta bannière de statistiques',
-        '📖 **Règles** : explications simples de tous les jeux',
-        '📨 **Invites** : tes invitations',
-        '',
-        '🔒 Toutes les parties sont privées.',
-      ].join('\n')
-    )
-    .addFields(
-      { name: 'Jouer', value: 'Start → MP', inline: true },
-      { name: 'Monnaie', value: COIN, inline: true },
-      { name: 'Daily', value: `${DAILY_AMOUNT} ${COIN}`, inline: true }
-    )
-    .setFooter({ text: 'Parties privées' })
-    .setTimestamp();
+    .setDescription('Clique sur **Start** pour ouvrir ton casino privé, puis choisis un jeu et ta mise.')
+    .setFooter({ text: 'Parties privées' });
 
   const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('panel_start').setLabel('Start').setEmoji('▶️').setStyle(ButtonStyle.Success),
@@ -5102,7 +5099,7 @@ function buildGameMenuPayload(userId = null, page = 0, mode = 'all', query = '')
   );
   components.push(nav);
 
-  return { embeds: [embed], components };
+  return animPanel({ embeds: [embed], components });
 }
 
 function buildSettingsPayload(userId) {
@@ -5139,7 +5136,7 @@ function buildSettingsPayload(userId) {
       .setEmoji('⏩')
       .setStyle(skip ? ButtonStyle.Danger : ButtonStyle.Success)
   );
-  return { embeds: [embed], components: [row] };
+  return animPanel({ embeds: [embed], components: [row] });
 }
 
 function buildRulesPayload(userId) {
@@ -5226,7 +5223,7 @@ function buildRulesPayload(userId) {
       .setDescription(desc)
       .setFooter({ text: fr ? 'Mise avant de lancer · parties privées' : 'Bet before playing · private games' })
   );
-  return { embeds, components: [] };
+  return animPanel({ embeds, components: [] });
 }
 
 function modalInput(id, label, { placeholder, value, required = true, max = 30 } = {}) {
@@ -6003,7 +6000,7 @@ function multAdminPayload(note, page = 0) {
       .setDisabled(p >= totalPages - 1)
   );
 
-  return { embeds: [embed], components: [new ActionRowBuilder().addComponents(select), nav] };
+  return animPanel({ embeds: [embed], components: [new ActionRowBuilder().addComponents(select), nav] });
 }
 
 const ADMIN_TITLES = {
