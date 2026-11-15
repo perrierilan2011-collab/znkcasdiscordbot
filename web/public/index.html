@@ -242,6 +242,40 @@ th{color:var(--mut);font-size:12px}
 .lbnone{color:var(--mut);text-align:center;padding:26px 12px;font-size:13px}
 @media(max-width:600px){#topView{padding:16px 8px 64px}.lbgrid{gap:8px}.lbtitle{padding:10px}.lbtitle b{font-size:14px}.lbtitle small{display:none}
   .lbrow{grid-template-columns:24px minmax(0,1fr);gap:2px 8px;padding:8px 10px}.lbrk{width:22px;height:22px;font-size:11px}.lbval{grid-column:2;font-size:12px}}
+/* ---------- RANK : rang (gains cumulés) + ELO ---------- */
+#rankView{align-items:center;padding:24px 16px 64px;overflow:auto}
+.rkwrap{width:100%;max-width:760px;display:flex;flex-direction:column;gap:14px}
+.rkme{background:#0a0a0a;border:1px solid #262626;border-radius:16px;padding:20px;display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px 22px;align-items:center;background-image:radial-gradient(120% 90% at 0% 0%,color-mix(in srgb,var(--c1,#888) 14%,transparent),transparent 60%)}
+.rklogo{display:block;flex:none}
+.rkmain{min-width:0}
+.rkkick{font-size:11px;letter-spacing:.2em;color:var(--mut);font-weight:800;text-transform:uppercase}
+.rkname{margin:2px 0 4px;font-size:30px;line-height:1.1;font-weight:900;letter-spacing:.07em;text-transform:uppercase;background:linear-gradient(90deg,var(--c1),var(--c3));-webkit-background-clip:text;background-clip:text;color:transparent;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rkearn{color:#d4d4d4;font-size:14px}.rkearn b{color:var(--gold);font-variant-numeric:tabular-nums}
+.rkprog{grid-column:1/-1;margin-top:6px}
+.rkbar{position:relative;height:14px;border-radius:99px;background:#161616;border:1px solid #2a2a2a;overflow:hidden}
+.rkfill{height:100%;border-radius:99px;background:linear-gradient(90deg,var(--c2),var(--c1));transition:width .7s ease;min-width:4px}
+.rkbar::after{content:"";position:absolute;inset:0;background:repeating-linear-gradient(90deg,transparent 0 calc(10% - 1px),rgba(0,0,0,.45) calc(10% - 1px) 10%)}
+.rkprow{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:8px;font-size:12px;color:var(--mut)}
+.rkprow b{color:#fff}.rkprow .nx{display:flex;align-items:center;gap:6px;font-weight:700;color:#d4d4d4}
+.rkstats{grid-column:1/-1;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:6px}
+.rkst{background:#111;border:1px solid #232323;border-radius:12px;padding:10px 12px}
+.rkst small{display:block;color:var(--mut);font-size:11px;letter-spacing:.06em;text-transform:uppercase;font-weight:700}
+.rkst b{display:block;margin-top:3px;font-size:19px;font-variant-numeric:tabular-nums}
+.rkst b.elo{color:var(--gold)}
+.rkst i{font-style:normal;font-size:11px;color:var(--mut);font-weight:600}
+.lbrow.rke{grid-template-columns:34px 30px minmax(0,1fr) auto auto;gap:10px}
+.lbrow.rke .rkb{display:flex;align-items:center;gap:6px;color:#bdbdbd;font-size:12px;font-weight:700;white-space:nowrap}
+.lbrow.rke .lbval small{display:block;text-align:right;color:var(--mut);font-size:11px;font-weight:600}
+.rksep{text-align:center;color:var(--mut);padding:2px;letter-spacing:.3em;border-bottom:1px solid #1a1a1a}
+.rkrow{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:12px;align-items:center;padding:9px 16px;border-bottom:1px solid #1a1a1a}
+.rkrow:last-child{border-bottom:0}
+.rkrow .nm{font-weight:800;letter-spacing:.04em;text-transform:uppercase;font-size:14px}
+.rkrow .mn{color:var(--mut);font-size:12px;font-variant-numeric:tabular-nums;text-align:right}
+.rkrow.locked .rklogo{filter:grayscale(1) brightness(.55)}.rkrow.locked .nm{color:#6b6b6b}
+.rkrow.cur{background:rgba(255,255,255,.07);box-shadow:inset 3px 0 0 var(--gold)}
+.rkrow.fam{border-top:1px solid #262626}
+.rklogo.hi{filter:drop-shadow(0 0 7px var(--glow))}
+@media(max-width:600px){#rankView{padding:16px 8px 64px}.rkme{grid-template-columns:1fr;justify-items:center;text-align:center;padding:16px}.rkname{font-size:24px}.rkprog{width:100%}.rkstats{grid-template-columns:repeat(2,minmax(0,1fr))}.lbrow.rke{grid-template-columns:28px 28px minmax(0,1fr) auto}.lbrow.rke .rkb span{display:none}}
 /* ---------- ROULETTE ---------- */
 .panel{background:#0a0a0a;border:1px solid #262626;border-radius:14px}
 #rHist{display:flex;gap:5px;flex-wrap:wrap;justify-content:center;min-height:26px}
@@ -467,8 +501,8 @@ td .pav{margin-right:8px;width:24px;height:24px}
 .cpop{position:fixed;right:12px;bottom:66px;max-width:300px;z-index:16;background:#0a0a0a;border:1px solid #525252;border-radius:12px;padding:9px 12px;font-size:13px;box-shadow:0 10px 30px rgba(0,0,0,.6);cursor:pointer;animation:cpin .25s ease;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .cpop b{margin-right:6px}
 @keyframes cpin{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
-.tdot.hot{background:#ef4444;animation:hotp 1s ease-in-out infinite}
-.tarrow.alert{border-color:#ef4444;color:#ef4444}
+.tdot.hot{background:#ef4444;animation:none;transform:scale(1.35)}
+.tarrow.alert{border-color:#ef4444;color:#ef4444;animation:none}
 @keyframes hotp{50%{transform:scale(1.8)}}
 svg.ic{display:block;flex:none}
 .btn svg.ic{display:inline-block;vertical-align:-3px;margin-right:4px}
@@ -487,13 +521,10 @@ svg.ic{display:block;flex:none}
 .tbtn.hands{background:linear-gradient(90deg,#f59e0b,#fde047);color:#3a2300;border-color:#fde68a;margin-left:10px}
 .tbar{gap:10px}
 .tnav{display:flex;align-items:center;gap:10px}
-.tarrow{width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.22);color:#fff;font-size:26px;line-height:1;display:grid;place-items:center;padding:0 0 3px;transition:background .15s,transform .15s}
-.tarrow:hover{background:#fff;color:#000}
-.tarrow:active{transform:scale(.88)}
-.tarrow.l{animation:nudgeL 1.8s ease-in-out infinite}.tarrow.r{animation:nudgeR 1.8s ease-in-out infinite}
-.tarrow:hover,.tarrow:active{animation:none}
-@keyframes nudgeL{0%,100%{transform:translateX(0)}50%{transform:translateX(-4px)}}
-@keyframes nudgeR{0%,100%{transform:translateX(0)}50%{transform:translateX(4px)}}
+.tarrow{flex:none;width:38px;height:38px;border-radius:50%;background:#000;border:1px solid #5a5a5a;color:#fff;display:grid;place-items:center;padding:0;animation:none;transition:background .15s,border-color .15s}
+.tarrow svg{display:block;width:20px;height:20px;pointer-events:none}
+.tarrow:hover{background:#1a1a1a;border-color:#fff}
+.tarrow:active{background:#262626}
 .tlabel{min-width:130px;text-align:center;font-weight:800;font-size:15px;display:flex;flex-direction:column;align-items:center;gap:1px}
 .tlabel small{font-size:11px;font-weight:800;color:#86efac;font-variant-numeric:tabular-nums}
 .tlabel.full small{color:#fca5a5}.tlabel.mine{color:var(--gold)}
@@ -693,6 +724,7 @@ body.fs.vpk #pkInfo{font-size:12px}
         </div>
       </div>
       <div class="msep"></div>
+      <button class="mitem" data-g="rank">Rank</button>
       <button class="mitem" data-g="top">Classement</button>
     </div>
   </div>
@@ -708,7 +740,7 @@ body.fs.vpk #pkInfo{font-size:12px}
   </div>
   <div class="pop" id="meWrap">
     <div class="me" id="me" role="button" tabindex="0" aria-haspopup="true"><div class="av" id="meAv">?</div><div id="meName" style="font-weight:700;font-size:12px">…</div><span class="car">▾</span></div>
-    <div class="ppanel" id="mePanel"><div class="mpn"><span>Solde</span><b id="meBal">—</b></div><button class="btn" id="bGift" data-ic="gift"> Envoyer des ZTKN</button><button class="btn" id="bLogout" data-ic="power"> Déconnexion</button></div>
+    <div class="ppanel" id="mePanel"><div class="mpn"><span>Solde</span><b id="meBal">—</b></div><button class="btn" id="bDaily" data-ic="sun"> Daily</button><button class="btn hide" id="bAdmin" data-ic="gift"> Ajouter de l’argent</button><button class="btn" id="bGift" data-ic="gift"> Envoyer des ZTKN</button><button class="btn" id="bLogout" data-ic="power"> Déconnexion</button></div>
   </div>
 </header>
 <div id="conn">Reconnexion…</div>
@@ -798,6 +830,19 @@ body.fs.vpk #pkInfo{font-size:12px}
       <section class="lbcol"><div class="lbtitle"><b>Classement actuel</b><small>Soldes actuels, du plus riche au moins riche</small></div><div id="lbCur"><div class="lbnone">…</div></div></section>
       <section class="lbcol"><div class="lbtitle"><b>Classement all-time</b><small>Plus haut solde jamais atteint</small></div><div id="lbAll"><div class="lbnone">…</div></div></section>
     </div>
+  </div>
+</main>
+<main id="rankView" class="hide">
+  <div class="rkwrap">
+    <section class="rkme" id="rkMe"><div class="lbnone">…</div></section>
+    <section class="lbcol">
+      <div class="lbtitle"><b>Classement ELO</b><small>Se joue contre les autres joueurs : poker, blackjack et roulette en ligne</small></div>
+      <div id="rkElo"><div class="lbnone">…</div></div>
+    </section>
+    <section class="lbcol">
+      <div class="lbtitle"><b>Tous les rangs</b><small>Basés sur le total des gains cumulés : les pertes ne te font jamais descendre</small></div>
+      <div id="rkLadder"></div>
+    </section>
   </div>
 </main>
 <main id="bjView" class="hide">
@@ -952,7 +997,7 @@ body.fs.vpk #pkInfo{font-size:12px}
   <div class="setrow"><b>Mes victoires</b><div class="seg" data-set="winMine"><button data-v="1">Afficher</button><button data-v="0">Masquer</button></div></div>
   <div class="setrow"><b>Notification de message</b><div class="seg" data-set="chatNotif"><button data-v="off">Aucune</button><button data-v="silent">Silencieuse</button><button data-v="sound">Avec son</button></div></div>
   <p style="text-align:right"><button class="btn" data-close>Fermer</button></p></div></div>
-<div class="modal" id="mGift"><div class="box"><h2>Envoyer des ZTKN</h2>
+<div class="modal" id="mGift"><div class="box"><h2 id="gTitle">Envoyer des ZTKN</h2>
   <input class="gin" id="gQ" placeholder="Chercher un joueur…" autocomplete="off" maxlength="32">
   <div id="gList"></div>
   <div id="gTo"></div>
@@ -1002,6 +1047,7 @@ const IC = {
   sliders: '<path d="M4 6h16M4 12h16M4 18h16"/><circle cx="15" cy="6" r="2.4" fill="currentColor"/><circle cx="8" cy="12" r="2.4" fill="currentColor"/><circle cx="16" cy="18" r="2.4" fill="currentColor"/>',
   bell: '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.9 1.9 0 0 0 3.4 0"/>',
   power: '<path d="M12 3v9M6.4 6.6a8 8 0 1 0 11.2 0"/>',
+  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
   gift: '<path d="M20 12v9H4v-9M2 7h20v5H2zM12 21V7M12 7H8a2.5 2.5 0 1 1 0-5c3 0 4 5 4 5zM12 7h4a2.5 2.5 0 1 0 0-5c-3 0-4 5-4 5z"/>',
   chat: '<path d="M21 12a8 8 0 0 1-11.6 7.1L3 21l1.9-5.4A8 8 0 1 1 21 12z"/>',
   cards: '<rect x="5" y="3" width="11" height="16" rx="2"/><path d="M19 7v12a2 2 0 0 1-2 2H9"/>',
@@ -1095,6 +1141,7 @@ function connect() {
     $('#meName').textContent = d.name; setAvatar($('#meAv'), d.avatar, d.name); $('#conn').style.display = 'none'; BJT.clear(); P.tables.clear(); rOnHello(d); pOnHello(d); });
   es.addEventListener('roulette', (e) => { const st = JSON.parse(e.data); offset = st.now - Date.now(); rRender(st); });
   es.addEventListener('poker', (e) => { const st = JSON.parse(e.data); offset = st.now - Date.now(); pUpdate(st); });
+  es.addEventListener('admin', () => $('#bAdmin').classList.remove('hide'));
   es.addEventListener('bal', (e) => { W.bal = JSON.parse(e.data).bal; pHeader(); if (!O.hold && W.bal != null) $('#meBal').textContent = num(W.bal) + ' ' + COIN; });
   es.addEventListener('inbox', (e) => nSet(JSON.parse(e.data), false));
   es.addEventListener('notif', (e) => nAdd(JSON.parse(e.data)));
@@ -1372,7 +1419,7 @@ try { Object.assign(SET, JSON.parse(localStorage.getItem('znk_set') || '{}')); }
 const cShow = (m) => m.sys !== 'win' || (me && m.uid === me.uid ? SET.winMine !== '0' : SET.winOthers !== '0');
 const CNAME = { hub: 'Accueil', bj: 'Blackjack', poker: 'Poker', roulette: 'Roulette', 'off-bj': 'Blackjack solo', 'off-fuse': 'Fusé', 'off-mine': 'Mine', 'off-coin': 'Pile ou Face', 'off-dice': 'Dés', 'off-horses': 'Chevaux', 'off-russian': 'Roulette russe', 'off-slots': 'Slots', 'off-duel': 'Duel', 'off-scratch': 'Ticket à gratter' };
 const GLAB = { blackjack: 'Blackjack', poker: 'Poker', roulette: 'Roulette', 'bj-solo': 'Blackjack solo', fuse: 'Fusé', mines: 'Mines', coin: 'Pile ou Face', dice: 'Dés', horses: 'Chevaux', russian: 'Roulette russe', slots: 'Slots', duel: 'Duel', scratch: 'Ticket à gratter' };
-const cRoom = () => (W.view === 'top' ? 'hub' : W.view);
+const cRoom = () => (W.view === 'top' || W.view === 'rank' ? 'hub' : W.view);
 function cLine(m) {
   if (m.sys === 'win') { // annonce automatique d'une victoire (tous les jeux du site)
     const d = el('div', 'cm win' + (me && m.uid === me.uid ? ' mine' : '')), t = new Date(m.t);
@@ -1382,7 +1429,7 @@ function cLine(m) {
     return d;
   }
   const d = el('div', 'cm' + (me && m.uid === me.uid ? ' mine' : '')), t = new Date(m.t);
-  const cn = el('span', 'cn', m.name); if (m.role) cn.append(el('span', 'crole', ' (' + m.role + ')'));
+  const cn = el('span', 'cn', m.name); if (m.role) { const cr = el('span', 'crole', ' ' + m.role); if (m.rc) { cr.style.background = 'linear-gradient(90deg,' + m.rc[0] + ',' + rkMix(m.rc[1], .45) + ')'; cr.style.webkitBackgroundClip = 'text'; cr.style.backgroundClip = 'text'; cr.style.color = 'transparent'; cr.style.fontWeight = '800'; } cn.append(cr); }
   d.append(cn, document.createTextNode(m.text), el('small', '', String(t.getHours()).padStart(2, '0') + ':' + String(t.getMinutes()).padStart(2, '0')));
   return d;
 }
@@ -1533,7 +1580,9 @@ function tabsRender(box, tables, cur, pick, extra, onNew) {
   const n = st ? st.seats.filter(Boolean).length : 0, N = st ? st.seats.length : 0, full = N > 0 && n >= N;
   const nav = el('div', 'tnav');
   const alert = ids.some((t) => t !== cur && hot(tables.get(t))) ? ' alert' : '';
-  const l = el('button', 'tarrow l' + alert, '‹'), r = el('button', 'tarrow r' + alert, '›');
+  const l = el('button', 'tarrow l' + alert), r = el('button', 'tarrow r' + alert);
+  l.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>';
+  r.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg>';
   l.title = 'Table précédente'; r.title = 'Table suivante'; l.onclick = () => go(-1); r.onclick = () => go(1);
   const lab = el('div', 'tlabel' + (mineOf(st) ? ' mine' : '') + (full ? ' full' : '') + (dir && String(cur) !== prevCur ? (dir > 0 ? ' inR' : ' inL') : ''), 'Table ' + cur);
   lab.append(el('small', '', full ? 'pleine' : n + '/' + N));
@@ -1871,14 +1920,16 @@ function setView(v) {
   $('#rlView').classList.toggle('hide', v !== 'roulette');
   $('#ofView').classList.toggle('hide', !v.startsWith('off-'));
   $('#topView').classList.toggle('hide', v !== 'top');
+  $('#rankView').classList.toggle('hide', v !== 'rank');
   document.body.classList.toggle('vpk', v === 'poker');
   lbWatch(v === 'top');
+  rkWatch(v === 'rank');
   pFitSoon();
   document.querySelectorAll('.mitem').forEach((t) => t.classList.toggle('on', t.dataset.g === v));
   menuSync(v);
-  document.title = v.startsWith('off-') ? 'Casino · Jeux offline' : v === 'roulette' ? 'Casino · Roulette' : v === 'bj' ? 'Casino · Blackjack' : v === 'poker' ? 'Casino · Poker' : v === 'top' ? 'Casino · Classement' : 'Casino · Jeux';
+  document.title = v.startsWith('off-') ? 'Casino · Jeux offline' : v === 'roulette' ? 'Casino · Roulette' : v === 'bj' ? 'Casino · Blackjack' : v === 'poker' ? 'Casino · Poker' : v === 'top' ? 'Casino · Classement' : v === 'rank' ? 'Casino · Rank' : 'Casino · Jeux';
   $('#bTop').classList.toggle('hide', v !== 'bj' && v !== 'poker');
-  $('#bRules').classList.toggle('hide', v === 'hub' || v === 'top' || v.startsWith('off-'));
+  $('#bRules').classList.toggle('hide', v === 'hub' || v === 'top' || v === 'rank' || v.startsWith('off-'));
   try { sessionStorage.setItem('znk_v', v); } catch {}
   C.unread = 0; cRender();
   if (v.startsWith('off-')) ofOpen(v);
@@ -1905,7 +1956,7 @@ $('#menuBtn').onclick = (e) => { e.stopPropagation(); const o = $('#menu').class
 document.querySelectorAll('#menuPanel .mhead').forEach((b) => (b.onclick = (e) => { e.stopPropagation(); b.parentElement.classList.toggle('open'); }));
 document.addEventListener('click', (e) => { if (!e.target.closest('#menu')) menuClose(); });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') menuClose(); });
-const MENU_LBL = { hub: 'Menu', bj: 'Blackjack', poker: 'Poker', roulette: 'Roulette', 'off-bj': 'Blackjack solo', 'off-fuse': 'Fusé', 'off-mine': 'Mine', 'off-coin': 'Pile ou Face', 'off-dice': 'Dés', 'off-horses': 'Chevaux', 'off-russian': 'Roulette russe', 'off-slots': 'Slots', 'off-duel': 'Duel', 'off-scratch': 'Ticket à gratter', top: 'Classement' };
+const MENU_LBL = { hub: 'Menu', bj: 'Blackjack', poker: 'Poker', roulette: 'Roulette', 'off-bj': 'Blackjack solo', 'off-fuse': 'Fusé', 'off-mine': 'Mine', 'off-coin': 'Pile ou Face', 'off-dice': 'Dés', 'off-horses': 'Chevaux', 'off-russian': 'Roulette russe', 'off-slots': 'Slots', 'off-duel': 'Duel', 'off-scratch': 'Ticket à gratter', top: 'Classement', rank: 'Rank' };
 function menuSync(v) {
   $('#menuLbl').textContent = MENU_LBL[v] || 'Menu';
   $('#msOn').classList.toggle('open', v === 'bj' || v === 'poker' || v === 'roulette');
@@ -1937,6 +1988,105 @@ async function lbLoad() {
 function lbWatch(on) {
   clearInterval(LB.timer); LB.timer = null;
   if (on) { lbLoad(); LB.timer = setInterval(lbLoad, 30000); }
+}
+
+
+// ---- page Rank : rang (gains cumulés) + classement ELO
+const RK = { timer: null, busy: false, d: null };
+const rkMix = (hex, t) => { const n = parseInt(hex.slice(1), 16), c = [n >> 16, (n >> 8) & 255, n & 255].map((v) => Math.round(v + (255 - v) * t)); return '#' + c.map((v) => v.toString(16).padStart(2, '0')).join(''); };
+function rkFmt(n) {
+  n = Number(n) || 0;
+  const u = [[1e12, ' Bn'], [1e9, ' Md'], [1e6, ' M'], [1e4, ' k']];
+  for (const [v, s] of u) if (n >= v) return (Math.round((n / v) * 100) / 100).toLocaleString('fr-FR') + s;
+  return num(Math.floor(n));
+}
+function rkStar(cx, cy, R, r) { let p = ''; for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + (i * Math.PI) / 5, d = i % 2 ? r : R; p += (i ? ' ' : '') + (cx + d * Math.cos(a)).toFixed(1) + ',' + (cy + d * Math.sin(a)).toFixed(1); } return p; }
+/** logo d'un rang : écu dégradé + emblème (chevrons, étoile, gemme, flamme, couronne, ailes) + pastilles de division */
+function rkLogo(r, size) {
+  const id = 'rk' + r.id + '_' + size;
+  const EM = 'fill="#fff" fill-opacity=".95" stroke="rgba(0,0,0,.4)" stroke-width="1" stroke-linejoin="round"';
+  let sym = '';
+  if (r.sym === 'chev') sym = `<path d="M19 28l13-9 13 9v5L32 24l-13 9z M19 38l13-9 13 9v5l-13-9-13 9z" ${EM}/>`;
+  else if (r.sym === 'star') sym = `<polygon points="${rkStar(32, 31, 15, 6.4)}" ${EM}/>`;
+  else if (r.sym === 'gem') sym = `<path d="M21 26l5-7h12l5 7-11 19z" ${EM}/><path d="M21 26h22M26 19l6 26 6-26M32 19v7" fill="none" stroke="rgba(0,0,0,.3)" stroke-width="1"/>`;
+  else if (r.sym === 'flame') sym = `<path d="M32 15c2 8 11 10 11 21 0 7-5 11-11 11s-11-4-11-11c0-5 4-7 5-12 2 3 3 4 5 4-1-4-1-8 1-13z" ${EM}/><path d="M32 47c-4 0-6-3-6-6 0-4 4-5 6-9 2 4 6 5 6 9 0 3-2 6-6 6z" fill="${r.c1}" fill-opacity=".85"/>`;
+  else if (r.sym === 'crown') sym = `<path d="M19 42l-2-19 9 8 6-12 6 12 9-8-2 19z" ${EM}/><rect x="19" y="43" width="26" height="4" rx="1.5" ${EM}/>`;
+  else sym = `<path d="M22 24l-10-8c0 9 3 15 9 18l3-1zM42 24l10-8c0 9-3 15-9 18l-3-1z" fill="${r.c1}" stroke="rgba(0,0,0,.4)" stroke-width="1"/><path d="M20 42l-2-18 9 8 5-11 5 11 9-8-2 18z" ${EM}/><rect x="20" y="43" width="24" height="4" rx="1.5" ${EM}/>`;
+  let pips = '';
+  for (let i = 0; i < (r.pips || 0); i++) pips += `<circle cx="${32 + (i - ((r.pips - 1) / 2)) * 7}" cy="54" r="2.2" fill="#fff" fill-opacity=".95"/>`;
+  const hi = r.fi >= 8 ? ' hi' : '';
+  return `<svg class="rklogo${hi}" style="--glow:${r.c1}" width="${size}" height="${size}" viewBox="0 0 64 64" aria-label="${r.name}"><defs><linearGradient id="${id}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${r.c1}"/><stop offset="1" stop-color="${r.c2}"/></linearGradient></defs><path d="M32 3l24 8v21c0 15-11 24-24 29C19 56 8 47 8 32V11z" fill="url(#${id})" stroke="${rkMix(r.c1, .55)}" stroke-width="2" stroke-linejoin="round"/><path d="M32 8l19 6.5V32c0 12-8.5 19.5-19 24C21.500 51.500 13 44 13 32V14.500z" fill="none" stroke="rgba(255,255,255,.28)" stroke-width="1.2"/>${sym}${pips}</svg>`;
+}
+const rkLogoEl = (r, size) => { const w = el('span', 'rkl'); w.style.display = 'inline-flex'; w.innerHTML = rkLogo(r, size); return w; };
+function rkRenderMe(d) {
+  const m = d.me, L = d.ladder, cur = L[m.idx], nxt = L[m.idx + 1] || null;
+  const box = $('#rkMe'); box.replaceChildren();
+  box.style.setProperty('--c1', cur.c1); box.style.setProperty('--c2', cur.c2); box.style.setProperty('--c3', rkMix(cur.c2, .45));
+  const lg = el('div'); lg.innerHTML = rkLogo(cur, 112);
+  const main = el('div', 'rkmain');
+  main.append(el('div', 'rkkick', 'Ton rang'), el('div', 'rkname', cur.name));
+  const ea = el('div', 'rkearn'); ea.innerHTML = 'Gains cumulés : <b></b>'; ea.querySelector('b').textContent = rkFmt(m.earned) + ' ' + COIN; main.append(ea);
+  const prog = el('div', 'rkprog'), bar = el('div', 'rkbar'), fill = el('div', 'rkfill'); fill.style.width = '0%'; bar.append(fill);
+  const row = el('div', 'rkprow'), left = el('span'), right = el('span', 'nx');
+  if (nxt) {
+    left.innerHTML = '<b></b> avant <b></b>'; const bs = left.querySelectorAll('b'); bs[0].textContent = rkFmt(m.toNext) + ' ' + COIN; bs[1].textContent = nxt.name;
+    right.append(rkLogoEl(nxt, 26), el('span', '', Math.floor(m.pct * 100) + ' %'));
+  } else { left.textContent = 'Rang maximum atteint'; right.append(el('span', '', '100 %')); }
+  row.append(left, right); prog.append(bar, row);
+  box.append(lg, main, prog);
+  requestAnimationFrame(() => requestAnimationFrame(() => { fill.style.width = Math.max(m.pct * 100, 1) + '%'; }));
+  const st = el('div', 'rkstats');
+  const cell = (k, v, cls, sub) => { const c = el('div', 'rkst'); c.append(el('small', '', k)); const b = el('b', cls || '', v); if (sub) { b.append(document.createTextNode(' ')); b.append(el('i', '', sub)); } c.append(b); return c; };
+  st.append(
+    cell('ELO', m.games ? String(m.elo) : '—', 'elo', m.games && m.prov ? 'provisoire' : ''),
+    cell('Position', m.pos ? '#' + m.pos : '—', '', m.pos ? '/ ' + m.total : ''),
+    cell('Manches classées', String(m.games)),
+    cell('Meilleur ELO', m.games ? String(m.peak) : '—')
+  );
+  box.append(st);
+}
+function rkRenderElo(d) {
+  const box = $('#rkElo'), L = d.ladder;
+  const mk = (r, i) => {
+    const row = el('div', 'lbrow rke' + (r.pos <= 3 ? ' r' + r.pos : '') + (me && r.uid === me.uid ? ' me' : ''));
+    const av = el('span', 'pav'); setAvatar(av, r.avatar, r.name);
+    const b = el('span', 'rkb'); b.append(rkLogoEl(L[r.rank], 26), el('span', '', L[r.rank].name));
+    const v = el('span', 'lbval', String(r.elo) + (r.prov ? ' ?' : '')); v.append(el('small', '', r.games + ' manche' + (r.games > 1 ? 's' : '')));
+    row.append(el('span', 'lbrk', String(r.pos)), av, el('span', 'lbname', r.name), b, v);
+    return row;
+  };
+  if (!d.elo.length) { box.replaceChildren(el('div', 'lbnone', 'Personne n’est encore classé. Joue une manche à plusieurs (poker, blackjack ou roulette) pour apparaître ici.')); return; }
+  const rows = d.elo.map(mk);
+  if (d.meRow) { rows.push(el('div', 'rksep', '···'), mk(d.meRow)); }
+  else if (!d.me.games) rows.push(el('div', 'lbnone', 'Tu n’es pas encore classé : joue une manche à plusieurs pour obtenir un ELO.'));
+  const note = el('div', 'lbnone', 'Un « ? » indique un ELO provisoire (moins de ' + d.provisional + ' manches classées).'); note.style.padding = '10px';
+  box.replaceChildren(...rows, note);
+}
+function rkRenderLadder(d) {
+  const box = $('#rkLadder'), L = d.ladder; box.replaceChildren();
+  const sorted = L.slice().reverse(); // du plus dur au plus facile
+  sorted.forEach((r, i) => {
+    const row = el('div', 'rkrow' + (r.id > d.me.idx ? ' locked' : '') + (r.id === d.me.idx ? ' cur' : '') + (i && sorted[i - 1].fam !== r.fam ? ' fam' : ''));
+    row.append(rkLogoEl(r, 40));
+    const nm = el('div', 'nm', r.name); if (r.id <= d.me.idx) { nm.style.background = `linear-gradient(90deg,${r.c1},${rkMix(r.c2, .45)})`; nm.style.webkitBackgroundClip = 'text'; nm.style.backgroundClip = 'text'; nm.style.color = 'transparent'; }
+    row.append(nm, el('div', 'mn', r.id === d.me.idx ? 'Ton rang' : r.min > 0 ? rkFmt(r.min) + ' ' + COIN : 'Départ'));
+    box.append(row);
+  });
+}
+async function rkLoad() {
+  if (RK.busy) return; RK.busy = true;
+  try {
+    const res = await fetch('/api/rank?t=' + encodeURIComponent(TOKEN));
+    if (!res.ok) throw new Error('rank');
+    const d = await res.json(); RK.d = d;
+    rkRenderMe(d); rkRenderElo(d); rkRenderLadder(d);
+  } catch {
+    if (!RK.d) $('#rkMe').replaceChildren(el('div', 'lbnone', 'Rang indisponible.'));
+  } finally { RK.busy = false; }
+}
+function rkWatch(on) {
+  clearInterval(RK.timer); RK.timer = null;
+  if (on) { rkLoad(); RK.timer = setInterval(rkLoad, 20000); }
 }
 
 // ---- poker plein écran : réduit les cartes tant que la table déborde de l'écran (aucun scroll)
@@ -2784,15 +2934,23 @@ async function gSearch() {
     gSel();
   } catch { box.textContent = ''; }
 }
-function gOpen() { menuClose(); G.to = null; $('#gQ').value = ''; $('#gAmt').value = ''; $('#mGift').classList.add('on'); gSel(); gSearch(); setTimeout(() => $('#gQ').focus(), 50); }
+function gOpen(admin) { menuClose(); G.admin = admin === true; $('#gTitle').textContent = G.admin ? 'Ajouter de l’argent (admin)' : 'Envoyer des ZTKN'; $('#gSend').textContent = G.admin ? 'Ajouter' : 'Envoyer'; G.to = null; $('#gQ').value = ''; $('#gAmt').value = ''; $('#mGift').classList.add('on'); gSel(); gSearch(); setTimeout(() => $('#gQ').focus(), 50); }
 $('#bGift').onclick = () => { popClose(); gOpen(); };
+$('#bAdmin').onclick = () => { popClose(); gOpen(true); };
+$('#bDaily').onclick = async () => {
+  const b = $('#bDaily'); if (b.disabled) return; b.disabled = true;
+  try {
+    const ok = await send('daily'), d = send.last;
+    if (ok && d && d.daily) toast(d.daily.claimed ? 'Daily récupéré : +' + num(d.daily.amount) + ' ' + COIN : 'Daily déjà récupéré aujourd’hui. Reviens après minuit (Paris).');
+  } finally { b.disabled = false; }
+};
 $('#gQ').oninput = () => { clearTimeout(G.t); G.t = setTimeout(gSearch, 250); };
 document.querySelectorAll('#mGift [data-q]').forEach((b) => (b.onclick = () => { $('#gAmt').value = b.dataset.q; }));
 $('#gSend').onclick = async () => {
   if (!G.to) return toast('Choisis un joueur.');
   const amt = parseAmt($('#gAmt').value); if (!(amt >= 1)) return toast('Montant invalide.');
   $('#gSend').disabled = true;
-  const ok = await send('gift', { to: G.to.uid, amount: amt });
+  const ok = await send(G.admin ? 'admingive' : 'gift', { to: G.to.uid, amount: amt });
   $('#gSend').disabled = false;
   if (!ok) return;
   SFX.chip(); $('#mGift').classList.remove('on'); toast(num(amt) + ' ' + COIN + ' → ' + G.to.name);
