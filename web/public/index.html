@@ -314,6 +314,38 @@ th{color:var(--mut);font-size:12px}
 .fst{position:absolute;left:0;right:0;bottom:10px;text-align:center;font-weight:700;font-size:13px;color:rgba(255,255,255,.75)}
 .ofsel{background:#0f0f0f;color:#fff;border:1px solid #3a3a3a;border-radius:8px;padding:9px 10px;font:inherit}
 .dockp .btn.big{min-width:150px}.dockp .hint{color:var(--mut);font-size:13px;text-align:center}
+
+/* ---------- sélecteur de tables ---------- */
+.tbar{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;align-items:center;padding:6px 10px 0}
+.tbtn{display:inline-flex;align-items:center;gap:7px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);border-radius:999px;padding:6px 14px;font-weight:700;font-size:13px;color:#fff}
+.tbtn small{font-size:11px;font-weight:800;color:#86efac;font-variant-numeric:tabular-nums}
+.tbtn.full small{color:#fca5a5}
+.tbtn:hover{background:rgba(255,255,255,.16)}
+.tbtn.on{background:#fff;color:#000;border-color:#fff}.tbtn.on small{color:#166534}.tbtn.on.full small{color:#b91c1c}
+.tbtn.mine{box-shadow:0 0 0 2px var(--gold)}
+.tbtn.hands{background:linear-gradient(90deg,#f59e0b,#fde047);color:#3a2300;border-color:#fde68a;margin-left:10px}
+/* nom de la main sous les cartes (poker) */
+.ftable.pk .hand .pill{white-space:normal;text-align:center;font-size:11px;line-height:1.25;max-width:calc(var(--cw)*3.2)}
+.ftable.pk .hand .pill.live{background:rgba(0,0,0,.72);border-color:rgba(251,191,36,.7);color:#fde68a}
+/* classement des mains */
+#mPHands .box{max-width:620px}
+.hr{display:grid;grid-template-columns:26px 1fr auto;gap:4px 12px;align-items:center;padding:9px 4px;border-bottom:1px solid rgba(255,255,255,.1)}
+.hr:last-child{border-bottom:0}
+.hr .rk{width:24px;height:24px;border-radius:50%;background:#fbbf24;color:#3a2300;font-weight:900;font-size:12px;display:grid;place-items:center}
+.hr .hn{font-weight:800;font-size:14px}.hr .hd{grid-column:2;color:rgba(255,255,255,.62);font-size:12px;line-height:1.35}
+.hr .hc5{grid-column:3;grid-row:1/3;display:flex;gap:3px}
+.mc{width:34px;height:48px;border-radius:5px;background:#fff;color:#111;display:flex;flex-direction:column;align-items:center;justify-content:center;font-weight:900;font-size:14px;line-height:1;box-shadow:0 2px 4px rgba(0,0,0,.5);border:1px solid #cbd5e1}
+.mc i{font-style:normal;font-size:16px;margin-top:1px}.mc.red{color:#dc2626}
+.mc.dim{opacity:.38;filter:grayscale(.4)}
+@media(max-width:560px){.hr{grid-template-columns:26px 1fr}.hr .hc5{grid-column:1/3;grid-row:auto;justify-content:center;margin-top:4px}.hr .hd{grid-column:2}}
+/* fusé : plus de tapis, une vraie scène spatiale */
+.ftable.of.fuse{background:none;border:0;border-radius:0;overflow:visible;box-shadow:none;padding:0;gap:10px}
+.ftable.of.fuse::before,.ftable.of.fuse::after{display:none}
+.ftable.of.fuse .obody{min-height:0}
+.fz{height:360px;border-radius:18px;background:radial-gradient(120% 90% at 50% 110%,#5b21b6 0%,#2e1065 38%,#0b0720 75%),#05030f;border:1px solid rgba(167,139,250,.35);box-shadow:0 12px 40px rgba(0,0,0,.55),inset 0 0 60px rgba(124,58,237,.18)}
+.fz .bigm{top:30%}
+.fz .bigm small{display:block;font-size:.2em;letter-spacing:.2em;font-weight:800;opacity:.85;margin-top:-4px;text-align:center}
+@media(max-width:760px){.fz{height:300px}}
 /* ---------- chat en direct ---------- */
 main{padding-bottom:56px!important}
 #chat{position:fixed;right:12px;bottom:12px;width:330px;max-width:calc(100vw - 24px);z-index:15;background:#0a0a0a;border:1px solid #333;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.6)}
@@ -424,6 +456,7 @@ main{padding-bottom:56px!important}
   </section>
 </main>
 <main id="bjView" class="hide">
+  <div class="tbar" id="bjTabs"></div>
   <section id="table">
     <div id="dealer"><div class="dname">CROUPIER</div><div class="cards" id="dcards"></div><div id="dtot"></div></div>
     <div id="shoe"><span id="shoeN"></span></div>
@@ -459,6 +492,7 @@ main{padding-bottom:56px!important}
   </section>
 </main>
 <main id="pkView" class="hide">
+  <div class="tbar" id="pkTabs"></div>
   <section class="ftable pk" id="pTable">
     <div id="pMid">
       <div id="pStreet"></div>
@@ -566,6 +600,7 @@ main{padding-bottom:56px!important}
 <li>Si tu quittes en pleine main, tu te couches et ton stack t'est rendu à la fin de la main. Si le bot redémarre, tes jetons en jeu te sont remboursés.</li>
 <li>Raccourcis : <kbd>F</kbd> se coucher · <kbd>C</kbd> check / suivre.</li>
 </ul><p style="text-align:right"><button class="btn" data-close>Fermer</button></p></div></div>
+<div class="modal" id="mPHands"><div class="box"><h2>Classement des mains au poker</h2><p style="color:rgba(255,255,255,.65);font-size:13px;margin:0 0 6px">Du plus fort (1) au plus faible (10). Les cartes éclairées forment la combinaison.</p><div id="hList"></div><p style="text-align:right"><button class="btn" data-close>Fermer</button></p></div></div>
 <div class="modal" id="mTop"><div class="box"><h2 id="topTitle">Classement du blackjack (gains nets)</h2><div id="topBody">…</div><p style="text-align:right"><button class="btn" data-close>Fermer</button></p></div></div>
 <div class="modal" id="mRules"><div class="box"><h2>Règles du blackjack</h2><ul>
 <li>Bats le croupier sans dépasser <b>21</b>. Figures = 10, As = 1 ou 11.</li>
@@ -593,6 +628,7 @@ if (params.get('t')) history.replaceState(null, '', location.pathname);
 if (!TOKEN) { $('#gate').classList.add('on'); return; }
 
 let me = null, S = null, offset = 0, COIN = '🪙', seatsN = 5;
+const BJT = new Map(); // tid -> snapshot (blackjack)
 let timerTotal = 1, lastDeadline = 0, lastTurnKey = '';
 const cardEls = new Map(), shown = new Set();
 const seatEls = [];
@@ -661,8 +697,10 @@ function setAmt(n) { n = Math.max(0, Math.floor(n * 100) / 100); $('#amt').value
 
 // ------------------------------------------------------------- réseau
 function toast(t) { const x = $('#toast'); x.textContent = t; x.classList.add('on'); clearTimeout(toast.t); toast.t = setTimeout(() => x.classList.remove('on'), 2600); }
+const BJ_ACTS = new Set(['sit', 'leave', 'bet', 'clear', 'hit', 'stand', 'double', 'split', 'emote', 'sync']);
 async function send(action, extra = {}) {
   try {
+    if (extra.tid == null) { if (/^p/.test(action)) extra = { ...extra, tid: P.cur }; else if (BJ_ACTS.has(action)) extra = { ...extra, tid: W.btid }; }
     const r = await fetch('/api/act', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ t: TOKEN, action, ...extra }) });
     const d = await r.json();
     if (d.rbal != null) W.bal = d.rbal;
@@ -676,14 +714,15 @@ let es;
 function connect() {
   es = new EventSource('/api/stream?t=' + encodeURIComponent(TOKEN));
   es.addEventListener('hello', (e) => { const d = JSON.parse(e.data); me = d; COIN = d.coin || COIN; seatsN = d.seats || 5; $('#coin').textContent = COIN;
-    $('#meName').textContent = d.name; setAvatar($('#meAv'), d.avatar, d.name); $('#conn').style.display = 'none'; rOnHello(d); pOnHello(d); });
+    $('#meName').textContent = d.name; setAvatar($('#meAv'), d.avatar, d.name); $('#conn').style.display = 'none'; BJT.clear(); P.tables.clear(); rOnHello(d); pOnHello(d); });
   es.addEventListener('roulette', (e) => { const st = JSON.parse(e.data); offset = st.now - Date.now(); rRender(st); });
-  es.addEventListener('poker', (e) => { const st = JSON.parse(e.data); offset = st.now - Date.now(); pRender(st); });
+  es.addEventListener('poker', (e) => { const st = JSON.parse(e.data); offset = st.now - Date.now(); pUpdate(st); });
   es.addEventListener('bal', (e) => { W.bal = JSON.parse(e.data).bal; pHeader(); });
   es.addEventListener('chathist', (e) => { C.msgs = JSON.parse(e.data); cRender(); });
   es.addEventListener('chat', (e) => cOnMsg(JSON.parse(e.data)));
-  es.addEventListener('state', (e) => { $('#conn').style.display = 'none'; const st = JSON.parse(e.data); offset = st.now - Date.now(); render(st); });
-  es.addEventListener('emote', (e) => { const d = JSON.parse(e.data); const i = S && S.seats.findIndex((p) => p && p.uid === d.uid); if (i >= 0) { const x = el('div', 'emo', d.e); seatEls[i].root.append(x); setTimeout(() => x.remove(), 1900); } });
+  es.addEventListener('state', (e) => { $('#conn').style.display = 'none'; const st = JSON.parse(e.data); offset = st.now - Date.now(); bjUpdate(st); });
+  es.addEventListener('tabledel', (e) => tableDel(JSON.parse(e.data)));
+  es.addEventListener('emote', (e) => { const d = JSON.parse(e.data); if (d.tid && d.tid !== W.btid) return; const i = S && S.seats.findIndex((p) => p && p.uid === d.uid); if (i >= 0) { const x = el('div', 'emo', d.e); seatEls[i].root.append(x); setTimeout(() => x.remove(), 1900); } });
   es.onerror = () => { $('#conn').style.display = 'block'; if (es.readyState === 2) setTimeout(connect, 2000); };
 }
 function setAvatar(box, url, name) {
@@ -973,7 +1012,7 @@ $('#chatForm').onsubmit = async (e) => {
 };
 
 // ============================================================= ROULETTE
-const W = { info: null, S: null, view: 'hub', bal: null, joined: false, round: -1, shownRound: -1, lastIdx: -1, lastTick: 0 };
+const W = { btid: 0, bman: false, info: null, S: null, view: 'hub', bal: null, joined: false, round: -1, shownRound: -1, lastIdx: -1, lastTick: 0 };
 const TAUW = Math.PI * 2;
 const RLAB = { red: 'Rouge', black: 'Noir', even: 'Pair', odd: 'Impair', low: '1-18', high: '19-36', d1: '1re douzaine', d2: '2e douzaine', d3: '3e douzaine', c1: 'Colonne 1', c2: 'Colonne 2', c3: 'Colonne 3' };
 const rLabel = (k) => RLAB[k] || k.slice(1);
@@ -1034,7 +1073,7 @@ function rEnter() { if (!me || W.joined || !W.info) return; W.joined = true; sen
 function rLeaveNow() { if (W.joined) { W.joined = false; send('rleave'); } }
 
 // ============================================================= POKER (Texas Hold'em No-Limit — même table que le blackjack)
-const P = { S: null, info: null, timerTotal: 1, lastDeadline: 0, lastTurnKey: '', raiseKey: '', rule: null, cardEls: new Map(), shown: new Set(), seats: [] };
+const P = { S: null, tables: new Map(), cur: 0, man: false, info: null, timerTotal: 1, lastDeadline: 0, lastTurnKey: '', raiseKey: '', rule: null, cardEls: new Map(), shown: new Set(), seats: [] };
 const r2 = (n) => Math.round(n * 100) / 100;
 const P_STREET = { dealing: 'Distribution', preflop: 'Pré-flop', flop: 'Flop', turn: 'Turn', river: 'River', showdown: 'Abattage', result: 'Résultat' };
 {
@@ -1064,8 +1103,93 @@ function hubPoker(ok) { const g = $('#gcPoker'); if (g) g.disabled = !ok; const 
 function pHub() {
   const w = $('#gPkLive'); if (!w) return;
   if (!P.info) { w.textContent = 'Indisponible'; return; }
-  const n = P.S ? P.S.seats.filter(Boolean).length : null;
+  const n = P.tables.size ? [...P.tables.values()].reduce((a, s) => a + s.seats.filter(Boolean).length, 0) : null;
   w.textContent = n == null ? '' : n ? n + ' joueur' + (n > 1 ? 's' : '') + ' à table' : 'Table libre';
+}
+
+// ---- tables multiples (blackjack + poker) : si une table est pleine, on joue sur une autre
+function tabsRender(box, tables, cur, pick, extra) {
+  const rows = [...tables.entries()].sort((a, b) => a[0] - b[0]);
+  const sig = rows.map(([t, s]) => t + ':' + s.seats.filter(Boolean).length + ':' + (s.seats.some((p) => p && me && p.uid === me.uid) ? 1 : 0)).join('|') + '#' + cur;
+  if (box.dataset.sig === sig) return; box.dataset.sig = sig; box.textContent = '';
+  rows.forEach(([tid, st]) => {
+    const n = st.seats.filter(Boolean).length, N = st.seats.length, mine = st.seats.some((p) => p && me && p.uid === me.uid);
+    const b = el('button', 'tbtn' + (tid === cur ? ' on' : '') + (n >= N ? ' full' : '') + (mine ? ' mine' : ''), 'Table ' + tid);
+    b.append(el('small', '', n >= N ? 'pleine' : n + '/' + N)); b.onclick = () => pick(tid); box.append(b);
+  });
+  if (extra) box.append(extra());
+}
+function chooseTable(tables, cur, manual) {
+  for (const [t, st] of tables) if (me && st.seats.some((p) => p && p.uid === me.uid)) return t; // ma place passe avant tout
+  if (cur && tables.has(cur) && (manual || !tables.get(cur).seats.every(Boolean))) return cur;
+  const free = [...tables.entries()].sort((a, b) => a[0] - b[0]).find(([, st]) => !st.seats.every(Boolean));
+  return free ? free[0] : tables.has(cur) ? cur : [...tables.keys()][0];
+}
+function bjReset() {
+  cardEls.forEach((d) => d.remove()); cardEls.clear(); S = null; lastDeadline = 0;
+  $('#dcards').textContent = '';
+  seatEls.forEach((se) => { se.hands.textContent = ''; se.hEls = []; se.bet.textContent = ''; se.bet.dataset.k = ''; });
+}
+function bjTabs() { tabsRender($('#bjTabs'), BJT, W.btid, (t) => { W.btid = t; W.bman = true; bjReset(); render(BJT.get(t)); bjTabs(); }); }
+function bjUpdate(st) {
+  BJT.set(st.tid, st);
+  const want = chooseTable(BJT, W.btid, W.bman), changed = want !== W.btid;
+  if (changed) { W.btid = want; bjReset(); }
+  bjTabs();
+  if (changed || st.tid === W.btid) render(BJT.get(W.btid));
+}
+function pReset() {
+  P.cardEls.forEach((d) => d.remove()); P.cardEls.clear(); P.lastDeadline = 0; P.lastTurnKey = ''; P.raiseKey = '';
+  $('#pBoard').textContent = '';
+  P.seats.forEach((se) => { se.cards.textContent = ''; se.hname.textContent = ''; se.bet.textContent = ''; se.bet.dataset.k = ''; se.plate.textContent = ''; delete se.plate.dataset.uid; if (se.res) { se.res.remove(); se.res = null; } });
+}
+function pTabs() {
+  tabsRender($('#pkTabs'), P.tables, P.cur, (t) => { P.cur = t; P.man = true; pReset(); pRender(P.tables.get(t)); pTabs(); pHub(); },
+    () => { const b = el('button', 'tbtn hands', '🃏 Mains'); b.onclick = () => $('#mPHands').classList.add('on'); return b; });
+}
+function pUpdate(st) {
+  P.tables.set(st.tid, st);
+  const want = chooseTable(P.tables, P.cur, P.man), changed = want !== P.cur;
+  if (changed) { P.cur = want; pReset(); }
+  pTabs(); pHub();
+  if (changed || st.tid === P.cur) pRender(P.tables.get(P.cur));
+}
+function tableDel(d) {
+  if (d.game === 'bj') {
+    BJT.delete(d.tid);
+    if (BJT.size) { const w = chooseTable(BJT, W.btid, W.bman); if (w !== W.btid) { W.btid = w; bjReset(); render(BJT.get(w)); } }
+    const b = $('#bjTabs'); if (b) b.dataset.sig = ''; bjTabs();
+  } else {
+    P.tables.delete(d.tid);
+    if (P.tables.size) { const w = chooseTable(P.tables, P.cur, P.man); if (w !== P.cur) { P.cur = w; pReset(); pRender(P.tables.get(w)); } }
+    const b = $('#pkTabs'); if (b) b.dataset.sig = ''; pTabs(); pHub();
+  }
+}
+
+// ---- classement des mains
+const HANDS = [
+  ['Quinte flush royale', '10, valet, dame, roi, as de la même couleur : la main imbattable.', 'A♠ K♠ Q♠ J♠ 10♠', 5],
+  ['Quinte flush', 'Cinq cartes qui se suivent, toutes de la même couleur.', '9♥ 8♥ 7♥ 6♥ 5♥', 5],
+  ['Carré', 'Quatre cartes de même valeur (la 5ᵉ sert de départage).', 'K♠ K♥ K♦ K♣ 4♠', 4],
+  ['Full', 'Un brelan + une paire.', '10♠ 10♥ 10♦ 6♣ 6♠', 5],
+  ['Couleur', 'Cinq cartes de la même couleur, sans suite.', 'A♦ J♦ 8♦ 6♦ 3♦', 5],
+  ['Quinte', 'Cinq cartes qui se suivent, couleurs mélangées (l’as vaut 1 ou 14).', '9♠ 8♥ 7♦ 6♣ 5♠', 5],
+  ['Brelan', 'Trois cartes de même valeur.', '7♠ 7♥ 7♦ K♣ 2♠', 3],
+  ['Double paire', 'Deux paires de valeurs différentes.', 'J♠ J♥ 4♦ 4♣ A♠', 4],
+  ['Paire', 'Deux cartes de même valeur.', 'Q♠ Q♥ 9♦ 5♣ 2♠', 2],
+  ['Carte haute', 'Aucune combinaison : la plus haute carte décide.', 'A♠ J♥ 8♦ 5♣ 3♠', 1],
+];
+{
+  const box = $('#hList');
+  HANDS.forEach(([name, desc, cards, n], i) => {
+    const r = el('div', 'hr'), c5 = el('div', 'hc5');
+    r.append(el('div', 'rk', String(i + 1)), el('div', 'hn', name), c5, el('div', 'hd', desc));
+    cards.split(' ').forEach((c, k) => {
+      const s = c.slice(-1), v = c.slice(0, -1), m = el('div', 'mc' + (s === '♥' || s === '♦' ? ' red' : '') + (k >= n ? ' dim' : ''));
+      m.append(el('span', '', v), el('i', '', s)); c5.append(m);
+    });
+    box.append(r);
+  });
 }
 
 function pRender(st) {
@@ -1114,7 +1238,7 @@ function pRender(st) {
     syncCards(se.cards, p.cards, P.cardEls, '#pDeck');
     se.hand.classList.toggle('fold', !!p.folded);
     se.hname.textContent = '';
-    if (p.hand && !p.folded) se.hname.append(el('span', 'pill t21', p.hand));
+    if (!p.folded) { if (p.hand) se.hname.append(el('span', 'pill t21', p.hand)); else if (mine && p.live) se.hname.append(el('span', 'pill live', p.live)); }
     // dernière action
     let t = '', c = '';
     if (p.folded) { t = 'Couché'; c = 'fold'; }
@@ -1186,7 +1310,9 @@ function pDock(st, mi, myTurn) {
   $('#pkTop').style.display = ms && ms.stack < st.max && !handNow ? '' : 'none';
   $('#pkLeave').style.display = ms ? '' : 'none';
   const info = $('#pkInfo');
-  if (!ms) {
+  if (!ms && st.seats.every(Boolean)) {
+    info.textContent = 'Table pleine : choisis une autre table en haut pour jouer en même temps.';
+  } else if (!ms) {
     info.innerHTML = `Blinds <b>${num(st.blinds.sb)} / ${num(st.blinds.bb)}</b> · cave de ${num(st.min)} à ${num(st.max)} ${COIN}. <b>Prends une place</b> avec ta cave.`;
     pBuyDefault();
   } else if (myTurn) info.textContent = '';
@@ -1305,7 +1431,7 @@ $('.logo').onclick = () => { ac(); setView('hub'); };
 function hubRoulette(ok) { $('#gcRoulette').disabled = !ok; const t = document.querySelector('.tab[data-g="roulette"]'); if (t) t.disabled = !ok; }
 function updHub() {
   const plural = (n, a) => n + ' ' + a + (n > 1 ? 's' : '');
-  const n = S && S.seats ? S.seats.filter(Boolean).length : null;
+  const n = BJT.size ? [...BJT.values()].reduce((a, s) => a + s.seats.filter(Boolean).length, 0) : null;
   $('#gBjLive').textContent = n == null ? '' : n ? plural(n, 'joueur') + ' à table' : 'Table libre';
   const w = $('#gRlLive');
   if (!W.info) { w.textContent = 'Indisponible'; return; }
@@ -1578,7 +1704,7 @@ async function ofStart() {
 }
 // ---- structure du tapis (une fois par jeu)
 function ofBuild() {
-  const t = $('#ofTable'); t.textContent = '';
+  const t = $('#ofTable'); t.textContent = ''; t.className = 'ftable of' + (O.game === 'fuse' ? ' fuse' : '');
   const top = el('div', 'otop'), hist = el('div', 'ohist'); hist.id = 'oHist';
   top.append(el('span', 'dname', OT[O.game]), el('span', 'grow'), hist);
   const b = el('div', 'obody'); t.append(top, b);
@@ -1631,49 +1757,107 @@ function rMines(s) {
   if (live) { box('Prochaine case', s.next ? s.next + 'x' : 'Dernière'); box('Gain actuel', num(s.cash) + ' ' + COIN, true); }
   else box(s.win > 0 ? 'Encaissé' : 'Mine touchée', s.win > 0 ? num(s.win) + ' ' + COIN : 'Mise perdue', s.win > 0);
 }
-// ---- fusé
-function fuseCanvas(tEnd, RT, crashed, live) {
+// ---- fusé : vraie fusée, qui continue sa course après l'encaissement jusqu'au point d'explosion réel
+function drawRocket(x, px, py, ang, flame, sc) {
+  x.save(); x.translate(px, py); x.rotate(ang); x.scale(sc, sc);
+  if (flame > 0) {
+    const L = (14 + Math.random() * 16) * flame, g = x.createLinearGradient(-17, 0, -17 - L, 0);
+    g.addColorStop(0, '#fff7ae'); g.addColorStop(0.35, '#fb923c'); g.addColorStop(1, 'rgba(239,68,68,0)');
+    x.fillStyle = g; x.beginPath(); x.moveTo(-15, -5); x.quadraticCurveTo(-17 - L * 0.55, -8, -17 - L, 0); x.quadraticCurveTo(-17 - L * 0.55, 8, -15, 5); x.closePath(); x.fill();
+  }
+  x.fillStyle = '#dc2626'; // ailerons
+  x.beginPath(); x.moveTo(-14, -7); x.lineTo(-23, -16); x.lineTo(-7, -7); x.closePath(); x.fill();
+  x.beginPath(); x.moveTo(-14, 7); x.lineTo(-23, 16); x.lineTo(-7, 7); x.closePath(); x.fill();
+  x.fillStyle = '#475569'; x.fillRect(-18, -4, 5, 8); // tuyère
+  const bg = x.createLinearGradient(0, -8, 0, 8); bg.addColorStop(0, '#ffffff'); bg.addColorStop(1, '#b6c2d4');
+  x.fillStyle = bg; x.strokeStyle = '#94a3b8'; x.lineWidth = 1;
+  x.beginPath(); x.moveTo(-14, -7); x.lineTo(6, -7); x.quadraticCurveTo(20, -6, 27, 0); x.quadraticCurveTo(20, 6, 6, 7); x.lineTo(-14, 7); x.closePath(); x.fill(); x.stroke();
+  x.fillStyle = '#ef4444'; // ogive
+  x.beginPath(); x.moveTo(13, -6.3); x.quadraticCurveTo(21, -5, 27, 0); x.quadraticCurveTo(21, 5, 13, 6.3); x.closePath(); x.fill();
+  x.fillStyle = '#dc2626'; x.fillRect(-6, -7, 3, 14); // bande
+  x.fillStyle = '#38bdf8'; x.strokeStyle = '#e2e8f0'; x.lineWidth = 1.6; x.beginPath(); x.arc(3, 0, 3.6, 0, 7); x.fill(); x.stroke();
+  x.fillStyle = 'rgba(255,255,255,.7)'; x.beginPath(); x.arc(2, -1.2, 1.1, 0, 7); x.fill();
+  x.restore();
+}
+function drawBoom(x, px, py, t) {
+  const f = Math.max(0, 1 - t / 520);
+  if (f > 0) { const r = 12 + t * 0.17, g = x.createRadialGradient(px, py, 0, px, py, r); g.addColorStop(0, `rgba(255,255,255,${f})`); g.addColorStop(0.4, `rgba(251,191,36,${0.9 * f})`); g.addColorStop(1, 'rgba(239,68,68,0)'); x.fillStyle = g; x.beginPath(); x.arc(px, py, r, 0, 7); x.fill(); }
+  x.strokeStyle = `rgba(252,165,165,${Math.max(0, 0.75 - t / 900)})`; x.lineWidth = 3; x.beginPath(); x.arc(px, py, 8 + t * 0.09, 0, 7); x.stroke();
+  const a = Math.max(0, 1 - t / 1500);
+  for (let i = 0; i < 24; i++) {
+    const ang = i * 2.399 + 0.7, d = (38 + ((i * 37) % 64)) * (1 - Math.exp(-t / 360));
+    x.globalAlpha = a; x.fillStyle = i % 3 ? '#f97316' : '#fde047';
+    x.beginPath(); x.arc(px + Math.cos(ang) * d, py + Math.sin(ang) * d + t * t * 0.00004, 2.8 - (i % 3) * 0.7, 0, 7); x.fill();
+  }
+  x.globalAlpha = 1;
+}
+function fuseCanvas(sc) {
   const cv = $('#oCv'); if (!cv) return;
   const w = cv.clientWidth, h = cv.clientHeight, dpr = window.devicePixelRatio || 1;
   if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
   const x = cv.getContext('2d'); x.setTransform(dpr, 0, 0, dpr, 0, 0); x.clearRect(0, 0, w, h);
-  const T = Math.max(8000, tEnd * 1.12), M = Math.max(2, Math.exp(RT * tEnd) * 1.18), pad = 34;
-  const px = (t) => pad + (w - pad - 14) * t / T, py = (v) => h - pad - (h - pad - 16) * (v - 1) / (M - 1);
-  x.font = '11px system-ui'; x.fillStyle = 'rgba(255,255,255,.4)'; x.strokeStyle = 'rgba(255,255,255,.1)'; x.lineWidth = 1;
+  const { RT, tEnd, mode } = sc, padL = 40, padB = 36, padT = 22, padR = 26;
+  // étoiles qui défilent vers le bas pendant le vol
+  for (let i = 0; i < 70; i++) {
+    const depth = 0.25 + (i % 4) * 0.25, sx = ((i * 97) % 101) / 101 * w, sy = (((i * 53) % 97) / 97 * h + tEnd * 0.035 * depth) % h;
+    x.fillStyle = `rgba(255,255,255,${0.25 + depth * 0.4})`; x.fillRect(sx, sy, depth * 1.8, depth * 1.8);
+  }
+  const T = Math.max(8000, tEnd * 1.12), M = Math.max(2, Math.exp(RT * tEnd) * 1.18);
+  const px = (t) => padL + (w - padL - padR) * t / T, py = (v) => h - padB - (h - padB - padT) * (v - 1) / (M - 1);
+  x.font = '11px system-ui'; x.fillStyle = 'rgba(255,255,255,.38)'; x.strokeStyle = 'rgba(255,255,255,.08)'; x.lineWidth = 1;
   const step = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 5000].find((q) => (M - 1) / q <= 6) || 5000;
-  for (let v = step; v < M; v += step) { x.beginPath(); x.moveTo(pad, py(v)); x.lineTo(w - 8, py(v)); x.stroke(); x.fillText(v + 'x', 4, py(v) + 4); }
-  if (tEnd <= 0) return;
-  const pts = []; for (let i = 0; i <= 90; i++) { const t = tEnd * i / 90; pts.push([px(t), py(Math.exp(RT * t))]); }
-  const col = crashed ? '#ef4444' : '#fbbf24';
-  x.beginPath(); pts.forEach((p, i) => (i ? x.lineTo(p[0], p[1]) : x.moveTo(p[0], p[1])));
-  x.lineTo(pts[90][0], h - pad); x.lineTo(pts[0][0], h - pad); x.closePath();
-  const gr = x.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, crashed ? 'rgba(239,68,68,.35)' : 'rgba(196,181,253,.38)'); gr.addColorStop(1, 'rgba(124,58,237,0)'); x.fillStyle = gr; x.fill();
-  x.beginPath(); pts.forEach((p, i) => (i ? x.lineTo(p[0], p[1]) : x.moveTo(p[0], p[1]))); x.strokeStyle = col; x.lineWidth = 3.5; x.lineCap = 'round'; x.shadowColor = col; x.shadowBlur = 12; x.stroke(); x.shadowBlur = 0;
-  const [ex, ey] = pts[90], [bx, by] = pts[84], a = Math.atan2(ey - by, ex - bx);
-  x.save(); x.translate(ex, ey);
-  if (crashed) { x.strokeStyle = '#fca5a5'; x.lineWidth = 3; for (let i = 0; i < 10; i++) { const r = i * Math.PI / 5; x.beginPath(); x.moveTo(Math.cos(r) * 8, Math.sin(r) * 8); x.lineTo(Math.cos(r) * (i % 2 ? 20 : 30), Math.sin(r) * (i % 2 ? 20 : 30)); x.stroke(); } }
-  else { x.rotate(a); x.fillStyle = '#fff'; x.beginPath(); x.moveTo(16, 0); x.lineTo(-8, -8); x.lineTo(-4, 0); x.lineTo(-8, 8); x.closePath(); x.fill();
-    if (live) { x.fillStyle = '#f97316'; x.beginPath(); x.moveTo(-6, -4); x.lineTo(-20 - Math.random() * 8, 0); x.lineTo(-6, 4); x.closePath(); x.fill(); } }
-  x.restore();
+  for (let v = step; v < M; v += step) { x.beginPath(); x.moveTo(padL, py(v)); x.lineTo(w - 8, py(v)); x.stroke(); x.fillText(v + 'x', 6, py(v) + 4); }
+  // rampe de lancement
+  x.fillStyle = '#334155'; x.fillRect(px(0) - 24, py(1) + 14, 48, 5); x.fillRect(px(0) - 18, py(1) + 19, 4, 8); x.fillRect(px(0) + 14, py(1) + 19, 4, 8);
+  const N = 90, pts = [];
+  for (let i = 0; i <= N; i++) { const t = tEnd * i / N; pts.push([px(t), py(Math.exp(RT * t))]); }
+  const [ex, ey] = pts[N];
+  if (tEnd > 0) {
+    const col = mode === 'boom' ? '#ef4444' : '#fbbf24';
+    x.beginPath(); pts.forEach((p, i) => (i ? x.lineTo(p[0], p[1]) : x.moveTo(p[0], p[1])));
+    x.lineTo(ex, h - padB); x.lineTo(pts[0][0], h - padB); x.closePath();
+    const gr = x.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, mode === 'boom' ? 'rgba(239,68,68,.28)' : 'rgba(196,181,253,.3)'); gr.addColorStop(1, 'rgba(124,58,237,0)'); x.fillStyle = gr; x.fill();
+    x.beginPath(); pts.forEach((p, i) => (i ? x.lineTo(p[0], p[1]) : x.moveTo(p[0], p[1])));
+    x.strokeStyle = col; x.lineWidth = 3; x.lineCap = 'round'; x.shadowColor = col; x.shadowBlur = 10; x.stroke(); x.shadowBlur = 0;
+    if (sc.cashAt) { // repère d'encaissement
+      const cx = px(Math.log(sc.cashAt) / RT), cy = py(sc.cashAt);
+      x.fillStyle = '#22c55e'; x.strokeStyle = '#fff'; x.lineWidth = 2; x.beginPath(); x.arc(cx, cy, 6, 0, 7); x.fill(); x.stroke();
+      x.fillStyle = '#bbf7d0'; x.font = '700 12px system-ui'; x.fillText('Encaissé ' + sc.cashAt.toFixed(2) + 'x', Math.min(cx + 10, w - 110), cy - 10);
+    }
+  }
+  if (mode === 'boom') { drawBoom(x, ex, ey, sc.boomT); return; }
+  if (mode === 'fly') {
+    for (let i = 70; i < N; i++) { const a = (i - 70) / 20; x.fillStyle = `rgba(226,232,240,${0.04 + a * 0.22})`; x.beginPath(); x.arc(pts[i][0], pts[i][1], 2 + a * 3.5, 0, 7); x.fill(); } // fumée
+    drawRocket(x, ex, ey, Math.atan2(ey - pts[N - 6][1], ex - pts[N - 6][0]), 1, 1.15);
+  } else {
+    const sh = sc.countdown ? (Math.random() - 0.5) * 1.6 : 0;
+    drawRocket(x, px(0) + sh, py(1) - 6, -Math.PI / 2, sc.countdown ? 0.9 : 0, 1.15);
+  }
 }
 function ofFuseTick() {
   const big = $('#oMult'); if (!big || O.game !== 'fuse') return;
-  const s = O.st, stat = $('#oStat'), RT = s ? s.rate : 0.00012; let tEnd = 0, crashed = false, live = false; big.className = 'bigm';
-  if (!s) { setTxt(big, '1.00x'); setTxt(stat, 'Choisis ta mise puis lance la fusée.'); }
-  else if (s.over) {
-    crashed = !(s.win > 0); tEnd = Math.log(Math.max(1, crashed ? s.crash : s.at)) / RT;
-    if (crashed) { big.classList.add('dead'); setTxt(big, s.crash.toFixed(2) + 'x'); setTxt(stat, 'Explosion : mise perdue'); }
-    else { big.classList.add('cash'); setTxt(big, s.at.toFixed(2) + 'x'); setTxt(stat, 'Encaissé ' + num(s.win) + ' ' + COIN + ' · explosion à ' + s.crash.toFixed(2) + 'x'); }
-  } else {
-    const dt = nowS() - s.start;
-    if (dt < 0) { setTxt(big, '1.00x'); setTxt(stat, 'Décollage dans ' + Math.ceil(-dt / 1000) + ' s'); }
+  const s = O.st, stat = $('#oStat'), RT = s ? s.rate : 0.00012, sc = { RT, tEnd: 0, mode: 'idle', boomT: 0, countdown: false, cashAt: 0 };
+  big.className = 'bigm';
+  const label = (m, t) => { big.textContent = ''; big.append(document.createTextNode(m)); if (t) big.append(el('small', '', t)); };
+  if (!s) { label('1.00x'); setTxt(stat, 'Choisis ta mise puis lance la fusée.'); }
+  else {
+    const dt = nowS() - s.start, cashed = s.over && s.win > 0, tCrash = s.over ? Math.log(Math.max(1, s.crash)) / RT : Infinity;
+    if (dt < 0 && !s.over) { sc.countdown = true; label('1.00x'); setTxt(stat, 'Décollage dans ' + Math.ceil(-dt / 1000) + ' s'); }
     else {
-      live = true; tEnd = dt; const m = Math.exp(RT * dt), pot = num(Math.floor(s.bet * m * 100) / 100);
-      setTxt(big, (Math.floor(m * 100) / 100).toFixed(2) + 'x'); setTxt(stat, 'Gain potentiel ' + pot + ' ' + COIN + (s.auto ? ' · encaissement auto à ' + s.auto + 'x' : ''));
-      const c = $('#oCash'); if (c) setTxt(c, 'Encaisser ' + pot + ' ' + COIN);
+      sc.tEnd = Math.min(Math.max(0, dt), tCrash); if (cashed) sc.cashAt = s.at;
+      const boom = s.over && (!cashed || dt >= tCrash);
+      if (boom) {
+        sc.mode = 'boom'; sc.boomT = Math.max(0, dt - tCrash); sc.tEnd = tCrash;
+        if (cashed) { big.classList.add('cash'); label(s.at.toFixed(2) + 'x', 'ENCAISSÉ'); setTxt(stat, 'Encaissé ' + num(s.win) + ' ' + COIN + ' · la fusée a explosé à ' + s.crash.toFixed(2) + 'x'); }
+        else { big.classList.add('dead'); label(s.crash.toFixed(2) + 'x', 'EXPLOSION'); setTxt(stat, 'La fusée a explosé : mise perdue'); }
+      } else {
+        sc.mode = 'fly'; const m = Math.exp(RT * sc.tEnd), mm = (Math.floor(m * 100) / 100).toFixed(2) + 'x';
+        if (cashed) { big.classList.add('cash'); label(s.at.toFixed(2) + 'x', 'ENCAISSÉ'); setTxt(stat, 'Encaissé ' + num(s.win) + ' ' + COIN + ' · la fusée continue… ' + mm); }
+        else { const pot = num(Math.floor(s.bet * m * 100) / 100); label(mm); setTxt(stat, 'Gain potentiel ' + pot + ' ' + COIN + (s.auto ? ' · encaissement auto à ' + s.auto + 'x' : '')); const c = $('#oCash'); if (c) setTxt(c, 'Encaisser ' + pot + ' ' + COIN); }
+      }
     }
   }
-  fuseCanvas(tEnd, RT, crashed, live);
+  fuseCanvas(sc);
 }
 // ---- dock : mise ou actions
 function ofSet(n) { n = Math.max(0, Math.floor(n * 100) / 100); O.bet = n ? String(n) : ''; const i = $('#oAmt'); if (i) i.value = O.bet; }
