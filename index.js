@@ -82,10 +82,11 @@ try {
 const fxAnim = require('./games/fx');
 const imgExt = (b) => (b && b[0] === 0x47 && b[1] === 0x49 && b[2] === 0x46 ? 'gif' : 'png');
 async function animOrPng(cv, file, src) {
-  if (CARD_GIF && canvasLib && file && src && src === localImg(file)) {
-    const gif = await fxAnim.animateCard(canvasLib, cv, file, IMG_DIR);
-    if (gif) return gif;
-  }
+  if (!CARD_GIF) return cv.toBuffer('image/png');
+  if (!canvasLib || !file) return cv.toBuffer('image/png');
+  // src = fond réellement utilisé (fichier local OU lien *_BG_URL) : on anime dans les deux cas
+  const gif = await fxAnim.animateCard(canvasLib, cv, file, IMG_DIR, { src: src || localImg(file) });
+  if (gif) return gif;
   return cv.toBuffer('image/png');
 }
 
@@ -406,6 +407,9 @@ function getGameAnimator() {
       clean: (txt) => noEmoji(txt),
       EmbedBuilder,
       AttachmentBuilder,
+      ActionRowBuilder,
+      ButtonBuilder,
+      ButtonStyle,
       color: gradientColor,
     });
     console.log(`[games] animations en images prêtes : ${gameAnimator.keys().join(', ')}`);
@@ -1726,7 +1730,52 @@ function bjOutcome(g, kind) {
   return { payout: 0, text: `😬 ${pv} contre ${dv} : tu perds ta mise.`, color: COLORS.red };
 }
 
-async function dealAnimation(i, game) {
+// --- Blackjack : tout reste dans le GIF (distribution, tirage, tour du croupier, résultat) ---
+// d = main complète du croupier ; si hidden, seule sa 1re carte est visible (la 2e est face cachée)
+const bjState = (p, d, hidden, cap) => {
+  const vis = hidden ? d.slice(0, 1) : d.slice();
+  return { p: p.slice(), d: vis, hidden, cap, ms: 850, pv: p.length ? handValue(p) : null, dv: vis.length ? handValue(vis) : null };
+};
+// Texte sous le GIF
+const bjLiveEmbed = (game, text) =>
+  new EmbedBuilder()
+    .setColor(COLORS.violet)
+    .setImage(`attachment://${game.gifName}`)
+    .setDescription(text)
+    .addFields({ name: 'Mise', value: fmt(game.bet), inline: true });
+const bjTurnText = (game) => {
+  const pInfo = handInfo(game.player);
+  return `À toi : **Tirer**, **Rester**${game.player.length === 2 ? ' ou **Doubler**' : ''}.` + (pInfo.isSoft ? `\n💡 Ton As te donne **${pInfo.low}** ou **${pInfo.total}**.` : '');
+};
+// Joue un GIF de blackjack. deliver(p) = envoi ; renvoie le ctx (gifName/gifUrl) si le GIF est passé, sinon null
+async function bjAnimate(game, deliver, steps, o = {}) {
+  const ctx = {
+    user: game.user,
+    bet: game.bet,
+    sub: `Mise ${coinTxt(game.bet)}`,
+    data: { steps, noShuffle: !!o.noShuffle },
+    components: o.components || [],
+    deliver,
+    noWait: !!o.noWait,
+    outcome: o.outcome,
+    resultText: o.resultText,
+    decorate: o.decorate,
+  };
+  const ok = await playGameImages(game.lastI, 'bj', null, ctx);
+  ctx.played = !!ok; // true aussi si le joueur a sauté l'animation ou si des images fixes ont été jouées
+  if (ok && ctx.gifName) {
+    game.gifName = ctx.gifName;
+    game.gifUrl = ctx.gifUrl;
+    game.fsRow = ctx.fullscreenRow || null;
+  } else {
+    game.gifName = null; // plus de GIF à l'écran : les mises à jour repassent par le texte
+    game.gifUrl = null;
+    game.fsRow = null;
+  }
+  return ctx;
+}
+
+async function dealAnimation(i, game, natural = null) {
   const [p1, p2] = game.player;
   const [d1, d2] = game.dealer;
   const steps = [
@@ -1736,7 +1785,8 @@ async function dealAnimation(i, game) {
     { p: [p1, p2], d: [d1], hidden: false, cap: 'Deuxième carte pour toi' },
     { p: [p1, p2], d: [d1], hidden: true, cap: 'Le croupier garde la sienne cachée' },
   ];
-  const frames = steps.map((s) => ({
+  if (natural) steps.push({ p: [p1, p2], d: [d1, d2], hidden: false, cap: 'Blackjack !' });
+  const frames = steps.slice(0, 5).map((s) => ({
     art: bjTable(s.p, s.d, s.hidden),
     caption: s.cap,
     ms: 850,
@@ -1750,13 +1800,14 @@ async function dealAnimation(i, game) {
     pv: s.p.length ? handValue(s.p) : null,
     dv: s.d.length ? handValue(s.d) : null,
   }));
-  const bjDone = await playGameImages(i, 'bj', null, {
-    user: game.user,
-    bet: game.bet,
-    sub: `Mise ${coinTxt(game.bet)}`,
-    data: { steps: imgSteps },
+  game.lastI = i;
+  const done = await bjAnimate(game, (p) => i.editReply(p), imgSteps, {
+    components: [],
+    outcome: natural ? natural.kind : undefined,
+    resultText: natural ? natural.text : undefined,
+    decorate: (e) => e.setDescription(`Mise **${fmt(game.bet)}** · distribution...`),
   });
-  if (!bjDone) await animate(i, frames, '🃏 Blackjack', '', 'bj');
+  if (!done.played) await animate(i, frames, '🃏 Blackjack', '', 'bj'); // ni GIF ni images : animation texte d'avant
 }
 
 async function startBlackjack(i, bet) {
@@ -1826,19 +1877,34 @@ async function startBlackjack(i, bet) {
       throw e;
     }
 
-    await dealAnimation(i, game);
+    await dealAnimation(
+      i,
+      game,
+      natural ? { kind: out.color === COLORS.green ? 'win' : out.color === COLORS.red ? 'lose' : 'push', text: animResultText(out.color === COLORS.green ? 'win' : out.color === COLORS.red ? 'lose' : 'push', round2(out.payout / bet)) } : null
+    );
 
     if (natural) {
       const npay = {
         embeds: [bjEmbed(game, { text: out.text, color: out.color, balance, revealAll: true })],
         components: bjRows(game, true),
       };
+      if (game.gifName) {
+        // le GIF reste affiché : on ajoute seulement le résultat sous l'image
+        const kindN = out.color === COLORS.green ? 'win' : out.color === COLORS.red ? 'lose' : 'push';
+        const e = bjLiveEmbed(game, `${outcomeBanner(kindN)}${out.text}`).setColor(outcomeColor(kindN)).addFields({ name: 'Solde', value: fmt(balance), inline: true });
+        await i.editReply({ embeds: [e], components: [...bjRows(game, true), ...(game.fsRow ? [game.fsRow] : [])] }).catch(() => {});
+        return;
+      }
       putCard(npay, await resultCard(i.user, 'bj', bet, round2(out.payout / bet), round2(out.payout - bet), balance));
       await i.editReply(npay).catch(() => {});
       return;
     }
 
-    await i.editReply({ embeds: [bjEmbed(game)], components: bjRows(game, false) }).catch(() => {});
+    if (game.gifName) {
+      await i.editReply({ embeds: [bjLiveEmbed(game, bjTurnText(game))], components: [...bjRows(game, false), ...(game.fsRow ? [game.fsRow] : [])] }).catch(() => {});
+    } else {
+      await i.editReply({ embeds: [bjEmbed(game)], components: bjRows(game, false) }).catch(() => {});
+    }
     games.set(uid, game);
     started = true;
     armTimer(game);
@@ -1859,44 +1925,33 @@ async function settleBlackjack(game, kind, i) {
     }
     await game.lastI.editReply(payload);
   };
+  const outKind = (out) => (out.color === COLORS.green ? 'win' : out.color === COLORS.red ? 'lose' : 'push');
 
   try {
-    if (kind === 'stand') {
-      await pushBoard(
-        { embeds: [bjEmbed(game, { revealing: true, text: '🃏 Le croupier **retourne** sa deuxième carte...' })], components: [] },
-        i
-      );
-      i = null;
-      await sleep(1100);
+    const useGif = !!game.gifName && String(process.env.GAME_GIF || 'on').toLowerCase() !== 'off';
+    const preP = game.preP || null; // main du joueur avant la dernière carte (tirage / double)
+    game.preP = null;
 
+    // ----- le croupier joue (tirages calculés d'avance ; affichés ensuite dans le GIF)
+    const steps = [];
+    if (preP) steps.push(bjState(preP, game.dealer, true, 'Ton tour...'));
+    steps.push(bjState(game.player, game.dealer, true, preP ? 'Tu tires une carte' : 'Tu restes'));
+    const textDraws = [];
+    if (kind === 'stand') {
+      steps.push(bjState(game.player, game.dealer, false, 'Le croupier retourne sa carte'));
       while (handValue(game.dealer) < 17) {
         game.dealer.push(game.deck.pop());
         const d = handInfo(game.dealer);
-        await game.lastI.editReply({
-          embeds: [
-            bjEmbed(game, {
-              revealing: true,
-              text: `🃏 Le croupier tire une carte... total **${d.label}**${d.isSoft ? ' (As soft)' : ''}`,
-            }),
-          ],
-          components: [],
-        });
-        await sleep(1100);
+        textDraws.push(d);
+        steps.push(bjState(game.player, game.dealer, false, `Le croupier tire... total ${d.label}`));
       }
-
       const dFinal = handInfo(game.dealer);
-      await game.lastI.editReply({
-        embeds: [
-          bjEmbed(game, {
-            revealing: true,
-            text: dFinal.total > 21 ? `💥 Le croupier dépasse (**${dFinal.label}**) !` : `🛑 Le croupier s’arrête à **${dFinal.label}**.`,
-          }),
-        ],
-        components: [],
-      });
-      await sleep(900);
+      steps[steps.length - 1].cap = dFinal.total > 21 ? `Le croupier dépasse (${dFinal.label})` : `Le croupier s'arrête à ${dFinal.label}`;
+    } else {
+      steps.push(bjState(game.player, game.dealer, false, `Tu dépasses 21 (${handInfo(game.player).label})`));
     }
 
+    // ----- résultat, boost, paiement
     const out = bjOutcome(game, kind);
     const boost = getBoost(game.guildId);
     if (out.payout > game.bet && (boost.winMult || 1) !== 1) {
@@ -1911,20 +1966,64 @@ async function settleBlackjack(game, kind, i) {
     const balance = out.payout > 0 ? await credit(game.userId, out.payout) : await getBalance(game.userId);
     const pL = handInfo(game.player).label;
     const dL = handInfo(game.dealer).label;
+    const mult = round2(out.payout / game.bet);
     recordResult({
       guildId: game.guildId,
       user: game.user,
       game: 'bj',
       bet: game.bet,
-      mult: round2(out.payout / game.bet),
+      mult,
       payout: out.payout,
       detail: `${pL} vs ${dL}`,
     });
+    const rk = outKind(out);
+
+    // ----- affichage : GIF (reste à l'écran) ou, à défaut, texte
+    let played = null;
+    if (useGif) {
+      if (i && !i.replied && !i.deferred) await i.deferUpdate().catch(() => {});
+      played = await bjAnimate(game, (p) => game.lastI.editReply(p), steps, {
+        noShuffle: true,
+        components: [],
+        outcome: rk,
+        resultText: animResultText(rk, mult),
+        decorate: (e) => e.setDescription(kind === 'stand' ? '🃏 Le croupier joue...' : '🃏 Tu dépasses...'),
+      });
+    }
+
+    if (played && game.gifName) {
+      const e = bjLiveEmbed(game, `${outcomeBanner(rk)}${out.text}`)
+        .setColor(outcomeColor(rk))
+        .addFields({ name: 'Solde', value: fmt(balance), inline: true });
+      await game.lastI.editReply({ embeds: [e], components: [...bjRows(game, true), ...(game.fsRow ? [game.fsRow] : [])] });
+      return;
+    }
+
+    // repli texte (pas de GIF) : même déroulé qu'avant
+    if (kind === 'stand') {
+      await pushBoard({ embeds: [bjEmbed(game, { revealing: true, text: '🃏 Le croupier **retourne** sa deuxième carte...' })], components: [], attachments: [] }, i);
+      i = null;
+      await sleep(1100);
+      const dFinal = handInfo(game.dealer);
+      for (const d of textDraws) {
+        await game.lastI.editReply({
+          embeds: [bjEmbed(game, { revealing: true, text: `🃏 Le croupier tire une carte... total **${d.label}**${d.isSoft ? ' (As soft)' : ''}` })],
+          components: [],
+        });
+        await sleep(1100);
+      }
+      await game.lastI.editReply({
+        embeds: [bjEmbed(game, { revealing: true, text: dFinal.total > 21 ? `💥 Le croupier dépasse (**${dFinal.label}**) !` : `🛑 Le croupier s’arrête à **${dFinal.label}**.` })],
+        components: [],
+      });
+      await sleep(900);
+    }
     const payload = {
       embeds: [bjEmbed(game, { text: out.text, color: out.color, balance, revealAll: true })],
       components: bjRows(game, true),
+      attachments: [],
     };
-    putCard(payload, await resultCard(game.user, 'bj', game.bet, round2(out.payout / game.bet), round2(out.payout - game.bet), balance));
+    putCard(payload, await resultCard(game.user, 'bj', game.bet, mult, round2(out.payout - game.bet), balance));
     if (i && !i.replied && !i.deferred) await i.update(payload);
     else await game.lastI.editReply(payload);
   } catch (e) {
@@ -1940,15 +2039,50 @@ async function handleBlackjackButton(i) {
     return respondText(i, 'Cette partie n’est plus active. Lance-en une nouvelle depuis le panneau.');
   }
   if (game.finished) return i.deferUpdate().catch(() => {});
+  if (game.busy) return i.deferUpdate().catch(() => {}); // une carte est en train d'être distribuée
   game.lastI = i;
   armTimer(game);
 
   if (i.customId === 'bj_hit') {
+    const before = game.player.slice();
     game.player.push(game.deck.pop());
     const v = handValue(game.player);
+    game.preP = before;
     if (v > 21) return settleBlackjack(game, 'bust', i);
     if (v === 21) return settleBlackjack(game, 'stand', i);
-    return i.update({ embeds: [bjEmbed(game)], components: bjRows(game, false) });
+    game.preP = null;
+
+    // le GIF reste à l'écran : la nouvelle carte glisse du sabot jusqu'à ta main, les boutons restent actifs
+    if (game.gifName && String(process.env.GAME_GIF || 'on').toLowerCase() !== 'off' && !wantsSkipAnim(game.userId)) {
+      game.busy = true;
+      try {
+        await i.deferUpdate();
+        const steps = [bjState(before, game.dealer, true, 'À toi de jouer'), bjState(game.player, game.dealer, true, 'Tu tires une carte')];
+        const ctx = await bjAnimate(game, (p) => i.editReply(p), steps, {
+          noShuffle: true,
+          noWait: true,
+          components: bjRows(game, false),
+          decorate: (e) => e.setDescription(bjTurnText(game)).addFields({ name: 'Mise', value: fmt(game.bet), inline: true }),
+        });
+        if (!ctx.played || !game.gifName) {
+          // GIF impossible : retour à l'affichage texte
+          await i.editReply({ embeds: [bjEmbed(game)], components: bjRows(game, false), attachments: [] });
+        }
+      } catch (e) {
+        console.error('[blackjack] tirage', e?.message || e);
+        game.gifName = null;
+        await i.editReply({ embeds: [bjEmbed(game)], components: bjRows(game, false), attachments: [] }).catch(() => {});
+      } finally {
+        game.busy = false;
+      }
+      return;
+    }
+    const upd = { embeds: [bjEmbed(game)], components: bjRows(game, false) };
+    if (game.gifName) {
+      // animation sautée : on garde quand même l'image du GIF précédent
+      upd.embeds = [bjLiveEmbed(game, bjTurnText(game))];
+    }
+    return i.update(upd);
   }
 
   if (i.customId === 'bj_stand') return settleBlackjack(game, 'stand', i);
@@ -1959,6 +2093,7 @@ async function handleBlackjackButton(i) {
       return respondText(i, `Pas assez de ${COIN} pour doubler.`);
     }
     game.bet = round2(game.bet * 2);
+    game.preP = game.player.slice();
     game.player.push(game.deck.pop());
     if (handValue(game.player) > 21) return settleBlackjack(game, 'bust', i);
     return settleBlackjack(game, 'stand', i);
@@ -2078,7 +2213,7 @@ async function playRoulette(i, bet, choiceStr) {
 
     const profit = round2(payout - bet);
     const kind = won ? 'win' : 'lose';
-    const rlImgDone = await playGameImages(i, 'roulette', null, {
+    const rlCtx = {
       user: i.user,
       bet,
       outcome: kind,
@@ -2086,7 +2221,8 @@ async function playRoulette(i, bet, choiceStr) {
       pickLabel: noEmoji(choice.label),
       sub: `Mise ${coinTxt(bet)} · ${noEmoji(choice.label)}`,
       data: { order: WHEEL_ORDER, reds: [...REDS], result },
-    });
+    };
+    const rlImgDone = await playGameImages(i, 'roulette', null, rlCtx);
     if (!rlImgDone) await animate(i, rouletteFrames(result, choice), '🎡 Roulette', `Mise **${fmt(bet)}**\n`, 'roulette');
 
     const embed = brand(
@@ -2113,9 +2249,15 @@ async function playRoulette(i, bet, choiceStr) {
       new ButtonBuilder().setCustomId(`replay|rl|${bet}|${choice.key}`).setLabel('Rejouer').setEmoji('🔁').setStyle(ButtonStyle.Success),
       new ButtonBuilder().setCustomId('panel_home').setLabel('Menu ZNK').setEmoji('💜').setStyle(ButtonStyle.Primary)
     );
-    const rlPayload = { embeds: [embed], components: [row] };
-    putCard(rlPayload, await resultCard(i.user, 'roulette', bet, won ? rlMult : 0, profit, balance));
-    await editWithCard(i, rlPayload);
+    const rlPayload = { embeds: [embed], components: [row, ...(rlCtx.fullscreenRow ? [rlCtx.fullscreenRow] : [])] }; // 🖥️ Plein écran = lien vers le GIF
+    if (rlCtx.gifName) {
+      // le GIF reste affiché (sa dernière image montre le résultat) : le lien « Plein écran » reste valable
+      embed.setImage(`attachment://${rlCtx.gifName}`);
+      await i.editReply(rlPayload);
+    } else {
+      putCard(rlPayload, await resultCard(i.user, 'roulette', bet, won ? rlMult : 0, profit, balance));
+      await editWithCard(i, rlPayload);
+    }
 
     recordResult({
       guildId: resolveGuildId(i),
@@ -4589,7 +4731,7 @@ async function playInstant(i, key, bet, choice) {
       console.error('[anim]', key, animErr?.message || animErr);
     }
     const kind = profit > 0 ? 'win' : profit < 0 ? 'lose' : 'push';
-    const imgDone = await playGameImages(i, key, res, {
+    const gCtx = {
       user: i.user,
       bet,
       choice,
@@ -4598,7 +4740,8 @@ async function playInstant(i, key, bet, choice) {
       resultText: animResultText(kind, mult),
       sub: `Mise ${coinTxt(bet)} · ${noEmoji(res.pick || '')}`,
       data: { wheel: WHEEL, horses: HORSES },
-    });
+    };
+    const imgDone = await playGameImages(i, key, res, gCtx);
     if (!imgDone) await animate(i, frames, G.title, `Mise **${fmt(bet)}** · ${res.pick || ''}\n`, key);
 
     const text =
@@ -4621,9 +4764,14 @@ async function playInstant(i, key, bet, choice) {
       key
     );
 
-    const igPayload = { embeds: [embed], components: [endGameRow(`replay|${key}|${bet}|${choice}`)] };
-    putCard(igPayload, await resultCard(i.user, key, bet, mult, profit, balance));
-    await editWithCard(i, igPayload);
+    const igPayload = { embeds: [embed], components: [endGameRow(`replay|${key}|${bet}|${choice}`), ...(gCtx.fullscreenRow ? [gCtx.fullscreenRow] : [])] }; // 🖥️ Plein écran = lien vers le GIF
+    if (gCtx.gifName) {
+      embed.setImage(`attachment://${gCtx.gifName}`);
+      await i.editReply(igPayload);
+    } else {
+      putCard(igPayload, await resultCard(i.user, key, bet, mult, profit, balance));
+      await editWithCard(i, igPayload);
+    }
 
     recordResult({
       guildId: resolveGuildId(i),
