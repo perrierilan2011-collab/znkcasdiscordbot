@@ -6690,9 +6690,9 @@ async function ensureAlltimeMessages() {
 }
 
 // ============================================================
-//  BLACKJACK EN LIGNE — table EXTERNE (page web hébergée par le bot)
+//  BLACKJACK + ROULETTE EN LIGNE — tables EXTERNES (page web hébergée par le bot)
 //  Les autres jeux « online » (poker, roulette, pile ou face, dés, cartes, slots, courses, crash) sont supprimés.
-//  Code : web/server.js (serveur + temps réel) · web/table.js (blackjack) · web/wheel.js (roue multijoueur) · web/public/index.html (animations)
+//  Code : web/server.js (serveur + temps réel) · web/table.js (blackjack) · web/roulette.js (roulette multijoueur) · web/public/index.html (animations)
 //  Adresse : PUBLIC_URL (défaut https://znkcasdiscordbot-production.up.railway.app) · port : PORT (Railway)
 //  Désactiver : variable WEB=off
 // ============================================================
@@ -6719,13 +6719,13 @@ try {
 function buildPokerPanelPayload() {
   const embed = new EmbedBuilder()
     .setColor(0x7c3aed)
-    .setTitle('🃏🎡 Casino en ligne')
+    .setTitle('🃏🎰 Casino en ligne')
     .setDescription(
       [
         'Des jeux **multijoueurs en direct**, sur une page web animée (ton solde du casino est utilisé).',
         '',
         '🃏 **Blackjack** — table à 5 places, **mise libre**, tu vois les cartes de tous, blackjack payé **3:2**',
-        '🎡 **Roue** — **une seule roue pour tout le monde, sans limite de joueurs** : x2 · x3 · x6 · x24. Tu vois **qui joue et qui a misé quoi** en direct, puis la roue tourne pour tous en même temps',
+        '🎰 **Roulette** — **une seule roulette pour tout le monde, sans limite de joueurs** : rouge/noir, pair/impair, douzaines, colonnes ou numéro plein (x36). Tu vois **qui joue et qui a misé quoi** en direct, puis la roue tourne pour tous en même temps',
         '',
         'Clique sur un bouton : tu reçois ton lien personnel (valable 12 h).',
       ].join('\n')
@@ -6733,7 +6733,7 @@ function buildPokerPanelPayload() {
     .setFooter({ text: 'Admin → Salon online pour créer ce salon' });
   const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('online_play').setLabel('Blackjack').setEmoji('🃏').setStyle(ButtonStyle.Success),
-    new ButtonBuilder().setCustomId('online_wheel').setLabel('Roue').setEmoji('🎡').setStyle(ButtonStyle.Primary)
+    new ButtonBuilder().setCustomId('online_roulette').setLabel('Roulette').setEmoji('🎰').setStyle(ButtonStyle.Primary)
   );
   return withBanner({ embeds: [embed], components: [row] }, 'panel_online.png');
 }
@@ -6751,7 +6751,7 @@ async function createPokerChannel(i) {
   const channel = await guild.channels.create({
     name: 'online',
     type: ChannelType.GuildText,
-    topic: 'Casino en ligne 🃏🎡 — blackjack et roue multijoueurs sur le site du casino',
+    topic: 'Casino en ligne 🃏🎰 — blackjack et roulette multijoueurs sur le site du casino',
     permissionOverwrites: [
       {
         id: guild.roles.everyone.id,
@@ -6770,7 +6770,7 @@ async function createPokerChannel(i) {
   await panelMsg.pin().catch(() => {});
   const saved = await saveChannel(guild.id, 'online', channel.id);
   return i.reply({
-    content: `✅ Salon <#${channel.id}> créé (blackjack + roue en ligne).${saved ? '' : DB_WARN}`,
+    content: `✅ Salon <#${channel.id}> créé (blackjack + roulette en ligne).${saved ? '' : DB_WARN}`,
     flags: EPH,
   });
 }
@@ -6780,7 +6780,7 @@ async function createPokerChannel(i) {
 async function handlePokerButton(i) {
   if (!i.guild) return respondText(i, 'Utilise ce bouton dans le serveur.');
   if (!webApp.enabled) return respondText(i, '⚠️ Les jeux en ligne sont désactivés pour le moment.');
-  const isWheel = i.customId === 'online_wheel';
+  const isWheel = i.customId === 'online_roulette' || i.customId === 'online_wheel'; // (nom conservé : = roulette)
   const url = webApp.makeLink(
     {
       id: i.user.id,
@@ -6788,18 +6788,18 @@ async function handlePokerButton(i) {
       avatar: i.user.displayAvatarURL({ extension: 'png', size: 128 }),
     },
     i.guild.id,
-    isWheel ? 'wheel' : undefined
+    isWheel ? 'roulette' : undefined
   );
   if (!url) return respondText(i, '⚠️ Lien indisponible, réessaie dans un instant.');
   const bal = await getBalance(i.user.id).catch(() => null);
   const embed = new EmbedBuilder()
     .setColor(COLORS.violet)
-    .setAuthor({ name: isWheel ? 'ZNK CASINO  •  ROUE EN LIGNE' : 'ZNK CASINO  •  BLACKJACK EN LIGNE', iconURL: ZNK_LOGO })
-    .setTitle(isWheel ? '🎡 La roue t’attend' : '🃏 Ta table t’attend')
+    .setAuthor({ name: isWheel ? 'ZNK CASINO  •  ROULETTE EN LIGNE' : 'ZNK CASINO  •  BLACKJACK EN LIGNE', iconURL: ZNK_LOGO })
+    .setTitle(isWheel ? '🎰 La roulette t’attend' : '🃏 Ta table t’attend')
     .setDescription(
       (isWheel
-        ? `Clique sur le bouton pour ouvrir la roue.\n` +
-          `Mise **ce que tu veux** sur x2 · x3 · x6 · x24${bal !== null ? ` (solde : **${fmt(bal)}**)` : ''} : tu vois en direct qui joue et qui a misé quoi, puis la roue tourne pour tout le monde.\n\n`
+        ? `Clique sur le bouton pour ouvrir la roulette.\n` +
+          `Mise **ce que tu veux** sur rouge/noir, pair/impair, douzaines, colonnes ou un numéro${bal !== null ? ` (solde : **${fmt(bal)}**)` : ''} : tu vois en direct qui joue et qui a misé quoi, puis la roulette tourne pour tout le monde.\n\n`
         : `Clique sur le bouton pour ouvrir la table.\n` +
           `Prends une place, mise **ce que tu veux**${bal !== null ? ` (solde : **${fmt(bal)}**)` : ''} et joue à ton tour.\n\n`) +
         `🔒 Ce lien est **personnel** (il te connecte à ton compte) : ne le partage pas. Valable 12 h.`
@@ -6807,7 +6807,7 @@ async function handlePokerButton(i) {
   return i.reply({
     embeds: [embed],
     components: [
-      new ActionRowBuilder().addComponents(new ButtonBuilder().setLabel(isWheel ? 'Ouvrir la roue' : 'Ouvrir la table').setEmoji(isWheel ? '🎡' : '🃏').setStyle(ButtonStyle.Link).setURL(url)),
+      new ActionRowBuilder().addComponents(new ButtonBuilder().setLabel(isWheel ? 'Ouvrir la roulette' : 'Ouvrir la table').setEmoji(isWheel ? '🎰' : '🃏').setStyle(ButtonStyle.Link).setURL(url)),
     ],
     flags: EPH,
   });
