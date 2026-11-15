@@ -6730,7 +6730,7 @@ function getWebBoards() {
         out[kind] = await Promise.all(
           rows.map(async (r) => {
             const u = await client.users.fetch(r.id).catch(() => null);
-            return { uid: r.id, name: u ? u.globalName || u.username : 'Utilisateur inconnu', value: r.value };
+            return { uid: r.id, name: u ? u.globalName || u.username : 'Utilisateur inconnu', value: r.value, avatar: u ? u.displayAvatarURL({ size: 64, extension: 'png' }) : '' };
           })
         );
       }
