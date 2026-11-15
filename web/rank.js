@@ -1,12 +1,12 @@
 'use strict';
 /*
- * web/rank.js — rangs (gains cumulés) + ELO du casino ZNK.
+ * web/rank.js — rangs (gains cumulés) + RR du casino ZNK.
  *
  * RANG  : basé sur le TOTAL des gains accumulés EN LIGNE (poker, blackjack, roulette), jamais sur le solde. Les pertes ne font jamais descendre :
  *         tu as gagné 100, tu perds tout, tu regagnes 10 => 110 de gains cumulés.
  *         Chaque manche en ligne gagnée (profit net > 0) s'ajoute au total.
- * ELO   : duel « implicite » entre les joueurs d'une même manche (poker, blackjack, roulette en ligne).
- *         Les joueurs d'une manche sont comparés deux à deux, et chacun affronte aussi la « maison » (ELO fixe 1000) :
+ * RR   : duel « implicite » entre les joueurs d'une même manche (poker, blackjack, roulette en ligne).
+ *         Les joueurs d'une manche sont comparés deux à deux, et chacun affronte aussi la « maison » (RR fixe 1000) :
  *         gain net = victoire, perte = défaite. Une manche à un seul joueur compte donc aussi.
  *
  * Pour modifier la difficulté des rangs : changer uniquement les seuils (min) dans FAMILIES ci-dessous.
@@ -53,16 +53,48 @@ function progress(earned) {
   return { idx: i, pct, toNext: next ? Math.max(0, next.min - e) : 0, maxed: !next };
 }
 
-// ---------- ELO ----------
-const ELO_START = 1000, ELO_FLOOR = 100;
+// ---------- RR ----------
+const RR_START = 1000, RR_FLOOR = 100;
 const K = { poker: 24, blackjack: 12, roulette: 12 };
-const PROVISIONAL = 10; // nombre de manches classées avant que l'ELO soit « fiable »
+const PROVISIONAL = 10; // nombre de manches classées avant que le RR soit « fiable »
 
-function create(file) {
+function create(file, supabase) {
   let users = {};
   try { users = JSON.parse(fs.readFileSync(file, 'utf8')) || {}; } catch { users = {}; }
   let timer = null;
-  function save() {
+  const dirty = new Set();
+  const toRow = (id, u) => ({ user_id: id, name: u.n || 'Joueur', avatar: u.a || '', earned: u.earned || 0, elo: u.elo, games: u.eg || 0, peak: u.peak, wins: u.w || 0, losses: u.l || 0, updated_at: new Date().toISOString() });
+  async function flushDb() {
+    if (!supabase || !dirty.size) return;
+    const ids = [...dirty]; dirty.clear();
+    const rows = ids.filter((id) => users[id]).map((id) => toRow(id, users[id]));
+    for (let i = 0; i < rows.length; i += 500) {
+      try {
+        const { error } = await supabase.from('player_rank').upsert(rows.slice(i, i + 500), { onConflict: 'user_id' });
+        if (error) throw error;
+      } catch (e) { console.error('[rank] supabase', e?.message || e); rows.slice(i, i + 500).forEach((r) => dirty.add(r.user_id)); }
+    }
+  }
+  // au démarrage : recharge les RR / rangs depuis Supabase (survit aux redéploiements)
+  if (supabase) (async () => {
+    try {
+      for (let from = 0; ; from += 1000) {
+        const { data, error } = await supabase.from('player_rank').select('*').range(from, from + 999);
+        if (error) throw error;
+        for (const r of data || []) {
+          const loc = users[r.user_id];
+          if (loc && (loc.eg || 0) > r.games) continue; // le local est plus récent
+          users[r.user_id] = { n: r.name || 'Joueur', a: r.avatar || '', earned: Number(r.earned) || 0, elo: Number(r.elo), eg: r.games || 0, peak: Number(r.peak), w: r.wins || 0, l: r.losses || 0 };
+        }
+        if (!data || data.length < 1000) break;
+      }
+      Object.keys(users).forEach((id) => dirty.add(id));
+      await flushDb();
+      console.log('[rank] RR chargés depuis Supabase');
+    } catch (e) { console.error('[rank] chargement supabase', e?.message || e); }
+  })();
+  function save(ids) {
+    for (const id of ids || []) dirty.add(id);
     clearTimeout(timer);
     timer = setTimeout(() => {
       try {
@@ -70,19 +102,20 @@ function create(file) {
         fs.writeFileSync(file + '.tmp', JSON.stringify(users));
         fs.renameSync(file + '.tmp', file);
       } catch (e) { console.error('[rank] écriture', e?.message || e); }
+      flushDb();
     }, 2000);
     if (timer.unref) timer.unref();
   }
   const get = (uid, name, avatar) => {
-    const u = users[uid] || (users[uid] = { n: name || 'Joueur', a: '', earned: 0, elo: ELO_START, eg: 0, peak: ELO_START, w: 0, l: 0 });
+    const u = users[uid] || (users[uid] = { n: name || 'Joueur', a: '', earned: 0, elo: RR_START, eg: 0, peak: RR_START, w: 0, l: 0 });
     if (name) u.n = name;
     if (avatar) u.a = avatar;
     return u;
   };
 
-  /** une manche terminée : cumule les gains de chaque gagnant, puis met à jour l'ELO */
+  /** une manche terminée : cumule les gains de chaque gagnant, puis met à jour le RR */
   function record(r, avatarOf) {
-    if (!r || !ONLINE.has(r.game)) return; // jeux offline / solo : ni rang ni ELO
+    if (!r || !ONLINE.has(r.game)) return; // jeux offline / solo : ni rang ni RR
     const players = (r && r.players || []).filter((p) => p && p.uid);
     for (const p of players) {
       const u = get(String(p.uid), p.name, avatarOf && avatarOf(String(p.uid)));
@@ -94,7 +127,7 @@ function create(file) {
       const score = players.map((p) => (r.game === 'poker' ? Number(p.net) || 0 : (Number(p.bet) > 0 ? (Number(p.net) || 0) / Number(p.bet) : 0)));
       const us = players.map((p) => get(String(p.uid)));
       const n = players.length, delta = new Array(n).fill(0);
-      const opp = n; // n-1 autres joueurs + la « maison » (adversaire virtuel à ELO_START)
+      const opp = n; // n-1 autres joueurs + la « maison » (adversaire virtuel à RR_START)
       for (let i = 0; i < n; i++) {
         for (let j = 0; j < n; j++) {
           if (i === j) continue;
@@ -104,17 +137,17 @@ function create(file) {
         }
         // duel contre la maison : gain = victoire, perte = défaite, égalité = nul
         const Sh = score[i] > 1e-9 ? 1 : score[i] < -1e-9 ? 0 : 0.5;
-        const Eh = 1 / (1 + Math.pow(10, (ELO_START - us[i].elo) / 400));
+        const Eh = 1 / (1 + Math.pow(10, (RR_START - us[i].elo) / 400));
         delta[i] += (k / opp) * (Sh - Eh);
       }
       for (let i = 0; i < n; i++) {
-        us[i].elo = Math.max(ELO_FLOOR, us[i].elo + delta[i]);
+        us[i].elo = Math.max(RR_FLOOR, us[i].elo + delta[i]);
         us[i].eg++;
         if (score[i] > 0) us[i].w++; else if (score[i] < 0) us[i].l++;
         if (us[i].elo > us[i].peak) us[i].peak = us[i].elo;
       }
     }
-    save();
+    save(players.map((p) => String(p.uid)));
   }
 
   const eloList = () => Object.entries(users).filter(([, u]) => u.eg > 0).sort((a, b) => b[1].elo - a[1].elo || b[1].eg - a[1].eg);
@@ -127,14 +160,14 @@ function create(file) {
       ladder: LADDER,
       me: meU
         ? { earned: meU.earned, ...progress(meU.earned), elo: Math.round(meU.elo), peak: Math.round(meU.peak), games: meU.eg, wins: meU.w, losses: meU.l, pos: mePos >= 0 ? mePos + 1 : 0, prov: meU.eg < PROVISIONAL, total: list.length }
-        : { earned: 0, ...progress(0), elo: ELO_START, peak: ELO_START, games: 0, wins: 0, losses: 0, pos: 0, prov: true, total: list.length },
+        : { earned: 0, ...progress(0), elo: RR_START, peak: RR_START, games: 0, wins: 0, losses: 0, pos: 0, prov: true, total: list.length },
       elo: list.slice(0, top).map(row),
       meRow: mePos >= top ? row(list[mePos], mePos) : null,
       provisional: PROVISIONAL,
     };
   }
   const info = (uid) => LADDER[rankIndex((users[uid] && users[uid].earned) || 0)];
-  return { info, record, view, touch: (uid, name, avatar) => { if (users[uid]) get(uid, name, avatar); } };
+  return { info, record, view, touch: (uid, name, avatar) => { if (users[uid]) { get(uid, name, avatar); save([uid]); } } };
 }
 
 module.exports = { create, LADDER, progress, rankIndex };

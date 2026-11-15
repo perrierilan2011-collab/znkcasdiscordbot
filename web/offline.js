@@ -24,7 +24,7 @@ const COIN_MULT = 1.95;
 const DICE_MULT = { under: 2.3, over: 2.3, seven: 5.8 };
 const HORSES = [{ p: 0.4, mult: 2.4 }, { p: 0.25, mult: 3.8 }, { p: 0.18, mult: 5.3 }, { p: 0.11, mult: 8.6 }, { p: 0.06, mult: 15.8 }];
 
-// ---- plinko : 12 rangées, 13 cases, 3 niveaux de risque (retour ≈ 96-97 %), 1 à 10 billes (la mise est répartie à parts égales)
+// ---- plinko : 12 rangées, 13 cases, 3 niveaux de risque (retour ≈ 96-97 %), 1 à 10 billes (la mise saisie = prix d'UNE bille : on paie mise x nombre de billes)
 const PL_ROWS = 12, PL_MAXBALLS = 10;
 const PL_HALF = { low: [5.6, 3.2, 1.6, 1.4, 1.1, 0.9, 0.6], med: [26, 9, 4, 2, 1.1, 0.5, 0.4], high: [130, 18, 6, 2.5, 0.7, 0.3, 0.2] };
 const PLINKO = {}; for (const k of Object.keys(PL_HALF)) PLINKO[k] = [...PL_HALF[k], ...PL_HALF[k].slice(0, -1).reverse()];
@@ -50,7 +50,8 @@ function genTicket(g) {
 }
 
 const shuffle = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = randomInt(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; };
-const minesMult = (m, k) => { let r = EDGE; for (let i = 0; i < k; i++) r *= (CELLS - i) / (CELLS - m - i); return r; };
+const MINES_EDGE = 0.94; // mines : retour joueur ~94 % (un peu moins que les autres jeux)
+const minesMult = (m, k) => { let r = MINES_EDGE; for (let i = 0; i < k; i++) r *= (CELLS - i) / (CELLS - m - i); return r; };
 const round2 = (x) => Math.floor(x * 100) / 100;
 const russianMult = (k) => round2((0.96 * 6) / (6 - k));
 // tirage d'un jeu « un coup » (le choix du joueur est validé AVANT le débit)
@@ -154,7 +155,7 @@ function create(deps, pending) {
     horses: (g) => ({ type: 'horses', bet: g.bet, want: g.want, winner: g.winner, mult: g.mult, over: true, win: g.win || 0, outcome: g.win > 0 ? 'win' : 'lose' }),
     russian: (g) => ({ type: 'russian', bet: g.bet, k: g.k, dead: g.dead, chambers: g.chambers, mult: g.mult, over: true, win: g.win || 0, outcome: g.win > 0 ? 'win' : 'lose' }),
     slots: (g) => ({ type: 'slots', bet: g.bet, grid: g.grid, wins: g.wins, mult: g.mult, over: true, win: g.win || 0, outcome: g.win > 0 ? 'win' : 'lose' }),
-    plinko: (g) => ({ type: 'plinko', bet: g.bet, risk: g.risk, n: g.n, drops: g.drops, mult: round2(g.mult), over: true, win: g.win || 0, outcome: g.win > 0 ? 'win' : 'lose' }),
+    plinko: (g) => ({ type: 'plinko', bet: g.bet, each: round2(g.bet / g.n), risk: g.risk, n: g.n, drops: g.drops, mult: round2(g.mult), over: true, win: g.win || 0, outcome: g.win > 0 ? 'win' : 'lose' }),
     duel: (g) => ({ type: 'duel', bet: g.bet, foe: g.foe, me: g.me, foeMs: g.foeMs, mult: g.mult, over: true, win: g.win || 0, outcome: g.win > 0 ? 'win' : 'lose' }),
     scratch: (g) => ({ type: 'scratch', id: g.id, bet: g.bet, cells: g.cells.map((v, i) => (g.seen.has(i) ? v : null)), over: g.over, mult: g.over ? g.mult : undefined, hit: g.over ? g.hit : undefined, win: g.win || 0, outcome: g.win > 0 ? 'win' : 'lose' }),
     bj: (g) => {
@@ -227,9 +228,12 @@ function create(deps, pending) {
         } else {
           ng.deck = newDeck(); ng.player = [ng.deck.pop()]; ng.dealer = [ng.deck.pop()]; ng.player.push(ng.deck.pop()); ng.dealer.push(ng.deck.pop());
         }
-        const nb = await deps.debit(u.uid, bet);
+        // plinko : la mise saisie = prix d'UNE bille -> on paie bet x nombre de billes
+        const cost = type === 'plinko' ? floor2(bet * ng.n) : bet;
+        if (type === 'plinko') ng.bet = cost; // ng.bet = mise totale ; gain = mise totale x multiplicateur moyen = mise/bille x somme des multiplicateurs
+        const nb = await deps.debit(u.uid, cost);
         if (nb === null) throw new Error('Solde insuffisant.');
-        ng.bal = nb; stake(u, ng, bet); g = ng;
+        ng.bal = nb; stake(u, ng, cost); g = ng;
         if (INSTANT.has(type)) { await end(u, g, g.bet * g.mult); return reply(u, g, false); } // un coup : jamais gardé en mémoire
         games.set(key, ng);
         if (type === 'fuse') scheduleFuse(u, g);

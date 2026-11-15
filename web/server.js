@@ -136,7 +136,7 @@ function init(deps) {
     return notif;
   }
   const avatarMap = new Map(); // uid -> avatar (affiché dans les classements)
-  const rankApi = createRank(path.join(DATA_DIR, 'rank.json'));
+  const rankApi = createRank(path.join(DATA_DIR, 'rank.json'), deps.supabase);
 
   // ---------- fin de manche : rang / ELO + récap Discord + annonce des gagnants dans le chat du site ----------
   function roundEnd(guildId, r) {
