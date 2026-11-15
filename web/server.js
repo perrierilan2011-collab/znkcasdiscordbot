@@ -1,6 +1,6 @@
 'use strict';
 /*
- * web/server.js — serveur web du casino ZNK (jeux « online » EXTERNES, hors Discord).
+ * web/server.js — serveur web du casino ZNK (jeux « online » EXTERNES, hors Discord) : blackjack + roue multijoueur.
  * Sans dépendance : module http de Node + Server-Sent Events (temps réel) + POST pour les actions.
  *
  * Adresse publique : variable PUBLIC_URL (défaut : https://znkcasdiscordbot-production.up.railway.app)
@@ -15,6 +15,7 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const { Room, SEATS } = require('./table');
+const { WheelRoom, INFO: WHEEL_INFO } = require('./wheel');
 
 const PUBLIC_URL = String(process.env.PUBLIC_URL || 'https://znkcasdiscordbot-production.up.railway.app').replace(/\/+$/, '');
 const TOKEN_TTL_MS = 12 * 3600 * 1000;
@@ -75,7 +76,7 @@ function init(deps) {
       return null;
     }
   }
-  const makeLink = (user, guildId) => `${PUBLIC_URL}/?t=${makeToken(user, guildId)}`;
+  const makeLink = (user, guildId, game) => `${PUBLIC_URL}/?t=${makeToken(user, guildId)}${game === 'wheel' ? '&g=wheel' : ''}`;
 
   // ---------- argent en jeu : remboursé au redémarrage si le bot a planté en pleine manche ----------
   const PENDING_FILE = path.join(DATA_DIR, 'bj_pending.json');
@@ -137,7 +138,24 @@ function init(deps) {
   function roomOf(guildId) {
     let r = rooms.get(guildId);
     if (r) return r;
-    const entry = { clients: new Set(), conns: new Map(), room: null };
+    const entry = { clients: new Set(), conns: new Map(), room: null, wheel: null };
+    const broadcast = (msg) => {
+      for (const res of entry.clients) {
+        try {
+          res.write(msg);
+        } catch {
+          /* connexion fermée */
+        }
+      }
+    };
+    entry.broadcast = broadcast;
+    entry.wheel = new WheelRoom(guildId, {
+      getBalance: deps.getBalance,
+      debit: deps.debit,
+      credit: deps.credit,
+      pending,
+      onChange: (w) => broadcast(`event: wheel\ndata: ${JSON.stringify(w.snapshot())}\n\n`),
+    });
     entry.room = new Room(guildId, {
       getBalance: deps.getBalance,
       debit: deps.debit,
@@ -193,11 +211,44 @@ function init(deps) {
     const user = readToken(d.t);
     if (!user) return json(res, 401, { ok: false, error: 'Lien expiré : reclique sur « Jouer » dans Discord.' });
     const now = Date.now();
-    if (now - (lastAct.get(user.uid) || 0) < 120) return json(res, 429, { ok: false, error: 'Doucement 🙂' });
+    if (now - (lastAct.get(user.uid) || 0) < (String(d.action).startsWith('w') ? 50 : 120)) return json(res, 429, { ok: false, error: 'Doucement 🙂' });
     lastAct.set(user.uid, now);
-    const { room } = roomOf(user.guildId);
+    const entry = roomOf(user.guildId);
+    const { room, wheel } = entry;
     try {
       switch (d.action) {
+        // ---- roue
+        case 'wjoin': {
+          const bal = await deps.getBalance(user.uid);
+          await wheel.run(async () => wheel.join(user, bal));
+          break;
+        }
+        case 'wleave':
+          await wheel.run(() => wheel.leave(user.uid));
+          break;
+        case 'wbet':
+          await wheel.run(() => wheel.bet(user.uid, d.zone, d.amount));
+          break;
+        case 'wrebet':
+          await wheel.run(() => wheel.rebet(user.uid));
+          break;
+        case 'wclear':
+          await wheel.run(() => wheel.clear(user.uid));
+          break;
+        case 'wemote': {
+          if (!EMOTES.has(d.e) || !wheel.players.has(user.uid)) break;
+          entry.broadcast(`event: wemote\ndata: ${JSON.stringify({ uid: user.uid, e: d.e })}\n\n`);
+          break;
+        }
+        case 'wsync': {
+          const p = wheel.players.get(user.uid);
+          if (p) {
+            p.bal = await deps.getBalance(user.uid);
+            wheel.emit();
+          }
+          break;
+        }
+        // ---- blackjack
         case 'sit': {
           const seat = Number(d.seat);
           const bal = await deps.getBalance(user.uid);
@@ -236,9 +287,9 @@ function init(deps) {
         default:
           return json(res, 400, { ok: false, error: 'Action inconnue.' });
       }
-      return json(res, 200, { ok: true });
+      return json(res, 200, { ok: true, wbal: wheel.players.get(user.uid)?.bal });
     } catch (e) {
-      return json(res, 200, { ok: false, error: String(e?.message || e).slice(0, 160) });
+      return json(res, 200, { ok: false, error: String(e?.message || e).slice(0, 160), wbal: wheel.players.get(user.uid)?.bal });
     }
   }
 
@@ -256,11 +307,13 @@ function init(deps) {
       'X-Accel-Buffering': 'no',
       ...SEC,
     });
-    res.write(`retry: 2000\nevent: hello\ndata: ${JSON.stringify({ uid: user.uid, name: user.name, avatar: user.avatar, seats: SEATS, coin: deps.coin || '🪙' })}\n\n`);
+    res.write(`retry: 2000\nevent: hello\ndata: ${JSON.stringify({ uid: user.uid, name: user.name, avatar: user.avatar, seats: SEATS, coin: deps.coin || '🪙', wheel: WHEEL_INFO })}\n\n`);
     entry.clients.add(res);
     entry.conns.set(user.uid, (entry.conns.get(user.uid) || 0) + 1);
     entry.room.setPresence(user.uid, true);
     res.write(`event: state\ndata: ${JSON.stringify(entry.room.snapshot())}\n\n`);
+    entry.wheel.setPresence(user.uid, true);
+    res.write(`event: wheel\ndata: ${JSON.stringify(entry.wheel.snapshot())}\n\n`);
     const hb = setInterval(() => {
       try {
         res.write(': ping\n\n');
@@ -275,7 +328,10 @@ function init(deps) {
       if (n <= 0) {
         entry.conns.delete(user.uid);
         setTimeout(() => {
-          if (!entry.conns.has(user.uid)) entry.room.setPresence(user.uid, false);
+          if (!entry.conns.has(user.uid)) {
+            entry.room.setPresence(user.uid, false);
+            entry.wheel.setPresence(user.uid, false);
+          }
         }, 8000); // tolérance : rechargement de page / coupure réseau brève
       } else entry.conns.set(user.uid, n);
     });
@@ -305,7 +361,7 @@ function init(deps) {
     }
   });
   const port = Number(process.env.PORT) || 3000;
-  server.listen(port, '0.0.0.0', () => console.log(`[web] table de blackjack en ligne → ${PUBLIC_URL} (port ${port})`));
+  server.listen(port, '0.0.0.0', () => console.log(`[web] blackjack + roue en ligne → ${PUBLIC_URL} (port ${port})`));
   server.on('error', (e) => console.error('[web] serveur :', e?.message || e));
 
   return { makeLink, enabled: true, rooms, server };
