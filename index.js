@@ -1305,17 +1305,20 @@ function statsFallbackEmbed(user, st, balance, lang) {
 //  MINES  (grille de 24 cases, 4 difficultés)
 // ============================================================
 const MINES_CELLS = 24;
-const MINES_EDGE = 0.97;
+const MINES_EDGE = 0.96;
+// 1er diamant : paie MOINS que la mise (il faut au moins 2 diamants pour être rentable)
+const MINES_FIRST_MULT = 0.9;
 const MINES_MAX_MULT = 1000;
 const LEVELS = {
-  easy: { name: 'Easy', emoji: '🟢', mines: 3, style: ButtonStyle.Success },
-  medium: { name: 'Medium', emoji: '🟡', mines: 6, style: ButtonStyle.Primary },
-  hard: { name: 'Hard', emoji: '🟠', mines: 10, style: ButtonStyle.Secondary },
-  impossible: { name: 'Impossible', emoji: '🔴', mines: 15, style: ButtonStyle.Danger },
+  easy: { name: 'Easy', emoji: '🟢', mines: 4, style: ButtonStyle.Success },
+  medium: { name: 'Medium', emoji: '🟡', mines: 7, style: ButtonStyle.Primary },
+  hard: { name: 'Hard', emoji: '🟠', mines: 11, style: ButtonStyle.Secondary },
+  impossible: { name: 'Impossible', emoji: '🔴', mines: 16, style: ButtonStyle.Danger },
 };
 
 function minesMultiplier(picks, mines) {
   if (picks <= 0) return 1;
+  if (picks === 1) return Math.max(0.01, Math.floor(MINES_FIRST_MULT * coef('mines') * 100) / 100);
   let m = 1;
   for (let k = 0; k < picks; k++) m *= (MINES_CELLS - k) / (MINES_CELLS - mines - k);
   return Math.min(MINES_MAX_MULT, Math.max(0.01, Math.floor(m * MINES_EDGE * coef('mines') * 100) / 100));
@@ -1330,7 +1333,7 @@ function minesPickerPayload() {
     .setTitle('💣 Mines : choisis ta difficulté')
     .setColor(COLORS.blue)
     .setDescription(
-      `${lines.join('\n')}\n\nPlus il y a de mines, plus le multiplicateur grimpe vite (max ${fx(MINES_MAX_MULT)}).`
+      `${lines.join('\n')}\n\nPlus il y a de mines, plus le multiplicateur grimpe vite (max ${fx(MINES_MAX_MULT)}).\n⚠️ Le 1er 💎 paie moins que ta mise : il en faut **2** pour être rentable.`
     );
   const row = new ActionRowBuilder().addComponents(
     ...Object.entries(LEVELS).map(([key, Lv]) =>
@@ -1510,11 +1513,13 @@ async function settleMines(game, kind, i) {
       const boost = getBoost(game.guildId);
       if ((boost.winMult || 1) !== 1) mult = round2(mult * boost.winMult);
       payout = floor2(game.bet * mult);
-      color = COLORS.green;
+      color = payout > game.bet ? COLORS.green : COLORS.grey;
       text =
         kind === 'timeout'
           ? `⏱️ Temps écoulé, encaissement automatique : **${fmt(payout)}** (${fx(mult)})`
-          : `✅ Bien joué ! Tu encaisses **${fmt(payout)}** (${fx(mult)}), profit : **${signed(round2(payout - game.bet))}**.`;
+          : payout > game.bet
+            ? `✅ Bien joué ! Tu encaisses **${fmt(payout)}** (${fx(mult)}), profit : **${signed(round2(payout - game.bet))}**.`
+            : `💰 Tu encaisses trop tôt : **${fmt(payout)}** (${fx(mult)}), il faut 2 💎 pour être rentable (${signed(round2(payout - game.bet))}).`;
       if (boost.label) text += `\n⚡ Boost **${boost.label}**`;
     }
 
