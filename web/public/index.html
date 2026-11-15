@@ -19,7 +19,7 @@ body{background:#000;color:var(--ink);
 button{font:inherit;color:inherit;cursor:pointer;border:0}
 button:disabled{opacity:.38;cursor:not-allowed;filter:grayscale(.4)}
 /* ---------- en-tête ---------- */
-header{display:flex;align-items:center;gap:10px;padding:8px 14px;background:#000;border-bottom:1px solid #1f1f1f;z-index:5}
+header{display:flex;align-items:center;gap:10px;padding:8px 14px;background:#000;border-bottom:1px solid #1f1f1f;position:relative;z-index:18}
 .logo{display:none}
 .sp{flex:1}
 .me{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.12);border-radius:999px;padding:3px 12px 3px 3px}
@@ -173,6 +173,8 @@ th{color:var(--mut);font-size:12px}
 #gate{position:fixed;inset:0;display:none;place-items:center;text-align:center;padding:24px;background:var(--bg);z-index:50}
 #gate.on{display:grid}
 #gate h1{margin:0 0 8px}
+#gate .dsc{display:inline-block;margin-top:14px;padding:13px 22px;border-radius:12px;background:#5865f2;color:#fff;font-weight:800;text-decoration:none;font-size:16px;box-shadow:0 6px 20px rgba(88,101,242,.4)}
+#gate .dsc:hover{filter:brightness(1.12)}
 @media(max-width:760px){
   :root{--cw:clamp(30px,10.5vw,44px)}
   header{padding:6px 8px}.logo small{display:none}
@@ -195,10 +197,51 @@ th{color:var(--mut);font-size:12px}
 @media(prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
 /* ---------- onglets de jeux ---------- */
 .hide{display:none!important}
-#tabs{display:flex;gap:4px;background:#0a0a0a;border:1px solid #1f1f1f;border-radius:10px;padding:3px}
-.tab{background:transparent;border-radius:8px;padding:6px 12px;font-weight:700;color:var(--mut);transition:.15s;white-space:nowrap}
-.tab.on{background:#fff;color:#000}
-.tab:hover:not(.on){color:#fff}
+/* menu déroulant (en haut à gauche) */
+#menu{position:relative}
+#menuBtn{display:flex;align-items:center;gap:9px;font-weight:700;padding:7px 12px;background:#0a0a0a;border:1px solid #262626;white-space:nowrap}
+#menuBtn:hover{background:#141414;border-color:#525252}
+#menu.open #menuBtn{background:#fff;color:#000;border-color:#fff}
+.mburger{display:inline-block;width:14px;height:2px;background:currentColor;border-radius:2px;box-shadow:0 -4px 0 currentColor,0 4px 0 currentColor}
+#menuBtn .car{font-size:10px;opacity:.7;transition:transform .15s}
+#menu.open #menuBtn .car{transform:rotate(180deg)}
+#menuPanel{display:none;position:absolute;left:0;top:calc(100% + 8px);min-width:236px;max-width:calc(100vw - 20px);padding:6px;flex-direction:column;gap:2px;
+  background:#0a0a0a;border:1px solid #262626;border-radius:14px;box-shadow:0 20px 50px rgba(0,0,0,.75);z-index:40}
+#menu.open #menuPanel{display:flex}
+.mitem,.mhead{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;text-align:left;background:transparent;border-radius:9px;padding:9px 12px;font-weight:700;color:#d4d4d4;transition:background .12s,color .12s}
+.mitem:hover:not(:disabled),.mhead:hover{background:#171717;color:#fff}
+.mitem.on{background:#fff;color:#000}
+.mitem:disabled{opacity:.4;cursor:not-allowed;filter:none}
+.mhead i{font-style:normal;font-size:10px;opacity:.6;transition:transform .15s}
+.msec.open>.mhead i{transform:rotate(180deg)}
+.msub{display:none;flex-direction:column;gap:2px;margin:2px 0 4px 10px;padding-left:8px;border-left:1px solid #262626}
+.msec.open>.msub{display:flex}
+.msub .mitem{font-weight:600;padding:7px 10px;font-size:13px}
+.msep{height:1px;background:#1f1f1f;margin:4px 6px}
+/* ---------- page classement : actuel + all-time côte à côte ---------- */
+#topView{align-items:center;padding:24px 16px 64px;overflow:auto}
+.lbwrap{width:100%;max-width:1000px;display:flex;flex-direction:column;gap:14px}
+.lbhead{display:flex;align-items:flex-end;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.lbhead h2{margin:0;font-size:20px;font-weight:700;color:#fff}
+.lbhead p{margin:4px 0 0;color:var(--mut);font-size:13px}
+#lbUpd{color:var(--mut);font-size:12px}
+.lbgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;align-items:start}
+.lbcol{background:#0a0a0a;border:1px solid #262626;border-radius:14px;overflow:hidden}
+.lbtitle{padding:14px 16px;border-bottom:1px solid #262626}
+.lbtitle b{display:block;font-size:16px}
+.lbtitle small{color:var(--mut);font-size:12px}
+.lbrow{display:grid;grid-template-columns:30px minmax(0,1fr) auto;gap:10px;align-items:center;padding:9px 16px;border-bottom:1px solid #1a1a1a}
+.lbrow:last-child{border-bottom:0}
+.lbrow.me{background:rgba(255,255,255,.07);box-shadow:inset 3px 0 0 var(--gold)}
+.lbrk{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-weight:800;font-size:12px;background:#1c1c1c;color:#d4d4d4;font-variant-numeric:tabular-nums}
+.lbrow.r1 .lbrk{background:#fbbf24;color:#3a2300}
+.lbrow.r2 .lbrk{background:#d4d4d4;color:#111}
+.lbrow.r3 .lbrk{background:#c2763a;color:#2a1200}
+.lbname{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lbval{font-weight:800;color:var(--gold);font-variant-numeric:tabular-nums;white-space:nowrap}
+.lbnone{color:var(--mut);text-align:center;padding:26px 12px;font-size:13px}
+@media(max-width:600px){#topView{padding:16px 8px 64px}.lbgrid{gap:8px}.lbtitle{padding:10px}.lbtitle b{font-size:14px}.lbtitle small{display:none}
+  .lbrow{grid-template-columns:24px minmax(0,1fr);gap:2px 8px;padding:8px 10px}.lbrk{width:22px;height:22px;font-size:11px}.lbval{grid-column:2;font-size:12px}}
 /* ---------- ROULETTE ---------- */
 .panel{background:#0a0a0a;border:1px solid #262626;border-radius:14px}
 #rHist{display:flex;gap:5px;flex-wrap:wrap;justify-content:center;min-height:26px}
@@ -220,7 +263,7 @@ th{color:var(--mut);font-size:12px}
 .rchip{min-width:52px;height:36px;border-radius:8px;border:1px solid #3a3a3a;background:#141414;font-weight:700;font-size:12px}
 .rchip:hover{border-color:#fff}.rchip.on{background:#fff;color:#000;border-color:#fff}
 .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:center}
-@media(max-width:760px){#tabs{margin-left:0}.tab{padding:6px 8px;font-size:12px}#meName{display:none}}
+@media(max-width:760px){#menuBtn{padding:6px 10px}#meName{display:none}}
 
 #rlView{flex:1;display:flex;flex-direction:column;align-items:center;min-height:0;padding:12px 12px 56px;overflow:auto}
 #rGrid{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:12px;width:100%;max-width:1320px;align-items:start}
@@ -315,6 +358,57 @@ th{color:var(--mut);font-size:12px}
 .ofsel{background:#0f0f0f;color:#fff;border:1px solid #3a3a3a;border-radius:8px;padding:9px 10px;font:inherit}
 .dockp .btn.big{min-width:150px}.dockp .hint{color:var(--mut);font-size:13px;text-align:center}
 
+/* ---------- jeux « un coup » : pile ou face, dés, chevaux, roulette russe ---------- */
+.sc,.hz{position:relative;width:100%;border-radius:18px;overflow:hidden;background:radial-gradient(120% 90% at 50% 110%,#5b21b6 0%,#2e1065 38%,#0b0720 75%),#05030f;border:1px solid rgba(167,139,250,.35);box-shadow:0 12px 40px rgba(0,0,0,.55),inset 0 0 60px rgba(124,58,237,.18)}
+.sc{min-height:340px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px}
+.sc::before{content:'';position:absolute;inset:0;pointer-events:none;background:radial-gradient(1.5px 1.5px at 12% 20%,rgba(255,255,255,.5),transparent),radial-gradient(1.5px 1.5px at 78% 14%,rgba(255,255,255,.4),transparent),radial-gradient(1px 1px at 40% 72%,rgba(255,255,255,.35),transparent),radial-gradient(1.5px 1.5px at 90% 62%,rgba(255,255,255,.4),transparent),radial-gradient(1px 1px at 22% 86%,rgba(255,255,255,.3),transparent),radial-gradient(1px 1px at 60% 30%,rgba(255,255,255,.3),transparent)}
+.cbtn{display:flex;flex-direction:column;align-items:center;gap:1px;min-width:92px;padding:8px 14px;border-radius:10px;border:1px solid #3a3a3a;background:#141414;font-weight:700}
+.cbtn small{color:var(--mut);font-size:11px;font-weight:600}.cbtn:hover:not(:disabled){border-color:#fff}
+.cbtn.on{background:#fff;color:#000;border-color:#fff}.cbtn.on small{color:#555}
+/* pile ou face */
+.cstage{position:relative;width:170px;height:210px;display:grid;place-items:center}
+.clift{position:relative;z-index:2}
+.cwrap{width:150px;height:150px;perspective:900px}
+.coin{position:relative;width:100%;height:100%;transform-style:preserve-3d}
+.cf{position:absolute;inset:0;border-radius:50%;backface-visibility:hidden;-webkit-backface-visibility:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#78350f;background:radial-gradient(circle at 35% 30%,#fff3b0 0,#fbbf24 38%,#b45309 100%);border:6px solid #f59e0b;box-shadow:inset 0 0 0 4px rgba(120,53,15,.5),inset 0 0 24px rgba(255,255,255,.4),0 8px 26px rgba(0,0,0,.5)}
+.cf::after{content:'';position:absolute;inset:14px;border-radius:50%;border:2px dashed rgba(120,53,15,.45)}
+.cf span{font-size:48px;line-height:1}.cf b{font-size:17px;letter-spacing:.2em;margin-top:2px}
+.cf.back{transform:rotateX(180deg)}
+.cshadow{position:absolute;left:50%;bottom:6px;width:120px;height:16px;margin-left:-60px;border-radius:50%;background:rgba(0,0,0,.6);filter:blur(6px)}
+/* dés */
+.dgrid{display:flex;gap:30px;margin-top:8px}
+.die{width:90px;height:90px;border-radius:18px;padding:12px;display:grid;grid-template:repeat(3,1fr)/repeat(3,1fr);background:linear-gradient(145deg,#fff,#d4d4d8);box-shadow:0 6px 0 #a1a1aa,0 16px 26px rgba(0,0,0,.55),inset 0 0 12px rgba(0,0,0,.12)}
+.pip{width:78%;height:78%;place-self:center;border-radius:50%;background:radial-gradient(circle at 35% 30%,#7c3aed,#2e1065)}
+.dsum{min-height:62px;text-align:center;font-size:46px;line-height:1;font-weight:900;font-variant-numeric:tabular-nums;color:#fff;animation:pop2 .35s cubic-bezier(.2,1.6,.4,1)}
+.dsum small{display:block;margin-top:6px;font-size:12px;letter-spacing:.2em;font-weight:800;opacity:.85}
+.dsum.win{color:#86efac;text-shadow:0 0 24px rgba(34,197,94,.6)}.dsum.lose{color:#fca5a5;text-shadow:0 0 24px rgba(239,68,68,.6)}
+/* chevaux */
+.hz{padding:14px 12px;display:flex;flex-direction:column;gap:7px}
+.lane{display:grid;grid-template-columns:32px 1fr 66px;gap:8px;align-items:center;padding:4px 6px;border-radius:12px;border:1px solid transparent;cursor:pointer;transition:border-color .15s,background .15s}
+.lane:hover{background:rgba(255,255,255,.05)}.lane.sel{border-color:var(--gold);background:rgba(251,191,36,.09)}
+.ln{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-weight:900;color:#fff;background:var(--hc);box-shadow:0 0 0 2px rgba(255,255,255,.25)}
+.ls{position:relative;height:42px;border-radius:8px;border-left:4px solid var(--hc);overflow:hidden;background:repeating-linear-gradient(90deg,rgba(255,255,255,.05) 0 2px,transparent 2px 38px),linear-gradient(180deg,#1b3a2b,#0f2a1e)}
+.ls::after{content:'';position:absolute;right:0;top:0;bottom:0;width:10px;background:repeating-conic-gradient(#fff 0 25%,#111 0 50%) 0 0/10px 10px}
+.horse{position:absolute;top:1px;left:0;width:34px;font-size:30px;line-height:40px;text-align:center;transform:scaleX(-1);will-change:left,transform;left:calc((100% - 44px) * 0)}
+.horse.lead{filter:drop-shadow(0 0 7px #fbbf24)}
+.lo{text-align:right;font-weight:800;color:var(--gold);font-variant-numeric:tabular-nums;line-height:1.1}.lo small{display:block;color:var(--mut);font-size:11px;font-weight:600}
+.lane.win .ls{box-shadow:0 0 0 2px #86efac,0 0 18px rgba(34,197,94,.55)}
+.hban{position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);z-index:4;text-align:center;pointer-events:none;font-size:clamp(30px,7vw,60px);font-weight:900;color:#fff;text-shadow:0 4px 24px #000,0 0 30px rgba(251,191,36,.7)}
+.hban.pop{animation:pop2 .35s cubic-bezier(.2,1.6,.4,1)}
+/* roulette russe */
+.rus{position:relative;width:240px;height:250px;padding-top:12px}
+.cyl{width:100%;height:100%;display:block;filter:drop-shadow(0 10px 18px rgba(0,0,0,.65))}
+.cyl.spinning{filter:blur(1.4px) drop-shadow(0 10px 18px rgba(0,0,0,.65))}
+.bul{opacity:0;transition:opacity .3s}.bul.on{opacity:1}
+.chm.hit circle:first-child{stroke:#ef4444;stroke-width:4}
+.hmr{position:absolute;left:50%;top:0;margin-left:-13px;width:0;height:0;border-left:13px solid transparent;border-right:13px solid transparent;border-top:22px solid var(--gold);filter:drop-shadow(0 2px 4px #000);z-index:3}
+.sc>.flash{position:absolute;inset:0;z-index:6;display:grid;place-items:center;opacity:0;pointer-events:none;font-size:clamp(46px,12vw,100px);font-weight:900;letter-spacing:.06em;color:#fff;text-shadow:0 0 30px #ef4444,0 6px 0 #7f1d1d}
+.sc.shake{animation:shk .5s}
+@media(max-width:560px){.sc{min-height:300px}.die{width:74px;height:74px;padding:10px}.dgrid{gap:22px}.rus{width:210px;height:220px}.cbtn{min-width:78px;padding:7px 9px}.lane{grid-template-columns:28px 1fr 56px;gap:6px}.ln{width:26px;height:26px;font-size:13px}}
+/* annonces de victoires dans le chat */
+.cm.win{padding:6px 9px;border-radius:8px;border-left:3px solid var(--gold);background:linear-gradient(90deg,rgba(251,191,36,.16),rgba(251,191,36,.02))}
+.cm.win .cn{color:var(--gold)}.cm.win .cg{color:#86efac;font-variant-numeric:tabular-nums}
+
 /* plein écran */
 body.fs header{padding-top:4px;padding-bottom:4px}
 body.fs main{padding-left:6px;padding-right:6px}
@@ -405,15 +499,73 @@ main{padding-bottom:56px!important}
   #pFeed{display:none}
   #pCd{font-size:24px;min-height:30px}
 }
+
+/* ---------- poker plein écran : tout tient dans la hauteur de l'écran, sans descendre ---------- */
+body.fs.vpk{height:100vh;height:100dvh;overflow:hidden}
+body.fs.vpk header{padding-top:4px;padding-bottom:4px}
+body.fs.vpk #pkView{flex:1;min-height:0;overflow:auto;gap:6px;padding:4px 8px 48px!important}
+body.fs.vpk #pkView .tbar{padding:0 10px}
+body.fs.vpk #pkView .tbtn{padding:3px 12px;font-size:12px}
+body.fs.vpk .ftable.pk{--cw:calc(clamp(24px,min(4.6vw,5.6vh),58px)*var(--pk,1));flex:1 1 0;min-height:0;border-width:10px;padding:8px 8px 28px;gap:0}
+body.fs.vpk .ftable.pk::after{inset:6px}
+body.fs.vpk .ftable.pk .hole{--cw:calc(clamp(22px,min(3.2vw,4.4vh),48px)*var(--pk,1))}
+body.fs.vpk .ftable.pk .rule{bottom:8px}
+body.fs.vpk #pMid{gap:4px;margin-top:0}
+body.fs.vpk #pStreet{min-height:0}
+body.fs.vpk #pPot{min-height:20px}
+body.fs.vpk #pMyHand{margin-top:0}
+body.fs.vpk #pCd{min-height:20px;font-size:20px;margin:0}
+body.fs.vpk #pSeats{row-gap:6px}
+body.fs.vpk .ftable.pk .seat{min-height:0;gap:3px}
+body.fs.vpk .ftable.pk .seat:nth-child(n){transform:none}
+body.fs.vpk .ftable.pk .plate{padding:3px 8px 3px 3px}
+body.fs.vpk .ftable.pk .plate .av{width:28px;height:28px}
+body.fs.vpk .ftable.pk .betspot{min-height:22px}
+body.fs.vpk .ftable.pk .ptags{min-height:14px}
+body.fs.vpk .ftable.pk .lact{min-height:16px;font-size:10px}
+body.fs.vpk #pkDock{flex:none;margin-bottom:0;padding:6px 10px;gap:6px}
+body.fs.vpk #pkAct{flex-direction:row;flex-wrap:wrap;justify-content:center;gap:6px 18px}
+body.fs.vpk #pkDock .btn{padding:6px 12px}
+body.fs.vpk #pkDock .btn.big{padding:8px 18px;font-size:15px;min-width:0}
+body.fs.vpk #pkInfo{font-size:12px}
+@media(max-width:760px){body.fs.vpk .ftable.pk{flex:none;min-height:640px}}
 </style>
 </head>
 <body>
-<div id="gate"><div><h1>Casino</h1><p id="gatemsg">Ouvre ce jeu depuis Discord : clique sur le bouton <b>Play Online</b> du salon « online » pour recevoir ton lien personnel.</p></div></div>
+<div id="gate"><div><h1>Casino</h1><p id="gatemsg">Connecte-toi avec ton compte Discord pour jouer avec ton solde du casino.</p><a class="dsc" href="/login">Se connecter avec Discord</a></div></div>
 <header>
   <div class="logo hide"><small id="subtitle"></small></div>
-  <nav id="tabs"><button class="tab on" data-g="hub">Jeux</button><button class="tab" data-g="bj">Blackjack</button><button class="tab" data-g="poker">Poker</button><button class="tab" data-g="roulette">Roulette</button></nav>
+  <div id="menu">
+    <button class="hb" id="menuBtn" aria-haspopup="true" aria-expanded="false"><span class="mburger"></span><span id="menuLbl">Menu</span><span class="car">▾</span></button>
+    <div id="menuPanel" role="menu">
+      <button class="mitem" data-g="hub">Accueil</button>
+      <div class="msep"></div>
+      <div class="msec" id="msOn">
+        <button class="mhead" type="button">Online <i>▾</i></button>
+        <div class="msub">
+          <button class="mitem" data-g="bj">Blackjack</button>
+          <button class="mitem" data-g="poker">Poker</button>
+          <button class="mitem" data-g="roulette">Roulette</button>
+        </div>
+      </div>
+      <div class="msec" id="msOff">
+        <button class="mhead" type="button">Offline <i>▾</i></button>
+        <div class="msub">
+          <button class="mitem" data-g="off-bj">Blackjack</button>
+          <button class="mitem" data-g="off-fuse">Fusé</button>
+          <button class="mitem" data-g="off-mine">Mine</button>
+          <button class="mitem" data-g="off-coin">Pile ou Face</button>
+          <button class="mitem" data-g="off-dice">Dés</button>
+          <button class="mitem" data-g="off-horses">Chevaux</button>
+          <button class="mitem" data-g="off-russian">Roulette russe</button>
+        </div>
+      </div>
+      <div class="msep"></div>
+      <button class="mitem" data-g="top">Classement</button>
+    </div>
+  </div>
   <div class="sp"></div>
-  <button class="hb hide" id="bTop" title="Classement">Classement</button>
+  <button class="hb hide" id="bTop" title="Top gains de ce jeu">Top gains</button>
   <button class="hb hide" id="bRules" title="Règles">Règles</button>
   <button class="hb" id="bSnd" title="Son">Son</button>
   <button class="hb" id="bFs" title="Plein écran">Plein écran</button>
@@ -461,8 +613,37 @@ main{padding-bottom:56px!important}
         <span class="gdesc">Évite les mines, encaisse quand tu veux</span>
         <span class="glive"></span><span class="gplay">Jouer</span>
       </button>
+      <button class="gcard" data-go="off-coin">
+        <span class="gname">Pile ou Face</span>
+        <span class="gdesc">Une chance sur deux, gain x1.95</span>
+        <span class="glive"></span><span class="gplay">Jouer</span>
+      </button>
+      <button class="gcard" data-go="off-dice">
+        <span class="gname">Dés</span>
+        <span class="gdesc">Parie sur la somme de 2 dés</span>
+        <span class="glive"></span><span class="gplay">Jouer</span>
+      </button>
+      <button class="gcard" data-go="off-horses">
+        <span class="gname">Chevaux</span>
+        <span class="gdesc">Course à 5 chevaux, jusqu’à x15.8</span>
+        <span class="glive"></span><span class="gplay">Jouer</span>
+      </button>
+      <button class="gcard" data-go="off-russian">
+        <span class="gname">Roulette russe</span>
+        <span class="gdesc">Survis au barillet, plus de balles = plus de gain</span>
+        <span class="glive"></span><span class="gplay">Jouer</span>
+      </button>
     </div>
   </section>
+</main>
+<main id="topView" class="hide">
+  <div class="lbwrap">
+    <div class="lbhead"><div><h2>Classement</h2><p>Les plus gros joueurs du casino.</p></div><span id="lbUpd"></span></div>
+    <div class="lbgrid">
+      <section class="lbcol"><div class="lbtitle"><b>Classement actuel</b><small>Soldes actuels, du plus riche au moins riche</small></div><div id="lbCur"><div class="lbnone">…</div></div></section>
+      <section class="lbcol"><div class="lbtitle"><b>Classement all-time</b><small>Plus haut solde jamais atteint</small></div><div id="lbAll"><div class="lbnone">…</div></div></section>
+    </div>
+  </div>
 </main>
 <main id="bjView" class="hide">
   <div class="tbar" id="bjTabs"></div>
@@ -632,7 +813,7 @@ const $ = (s, el = document) => el.querySelector(s);
 const el = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
 const params = new URLSearchParams(location.search);
 let TOKEN = params.get('t') || '';
-try { if (TOKEN) sessionStorage.setItem('znk_t', TOKEN); else TOKEN = sessionStorage.getItem('znk_t') || ''; } catch {}
+try { if (TOKEN) localStorage.setItem('znk_t', TOKEN); else TOKEN = localStorage.getItem('znk_t') || ''; } catch {}
 if (params.get('t')) history.replaceState(null, '', location.pathname);
 if (!TOKEN) { $('#gate').classList.add('on'); return; }
 
@@ -713,11 +894,11 @@ async function send(action, extra = {}) {
     const r = await fetch('/api/act', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ t: TOKEN, action, ...extra }) });
     const d = await r.json();
     if (d.rbal != null) W.bal = d.rbal;
-    if (!d.ok) { toast(d.error || 'Erreur'); if (r.status === 401) showGate('Ton lien a expiré : reclique sur « Jouer » dans Discord.'); }
+    if (!d.ok) { toast(d.error || 'Erreur'); if (r.status === 401) showGate('Ta session a expiré : reconnecte-toi avec Discord.'); }
     return d.ok;
   } catch { toast('Connexion perdue…'); return false; }
 }
-function showGate(t) { $('#gatemsg').textContent = t; $('#gate').classList.add('on'); try { sessionStorage.removeItem('znk_t'); } catch {} }
+function showGate(t) { $('#gatemsg').textContent = t; $('#gate').classList.add('on'); try { localStorage.removeItem('znk_t'); } catch {} }
 
 let es;
 function connect() {
@@ -993,9 +1174,17 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden && my
 
 // ============================================================= CHAT EN DIRECT (un salon par jeu)
 const C = { msgs: {}, open: false, unread: 0 };
-const CNAME = { hub: 'Accueil', bj: 'Blackjack', poker: 'Poker', roulette: 'Roulette', 'off-bj': 'Blackjack solo', 'off-fuse': 'Fusé', 'off-mine': 'Mine' };
-const cRoom = () => W.view;
+const CNAME = { hub: 'Accueil', bj: 'Blackjack', poker: 'Poker', roulette: 'Roulette', 'off-bj': 'Blackjack solo', 'off-fuse': 'Fusé', 'off-mine': 'Mine', 'off-coin': 'Pile ou Face', 'off-dice': 'Dés', 'off-horses': 'Chevaux', 'off-russian': 'Roulette russe' };
+const GLAB = { blackjack: 'Blackjack', poker: 'Poker', roulette: 'Roulette', 'bj-solo': 'Blackjack solo', fuse: 'Fusé', mines: 'Mines', coin: 'Pile ou Face', dice: 'Dés', horses: 'Chevaux', russian: 'Roulette russe' };
+const cRoom = () => (W.view === 'top' ? 'hub' : W.view);
 function cLine(m) {
+  if (m.sys === 'win') { // annonce automatique d'une victoire (tous les jeux du site)
+    const d = el('div', 'cm win' + (me && m.uid === me.uid ? ' mine' : '')), t = new Date(m.t);
+    d.append(document.createTextNode('🏆 '), el('b', 'cn', m.name), document.createTextNode(' a gagné '), el('b', 'cg', '+' + num(m.net) + ' ' + COIN),
+      document.createTextNode(' à ' + (GLAB[m.game] || 'un jeu') + (m.mult ? ' · x' + m.mult : '') + (m.detail ? ' · ' + m.detail : '') + ' · mise ' + num(m.bet)),
+      el('small', '', String(t.getHours()).padStart(2, '0') + ':' + String(t.getMinutes()).padStart(2, '0')));
+    return d;
+  }
   const d = el('div', 'cm' + (me && m.uid === me.uid ? ' mine' : '')), t = new Date(m.t);
   const cn = el('span', 'cn', m.name); if (m.role) cn.append(el('span', 'crole', ' (' + m.role + ')'));
   d.append(cn, document.createTextNode(m.text), el('small', '', String(t.getHours()).padStart(2, '0') + ':' + String(t.getMinutes()).padStart(2, '0')));
@@ -1109,7 +1298,7 @@ function pOnHello(d) {
   if (P.info) $('#pBlinds').textContent = 'blinds ' + num(P.info.sb) + ' / ' + num(P.info.bb);
   hubPoker(!!P.info);
 }
-function hubPoker(ok) { const g = $('#gcPoker'); if (g) g.disabled = !ok; const t = document.querySelector('.tab[data-g="poker"]'); if (t) t.disabled = !ok; }
+function hubPoker(ok) { const g = $('#gcPoker'); if (g) g.disabled = !ok; const t = document.querySelector('.mitem[data-g="poker"]'); if (t) t.disabled = !ok; }
 function pHub() {
   const w = $('#gPkLive'); if (!w) return;
   if (!P.info) { w.textContent = 'Indisponible'; return; }
@@ -1177,7 +1366,7 @@ function tableDel(d) {
 }
 
 // ---- plein écran (API native, sinon plein écran « simulé » sur iPhone)
-function fsUpd() { const on = !!document.fullscreenElement || !!document.webkitFullscreenElement || document.body.classList.contains('pfs'); document.body.classList.toggle('fs', on); $('#bFs').textContent = on ? 'Quitter le plein écran' : 'Plein écran'; }
+function fsUpd() { setTimeout(pFitSoon, 0); const on = !!document.fullscreenElement || !!document.webkitFullscreenElement || document.body.classList.contains('pfs'); document.body.classList.toggle('fs', on); $('#bFs').textContent = on ? 'Quitter le plein écran' : 'Plein écran'; }
 $('#bFs').onclick = async () => {
   const d = document.documentElement, b = document.body;
   try {
@@ -1190,6 +1379,7 @@ $('#bFs').onclick = async () => {
   } catch { b.classList.toggle('pfs'); }
   fsUpd();
 };
+document.addEventListener('fullscreenchange', pFitSoon); document.addEventListener('webkitfullscreenchange', pFitSoon); window.addEventListener('resize', pFitSoon);
 document.addEventListener('fullscreenchange', fsUpd); document.addEventListener('webkitfullscreenchange', fsUpd);
 
 // ---- classement des mains
@@ -1424,7 +1614,7 @@ function pTick() {
 function setView(v) {
   if (v === W.view) return;
   if (W.view.startsWith('off-') && O.game === 'fuse' && O.st && !O.st.over && !confirm('Une fusée est en vol : tu perdras ta mise si tu quittes.')) return;
-  if (W.view.startsWith('off-')) ofStop();
+  if (W.view.startsWith('off-')) { ofStop(); O.run++; ofRelease(); }
   if (v !== 'roulette' && W.view === 'roulette') {
     const p = rMe();
     if (W.S && W.S.phase === 'betting' && p && p.total > 0 && !confirm('Quitter la roulette ? Tes mises en cours seront remboursées.')) return;
@@ -1443,10 +1633,15 @@ function setView(v) {
   $('#pkView').classList.toggle('hide', v !== 'poker');
   $('#rlView').classList.toggle('hide', v !== 'roulette');
   $('#ofView').classList.toggle('hide', !v.startsWith('off-'));
-  document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('on', t.dataset.g === v));
-  document.title = v.startsWith('off-') ? 'Casino · Jeux offline' : v === 'roulette' ? 'Casino · Roulette' : v === 'bj' ? 'Casino · Blackjack' : v === 'poker' ? 'Casino · Poker' : 'Casino · Jeux';
+  $('#topView').classList.toggle('hide', v !== 'top');
+  document.body.classList.toggle('vpk', v === 'poker');
+  lbWatch(v === 'top');
+  pFitSoon();
+  document.querySelectorAll('.mitem').forEach((t) => t.classList.toggle('on', t.dataset.g === v));
+  menuSync(v);
+  document.title = v.startsWith('off-') ? 'Casino · Jeux offline' : v === 'roulette' ? 'Casino · Roulette' : v === 'bj' ? 'Casino · Blackjack' : v === 'poker' ? 'Casino · Poker' : v === 'top' ? 'Casino · Classement' : 'Casino · Jeux';
   $('#bTop').classList.toggle('hide', v !== 'bj' && v !== 'poker');
-  $('#bRules').classList.toggle('hide', v === 'hub' || v.startsWith('off-'));
+  $('#bRules').classList.toggle('hide', v === 'hub' || v === 'top' || v.startsWith('off-'));
   try { sessionStorage.setItem('znk_v', v); } catch {}
   C.unread = 0; cRender();
   if (v.startsWith('off-')) ofOpen(v);
@@ -1456,7 +1651,7 @@ function setView(v) {
 }
 document.querySelectorAll('.gcard').forEach((c) => (c.onclick = () => { ac(); setView(c.dataset.go); }));
 $('.logo').onclick = () => { ac(); setView('hub'); };
-function hubRoulette(ok) { $('#gcRoulette').disabled = !ok; const t = document.querySelector('.tab[data-g="roulette"]'); if (t) t.disabled = !ok; }
+function hubRoulette(ok) { $('#gcRoulette').disabled = !ok; const t = document.querySelector('.mitem[data-g="roulette"]'); if (t) t.disabled = !ok; }
 function updHub() {
   const plural = (n, a) => n + ' ' + a + (n > 1 ? 's' : '');
   const n = BJT.size ? [...BJT.values()].reduce((a, s) => a + s.seats.filter(Boolean).length, 0) : null;
@@ -1466,8 +1661,58 @@ function updHub() {
   const m = W.S ? W.S.players.length : null;
   w.textContent = m == null ? '' : m ? plural(m, 'joueur') + ' en jeu' : 'Table ouverte';
 }
+
+// ---- menu déroulant
+function menuClose() { $('#menu').classList.remove('open'); $('#menuBtn').setAttribute('aria-expanded', 'false'); }
+$('#menuBtn').onclick = (e) => { e.stopPropagation(); const o = $('#menu').classList.toggle('open'); $('#menuBtn').setAttribute('aria-expanded', String(o)); };
+document.querySelectorAll('#menuPanel .mhead').forEach((b) => (b.onclick = (e) => { e.stopPropagation(); b.parentElement.classList.toggle('open'); }));
+document.addEventListener('click', (e) => { if (!e.target.closest('#menu')) menuClose(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') menuClose(); });
+const MENU_LBL = { hub: 'Menu', bj: 'Blackjack', poker: 'Poker', roulette: 'Roulette', 'off-bj': 'Blackjack solo', 'off-fuse': 'Fusé', 'off-mine': 'Mine', 'off-coin': 'Pile ou Face', 'off-dice': 'Dés', 'off-horses': 'Chevaux', 'off-russian': 'Roulette russe', top: 'Classement' };
+function menuSync(v) {
+  $('#menuLbl').textContent = MENU_LBL[v] || 'Menu';
+  $('#msOn').classList.toggle('open', v === 'bj' || v === 'poker' || v === 'roulette');
+  $('#msOff').classList.toggle('open', v.startsWith('off-'));
+}
+
+// ---- page classement : actuel + all-time côte à côte
+const LB = { timer: null, busy: false };
+function lbFill(sel, rows) {
+  const box = $(sel);
+  if (!rows || !rows.length) { box.replaceChildren(el('div', 'lbnone', 'Aucun joueur pour le moment.')); return; }
+  box.replaceChildren(...rows.map((r, i) => {
+    const row = el('div', 'lbrow' + (i < 3 ? ' r' + (i + 1) : '') + (me && r.uid === me.uid ? ' me' : ''));
+    row.append(el('span', 'lbrk', String(i + 1)), el('span', 'lbname', r.name), el('span', 'lbval', num(r.value) + ' ' + COIN));
+    return row;
+  }));
+}
+async function lbLoad() {
+  if (LB.busy) return; LB.busy = true;
+  try {
+    const d = await (await fetch('/api/boards')).json();
+    lbFill('#lbCur', d.rich); lbFill('#lbAll', d.alltime);
+    const t = new Date(); $('#lbUpd').textContent = 'Mis à jour à ' + String(t.getHours()).padStart(2, '0') + ':' + String(t.getMinutes()).padStart(2, '0');
+  } catch {
+    for (const s of ['#lbCur', '#lbAll']) $(s).replaceChildren(el('div', 'lbnone', 'Classement indisponible.'));
+  } finally { LB.busy = false; }
+}
+function lbWatch(on) {
+  clearInterval(LB.timer); LB.timer = null;
+  if (on) { lbLoad(); LB.timer = setInterval(lbLoad, 30000); }
+}
+
+// ---- poker plein écran : réduit les cartes tant que la table déborde de l'écran (aucun scroll)
+let pFitRaf = 0;
+function pFitSoon() { if (!pFitRaf) pFitRaf = requestAnimationFrame(() => { pFitRaf = 0; pFit(); }); }
+function pFit() {
+  const t = document.getElementById('pTable'); if (!t) return;
+  if (!(document.body.classList.contains('fs') && W.view === 'poker') || !t.offsetHeight) { t.style.removeProperty('--pk'); return; }
+  let k = 1; t.style.setProperty('--pk', '1');
+  for (let i = 0; i < 9 && t.scrollHeight > t.clientHeight + 1 && k > 0.45; i++) { k = Math.round((k - 0.07) * 100) / 100; t.style.setProperty('--pk', String(k)); }
+}
+try { new MutationObserver(pFitSoon).observe(document.getElementById('pTable'), { childList: true, subtree: true }); } catch {}
 hubRoulette(false); hubPoker(false); setInterval(() => { updHub(); pHub(); }, 1000); updHub();
-document.querySelectorAll('.tab').forEach((t) => (t.onclick = () => { ac(); setView(t.dataset.g); }));
+document.querySelectorAll('.mitem').forEach((t) => (t.onclick = () => { ac(); menuClose(); setView(t.dataset.g); }));
 $('#bRules').onclick = () => $(W.view === 'roulette' ? '#mRRules' : W.view === 'poker' ? '#mPRules' : '#mRules').classList.add('on');
 function rOnHello(d) { W.info = d.roulette; W.joined = false; if (W.info) rBuild(); if (W.view === 'roulette') rEnter(); hubRoulette(!!W.info); updHub(); }
 
@@ -1680,9 +1925,9 @@ requestAnimationFrame(rLoop);
 { let v = null; try { v = params.get('t') ? params.get('g') : sessionStorage.getItem('znk_v'); } catch {} if (v === 'wheel') v = 'roulette'; if (v === 'roulette' || v === 'bj') setView(v); }
 
 // ============================================================= JEUX OFFLINE (solo, serveur : offline.js)
-const O = { game: null, st: null, bal: null, bet: '100', mines: 3, auto: '', hist: { fuse: [], mines: [], bj: [] }, timer: 0, pp: [] };
-const OMAP = { 'off-bj': 'bj', 'off-fuse': 'fuse', 'off-mine': 'mines' };
-const OT = { bj: 'BLACKJACK SOLO', fuse: 'FUSÉ', mines: 'MINES' };
+const O = { game: null, st: null, bal: null, bet: '100', mines: 3, auto: '', hist: { fuse: [], mines: [], bj: [], coin: [], dice: [], horses: [], russian: [] }, timer: 0, pp: [], run: 0, anim: false, hold: false, pick: { coin: 'pile', dice: 'over', horses: '1', russian: '1' } };
+const OMAP = { 'off-bj': 'bj', 'off-fuse': 'fuse', 'off-mine': 'mines', 'off-coin': 'coin', 'off-dice': 'dice', 'off-horses': 'horses', 'off-russian': 'russian' };
+const OT = { bj: 'BLACKJACK SOLO', fuse: 'FUSÉ', mines: 'MINES', coin: 'PILE OU FACE', dice: 'DÉS', horses: 'COURSE DE CHEVAUX', russian: 'ROULETTE RUSSE' };
 const GEM = '<svg viewBox="0 0 24 24"><path d="M6 3h12l4 6-10 12L2 9z" fill="#bbf7d0" stroke="#fff" stroke-width="1.2" stroke-linejoin="round"/><path d="M2 9h20M9 3l3 6 3-6M12 9v12" fill="none" stroke="#16a34a" stroke-width="1"/></svg>';
 const BOMB = '<svg viewBox="0 0 24 24"><circle cx="11" cy="14" r="7.5" fill="#1c1c1c" stroke="#fca5a5" stroke-width="1.4"/><path d="M16 8l3-3M18 3v3M17 4h3" stroke="#fbbf24" stroke-width="1.6" stroke-linecap="round"/><circle cx="8.5" cy="11.5" r="1.8" fill="#fff" opacity=".5"/></svg>';
 async function osend(action, extra = {}) {
@@ -1690,14 +1935,14 @@ async function osend(action, extra = {}) {
     const r = await fetch('/api/act', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ t: TOKEN, action, game: O.game, ...extra }) });
     const d = await r.json();
     if (d.now) offset = d.now - Date.now();
-    if (d.bal != null) { O.bal = d.bal; W.bal = d.bal; $('#meBal').textContent = num(d.bal) + ' ' + COIN; }
-    if (!d.ok) { toast(d.error || 'Erreur'); if (r.status === 401) showGate('Ton lien a expiré : reclique sur « Jouer » dans Discord.'); return null; }
+    if (d.bal != null) { O.bal = d.bal; W.bal = d.bal; if (!O.hold) $('#meBal').textContent = num(d.bal) + ' ' + COIN; }
+    if (!d.ok) { toast(d.error || 'Erreur'); if (r.status === 401) showGate('Ta session a expiré : reconnecte-toi avec Discord.'); return null; }
     return d;
   } catch { toast('Connexion perdue…'); return null; }
 }
 const ofStop = () => { clearInterval(O.timer); O.timer = 0; };
 async function ofOpen(view) {
-  ofStop(); O.game = OMAP[view]; O.st = null; O.pp = []; ofBuild(); ofRender();
+  ofStop(); O.run++; ofRelease(); O.game = OMAP[view]; O.st = null; O.pp = []; ofBuild(); ofRender();
   const g = O.game, d = await osend('ostate');
   if (d && O.game === g) { O.st = d.g; ofRender(); ofWatch(); }
 }
@@ -1721,18 +1966,20 @@ function ofDone(prev, st) {
 }
 async function ofMove(move, extra = {}) { ac(); const was = O.st, d = await osend('omove', { move, ...extra }); if (!d) return; O.st = d.g; ofDone(was, d.g); ofRender(); ofWatch(); }
 async function ofStart() {
-  ac(); const bet = parseAmt(O.bet);
+  ac(); if (O.anim) return; const bet = parseAmt(O.bet);
   if (!(bet > 0)) return toast('Montant invalide.');
   const x = { bet };
   if (O.game === 'mines') x.mines = O.mines;
   if (O.game === 'fuse') x.auto = Number(String(O.auto).replace(',', '.')) || 0;
-  const d = await osend('ostart', x); if (!d) return;
+  if (INST[O.game]) { if (O.anim) return; x.choice = O.pick[O.game]; O.hold = true; }
+  const d = await osend('ostart', x); if (!d) { O.hold = false; return; }
+  if (INST[O.game]) { SFX.chip(); return ofInstant(d.g); }
   SFX.chip(); O.pp = []; ['#oDc', '#oPc'].forEach((s) => { const b = $(s); if (b) b.textContent = ''; });
   O.st = d.g; ofDone(null, d.g); ofRender(); ofWatch();
 }
 // ---- structure du tapis (une fois par jeu)
 function ofBuild() {
-  const t = $('#ofTable'); t.textContent = ''; t.className = 'ftable of' + (O.game === 'fuse' ? ' fuse' : '');
+  const t = $('#ofTable'); t.textContent = ''; t.className = 'ftable of' + (O.game === 'fuse' || INST[O.game] ? ' fuse' : '');
   const top = el('div', 'otop'), hist = el('div', 'ohist'); hist.id = 'oHist';
   top.append(el('span', 'dname', OT[O.game]), el('span', 'grow'), hist);
   const b = el('div', 'obody'); t.append(top, b);
@@ -1740,12 +1987,13 @@ function ofBuild() {
     t.append(el('div', 'shoe'));
     b.innerHTML = '<div class="dname">CROUPIER</div><div class="cards" id="oDc"></div><div id="oDt"></div><div class="omsg" id="oMsg"></div><div class="dname">TOI</div><div class="cards" id="oPc"></div><div id="oPt"></div><div class="betspot" id="oBs"></div>';
   } else if (O.game === 'fuse') b.innerHTML = '<div class="fz"><canvas id="oCv"></canvas><div class="bigm" id="oMult">1.00x</div><div class="fst" id="oStat"></div></div>';
+  else if (INST[O.game]) ofBuildInst(b);
   else b.innerHTML = '<div class="gems" id="oGems"></div><div class="stats" id="oStats"></div>';
 }
 function ofRender() {
   const s = O.st, h = $('#oHist'); if (!h) return; h.textContent = '';
   O.hist[O.game].forEach((v) => h.append(O.game === 'fuse' ? el('span', 'hc ' + (v >= 2 ? 'g' : 'r'), v.toFixed(2) + 'x') : el('span', 'hc ' + (v > 0 ? 'g' : v < 0 ? 'r' : 'z0'), (v > 0 ? '+' : '') + num(v))));
-  if (O.game === 'bj') rBj(s); else if (O.game === 'mines') rMines(s); else ofFuseTick();
+  if (O.game === 'bj') rBj(s); else if (O.game === 'mines') rMines(s); else if (INST[O.game]) rInst(s); else ofFuseTick();
   ofDock();
 }
 // ---- blackjack
@@ -1888,10 +2136,11 @@ function ofFuseTick() {
   fuseCanvas(sc);
 }
 // ---- dock : mise ou actions
-function ofSet(n) { n = Math.max(0, Math.floor(n * 100) / 100); O.bet = n ? String(n) : ''; const i = $('#oAmt'); if (i) i.value = O.bet; }
+function ofSet(n) { n = Math.max(0, Math.floor(n * 100) / 100); O.bet = n ? String(n) : ''; const i = $('#oAmt'); if (i) i.value = O.bet; ofGoLabel(); }
 function ofDock() {
   const d = $('#ofDock'); d.textContent = ''; const s = O.st, live = !!(s && !s.over), row = (...c) => { const r = el('div', 'row'); r.append(...c); d.append(r); return r; };
   const act = (cls, label, fn, on = true) => { const b = el('button', 'btn big ' + cls, label); b.disabled = !on; b.onclick = fn; return b; };
+  if (O.anim) { row(act('go', 'En cours…', () => {}, false)); return; }
   if (live) {
     if (O.game === 'mines') { row(act('go', 'Encaisser ' + num(s.cash) + ' ' + COIN, () => ofMove('cash'), s.picks.length)); d.append(el('div', 'hint', s.picks.length ? 'Chaque case sûre augmente le gain : encaisse avant de toucher une mine.' : 'Révèle au moins une case pour pouvoir encaisser.')); }
     else if (O.game === 'fuse') { const b = act('go', 'Encaisser', () => ofMove('cash')); b.id = 'oCash'; row(b); d.append(el('div', 'hint', 'Encaisse avant que la fusée explose.')); }
@@ -1900,7 +2149,7 @@ function ofDock() {
   }
   const chips = [[1, 'c1', '1'], [10, 'c10', '10'], [100, 'c100', '100'], [1000, 'c1k', '1K'], [10000, 'c10k', '10K'], [100000, 'c100k', '100K']].map(([v, c, t]) => { const b = el('button', 'chip ' + c, t); b.title = '+' + num(v); b.onclick = () => { ofSet((parseAmt(O.bet) || 0) + v); SFX.chip(); }; return b; });
   row(...chips);
-  const w = el('div', 'amt'), inp = document.createElement('input'); inp.id = 'oAmt'; inp.inputMode = 'decimal'; inp.autocomplete = 'off'; inp.placeholder = 'Mise'; inp.value = O.bet; inp.oninput = () => { O.bet = inp.value; }; w.append(inp, el('span', '', COIN));
+  const w = el('div', 'amt'), inp = document.createElement('input'); inp.id = 'oAmt'; inp.inputMode = 'decimal'; inp.autocomplete = 'off'; inp.placeholder = 'Mise'; inp.value = O.bet; inp.oninput = () => { O.bet = inp.value; ofGoLabel(); }; w.append(inp, el('span', '', COIN));
   const bt = (l, f) => { const b = el('button', 'btn', l); b.onclick = f; return b; };
   row(bt('½', () => ofSet((parseAmt(O.bet) || 0) / 2)), w, bt('×2', () => ofSet((parseAmt(O.bet) || 0) * 2)), bt('Tapis', () => ofSet(O.bal ?? W.bal ?? 0)));
   if (O.game === 'mines') {
@@ -1911,7 +2160,168 @@ function ofDock() {
     const a = document.createElement('input'); a.className = 'ofsel'; a.style.width = '90px'; a.inputMode = 'decimal'; a.placeholder = 'ex. 2'; a.value = O.auto; a.oninput = () => { O.auto = a.value; };
     row(el('span', 'note', 'Encaissement auto (facultatif)'), a);
   }
+  if (INST[O.game]) {
+    const r = row(); CH[O.game].forEach(([v, l, m, sub]) => { const b = el('button', 'cbtn' + (O.pick[O.game] === v ? ' on' : '')); b.append(el('b', '', l), el('small', '', 'x' + m + (sub ? ' · ' + sub : ''))); b.onclick = () => { SFX.chip(); O.pick[O.game] = v; ofSel(); }; r.append(b); });
+    const gb = act('go', 'Lancer', ofStart); gb.id = 'oGo'; row(gb); ofGoLabel(); return;
+  }
   row(act('go', s ? 'Rejouer' : 'Jouer', ofStart));
+}
+// ---- jeux « un coup » : pile ou face, dés, chevaux, roulette russe (tirage côté serveur, animation côté site)
+const INST = { coin: 1, dice: 1, horses: 1, russian: 1 };
+const HM = [2.4, 3.8, 5.3, 8.6, 15.8], HP = [40, 25, 18, 11, 6], HCOL = ['#ef4444', '#3b82f6', '#22c55e', '#f59e0b', '#a855f7'];
+const rusM = (k) => Math.floor(0.96 * 6 / (6 - k) * 100) / 100;
+const CH = {
+  coin: [['pile', 'Pile', 1.95], ['face', 'Face', 1.95]],
+  dice: [['under', 'Moins de 7', 2.3], ['seven', 'Exactement 7', 5.8], ['over', 'Plus de 7', 2.3]],
+  horses: HM.map((m, i) => [String(i + 1), 'Cheval ' + (i + 1), m, HP[i] + ' %']),
+  russian: [1, 2, 3, 4, 5].map((k) => [String(k), k + ' balle' + (k > 1 ? 's' : ''), rusM(k), Math.round(k / 6 * 100) + ' % de risque']),
+};
+const IDLE = { coin: 'Choisis pile ou face, puis lance la pièce', dice: 'Choisis ton pari, puis lance les dés', horses: 'Clique sur ton cheval, puis lance la course', russian: 'Choisis le nombre de balles, puis tire' };
+const BUSY = { coin: 'La pièce tourne…', dice: 'Les dés roulent…', horses: 'La course est lancée…', russian: 'Le barillet tourne…' };
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+const alive = (tok) => O.run === tok;
+const flr2 = (x) => Math.floor(x * 100 + 1e-9) / 100;
+function ofRelease() { O.anim = false; if (O.hold) { O.hold = false; if (O.bal != null) $('#meBal').textContent = num(O.bal) + ' ' + COIN; } }
+function ofGoLabel() {
+  const b = $('#oGo'); if (!b || !INST[O.game]) return;
+  const c = CH[O.game].find((x) => x[0] === O.pick[O.game]), bet = parseAmt(O.bet) || 0;
+  b.textContent = (O.st ? 'Relancer' : 'Lancer') + (bet && c ? ' · gain possible ' + num(flr2(bet * c[2])) + ' ' + COIN : '');
+}
+function ofSel() {
+  ofDock();
+  if (O.game === 'horses') document.querySelectorAll('.lane').forEach((l, i) => l.classList.toggle('sel', String(i + 1) === O.pick.horses));
+  if (O.game === 'russian' && !O.anim) rusPre();
+  ofStatsInst();
+}
+function ofStatsInst() {
+  const st = $('#oStats'); if (!st) return; st.textContent = ''; const s = O.st;
+  const box = (l, v, gold) => { const d = el('div', 'stat' + (gold ? ' gold' : '')); d.append(el('small', '', l), el('b', '', v)); st.append(d); };
+  const c = CH[O.game].find((x) => x[0] === O.pick[O.game]);
+  if (s && s.over) { box('Mise', num(s.bet) + ' ' + COIN); box('Multiplicateur', (s.mult || 0) + 'x'); box(s.win > 0 ? 'Gain' : 'Perdu', s.win > 0 ? num(s.win) + ' ' + COIN : '−' + num(s.bet) + ' ' + COIN, s.win > 0); }
+  else if (c) { box('Ton choix', c[1]); box('Multiplicateur', 'x' + c[2], true); }
+}
+function rInst(s) {
+  const msg = $('#oMsg'); if (!msg) return;
+  if (O.anim) msg.replaceChildren(el('span', '', BUSY[O.game]));
+  else if (!s) msg.replaceChildren(el('span', '', IDLE[O.game]));
+  else {
+    const net = Math.round((s.win - s.bet) * 100) / 100;
+    const head = s.type === 'coin' ? (s.side === 'pile' ? 'PILE' : 'FACE') : s.type === 'dice' ? s.a + ' + ' + s.b + ' = ' + s.sum : s.type === 'horses' ? 'Cheval n°' + (s.winner + 1) + ' vainqueur' : s.dead ? 'BANG !' : 'Clic… tu survis';
+    msg.replaceChildren(el('span', s.win > 0 ? 'win' : 'lose', head + ' · ' + (net > 0 ? '+' : '') + num(net) + ' ' + COIN));
+  }
+  ofStatsInst();
+}
+async function ofInstant(st) {
+  const tok = ++O.run; O.anim = true; O.st = null; ofRender();
+  try { await ({ coin: aCoin, dice: aDice, horses: aHorses, russian: aRussian })[st.type](st, tok); } catch (e) { console.error(e); }
+  if (!alive(tok)) return;
+  ofRelease(); O.st = st; ofDone(null, st); ofRender();
+}
+function dieFace(d, n) {
+  const P = { 1: [5], 2: [1, 9], 3: [1, 5, 9], 4: [1, 3, 7, 9], 5: [1, 3, 5, 7, 9], 6: [1, 3, 4, 6, 7, 9] }[n] || [];
+  d.textContent = ''; for (let i = 1; i <= 9; i++) { const c = el('span'); if (P.includes(i)) c.className = 'pip'; d.append(c); }
+}
+function cylSVG() {
+  let ch = '';
+  for (let i = 0; i < 6; i++) {
+    const a = (-90 + i * 60) * Math.PI / 180, x = (58 * Math.cos(a)).toFixed(1), y = (58 * Math.sin(a)).toFixed(1);
+    ch += '<g transform="translate(' + x + ' ' + y + ')" class="chm"><circle r="21" fill="#07070b" stroke="#94a3b8" stroke-width="2.5"/><circle r="16" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="2"/><g class="bul"><circle r="14" fill="url(#oBrs)" stroke="#92400e" stroke-width="1.5"/><circle r="5.5" fill="#7c2d12"/><circle cx="-4" cy="-4" r="2.2" fill="#fde68a" opacity=".8"/></g></g>';
+  }
+  return '<svg class="cyl" id="oCyl" viewBox="-100 -100 200 200"><defs><radialGradient id="oStl" cx="35%" cy="30%"><stop offset="0" stop-color="#cbd5e1"/><stop offset=".55" stop-color="#64748b"/><stop offset="1" stop-color="#1e293b"/></radialGradient><radialGradient id="oBrs" cx="35%" cy="30%"><stop offset="0" stop-color="#fde68a"/><stop offset=".6" stop-color="#f59e0b"/><stop offset="1" stop-color="#b45309"/></radialGradient></defs><g id="oCylG"><circle r="94" fill="url(#oStl)" stroke="#0f172a" stroke-width="3"/>' + ch + '<circle r="17" fill="#0f172a" stroke="#94a3b8" stroke-width="3"/><circle r="6" fill="#475569"/></g></svg>';
+}
+function rusReset() { const g = $('#oCylG'); if (!g) return; g.style.transition = 'none'; g.style.transform = 'rotate(0deg)'; g.querySelectorAll('.chm').forEach((c) => c.classList.remove('hit')); void g.getBoundingClientRect(); }
+function rusPre() { // barillet « au repos » : k balles à des places au hasard (décor, le vrai tirage est révélé après le tour)
+  const g = $('#oCylG'); if (!g) return; rusReset();
+  const k = Number(O.pick.russian), idx = [0, 1, 2, 3, 4, 5].sort(() => Math.random() - 0.5).slice(0, k);
+  g.querySelectorAll('.bul').forEach((b, i) => b.classList.toggle('on', idx.includes(i)));
+}
+function ofBuildInst(b) {
+  const g = O.game, foot = '<div class="omsg" id="oMsg"></div><div class="stats" id="oStats"></div>';
+  if (g === 'coin') b.innerHTML = '<div class="sc"><div class="cstage"><div class="clift" id="oLift"><div class="cwrap"><div class="coin" id="oCoin"><div class="cf"><span>♛</span><b>PILE</b></div><div class="cf back"><span>✦</span><b>FACE</b></div></div></div></div><div class="cshadow" id="oShadow"></div></div></div>' + foot;
+  else if (g === 'dice') { b.innerHTML = '<div class="sc"><div class="dgrid"><div class="die" id="oD1"></div><div class="die" id="oD2"></div></div><div class="dsum" id="oSum"></div></div>' + foot; dieFace($('#oD1'), 3); dieFace($('#oD2'), 4); }
+  else if (g === 'horses') {
+    b.innerHTML = '<div class="hz" id="oTrack"><div class="hban" id="oBan"></div></div>' + foot; const tr = $('#oTrack');
+    HM.forEach((m, i) => {
+      const l = el('div', 'lane' + (String(i + 1) === O.pick.horses ? ' sel' : '')); l.style.setProperty('--hc', HCOL[i]);
+      l.innerHTML = '<span class="ln">' + (i + 1) + '</span><div class="ls"><span class="horse">🐎</span></div><span class="lo">x' + m + '<small>' + HP[i] + ' %</small></span>';
+      l.onclick = () => { if (O.anim) return; SFX.chip(); O.pick.horses = String(i + 1); ofSel(); }; tr.append(l);
+    });
+  } else { b.innerHTML = '<div class="sc"><div class="rus"><div class="hmr"></div>' + cylSVG() + '</div><div class="flash" id="oFlash"></div></div>' + foot; rusPre(); }
+}
+// ---- animations (le résultat vient du serveur : l'animation ne fait que le révéler)
+async function aCoin(st, tok) {
+  const coin = $('#oCoin'), lift = $('#oLift'), sh = $('#oShadow'); if (!coin) return;
+  const cur = Number(coin.dataset.rx || 0), end = (5 + Math.floor(Math.random() * 3)) * 360 + (st.side === 'pile' ? 0 : 180), D = 2500;
+  SFX.wspin();
+  const a1 = coin.animate([{ transform: 'rotateX(' + cur + 'deg)' }, { transform: 'rotateX(' + end + 'deg)' }], { duration: D, easing: 'cubic-bezier(.25,.6,.3,1)', fill: 'forwards' });
+  lift.animate([{ transform: 'translateY(0) scale(1)', offset: 0, easing: 'cubic-bezier(.2,.7,.4,1)' }, { transform: 'translateY(-112px) scale(1.3)', offset: .45, easing: 'cubic-bezier(.6,0,.9,.4)' }, { transform: 'translateY(0) scale(1)', offset: .85, easing: 'ease-out' }, { transform: 'translateY(-20px) scale(1.04)', offset: .93, easing: 'ease-in' }, { transform: 'translateY(0) scale(1)', offset: 1 }], { duration: D });
+  sh.animate([{ transform: 'scale(1)', opacity: .6, offset: 0 }, { transform: 'scale(.5)', opacity: .22, offset: .45 }, { transform: 'scale(1)', opacity: .6, offset: .85 }, { transform: 'scale(.9)', opacity: .5, offset: .93 }, { transform: 'scale(1)', opacity: .6, offset: 1 }], { duration: D });
+  await wait(D * 0.85); if (!alive(tok)) return; SFX.chip(); await wait(D * 0.15 + 150);
+  if (!alive(tok)) return; coin.dataset.rx = String(end % 360); coin.style.transform = 'rotateX(' + (end % 360) + 'deg)'; a1.cancel();
+}
+async function aDice(st, tok) {
+  const ds = [$('#oD1'), $('#oD2')], vals = [st.a, st.b], sum = $('#oSum'); if (!ds[0]) return;
+  sum.textContent = ''; sum.className = 'dsum';
+  await Promise.all(ds.map(async (d, i) => {
+    await wait(i * 170); const tilt = (Math.random() - 0.5) * 14, dur = 1500 + i * 280, t0 = performance.now();
+    d.animate([{ transform: 'translateY(0) rotate(0deg) scale(1)', offset: 0 }, { transform: 'translateY(-125px) rotate(300deg) scale(1.15)', offset: .25 }, { transform: 'translateY(0) rotate(560deg) scale(1)', offset: .5 }, { transform: 'translateY(-52px) rotate(690deg) scale(1.06)', offset: .7 }, { transform: 'translateY(0) rotate(760deg) scale(1)', offset: .85 }, { transform: 'translateY(-12px) rotate(' + (770 + tilt) + 'deg)', offset: .93 }, { transform: 'translateY(0) rotate(' + (720 + tilt) + 'deg)', offset: 1 }], { duration: dur, easing: 'ease-in-out' });
+    while (performance.now() - t0 < dur) { if (!alive(tok)) return; dieFace(d, 1 + Math.floor(Math.random() * 6)); SFX.deal(); await wait(65 + ((performance.now() - t0) / dur) * 100); }
+    if (!alive(tok)) return; dieFace(d, vals[i]); d.style.transform = 'rotate(' + tilt + 'deg)'; SFX.chip();
+  }));
+  if (!alive(tok)) return;
+  sum.className = 'dsum ' + (st.win > 0 ? 'win' : 'lose'); sum.textContent = String(st.sum);
+  sum.append(el('small', '', st.sum < 7 ? 'MOINS DE 7' : st.sum > 7 ? 'PLUS DE 7' : 'PILE 7 !'));
+  await wait(450);
+}
+async function aHorses(st, tok) {
+  const hs = [...document.querySelectorAll('.horse')], lanes = [...document.querySelectorAll('.lane')], ban = $('#oBan'); if (!hs.length) return;
+  const say = (t) => { ban.textContent = t; ban.classList.remove('pop'); void ban.offsetWidth; ban.classList.add('pop'); };
+  hs.forEach((h) => { h.style.left = 'calc((100% - 44px) * 0)'; h.style.transform = 'scaleX(-1)'; h.classList.remove('lead'); }); lanes.forEach((l) => l.classList.remove('win'));
+  for (const t of ['Prêts…', '3', '2', '1', 'PARTEZ !']) { if (!alive(tok)) return; say(t); SFX.chip(); await wait(t === 'Prêts…' ? 700 : 480); }
+  ban.textContent = '';
+  const TW = 5400, T = hs.map((_, i) => (i === st.winner ? TW : TW * (1.03 + Math.random() * 0.1)));
+  const A = hs.map(() => 0.05 + Math.random() * 0.06), F = hs.map(() => 0.8 + Math.random() * 1.4), PH = hs.map(() => Math.random() * 6.28), prev = hs.map(() => 0);
+  const t0 = performance.now(); let lastTick = 0;
+  await new Promise((res) => {
+    const step = (now) => {
+      if (!alive(tok)) return res();
+      const t = now - t0; let done = true, lead = 0;
+      hs.forEach((h, i) => {
+        const x = Math.min(1, t / T[i]); if (x < 1) done = false;
+        const p = Math.max(prev[i], Math.min(1, x + A[i] * Math.sin(F[i] * (t / 1000) * 6.28 + PH[i]) * Math.sin(Math.PI * x))); prev[i] = p; if (p > prev[lead]) lead = i;
+        h.style.left = 'calc((100% - 44px) * ' + p + ')'; h.style.transform = 'translateY(' + (x < 1 ? (Math.sin(t / 55 + i * 2) * 2.5).toFixed(2) : 0) + 'px) scaleX(-1)';
+      });
+      hs.forEach((h, i) => h.classList.toggle('lead', i === lead && t < TW));
+      if (t - lastTick > 120 && !done) { SFX.wtick(); lastTick = t; }
+      if (done) return res(); requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  });
+  if (!alive(tok)) return;
+  hs.forEach((h) => h.classList.remove('lead')); lanes[st.winner].classList.add('win'); say('🏁 Cheval n°' + (st.winner + 1) + ' !'); SFX.bj();
+  await wait(1100); if (alive(tok)) ban.textContent = '';
+}
+async function aRussian(st, tok) {
+  const g = $('#oCylG'), svg = $('#oCyl'), sc = svg && svg.closest('.sc'), fl = $('#oFlash'); if (!g) return;
+  const bul = [...g.querySelectorAll('.bul')];
+  rusReset(); bul.forEach((b) => b.classList.remove('on')); await wait(320); if (!alive(tok)) return;
+  svg.classList.add('spinning'); g.style.transition = 'transform 2.9s cubic-bezier(.12,.75,.12,1)'; g.style.transform = 'rotate(2520deg)';
+  const t0 = performance.now(); let d = 55; SFX.wspin();
+  for (let t = 0; t < 2500; t += d, d *= 1.09) { if (!alive(tok)) return; tone(1500 + Math.random() * 400, .02, 'square', .02); await wait(d); }
+  await wait(Math.max(0, 3000 - (performance.now() - t0))); if (!alive(tok)) return;
+  svg.classList.remove('spinning'); await wait(700); if (!alive(tok)) return;
+  tone(1300, .05, 'square', .05); await wait(350);
+  if (st.dead) {
+    fl.textContent = 'BANG !'; fl.style.background = 'radial-gradient(circle,#fff 0,#f97316 22%,rgba(220,38,38,.75) 55%,rgba(127,29,29,.2) 80%)';
+    noise(.45, .3); tone(90, .35, 'sawtooth', .09, 0, -50); sc.classList.add('shake'); setTimeout(() => sc.classList.remove('shake'), 520);
+    fl.animate([{ opacity: 1, transform: 'scale(1.25)' }, { opacity: 1, transform: 'scale(1)', offset: .35 }, { opacity: 0 }], { duration: 1100, fill: 'forwards' });
+    g.querySelectorAll('.chm')[0].classList.add('hit');
+  } else {
+    fl.textContent = 'CLIC'; fl.style.background = 'radial-gradient(circle,rgba(255,255,255,.18),transparent 65%)'; tone(2000, .05, 'square', .05); tone(700, .08, 'sine', .05, .08);
+    fl.animate([{ opacity: 1, transform: 'scale(.8)' }, { opacity: 1, transform: 'scale(1)', offset: .3 }, { opacity: 0 }], { duration: 1000, fill: 'forwards' });
+  }
+  bul.forEach((b, i) => b.classList.toggle('on', !!st.chambers[i]));
+  await wait(st.dead ? 1200 : 1000);
 }
 function ofLoop() { if (W.view.startsWith('off-') && O.game === 'fuse') ofFuseTick(); requestAnimationFrame(ofLoop); }
 requestAnimationFrame(ofLoop);
