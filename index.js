@@ -1015,6 +1015,7 @@ async function startBoost(guildId, { winMult, loseMult, label, minutes }) {
   if (expiresAt) {
     entry.timer = setTimeout(() => {
       activeBoosts.delete(guildId);
+      webEvent(guildId, { kind: 'boost_end', title: '⏰ Boost terminé', text: `L’événement ${label} est terminé. Retour aux gains normaux.` });
       client.guilds
         .fetch(guildId)
         .then((guild) =>
@@ -5842,6 +5843,25 @@ const EVENT_TYPES = [
   { id: 'goldrush', label: 'Ruée vers l’or', desc: 'Gains x3 pendant X min' },
 ];
 
+const BOOST_PRESETS = {
+  x2win: { winMult: 2, loseMult: 1, label: 'x2 Gains 🔥' },
+  x2lose: { winMult: 1, loseMult: 2, label: 'x2 Pertes 💀' },
+  x2both: { winMult: 2, loseMult: 2, label: 'x2 Gains & Pertes ⚡' },
+  lucky: { winMult: 1.5, loseMult: 1, label: 'Heure chanceuse 🍀' },
+  goldrush: { winMult: 3, loseMult: 1, label: 'Ruée vers l’or 🏆' },
+};
+/** envoie une notification d'événement dans la boîte de réception du site (tous les joueurs du serveur) */
+function webEvent(guildId, n) {
+  try { if (webApp && webApp.pushEvent) webApp.pushEvent(String(guildId), n); } catch (e) { console.error('[web event]', e?.message || e); }
+}
+const boostText = (p, minutes) => [p.winMult !== 1 ? `Gains ×${p.winMult}` : '', p.loseMult !== 1 ? `Pertes ×${p.loseMult}` : '', `pendant ${minutes} min`].filter(Boolean).join(' · ');
+const evNotif = (ev, eventId) => ({
+  kind: ev.type, eventId,
+  title: ev.type === 'giveaway' ? '🎉 Giveaway' : '📢 Claim : premier arrivé',
+  text: ev.type === 'giveaway' ? `Prix : ${num(ev.amount)} × ${ev.maxWinners} gagnant(s) · tirage ${ev.expiresAt ? 'dans ' + Math.max(1, Math.round((ev.expiresAt - Date.now()) / 60000)) + ' min' : ''}` : `${num(ev.amount)} par gagnant · ${ev.maxWinners} place(s)` + (ev.expiresAt ? ` · ${Math.max(1, Math.round((ev.expiresAt - Date.now()) / 60000))} min` : ''),
+  amount: ev.amount, expiresAt: ev.expiresAt || 0,
+});
+
 function claimEventEmbed(ev) {
   const left = ev.maxWinners - ev.winners.size;
   const host = ev.hostId ? `👤 Par <@${ev.hostId}>\n` : '';
@@ -5927,6 +5947,7 @@ async function finishGiveaway(eventId) {
       console.error('[giveaway] credit', e?.message || e);
     }
   }
+  webEvent(ev.guildId, { kind: 'giveaway_end', title: '🎉 Giveaway terminé', text: `Gagnant(s) : ${[...ev.winners].map((id) => { const u = client.users.cache.get(id); return u ? u.globalName || u.username : id; }).join(', ') || 'personne'} · ${num(ev.amount)} chacun` });
   // Notifie les perdants inscrits
   for (const uid of pool) {
     if (ev.winners.has(uid)) continue;
@@ -6018,18 +6039,13 @@ async function handleEventJoin(i) {
 }
 
 async function postBoostEvent(i, kind, minutes) {
-  const presets = {
-    x2win: { winMult: 2, loseMult: 1, label: 'x2 Gains 🔥' },
-    x2lose: { winMult: 1, loseMult: 2, label: 'x2 Pertes 💀' },
-    x2both: { winMult: 2, loseMult: 2, label: 'x2 Gains & Pertes ⚡' },
-    lucky: { winMult: 1.5, loseMult: 1, label: 'Heure chanceuse 🍀' },
-    goldrush: { winMult: 3, loseMult: 1, label: 'Ruée vers l’or 🏆' },
-  };
+  const presets = BOOST_PRESETS;
   const p = presets[kind];
   if (!p) return respondText(i, 'Type de boost inconnu.');
   if (!minutes || minutes < 1) return respondText(i, 'Indique une durée en minutes (min. 1).');
 
   await startBoost(i.guild.id, { ...p, minutes });
+  webEvent(i.guild.id, { kind: 'boost', title: `⚡ Boost : ${p.label}`, text: boostText(p, minutes), expiresAt: Date.now() + minutes * 60_000 });
   const ends = Math.floor((Date.now() + minutes * 60_000) / 1000);
   const payload = {
     embeds: [
@@ -6079,6 +6095,7 @@ async function createClaimOrGiveaway(i, type, amount, winners, minutes) {
   if (type === 'giveaway') ev.timer = setTimeout(() => finishGiveaway(eventId), expiresAt - Date.now());
   else if (expiresAt) ev.timer = setTimeout(() => expireClaimEvent(eventId), expiresAt - Date.now());
   activeEvents.set(eventId, ev);
+  webEvent(ev.guildId, evNotif(ev, eventId));
 
   const payload = {
     embeds: [type === 'giveaway' ? giveawayEmbed(ev) : claimEventEmbed(ev)],
@@ -6096,6 +6113,70 @@ async function createClaimOrGiveaway(i, type, amount, winners, minutes) {
   });
   const { ok, fail } = await dmGuildEveryone(i.guild, payload);
   return i.followUp({ content: `📬 Envoyé en MP : **${ok}** ok · **${fail}** échecs.`, flags: EPH }).catch(() => {});
+}
+
+// ---------- Événements lancés / utilisés depuis le site ----------
+async function webLaunchBoost(guildId, hostId, kind, minutes) {
+  const p = BOOST_PRESETS[kind];
+  if (!p) throw new Error('Type de boost inconnu.');
+  minutes = Math.max(1, Math.min(24 * 60, Math.floor(Number(minutes) || 0)));
+  const guild = await client.guilds.fetch(guildId).catch(() => null);
+  if (!guild) throw new Error('Serveur introuvable.');
+  await startBoost(guildId, { ...p, minutes });
+  webEvent(guildId, { kind: 'boost', title: `⚡ Boost : ${p.label}`, text: boostText(p, minutes), expiresAt: Date.now() + minutes * 60_000 });
+  const ends = Math.floor((Date.now() + minutes * 60_000) / 1000);
+  const payload = { embeds: [new EmbedBuilder().setTitle(`⚡ Boost : ${p.label}`).setColor(COLORS.gold).setDescription(
+    `👤 Lancé par <@${hostId}>\nUn boost est actif pendant **${minutes} min** (fin <t:${ends}:R>) !\n` +
+    (p.winMult !== 1 ? `• Gains × **${p.winMult}**\n` : '') + (p.loseMult !== 1 ? `• Pertes × **${p.loseMult}** (mise perdue ×${p.loseMult})\n` : '') + `\nJoue maintenant pour en profiter !`).setTimestamp()] };
+  dmGuildEveryone(guild, payload).catch((e) => console.error('[boost web] MP', e?.message || e));
+  return { label: p.label, minutes };
+}
+
+async function webLaunchEvent(guildId, hostId, type, amount, winners, minutes) {
+  if (type !== 'claim' && type !== 'giveaway') throw new Error('Type d’événement inconnu.');
+  amount = round2(Number(amount));
+  if (!(amount > 0) || amount > MAX_ADMIN_AMOUNT) throw new Error(`Montant invalide (entre 0.01 et ${num(MAX_ADMIN_AMOUNT)}).`);
+  minutes = Math.max(0, Math.min(24 * 60, Math.floor(Number(minutes) || 0)));
+  if (type === 'giveaway' && minutes < 1) throw new Error('Un giveaway doit avoir une durée (minutes ≥ 1).');
+  const guild = await client.guilds.fetch(guildId).catch(() => null);
+  if (!guild) throw new Error('Serveur introuvable.');
+  const eventId = `${Date.now().toString(36)}_${randomInt(1000, 9999)}`;
+  const expiresAt = minutes > 0 ? Date.now() + minutes * 60_000 : null;
+  const ev = { type, amount, maxWinners: Math.max(1, Math.min(50, Math.floor(Number(winners) || 1))), winners: new Set(), entries: new Set(), guildId, channelId: null, messageId: null, expiresAt, finished: false, timer: null, hostId, dmMode: true };
+  if (type === 'giveaway') ev.timer = setTimeout(() => finishGiveaway(eventId), expiresAt - Date.now());
+  else if (expiresAt) ev.timer = setTimeout(() => expireClaimEvent(eventId), expiresAt - Date.now());
+  activeEvents.set(eventId, ev);
+  webEvent(guildId, evNotif(ev, eventId));
+  const payload = { embeds: [type === 'giveaway' ? giveawayEmbed(ev) : claimEventEmbed(ev)], components: [eventActionRow(eventId, type, false)] };
+  dmGuildEveryone(guild, payload).catch((e) => console.error('[event web] MP', e?.message || e));
+  return { type, amount, winners: ev.maxWinners, minutes };
+}
+
+async function webEventClaim(uid, guildId, eventId) {
+  const ev = activeEvents.get(eventId);
+  if (!ev || ev.guildId !== guildId || ev.finished || ev.type !== 'claim') return { ok: false, msg: 'Cette récompense n’est plus disponible.' };
+  if (ev.expiresAt && Date.now() > ev.expiresAt) { await expireClaimEvent(eventId); return { ok: false, msg: 'Cet événement a expiré.' }; }
+  if (ev.winners.has(uid)) return { ok: false, msg: 'Tu as déjà réclamé ta part !' };
+  if (ev.winners.size >= ev.maxWinners) { ev.finished = true; activeEvents.delete(eventId); return { ok: false, msg: 'Plus de places disponibles.' }; }
+  ev.winners.add(uid);
+  if (ev.winners.size >= ev.maxWinners) { ev.finished = true; clearTimeout(ev.timer); activeEvents.delete(eventId); }
+  try {
+    const balance = await credit(uid, ev.amount);
+    return { ok: true, msg: `Tu as reçu ${num(ev.amount)} !`, balance };
+  } catch (e) {
+    ev.winners.delete(uid);
+    console.error('[event web] claim', e?.message || e);
+    return { ok: false, msg: 'Erreur lors du crédit.' };
+  }
+}
+
+async function webEventJoin(uid, guildId, eventId) {
+  const ev = activeEvents.get(eventId);
+  if (!ev || ev.guildId !== guildId || ev.finished || ev.type !== 'giveaway') return { ok: false, msg: 'Ce giveaway est terminé.' };
+  if (ev.expiresAt && Date.now() > ev.expiresAt) { await finishGiveaway(eventId); return { ok: false, msg: 'Le giveaway est terminé.' }; }
+  if (ev.entries.has(uid)) return { ok: false, msg: 'Tu es déjà inscrit !' };
+  ev.entries.add(uid);
+  return { ok: true, msg: 'Tu es inscrit au giveaway ! Bonne chance.' };
 }
 
 const MULT_INFO = {
@@ -6746,6 +6827,11 @@ try {
       const u = await client.users.fetch(uid).catch(() => null);
       return !!u && String(u.username).toLowerCase() === 'b7f5';
     },
+    // événements (boosts, claim, giveaway) lancés depuis la page admin du site ; les notifs partent aussi quand c'est lancé depuis Discord
+    launchBoost: webLaunchBoost,
+    launchEvent: webLaunchEvent,
+    eventClaim: webEventClaim,
+    eventJoin: webEventJoin,
     // bouton « Daily » du site : même RPC que le bouton Discord
     claimDaily: async (uid) => {
       const res = await rpc('claim_daily', { p_user_id: String(uid), p_amount: DAILY_AMOUNT });
