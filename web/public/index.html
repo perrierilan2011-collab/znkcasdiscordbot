@@ -528,6 +528,53 @@ svg.ic{display:block;flex:none}
 .fz .bigm{top:30%}
 .fz .bigm small{display:block;font-size:.2em;letter-spacing:.2em;font-weight:800;opacity:.85;margin-top:-4px;text-align:center}
 @media(max-width:760px){.fz{height:300px}}
+/* ---------- slots / duel / ticket à gratter ---------- */
+.slm{position:relative;width:min(100%,380px);padding:14px 16px 16px;border-radius:20px;background:linear-gradient(160deg,#4c1d95,#1e0a45 60%,#0b0720);border:2px solid #a78bfa;box-shadow:0 0 0 4px #2e1065,0 14px 40px rgba(0,0,0,.6),inset 0 0 40px rgba(167,139,250,.25)}
+.slj{text-align:center;font-weight:900;letter-spacing:.08em;color:#ddd6fe;margin-bottom:10px}.slj b{color:#fde047;text-shadow:0 0 12px rgba(253,224,71,.7)}
+.slr{display:flex;gap:8px;background:#05030f;padding:8px;border-radius:14px;border:2px solid #7c3aed;--cell:84px}
+.reel{position:relative;flex:1;height:calc(var(--cell)*3);overflow:hidden;border-radius:8px;background:linear-gradient(#0b0720,#1a1040 50%,#0b0720)}
+.reel::after{content:"";position:absolute;inset:0;background:linear-gradient(rgba(0,0,0,.6),transparent 28%,transparent 72%,rgba(0,0,0,.6));pointer-events:none}
+.reel.spin .strip{filter:blur(2.5px)}
+.sy{display:grid;place-items:center;height:var(--cell);font-style:normal;font-size:44px;font-weight:900}
+.sy.s4{color:#ef4444;font-family:Georgia,serif;font-size:54px;text-shadow:0 0 10px rgba(239,68,68,.7)}
+.sy.s5{font-family:Georgia,serif;font-size:66px;background:linear-gradient(180deg,#f3e8ff,#a855f7 55%,#6b21a8);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 0 8px #a855f7)}
+.sy.win{position:relative;z-index:2;animation:syw .45s ease-in-out infinite alternate}
+@keyframes syw{to{transform:scale(1.18);filter:drop-shadow(0 0 12px #fde047)}}
+.jpf{position:absolute;inset:0;display:grid;place-items:center;border-radius:20px;font-weight:900;font-size:46px;letter-spacing:.06em;color:#fff;text-shadow:0 0 22px #d8b4fe,0 0 6px #a855f7;background:radial-gradient(circle,rgba(168,85,247,.88),rgba(76,29,149,.2) 72%);opacity:0;pointer-events:none;z-index:6}
+.jpf.on{animation:jpf 2.6s ease forwards}
+@keyframes jpf{0%{opacity:0;transform:scale(.6)}15%,70%{opacity:1;transform:scale(1)}100%{opacity:0;transform:scale(1.15)}}
+.cfl{position:absolute;left:50%;top:45%;width:9px;height:14px;background:var(--c);pointer-events:none;z-index:7;animation:cfl 2s cubic-bezier(.15,.7,.4,1) forwards}
+@keyframes cfl{to{transform:translate(var(--dx),var(--dy)) rotate(var(--r));opacity:0}}
+.arena{position:relative;width:min(100%,520px);height:250px;border-radius:18px;overflow:hidden;background:linear-gradient(#fbbf24,#f97316 45%,#7c2d12 80%);border:2px solid #fcd34d;box-shadow:0 12px 40px rgba(0,0,0,.55)}
+.sun{position:absolute;left:50%;top:52px;width:90px;height:90px;margin-left:-45px;border-radius:50%;background:#fef3c7;box-shadow:0 0 60px #fde68a}
+.gnd{position:absolute;left:0;right:0;bottom:0;height:46px;background:#3b1d0c}
+.fgt{position:absolute;bottom:26px;width:84px;height:140px}.fgt.fme{left:11%}.fgt.ffoe{right:11%;transform:scaleX(-1)}
+.fgt svg{width:100%;height:100%;overflow:visible}
+.fgt .bd,.fgt .arm{transform-box:view-box}
+.fgt .bd{transform-origin:40px 126px;transition:transform .7s cubic-bezier(.5,0,.8,1.15)}
+.fgt .arm{transform-origin:42px 54px;transition:transform .12s ease-out}
+.fgt.up .arm{transform:rotate(-90deg)}.fgt.dead .bd{transform:rotate(-82deg)}
+.fgt .mz{transform-box:fill-box;transform-origin:center;transform:scale(0)}
+.fgt.fire .mz{animation:mz .3s ease-out}
+@keyframes mz{0%{transform:scale(0)}30%{transform:scale(2)}100%{transform:scale(0)}}
+.dban{position:absolute;left:0;right:0;top:12px;text-align:center;font-weight:900;font-size:28px;color:#fff;text-shadow:0 3px 0 #7c2d12;z-index:3}
+.dban.go{color:#fde047;font-size:50px;animation:pop2 .25s cubic-bezier(.2,1.6,.4,1)}
+.dms{position:absolute;left:0;right:0;bottom:6px;text-align:center;font-size:13px;font-weight:800;color:#fed7aa}
+.dnm{position:absolute;top:12px;right:12px;font-size:12px;font-weight:800;color:#fff7ed;background:rgba(0,0,0,.35);padding:2px 10px;border-radius:99px}
+.tk{position:relative;width:min(100%,380px);padding:14px 14px 12px;border-radius:18px;background:linear-gradient(150deg,#6d28d9,#3b0764 70%);border:2px solid #fbbf24;box-shadow:0 12px 36px rgba(0,0,0,.6),inset 0 0 30px rgba(251,191,36,.18)}
+.tkh{text-align:center;font-weight:900;font-size:20px;letter-spacing:.18em;color:#fde68a;margin-bottom:10px}.tkh b{color:#e9d5ff;text-shadow:0 0 12px #a855f7}
+.tkg{position:relative;display:grid;grid-template-columns:repeat(3,1fr);gap:8px;touch-action:none;user-select:none;-webkit-user-select:none;cursor:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='28' height='28'><circle cx='14' cy='14' r='12' fill='%23fbbf24' stroke='%2392400e' stroke-width='2'/><text x='14' y='19' font-size='14' font-weight='bold' text-anchor='middle' fill='%2392400e'>Z</text></svg>") 14 14,crosshair}
+.tkc{position:relative;aspect-ratio:1;border-radius:12px;overflow:hidden;background:#fff7ed;border:2px solid #fbbf24}
+.tku{position:absolute;inset:0;display:grid;place-items:center;align-content:center;text-align:center;color:#4c1d95;font-weight:900;font-size:26px;line-height:1}
+.tku small{display:block;font-size:9px;letter-spacing:.1em;color:#7c3aed}
+.zj{font-style:normal;font-family:Georgia,serif;font-size:44px;background:linear-gradient(180deg,#c084fc,#6b21a8);-webkit-background-clip:text;background-clip:text;color:transparent}
+.foil{position:absolute;inset:0;width:100%;height:100%;transition:opacity .4s}.foil.off{opacity:0}
+.tkc.hit{border-color:#fde047;box-shadow:0 0 18px #fde047;animation:tkh .5s ease-in-out infinite alternate}
+@keyframes tkh{to{transform:scale(1.07)}}
+.tkr{text-align:center;margin-top:10px;font-size:12px;color:#ddd6fe}
+.flk{position:absolute;width:5px;height:5px;background:#d1d5db;pointer-events:none;z-index:4;animation:flk .65s ease-in forwards}
+@keyframes flk{to{transform:translate(var(--dx),46px) rotate(200deg);opacity:0}}
+@media(prefers-reduced-motion:reduce){.sy.win,.tkc.hit{animation:none}}
 /* ---------- chat en direct ---------- */
 main{padding-bottom:56px!important}
 #chat{position:fixed;right:12px;bottom:12px;width:330px;max-width:calc(100vw - 24px);z-index:15;background:#0a0a0a;border:1px solid #333;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.6)}
@@ -640,6 +687,9 @@ body.fs.vpk #pkInfo{font-size:12px}
           <button class="mitem" data-g="off-dice">Dés</button>
           <button class="mitem" data-g="off-horses">Chevaux</button>
           <button class="mitem" data-g="off-russian">Roulette russe</button>
+          <button class="mitem" data-g="off-slots">Slots</button>
+          <button class="mitem" data-g="off-duel">Duel</button>
+          <button class="mitem" data-g="off-scratch">Ticket à gratter</button>
         </div>
       </div>
       <div class="msep"></div>
@@ -721,6 +771,21 @@ body.fs.vpk #pkInfo{font-size:12px}
       <button class="gcard" data-go="off-russian">
         <span class="gname">Roulette russe</span>
         <span class="gdesc">Survis au barillet, plus de balles = plus de gain</span>
+        <span class="glive"></span><span class="gplay">Jouer</span>
+      </button>
+      <button class="gcard" data-go="off-slots">
+        <span class="gname">Slots</span>
+        <span class="gdesc">Aligne trois Z violets : jackpot x400</span>
+        <span class="glive"></span><span class="gplay">Jouer</span>
+      </button>
+      <button class="gcard" data-go="off-duel">
+        <span class="gname">Duel</span>
+        <span class="gdesc">Dégaine plus vite que ton adversaire</span>
+        <span class="glive"></span><span class="gplay">Jouer</span>
+      </button>
+      <button class="gcard" data-go="off-scratch">
+        <span class="gname">Ticket à gratter</span>
+        <span class="gdesc">Gratte pour de vrai, trois montants identiques gagnent</span>
         <span class="glive"></span><span class="gplay">Jouer</span>
       </button>
     </div>
@@ -1305,8 +1370,8 @@ const C = { msgs: {}, open: false, unread: 0 };
 const SET = { winOthers: '1', winMine: '1', chatNotif: 'silent' };
 try { Object.assign(SET, JSON.parse(localStorage.getItem('znk_set') || '{}')); } catch {}
 const cShow = (m) => m.sys !== 'win' || (me && m.uid === me.uid ? SET.winMine !== '0' : SET.winOthers !== '0');
-const CNAME = { hub: 'Accueil', bj: 'Blackjack', poker: 'Poker', roulette: 'Roulette', 'off-bj': 'Blackjack solo', 'off-fuse': 'Fusé', 'off-mine': 'Mine', 'off-coin': 'Pile ou Face', 'off-dice': 'Dés', 'off-horses': 'Chevaux', 'off-russian': 'Roulette russe' };
-const GLAB = { blackjack: 'Blackjack', poker: 'Poker', roulette: 'Roulette', 'bj-solo': 'Blackjack solo', fuse: 'Fusé', mines: 'Mines', coin: 'Pile ou Face', dice: 'Dés', horses: 'Chevaux', russian: 'Roulette russe' };
+const CNAME = { hub: 'Accueil', bj: 'Blackjack', poker: 'Poker', roulette: 'Roulette', 'off-bj': 'Blackjack solo', 'off-fuse': 'Fusé', 'off-mine': 'Mine', 'off-coin': 'Pile ou Face', 'off-dice': 'Dés', 'off-horses': 'Chevaux', 'off-russian': 'Roulette russe', 'off-slots': 'Slots', 'off-duel': 'Duel', 'off-scratch': 'Ticket à gratter' };
+const GLAB = { blackjack: 'Blackjack', poker: 'Poker', roulette: 'Roulette', 'bj-solo': 'Blackjack solo', fuse: 'Fusé', mines: 'Mines', coin: 'Pile ou Face', dice: 'Dés', horses: 'Chevaux', russian: 'Roulette russe', slots: 'Slots', duel: 'Duel', scratch: 'Ticket à gratter' };
 const cRoom = () => (W.view === 'top' ? 'hub' : W.view);
 function cLine(m) {
   if (m.sys === 'win') { // annonce automatique d'une victoire (tous les jeux du site)
@@ -1840,7 +1905,7 @@ $('#menuBtn').onclick = (e) => { e.stopPropagation(); const o = $('#menu').class
 document.querySelectorAll('#menuPanel .mhead').forEach((b) => (b.onclick = (e) => { e.stopPropagation(); b.parentElement.classList.toggle('open'); }));
 document.addEventListener('click', (e) => { if (!e.target.closest('#menu')) menuClose(); });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') menuClose(); });
-const MENU_LBL = { hub: 'Menu', bj: 'Blackjack', poker: 'Poker', roulette: 'Roulette', 'off-bj': 'Blackjack solo', 'off-fuse': 'Fusé', 'off-mine': 'Mine', 'off-coin': 'Pile ou Face', 'off-dice': 'Dés', 'off-horses': 'Chevaux', 'off-russian': 'Roulette russe', top: 'Classement' };
+const MENU_LBL = { hub: 'Menu', bj: 'Blackjack', poker: 'Poker', roulette: 'Roulette', 'off-bj': 'Blackjack solo', 'off-fuse': 'Fusé', 'off-mine': 'Mine', 'off-coin': 'Pile ou Face', 'off-dice': 'Dés', 'off-horses': 'Chevaux', 'off-russian': 'Roulette russe', 'off-slots': 'Slots', 'off-duel': 'Duel', 'off-scratch': 'Ticket à gratter', top: 'Classement' };
 function menuSync(v) {
   $('#menuLbl').textContent = MENU_LBL[v] || 'Menu';
   $('#msOn').classList.toggle('open', v === 'bj' || v === 'poker' || v === 'roulette');
@@ -2097,10 +2162,160 @@ function rLoop() {
 requestAnimationFrame(rLoop);
 { let v = null; try { v = params.get('t') ? params.get('g') : sessionStorage.getItem('znk_v'); } catch {} if (v === 'wheel') v = 'roulette'; if (v === 'roulette' || v === 'bj') setView(v); }
 
+// ============================================================= SLOTS · DUEL · TICKET À GRATTER
+const JP = 400, SYMS = ['🍒', '🍋', '🔔', '💎', '7', 'Z'], symH = (n) => '<i class="sy s' + n + '">' + SYMS[n] + '</i>';
+const SL = { grid: [[1, 0, 2], [0, 3, 1], [2, 1, 0]] };
+function slInit() {
+  const r = $('#oSlr'); if (!r) return; r.textContent = '';
+  SL.grid.forEach((col) => { const rl = el('div', 'reel'), st = el('div', 'strip'); st.innerHTML = col.map(symH).join(''); rl.append(st); r.append(rl); });
+}
+function confetti(box, n, cols) {
+  for (let i = 0; i < n; i++) {
+    const c = el('span', 'cfl'), a = Math.random() * 6.28, d = 90 + Math.random() * 190;
+    c.style.cssText = '--c:' + cols[i % cols.length] + ';--dx:' + (Math.cos(a) * d).toFixed(0) + 'px;--dy:' + (Math.sin(a) * d - 40 + Math.random() * 160).toFixed(0) + 'px;--r:' + Math.floor(Math.random() * 900 - 450) + 'deg';
+    box.append(c); setTimeout(() => c.remove(), 2100);
+  }
+}
+function jackpotFx(box) {
+  const f = $('#oJpf'); if (f) { f.textContent = 'JACKPOT'; f.classList.remove('on'); void f.offsetWidth; f.classList.add('on'); }
+  confetti(box, 70, ['#a855f7', '#fde047', '#e9d5ff', '#c084fc', '#fff']);
+  [523, 659, 784, 1047, 1319, 1568].forEach((q, i) => tone(q, .3, 'triangle', .07, i * .11));
+  SFX.bj();
+}
+async function aSlots(st, tok) {
+  const strips = [...document.querySelectorAll('#oSlr .strip')], N = 22; if (!strips.length) return;
+  const H = strips[0].firstChild.offsetHeight; SFX.wspin();
+  await Promise.all(strips.map(async (sp, i) => {
+    const rnd = Array.from({ length: N }, () => Math.floor(Math.random() * 6));
+    sp.innerHTML = SL.grid[i].concat(rnd, st.grid[i]).map(symH).join(''); sp.parentNode.classList.add('spin');
+    const a = sp.animate([{ transform: 'translateY(0)' }, { transform: 'translateY(' + -(N + 3) * H + 'px)' }], { duration: 1300 + i * 550, easing: 'cubic-bezier(.35,.05,.2,1.1)', fill: 'forwards' });
+    await a.finished.catch(() => {});
+    sp.innerHTML = st.grid[i].map(symH).join(''); a.cancel(); sp.parentNode.classList.remove('spin');
+    if (alive(tok)) { SFX.chip(); tone(300 + i * 90, .08, 'square', .04); }
+  }));
+  if (!alive(tok)) return;
+  SL.grid = st.grid;
+  const reels = [...document.querySelectorAll('#oSlr .reel')];
+  st.wins.forEach((w) => w.rows.slice(0, w.n).forEach((row, r) => reels[r].firstChild.children[row].classList.add('win')));
+  const jp = st.wins.some((w) => w.sym === 5);
+  if (jp) jackpotFx($('#oSlm')); else if (st.wins.length) { tone(880, .12, 'triangle', .06); tone(1175, .16, 'triangle', .06, .1); }
+  await wait(jp ? 2400 : st.wins.length ? 1100 : 350);
+}
+const FIGHTER = (c1, c2) => '<svg viewBox="0 0 80 130"><g class="bd"><rect x="30" y="88" width="8" height="38" fill="#1e293b"/><rect x="42" y="88" width="8" height="38" fill="#1e293b"/><rect x="28" y="48" width="24" height="42" rx="6" fill="' + c1 + '"/><circle cx="40" cy="38" r="10" fill="#f1c9a0"/><ellipse cx="40" cy="30" rx="23" ry="5" fill="#3b2a1a"/><rect x="29" y="14" width="22" height="16" rx="4" fill="#3b2a1a"/><g class="arm"><rect x="38" y="52" width="9" height="32" rx="4" fill="' + c2 + '"/><rect x="40" y="80" width="20" height="6" rx="2" fill="#94a3b8"/><circle class="mz" cx="64" cy="83" r="9" fill="#fde047"/></g></g></svg>';
+function duelPre() {
+  const m = $('#oMe'), f = $('#oFoe'), n = $('#oFoeN'), b = $('#oDban'), t = $('#oDms'); if (!m) return;
+  [m, f].forEach((x) => x.classList.remove('up', 'dead', 'fire')); b.textContent = ''; b.className = 'dban'; t.textContent = '';
+  n.textContent = FOES[Number(O.pick.duel)].n;
+}
+async function aDuel(st, tok) {
+  const m = $('#oMe'), f = $('#oFoe'), ban = $('#oDban'), ms = $('#oDms'); if (!m) return;
+  duelPre(); const say = (t, c) => { ban.textContent = t; ban.className = 'dban' + (c ? ' ' + c : ''); };
+  say('Prêts…'); tone(220, .12, 'square', .04); await wait(900); if (!alive(tok)) return;
+  say('Dos à dos…'); await wait(700 + Math.random() * 1400); if (!alive(tok)) return;
+  say('TIREZ !', 'go'); tone(880, .15, 'square', .08);
+  const K = 2.6, meFirst = st.me < st.foeMs, tw = Math.min(st.me, st.foeMs) * K, tl = Math.max(st.me, st.foeMs) * K, W = meFirst ? m : f, L = meFirst ? f : m;
+  await wait(tw); if (!alive(tok)) return; W.classList.add('up');
+  await wait(140); if (!alive(tok)) return;
+  W.classList.add('fire'); noise(.3, .22); tone(90, .3, 'sawtooth', .09, 0, -50); L.classList.add('dead');
+  if (tl - tw < 140) L.classList.add('up');
+  ms.textContent = 'Toi ' + st.me + ' ms · ' + FOES[st.foe].n + ' ' + st.foeMs + ' ms';
+  say(meFirst ? 'TU AS GAGNÉ !' : 'TROP LENT…', ''); await wait(1300);
+}
+// ---- ticket à gratter
+const PRZ = [1, 2, 3, 5, 10, 25, 100, 1000], SC = { id: 0, busy: false, cl: [], rq: [], cv: [], cnt: [], q: Promise.resolve(), fin: null, fresh: false };
+const scSym = (v) => (v === 7 ? '<i class="zj">Z</i><small>JACKPOT</small>' : '<b>x' + PRZ[v] + '</b>');
+function scFoil(c) {
+  const w = c.clientWidth, h = c.clientHeight, d = window.devicePixelRatio || 1; c.width = w * d; c.height = h * d;
+  const x = c.getContext('2d'); x.scale(d, d); const g = x.createLinearGradient(0, 0, w, h);
+  g.addColorStop(0, '#e5e7eb'); g.addColorStop(.35, '#9ca3af'); g.addColorStop(.6, '#f3f4f6'); g.addColorStop(1, '#6b7280'); x.fillStyle = g; x.fillRect(0, 0, w, h);
+  x.strokeStyle = 'rgba(255,255,255,.35)'; x.lineWidth = 3; for (let i = -h; i < w; i += 9) { x.beginPath(); x.moveTo(i, h); x.lineTo(i + h, 0); x.stroke(); }
+  x.fillStyle = 'rgba(88,28,135,.4)'; x.font = '900 ' + h * .6 + 'px Georgia,serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('Z', w / 2, h / 2 + 3);
+  for (let i = 0; i < 90; i++) { x.fillStyle = i % 2 ? 'rgba(255,255,255,.14)' : 'rgba(0,0,0,.12)'; x.fillRect(Math.random() * w, Math.random() * h, 2, 2); }
+}
+function scBuild() {
+  const g = $('#oScr'); g.textContent = ''; SC.cv = []; SC.cl = []; SC.rq = []; SC.cnt = []; SC.fin = null;
+  for (let i = 0; i < 6; i++) { const c = el('div', 'tkc'), u = el('div', 'tku'), cv = document.createElement('canvas'); cv.className = 'foil'; c.append(u, cv); g.append(c); SC.cv.push(cv); scFoil(cv); }
+}
+const scPut = (i, v) => { const c = SC.cv[i]; if (c && c.previousSibling) c.previousSibling.innerHTML = scSym(v); };
+function scPeek(i) {
+  SC.q = SC.q.then(async () => {
+    const d = await osend('omove', { move: 'peek', i }); if (!d) { SC.rq[i] = false; return; }
+    O.st = d.g; if (d.g.over) SC.fin = d.g; d.g.cells.forEach((v, k) => v != null && scPut(k, v));
+  });
+}
+function scPct(cv) {
+  const d = cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data; let t = 0, k = 0;
+  for (let p = 3; p < d.length; p += 148) { k++; if (d[p] < 40) t++; } return t / k;
+}
+function scDone(i, instant) {
+  if (SC.cl[i]) return; SC.cl[i] = true; const cv = SC.cv[i];
+  if (instant) cv.remove(); else { cv.classList.add('off'); setTimeout(() => cv.remove(), 450); tone(1200 + i * 60, .08, 'triangle', .05); SFX.chip(); }
+  if (SC.cl.filter(Boolean).length === 6 && SC.busy) scFinish();
+}
+async function scFinish() {
+  await SC.q; let s = SC.fin;
+  if (!s) { (O.st ? O.st.cells : []).forEach((v, k) => { if (v == null) scPeek(k); }); await SC.q; s = SC.fin; }
+  if (!s) return;
+  SC.busy = false; ofRelease(); scShow(s); ofDone(null, s); ofDock();
+}
+function scShow(s) {
+  const cells = $('#oScr').children; (s.hit || []).forEach((i) => cells[i] && cells[i].classList.add('hit'));
+  const net = Math.round((s.win - s.bet) * 100) / 100;
+  $('#oMsg').replaceChildren(el('span', s.win > 0 ? 'win' : 'lose', s.win > 0 ? 'GAGNÉ x' + s.mult + ' · +' + num(net) + ' ' + COIN : 'Perdu… retente ta chance'));
+  if (s.win > 0) { SFX.win(); confetti($('#oTk'), s.mult >= 100 ? 80 : 26, s.mult === 1000 ? ['#a855f7', '#fde047', '#fff'] : ['#fde047', '#fbbf24', '#e9d5ff']); }
+  if (s.mult === 1000) { [523, 659, 784, 1047, 1319].forEach((q, i) => tone(q, .3, 'triangle', .07, i * .11)); }
+  scStats(s);
+}
+function scStats(s) {
+  const st = $('#oStats'); if (!st) return; st.textContent = '';
+  const box = (l, v, gold) => { const d = el('div', 'stat' + (gold ? ' gold' : '')); d.append(el('small', '', l), el('b', '', v)); st.append(d); };
+  if (s) box('Mise', num(s.bet) + ' ' + COIN);
+  if (s && s.over && !SC.busy) box(s.win > 0 ? 'Gain' : 'Perdu', s.win > 0 ? num(s.win) + ' ' + COIN : '−' + num(s.bet) + ' ' + COIN, s.win > 0); else box('Gros lot', 'x1000', true);
+}
+function rScratch(s) {
+  if (!$('#oScr')) return;
+  if (!s) { if (SC.id !== -1) { SC.id = -1; SC.busy = false; scBuild(); } $('#oMsg').replaceChildren(el('span', '', 'Achète un ticket, puis gratte-le')); scStats(null); return; }
+  if (SC.id !== s.id) {
+    SC.id = s.id; scBuild(); SC.busy = SC.fresh || !s.over;
+    if (!SC.fresh) s.cells.forEach((v, i) => { if (v != null) { scPut(i, v); SC.rq[i] = true; scDone(i, true); } });
+    SC.fresh = false;
+    if (SC.busy) $('#oMsg').replaceChildren(el('span', '', 'Gratte les cases avec ta souris ou ton doigt'));
+    else scShow(s);
+  } else s.cells.forEach((v, i) => v != null && scPut(i, v));
+  if (SC.busy) scStats(s);
+}
+function scBind() {
+  const g = $('#oScr'); SC.id = 0; SC.busy = false; let down = false, px = 0, py = 0, snd = 0;
+  const flake = (x, y) => { const f = el('span', 'flk'), r = g.getBoundingClientRect(); f.style.cssText = 'left:' + (x - r.left) + 'px;top:' + (y - r.top) + 'px;--dx:' + (Math.random() * 44 - 22) + 'px'; g.append(f); setTimeout(() => f.remove(), 700); };
+  const draw = (x, y, fx, fy) => SC.cv.forEach((cv, i) => {
+    if (SC.cl[i]) return; const r = cv.getBoundingClientRect();
+    if (x < r.left - 16 || x > r.right + 16 || y < r.top - 16 || y > r.bottom + 16) return;
+    if (!SC.rq[i]) { SC.rq[i] = true; scPeek(i); }
+    const c = cv.getContext('2d'); c.globalCompositeOperation = 'destination-out'; c.strokeStyle = '#000'; c.lineWidth = 30; c.lineCap = c.lineJoin = 'round';
+    c.beginPath(); c.moveTo(fx - r.left, fy - r.top); c.lineTo(x - r.left, y - r.top); c.stroke();
+    if ((SC.cnt[i] = (SC.cnt[i] || 0) + 1) % 4 === 0 && scPct(cv) > .55) scDone(i);
+  });
+  g.onpointerdown = (e) => { if (!SC.busy) return; ac(); down = true; try { g.setPointerCapture(e.pointerId); } catch {} px = e.clientX; py = e.clientY; draw(px, py, px, py); };
+  g.onpointermove = (e) => {
+    if (!down || !SC.busy) return; draw(e.clientX, e.clientY, px, py); px = e.clientX; py = e.clientY;
+    const t = performance.now(); if (t - snd > 55) { snd = t; noise(.05, .03); flake(px, py); }
+  };
+  g.onpointerup = g.onpointercancel = () => { down = false; };
+}
+function scAuto() {
+  SC.cv.forEach((cv, i) => {
+    if (SC.cl[i]) return; if (!SC.rq[i]) { SC.rq[i] = true; scPeek(i); }
+    setTimeout(() => {
+      if (SC.cl[i]) return; const c = cv.getContext('2d'), w = cv.clientWidth, h = cv.clientHeight; let k = 0;
+      c.globalCompositeOperation = 'destination-out'; c.strokeStyle = '#000'; c.lineWidth = 34; c.lineCap = 'round';
+      const iv = setInterval(() => { const y = (k % 6) * h / 5, a = k % 2; c.beginPath(); c.moveTo(a ? w : 0, y); c.lineTo(a ? 0 : w, y); c.stroke(); noise(.06, .03); if (++k > 6) { clearInterval(iv); scDone(i); } }, 70);
+    }, i * 170);
+  });
+}
 // ============================================================= JEUX OFFLINE (solo, serveur : offline.js)
-const O = { game: null, st: null, bal: null, bet: '100', mines: 3, auto: '', hist: { fuse: [], mines: [], bj: [], coin: [], dice: [], horses: [], russian: [] }, timer: 0, pp: [], run: 0, anim: false, hold: false, pick: { coin: 'pile', dice: 'over', horses: '1', russian: '1' } };
-const OMAP = { 'off-bj': 'bj', 'off-fuse': 'fuse', 'off-mine': 'mines', 'off-coin': 'coin', 'off-dice': 'dice', 'off-horses': 'horses', 'off-russian': 'russian' };
-const OT = { bj: 'BLACKJACK SOLO', fuse: 'FUSÉ', mines: 'MINES', coin: 'PILE OU FACE', dice: 'DÉS', horses: 'COURSE DE CHEVAUX', russian: 'ROULETTE RUSSE' };
+const O = { game: null, st: null, bal: null, bet: '100', mines: 3, auto: '', hist: { fuse: [], mines: [], bj: [], coin: [], dice: [], horses: [], russian: [], slots: [], duel: [], scratch: [] }, timer: 0, pp: [], run: 0, anim: false, hold: false, pick: { coin: 'pile', dice: 'over', horses: '1', russian: '1', slots: '1', duel: '0' } };
+const OMAP = { 'off-bj': 'bj', 'off-fuse': 'fuse', 'off-mine': 'mines', 'off-coin': 'coin', 'off-dice': 'dice', 'off-horses': 'horses', 'off-russian': 'russian', 'off-slots': 'slots', 'off-duel': 'duel', 'off-scratch': 'scratch' };
+const OT = { bj: 'BLACKJACK SOLO', fuse: 'FUSÉ', mines: 'MINES', coin: 'PILE OU FACE', dice: 'DÉS', horses: 'COURSE DE CHEVAUX', russian: 'ROULETTE RUSSE', slots: 'SLOTS', duel: 'DUEL', scratch: 'TICKET À GRATTER' };
 const GEM = '<svg viewBox="0 0 24 24"><path d="M6 3h12l4 6-10 12L2 9z" fill="#bbf7d0" stroke="#fff" stroke-width="1.2" stroke-linejoin="round"/><path d="M2 9h20M9 3l3 6 3-6M12 9v12" fill="none" stroke="#16a34a" stroke-width="1"/></svg>';
 const BOMB = '<svg viewBox="0 0 24 24"><circle cx="11" cy="14" r="7.5" fill="#1c1c1c" stroke="#fca5a5" stroke-width="1.4"/><path d="M16 8l3-3M18 3v3M17 4h3" stroke="#fbbf24" stroke-width="1.6" stroke-linecap="round"/><circle cx="8.5" cy="11.5" r="1.8" fill="#fff" opacity=".5"/></svg>';
 async function osend(action, extra = {}) {
@@ -2152,7 +2367,7 @@ async function ofStart() {
 }
 // ---- structure du tapis (une fois par jeu)
 function ofBuild() {
-  const t = $('#ofTable'); t.textContent = ''; t.className = 'ftable of' + (O.game === 'fuse' || INST[O.game] ? ' fuse' : '');
+  const t = $('#ofTable'); t.textContent = ''; t.className = 'ftable of' + (O.game === 'fuse' || O.game === 'scratch' || INST[O.game] ? ' fuse' : '');
   const top = el('div', 'otop'), hist = el('div', 'ohist'); hist.id = 'oHist';
   top.append(el('span', 'dname', OT[O.game]), el('span', 'grow'), hist);
   const b = el('div', 'obody'); t.append(top, b);
@@ -2161,12 +2376,13 @@ function ofBuild() {
     b.innerHTML = '<div class="dname">CROUPIER</div><div class="cards" id="oDc"></div><div id="oDt"></div><div class="omsg" id="oMsg"></div><div class="dname">TOI</div><div class="cards" id="oPc"></div><div id="oPt"></div><div class="betspot" id="oBs"></div>';
   } else if (O.game === 'fuse') b.innerHTML = '<div class="fz"><canvas id="oCv"></canvas><div class="bigm" id="oMult">1.00x</div><div class="fst" id="oStat"></div></div>';
   else if (INST[O.game]) ofBuildInst(b);
+  else if (O.game === 'scratch') { b.innerHTML = '<div class="tk" id="oTk"><div class="tkh">TICKET <b>Z</b></div><div class="tkg" id="oScr"></div><div class="tkr">Trouve trois montants identiques pour les gagner</div></div><div class="omsg" id="oMsg"></div><div class="stats" id="oStats"></div>'; scBind(); }
   else b.innerHTML = '<div class="gems" id="oGems"></div><div class="stats" id="oStats"></div>';
 }
 function ofRender() {
   const s = O.st, h = $('#oHist'); if (!h) return; h.textContent = '';
   O.hist[O.game].forEach((v) => h.append(O.game === 'fuse' ? el('span', 'hc ' + (v >= 2 ? 'g' : 'r'), v.toFixed(2) + 'x') : el('span', 'hc ' + (v > 0 ? 'g' : v < 0 ? 'r' : 'z0'), (v > 0 ? '+' : '') + num(v))));
-  if (O.game === 'bj') rBj(s); else if (O.game === 'mines') rMines(s); else if (INST[O.game]) rInst(s); else ofFuseTick();
+  if (O.game === 'bj') rBj(s); else if (O.game === 'mines') rMines(s); else if (INST[O.game]) rInst(s); else if (O.game === 'scratch') rScratch(s); else ofFuseTick();
   ofDock();
 }
 // ---- blackjack
@@ -2313,6 +2529,7 @@ function ofSet(n) { n = Math.max(0, Math.floor(n * 100) / 100); O.bet = n ? Stri
 function ofDock() {
   const d = $('#ofDock'); d.textContent = ''; const s = O.st, live = !!(s && !s.over), row = (...c) => { const r = el('div', 'row'); r.append(...c); d.append(r); return r; };
   const act = (cls, label, fn, on = true) => { const b = el('button', 'btn big ' + cls, label); b.disabled = !on; b.onclick = fn; return b; };
+  if (O.game === 'scratch' && SC.busy) { row(act('go', 'Tout gratter', scAuto)); d.append(el('div', 'hint', 'Gratte les cases avec la souris ou le doigt, ou révèle tout d’un coup.')); return; }
   if (O.anim) { row(act('go', 'En cours…', () => {}, false)); return; }
   if (live) {
     if (O.game === 'mines') { row(act('go', 'Encaisser ' + num(s.cash) + ' ' + COIN, () => ofMove('cash'), s.picks.length)); d.append(el('div', 'hint', s.picks.length ? 'Chaque case sûre augmente le gain : encaisse avant de toucher une mine.' : 'Révèle au moins une case pour pouvoir encaisser.')); }
@@ -2334,23 +2551,26 @@ function ofDock() {
     row(el('span', 'note', 'Encaissement auto (facultatif)'), a);
   }
   if (INST[O.game]) {
-    const r = row(); CH[O.game].forEach(([v, l, m, sub]) => { const b = el('button', 'cbtn' + (O.pick[O.game] === v ? ' on' : '')); b.append(el('b', '', l), el('small', '', 'x' + m + (sub ? ' · ' + sub : ''))); b.onclick = () => { SFX.chip(); O.pick[O.game] = v; ofSel(); }; r.append(b); });
+    const r = row(); if (O.game !== 'slots') CH[O.game].forEach(([v, l, m, sub]) => { const b = el('button', 'cbtn' + (O.pick[O.game] === v ? ' on' : '')); b.append(el('b', '', l), el('small', '', 'x' + m + (sub ? ' · ' + sub : ''))); b.onclick = () => { SFX.chip(); O.pick[O.game] = v; ofSel(); }; r.append(b); });
     const gb = act('go', 'Lancer', ofStart); gb.id = 'oGo'; row(gb); ofGoLabel(); return;
   }
-  row(act('go', s ? 'Rejouer' : 'Jouer', ofStart));
+  row(act('go', O.game === 'scratch' ? 'Acheter un ticket' : s ? 'Rejouer' : 'Jouer', ofStart));
 }
 // ---- jeux « un coup » : pile ou face, dés, chevaux, roulette russe (tirage côté serveur, animation côté site)
-const INST = { coin: 1, dice: 1, horses: 1, russian: 1 };
+const INST = { coin: 1, dice: 1, horses: 1, russian: 1, slots: 1, duel: 1 };
+const FOES = [{ n: 'Recrue', p: 60, m: 1.6 }, { n: 'Pistolero', p: 45, m: 2.1 }, { n: 'Légende', p: 25, m: 3.8 }, { n: 'Fantôme', p: 10, m: 9.6 }];
 const HM = [2.4, 3.8, 5.3, 8.6, 15.8], HP = [40, 25, 18, 11, 6], HCOL = ['#ef4444', '#3b82f6', '#22c55e', '#f59e0b', '#a855f7'];
 const rusM = (k) => Math.floor(0.96 * 6 / (6 - k) * 100) / 100;
 const CH = {
   coin: [['pile', 'Pile', 1.95], ['face', 'Face', 1.95]],
   dice: [['under', 'Moins de 7', 2.3], ['seven', 'Exactement 7', 5.8], ['over', 'Plus de 7', 2.3]],
   horses: HM.map((m, i) => [String(i + 1), 'Cheval ' + (i + 1), m, HP[i] + ' %']),
+  slots: [['1', '5 lignes', 0]],
+  duel: FOES.map((f, i) => [String(i), f.n, f.m, f.p + ' % de réussite']),
   russian: [1, 2, 3, 4, 5].map((k) => [String(k), k + ' balle' + (k > 1 ? 's' : ''), rusM(k), Math.round(k / 6 * 100) + ' % de risque']),
 };
-const IDLE = { coin: 'Choisis pile ou face, puis lance la pièce', dice: 'Choisis ton pari, puis lance les dés', horses: 'Clique sur ton cheval, puis lance la course', russian: 'Choisis le nombre de balles, puis tire' };
-const BUSY = { coin: 'La pièce tourne…', dice: 'Les dés roulent…', horses: 'La course est lancée…', russian: 'Le barillet tourne…' };
+const IDLE = { coin: 'Choisis pile ou face, puis lance la pièce', dice: 'Choisis ton pari, puis lance les dés', horses: 'Clique sur ton cheval, puis lance la course', russian: 'Choisis le nombre de balles, puis tire', slots: 'Lance les rouleaux : trois Z violets = jackpot', duel: 'Choisis ton adversaire, puis dégaine' };
+const BUSY = { coin: 'La pièce tourne…', dice: 'Les dés roulent…', horses: 'La course est lancée…', russian: 'Le barillet tourne…', slots: 'Les rouleaux tournent…', duel: 'Le duel commence…' };
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 const alive = (tok) => O.run === tok;
 const flr2 = (x) => Math.floor(x * 100 + 1e-9) / 100;
@@ -2358,12 +2578,13 @@ function ofRelease() { O.anim = false; if (O.hold) { O.hold = false; if (O.bal !
 function ofGoLabel() {
   const b = $('#oGo'); if (!b || !INST[O.game]) return;
   const c = CH[O.game].find((x) => x[0] === O.pick[O.game]), bet = parseAmt(O.bet) || 0;
-  b.textContent = (O.st ? 'Relancer' : 'Lancer') + (bet && c ? ' · gain possible ' + num(flr2(bet * c[2])) + ' ' + COIN : '');
+  b.textContent = (O.st ? 'Relancer' : 'Lancer') + (bet && c && c[2] ? ' · gain possible ' + num(flr2(bet * c[2])) + ' ' + COIN : '');
 }
 function ofSel() {
   ofDock();
   if (O.game === 'horses') document.querySelectorAll('.lane').forEach((l, i) => l.classList.toggle('sel', String(i + 1) === O.pick.horses));
   if (O.game === 'russian' && !O.anim) rusPre();
+  if (O.game === 'duel' && !O.anim) duelPre();
   ofStatsInst();
 }
 function ofStatsInst() {
@@ -2371,6 +2592,7 @@ function ofStatsInst() {
   const box = (l, v, gold) => { const d = el('div', 'stat' + (gold ? ' gold' : '')); d.append(el('small', '', l), el('b', '', v)); st.append(d); };
   const c = CH[O.game].find((x) => x[0] === O.pick[O.game]);
   if (s && s.over) { box('Mise', num(s.bet) + ' ' + COIN); box('Multiplicateur', (s.mult || 0) + 'x'); box(s.win > 0 ? 'Gain' : 'Perdu', s.win > 0 ? num(s.win) + ' ' + COIN : '−' + num(s.bet) + ' ' + COIN, s.win > 0); }
+  else if (O.game === 'slots') { box('Lignes', '5'); box('Jackpot', 'x' + JP, true); }
   else if (c) { box('Ton choix', c[1]); box('Multiplicateur', 'x' + c[2], true); }
 }
 function rInst(s) {
@@ -2379,14 +2601,14 @@ function rInst(s) {
   else if (!s) msg.replaceChildren(el('span', '', IDLE[O.game]));
   else {
     const net = Math.round((s.win - s.bet) * 100) / 100;
-    const head = s.type === 'coin' ? (s.side === 'pile' ? 'PILE' : 'FACE') : s.type === 'dice' ? s.a + ' + ' + s.b + ' = ' + s.sum : s.type === 'horses' ? 'Cheval n°' + (s.winner + 1) + ' vainqueur' : s.dead ? 'BANG !' : 'Clic… tu survis';
+    const head = s.type === 'slots' ? (s.mult ? 'x' + s.mult : 'Pas de ligne') : s.type === 'duel' ? (s.win > 0 ? 'Tu dégaines le premier !' : 'Trop lent…') : s.type === 'coin' ? (s.side === 'pile' ? 'PILE' : 'FACE') : s.type === 'dice' ? s.a + ' + ' + s.b + ' = ' + s.sum : s.type === 'horses' ? 'Cheval n°' + (s.winner + 1) + ' vainqueur' : s.dead ? 'BANG !' : 'Clic… tu survis';
     msg.replaceChildren(el('span', s.win > 0 ? 'win' : 'lose', head + ' · ' + (net > 0 ? '+' : '') + num(net) + ' ' + COIN));
   }
   ofStatsInst();
 }
 async function ofInstant(st) {
   const tok = ++O.run; O.anim = true; O.st = null; ofRender();
-  try { await ({ coin: aCoin, dice: aDice, horses: aHorses, russian: aRussian })[st.type](st, tok); } catch (e) { console.error(e); }
+  try { await ({ coin: aCoin, dice: aDice, horses: aHorses, russian: aRussian, slots: aSlots, duel: aDuel })[st.type](st, tok); } catch (e) { console.error(e); }
   if (!alive(tok)) return;
   ofRelease(); O.st = st; ofDone(null, st); ofRender();
 }
@@ -2419,6 +2641,8 @@ function ofBuildInst(b) {
       l.innerHTML = '<span class="ln">' + (i + 1) + '</span><div class="ls"><span class="horse"><svg viewBox="0 0 40 24" width="34" height="22"><path d="M2 12 15 2v6h23v8H15v6z" fill="currentColor"/></svg></span></div><span class="lo">x' + m + '<small>' + HP[i] + ' %</small></span>';
       l.onclick = () => { if (O.anim) return; SFX.chip(); O.pick.horses = String(i + 1); ofSel(); }; tr.append(l);
     });
+  } else if (g === 'slots') { b.innerHTML = '<div class="sc"><div class="slm" id="oSlm"><div class="slj">JACKPOT <b>x' + JP + '</b></div><div class="slr" id="oSlr"></div><div class="jpf" id="oJpf"></div></div></div>' + foot; slInit();
+  } else if (g === 'duel') { b.innerHTML = '<div class="sc"><div class="arena"><div class="sun"></div><div class="dnm" id="oFoeN"></div><div class="dban" id="oDban"></div><div class="fgt fme" id="oMe">' + FIGHTER('#1d4ed8', '#1e40af') + '</div><div class="fgt ffoe" id="oFoe">' + FIGHTER('#991b1b', '#7f1d1d') + '</div><div class="gnd"></div><div class="dms" id="oDms"></div></div></div>' + foot; duelPre();
   } else { b.innerHTML = '<div class="sc"><div class="rus"><div class="hmr"></div>' + cylSVG() + '</div><div class="flash" id="oFlash"></div></div>' + foot; rusPre(); }
 }
 // ---- animations (le résultat vient du serveur : l'animation ne fait que le révéler)
