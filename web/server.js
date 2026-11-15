@@ -143,6 +143,7 @@ function init(deps) {
   // ---------- jeux offline solo (mines, fusé, blackjack, pile ou face, dés, chevaux, roulette russe) ----------
   const offline = createOffline({ getBalance: deps.getBalance, debit: deps.debit, credit: deps.credit, onRoundEnd: (guildId, r) => roundEnd(guildId, r) }, pending);
 
+  const avatarMap = new Map(); // uid -> avatar (affiché dans les classements)
   // ---------- statistiques / classement (un fichier par jeu : blackjack, poker) ----------
   function makeStats(file) {
     const stats = readJson(file, {});
@@ -151,6 +152,7 @@ function init(deps) {
       record(uid, name, net, outcome) {
         const s = stats[uid] || { n: name, rounds: 0, wins: 0, bj: 0, net: 0, best: 0 };
         s.n = name;
+        s.a = avatarMap.get(uid) || s.a || '';
         s.rounds++;
         if (outcome === 'win' || outcome === 'bj') s.wins++;
         if (outcome === 'bj') s.bj++;
@@ -162,7 +164,7 @@ function init(deps) {
       },
       top() {
         return Object.entries(stats)
-          .map(([uid, s]) => ({ uid, name: s.n, rounds: s.rounds, wins: s.wins, bj: s.bj, net: s.net, best: s.best }))
+          .map(([uid, s]) => ({ uid, name: s.n, avatar: s.a || '', rounds: s.rounds, wins: s.wins, bj: s.bj, net: s.net, best: s.best }))
           .sort((a, b) => b.net - a.net)
           .slice(0, 10);
       },
@@ -220,7 +222,8 @@ function init(deps) {
   const isFull = (r) => r.seats.every(Boolean);
   /** garde toujours au moins une table avec une place libre, et supprime les tables vides en trop */
   function syncOne(entry, map, make, kind) {
-    const empties = [...map.entries()].filter(([, r]) => r.isEmpty()).map(([t]) => t).sort((x, y) => x - y);
+    const nowMs = Date.now();
+    const empties = [...map.entries()].filter(([, r]) => r.isEmpty() && !(r.keepUntil > nowMs)).map(([t]) => t).sort((x, y) => x - y); // une table créée à la main reste 15 min même vide
     const spare = [...map.values()].some((r) => !r.isEmpty() && !isFull(r)); // une table partiellement remplie accueille déjà les nouveaux
     for (const t of spare ? empties : empties.slice(1)) {
       const r = map.get(t);
@@ -252,7 +255,7 @@ function init(deps) {
   function roomOf(guildId) {
     let r = rooms.get(guildId);
     if (r) return r;
-    const entry = { guildId, clients: new Set(), conns: new Map(), roulette: null, chat: new Map() };
+    const entry = { guildId, clients: new Set(), conns: new Map(), roulette: null, chat: new Map(), seen: new Map() };
     const broadcast = (msg) => {
       for (const res of entry.clients) {
         try {
@@ -365,6 +368,7 @@ function init(deps) {
     }
     const user = readToken(d.t);
     if (!user) return json(res, 401, { ok: false, error: 'Lien expiré : reclique sur « Jouer » dans Discord.' });
+    if (user.avatar) avatarMap.set(user.uid, user.avatar);
     const now = Date.now();
     if (now - (lastAct.get(user.uid) || 0) < (/^[ro]/.test(String(d.action)) ? 50 : 120)) return json(res, 429, { ok: false, error: 'Doucement 🙂' });
     lastAct.set(user.uid, now);
@@ -378,9 +382,51 @@ function init(deps) {
     const poker = needPk ? entry.pokers.get(tid) : null;
     if ((needBj && !room) || (needPk && !poker)) return json(res, 200, { ok: false, error: 'Cette table n’existe plus.' });
     let walBal; // solde du portefeuille renvoyé après une action de poker
+    let created; // numéro de la table créée par un joueur (action tnew)
     try {
       if (String(d.action).startsWith('o')) return json(res, 200, { ok: true, ...(await offline.handle(user, d)) });
       switch (d.action) {
+        // ---- envoi de pièces à un autre joueur du serveur
+        case 'gift': {
+          const to = String(d.to || '');
+          const amt = Math.floor(Number(d.amount) * 100 + 1e-6) / 100;
+          if (!/^\d{5,25}$/.test(to)) throw new Error('Choisis un joueur.');
+          if (to === user.uid) throw new Error('Tu ne peux pas t’envoyer de pièces à toi-même.');
+          if (!Number.isFinite(amt) || amt < 1) throw new Error('Montant minimum : 1.');
+          if (deps.isMember && !(await deps.isMember(user.guildId, to))) throw new Error('Ce joueur n’est pas sur le serveur.');
+          const nb = await deps.debit(user.uid, amt);
+          if (nb === null) throw new Error('Solde insuffisant.');
+          try {
+            await deps.credit(to, amt);
+          } catch (e) {
+            await deps.credit(user.uid, amt).catch(() => {}); // échec : on rembourse l’expéditeur
+            throw new Error('Envoi impossible, réessaie.');
+          }
+          walBal = nb;
+          const rb = await deps.getBalance(to).catch(() => null);
+          for (const c of entry.clients) {
+            if (c.uid !== to) continue;
+            try {
+              c.write(`event: gift\ndata: ${JSON.stringify({ from: user.name, amount: amt })}\n\n`);
+              if (rb !== null) c.write(`event: bal\ndata: ${JSON.stringify({ bal: rb })}\n\n`);
+            } catch { /* fermée */ }
+          }
+          break;
+        }
+        // ---- créer une table (même si les autres ne sont pas remplies)
+        case 'tnew': {
+          const kind = d.game === 'poker' ? 'poker' : 'bj';
+          const map = kind === 'poker' ? entry.pokers : entry.bjs;
+          if (map.size >= MAX_TABLES) throw new Error(`Maximum ${MAX_TABLES} tables.`);
+          let nt = 1;
+          while (map.has(nt)) nt++;
+          const r = (kind === 'poker' ? makePoker : makeBj)(entry, nt);
+          r.keepUntil = Date.now() + 15 * 60 * 1000;
+          map.set(nt, r);
+          r.emit();
+          created = nt;
+          break;
+        }
         // ---- chat en direct
         case 'chatsend': {
           const chatRoom = String(d.room);
@@ -505,7 +551,7 @@ function init(deps) {
           return json(res, 400, { ok: false, error: 'Action inconnue.' });
       }
       entry.syncTables();
-      return json(res, 200, { ok: true, rbal: walBal ?? roulette.players.get(user.uid)?.bal });
+      return json(res, 200, { ok: true, tid: created, rbal: walBal ?? roulette.players.get(user.uid)?.bal });
     } catch (e) {
       return json(res, 200, { ok: false, error: String(e?.message || e).slice(0, 160), rbal: walBal ?? roulette.players.get(user.uid)?.bal });
     }
@@ -527,6 +573,9 @@ function init(deps) {
     });
     res.write(`retry: 2000\nevent: hello\ndata: ${JSON.stringify({ uid: user.uid, name: user.name, avatar: user.avatar, seats: SEATS, coin: deps.coin || '🪙', roulette: ROULETTE_INFO, poker: POKER_INFO })}\n\n`);
     res.uid = user.uid; // sert au snapshot personnalisé du poker
+    if (user.avatar) avatarMap.set(user.uid, user.avatar);
+    entry.seen.set(user.uid, { uid: user.uid, name: user.name, avatar: user.avatar });
+    if (entry.seen.size > 300) entry.seen.delete(entry.seen.keys().next().value);
     entry.clients.add(res);
     entry.conns.set(user.uid, (entry.conns.get(user.uid) || 0) + 1);
     for (const [t, r] of entry.bjs) {
@@ -577,6 +626,16 @@ function init(deps) {
       if (req.method === 'GET' && url.pathname === '/api/stream') return handleStream(req, res, url);
       if (req.method === 'GET' && url.pathname === '/api/top') return json(res, 200, { top: (url.searchParams.get('g') === 'poker' ? pokerStats : statsApi).top() });
       if (req.method === 'GET' && url.pathname === '/api/boards') return json(res, 200, await Promise.resolve(deps.getBoards ? deps.getBoards() : null).catch(() => null) || { rich: [], alltime: [] });
+      if (req.method === 'GET' && url.pathname === '/api/players') { // recherche d'un joueur (menu « Envoyer des pièces »)
+        const u = readToken(url.searchParams.get('t'));
+        if (!u) return json(res, 401, { players: [] });
+        const q = String(url.searchParams.get('q') || '').trim().slice(0, 32).toLowerCase();
+        const seen = [...roomOf(u.guildId).seen.values()].filter((p) => !q || p.name.toLowerCase().includes(q));
+        const found = q && deps.searchMembers ? await Promise.resolve(deps.searchMembers(u.guildId, q)).catch(() => []) : [];
+        const out = new Map();
+        for (const p of [...found, ...seen]) if (p && p.uid !== u.uid && !out.has(p.uid)) out.set(p.uid, { uid: String(p.uid), name: String(p.name), avatar: /^https:\/\/(cdn|media)\.discordapp\.(com|net)\//.test(p.avatar || '') ? p.avatar : '' });
+        return json(res, 200, { players: [...out.values()].slice(0, 8) });
+      }
       if (req.method === 'POST' && url.pathname === '/api/act') return await handleAct(req, res);
       res.writeHead(404, SEC);
       res.end('Not found');

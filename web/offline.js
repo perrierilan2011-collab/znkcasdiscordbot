@@ -19,6 +19,7 @@ const LEAD_MS = 900; // fusé : délai avant décollage
 const MAX_CRASH = 10000;
 const TYPES = { mines: 'mines', fuse: 'fuse', bj: 'bj', coin: 'coin', dice: 'dice', horses: 'horses', russian: 'russian' };
 const INSTANT = new Set(['coin', 'dice', 'horses', 'russian']); // jeux « un coup » : résolus d'un coup côté serveur, animés côté site
+const ANIM_MS = { coin: 3300, dice: 3300, horses: 10500, russian: 6800 }; // durée des animations côté site : l'annonce de victoire attend la fin
 const COIN_MULT = 1.95;
 const DICE_MULT = { under: 2.3, over: 2.3, seven: 5.8 };
 const HORSES = [{ p: 0.4, mult: 2.4 }, { p: 0.25, mult: 3.8 }, { p: 0.18, mult: 5.3 }, { p: 0.11, mult: 8.6 }, { p: 0.06, mult: 15.8 }];
@@ -85,9 +86,13 @@ function create(deps, pending) {
       const detail = g.type === 'mines' ? `${g.picks.length} case(s) · ${g.m} mine(s)` : g.type === 'fuse' ? `encaissé à ${g.at}x`
         : g.type === 'coin' ? NAMES[g.side] : g.type === 'dice' ? `${g.a}+${g.b}=${g.sum} (${NAMES[g.choice]})`
         : g.type === 'horses' ? `cheval n°${g.winner + 1}` : g.type === 'russian' ? `${g.k} balle${g.k > 1 ? 's' : ''}, survécu` : g.outcome === 'bj' ? 'BLACKJACK' : '';
-      try {
-        deps.onRoundEnd(u.guildId, { game: g.type === 'bj' ? 'bj-solo' : g.type, players: [{ uid: u.uid, name: u.name, bet: stake, win: g.win, net, mult: floor2(g.win / stake), detail }] });
-      } catch (e) { console.error('[offline] recap', e?.message || e); }
+      const announce = () => {
+        try {
+          deps.onRoundEnd(u.guildId, { game: g.type === 'bj' ? 'bj-solo' : g.type, players: [{ uid: u.uid, name: u.name, bet: stake, win: g.win, net, mult: floor2(g.win / stake), detail }] });
+        } catch (e) { console.error('[offline] recap', e?.message || e); }
+      };
+      if (INSTANT.has(g.type)) setTimeout(announce, ANIM_MS[g.type] || 3000); // jeu « un coup » : le résultat est connu tout de suite, mais on n'annonce la victoire qu'après l'animation
+      else announce();
     }
   }
 
