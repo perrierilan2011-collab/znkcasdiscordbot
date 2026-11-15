@@ -2146,7 +2146,7 @@ function rkRenderElo(d) {
     const row = el('div', 'lbrow rke' + (r.pos <= 3 ? ' r' + r.pos : '') + (me && r.uid === me.uid ? ' me' : ''));
     const av = el('span', 'pav'); setAvatar(av, r.avatar, r.name);
     const b = el('span', 'rkb'); b.append(rkLogoEl(L[r.rank], 26), el('span', '', L[r.rank].name));
-    const v = el('span', 'lbval', String(r.elo) + (r.prov ? ' ?' : '')); v.append(el('small', '', r.games + ' manche' + (r.games > 1 ? 's' : '')));
+    const v = el('span', 'lbval', String(r.elo) + (r.prov ? ' RR' : '')); v.append(el('small', '', r.games + ' manche' + (r.games > 1 ? 's' : '')));
     row.append(el('span', 'lbrk', String(r.pos)), av, el('span', 'lbname', r.name), b, v);
     return row;
   };
@@ -2154,7 +2154,7 @@ function rkRenderElo(d) {
   const rows = d.elo.map(mk);
   if (d.meRow) { rows.push(el('div', 'rksep', '···'), mk(d.meRow)); }
   else if (!d.me.games) rows.push(el('div', 'lbnone', 'Tu n’es pas encore classé : joue une manche à plusieurs pour obtenir un RR.'));
-  const note = el('div', 'lbnone', 'Un « ? » indique un RR provisoire (moins de ' + d.provisional + ' manches classées).'); note.style.padding = '10px';
+  const note = el('div', 'lbnone', 'Un « RR » indique un RR provisoire (moins de ' + d.provisional + ' manches classées).'); note.style.padding = '10px';
   box.replaceChildren(...rows, note);
 }
 function rkRenderLadder(d) {
