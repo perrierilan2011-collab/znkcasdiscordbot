@@ -459,6 +459,7 @@ class Room {
     const dInfo = handInfo(this.dealer.cards);
     const dBust = dInfo.total > 21;
     const dBJ = this.dealer.cards.length === 2 && dInfo.total === 21;
+    const recapPlayers = [];
     for (const p of this.seats) {
       if (!p || !p.hands.length) continue;
       let payout = 0;
@@ -505,6 +506,7 @@ class Room {
       } catch {
         /* stats facultatives */
       }
+      recapPlayers.push({ uid: p.uid, name: p.name, bet: floor2(p.hands.reduce((x, h) => x + h.bet, 0)), net, outcome, hands: p.hands.map((h) => ({ cards: h.cards.map((c) => c.r + c.s), total: handInfo(h.cards).total, result: h.result })) });
       if (net > 0) this.say(`🏆 ${p.name} gagne ${net}`);
       else if (net < 0) this.say(`💸 ${p.name} perd ${-net}`);
       else this.say(`🤝 ${p.name} : égalité`);
@@ -512,6 +514,14 @@ class Room {
     this.phase = 'result';
     this.setTimer(RESULT_MS, () => this.newRound());
     this.emit();
+    // récap envoyé dans le salon des victoires (jamais bloquant)
+    try {
+      if (recapPlayers.length && this.deps.onRoundEnd) {
+        this.deps.onRoundEnd({ game: 'blackjack', round: this.round, dealer: { cards: this.dealer.cards.map((c) => c.r + c.s), total: dInfo.total, bust: dBust, bj: dBJ }, players: recapPlayers });
+      }
+    } catch (e) {
+      console.error('[bj] recap', e?.message || e);
+    }
   }
 
   async newRound() {
