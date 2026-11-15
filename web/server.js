@@ -143,6 +143,17 @@ function init(deps) {
   // ---------- jeux offline solo (mines, fusé, blackjack, pile ou face, dés, chevaux, roulette russe) ----------
   const offline = createOffline({ getBalance: deps.getBalance, debit: deps.debit, credit: deps.credit, onRoundEnd: (guildId, r) => roundEnd(guildId, r) }, pending);
 
+  // ---------- boîte de réception (notifications reçues : envoi de pièces…), gardée même hors ligne ----------
+  const INBOX_FILE = path.join(DATA_DIR, 'inbox.json');
+  const inbox = readJson(INBOX_FILE, {});
+  let inboxTimer = null;
+  function pushNotif(uid, n) {
+    const list = inbox[uid] || (inbox[uid] = []);
+    list.unshift(n);
+    if (list.length > 30) list.length = 30;
+    clearTimeout(inboxTimer);
+    inboxTimer = setTimeout(() => saveJson(INBOX_FILE, inbox), 1500);
+  }
   const avatarMap = new Map(); // uid -> avatar (affiché dans les classements)
   // ---------- statistiques / classement (un fichier par jeu : blackjack, poker) ----------
   function makeStats(file) {
@@ -404,10 +415,12 @@ function init(deps) {
           }
           walBal = nb;
           const rb = await deps.getBalance(to).catch(() => null);
+          const notif = { id: crypto.randomBytes(6).toString('hex'), t: Date.now(), type: 'gift', from: user.name, amount: amt };
+          pushNotif(to, notif);
           for (const c of entry.clients) {
             if (c.uid !== to) continue;
             try {
-              c.write(`event: gift\ndata: ${JSON.stringify({ from: user.name, amount: amt })}\n\n`);
+              c.write(`event: notif\ndata: ${JSON.stringify(notif)}\n\n`);
               if (rb !== null) c.write(`event: bal\ndata: ${JSON.stringify({ bal: rb })}\n\n`);
             } catch { /* fermée */ }
           }
@@ -590,6 +603,7 @@ function init(deps) {
     entry.roulette.setPresence(user.uid, true);
     res.write(`event: roulette\ndata: ${JSON.stringify(entry.roulette.snapshot())}\n\n`);
     res.write(`event: chathist\ndata: ${JSON.stringify(Object.fromEntries(entry.chat))}\n\n`);
+    res.write(`event: inbox\ndata: ${JSON.stringify(inbox[user.uid] || [])}\n\n`);
     const hb = setInterval(() => {
       try {
         res.write(': ping\n\n');
