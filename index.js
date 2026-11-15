@@ -6664,7 +6664,11 @@ function trackAlltime(guildId, channelId, messageId) {
   alltimeBoardMessages.set(guildId, { channelId, messageId });
   saveAlltimeMsgs();
 }
-// Retrouve (ou reposte) le message du classement all-time de chaque serveur
+// Retrouve le message du classement all-time de chaque serveur après un redéploiement (le fichier data/ est perdu).
+// NE REPOSTE JAMAIS : si le message est introuvable, on ne fait rien (le bouton admin « Salon all-time » en recrée un).
+const isAlltimeBoardMsg = (m) =>
+  m.author?.id === client.user.id &&
+  (/^Record/.test(m.embeds?.[0]?.footer?.text || '') || /board-alltime-/.test(m.embeds?.[0]?.image?.url || '') || m.attachments?.some?.((a) => /^board-alltime-/.test(a.name || '')));
 async function ensureAlltimeMessages() {
   for (const guild of client.guilds.cache.values()) {
     if (alltimeBoardMessages.has(guild.id)) continue;
@@ -6672,17 +6676,15 @@ async function ensureAlltimeMessages() {
     if (!chId) continue;
     try {
       const ch = await client.channels.fetch(chId).catch(() => null);
-      if (!ch) continue;
-      const recent = await ch.messages.fetch({ limit: 25 }).catch(() => null);
-      const mine = recent?.find(
-        (m) => m.author.id === client.user.id && /^Record/.test(m.embeds?.[0]?.footer?.text || '')
-      );
-      if (mine) trackAlltime(guild.id, ch.id, mine.id);
-      else {
-        const sent = await ch.send(await buildBoardPayload('alltime'));
-        await sent.pin().catch(() => {});
-        trackAlltime(guild.id, ch.id, sent.id);
+      if (!ch || !ch.messages) continue;
+      const pinned = await ch.messages.fetchPinned().catch(() => null);
+      let mine = pinned?.find(isAlltimeBoardMsg);
+      if (!mine) {
+        const recent = await ch.messages.fetch({ limit: 100 }).catch(() => null);
+        mine = recent?.find(isAlltimeBoardMsg);
       }
+      if (mine) trackAlltime(guild.id, ch.id, mine.id);
+      else console.warn(`[alltime] message du classement introuvable dans <#${chId}> : rien n'est reposté (utilise Admin → Salon all-time pour le recréer).`);
     } catch (e) {
       console.error('[alltime] restauration', e?.message || e);
     }
@@ -6711,9 +6713,49 @@ try {
     credit,
     coin: /^<a?:\w+:\d+>$/.test(COIN_PLAIN) ? '🪙' : COIN_PLAIN, // un emoji perso Discord ne s'affiche pas sur le web
     secretSeed: DISCORD_TOKEN,
+    onRoundEnd: (guildId, recap) => postOnlineRecap(guildId, recap).catch((e) => console.error('[online recap]', e?.message || e)),
   });
 } catch (e) {
   console.error('[web] blackjack en ligne non démarré (dossier web/ manquant ?) :', e?.message || e);
+}
+
+// Récap d'une manche en ligne (blackjack / roulette) envoyé dans le salon des victoires
+const SPOT_FR = { red: 'Rouge', black: 'Noir', even: 'Pair', odd: 'Impair', low: '1-18', high: '19-36', d1: '1re 12', d2: '2e 12', d3: '3e 12', c1: 'Col. 1', c2: 'Col. 2', c3: 'Col. 3' };
+const spotFr = (k) => SPOT_FR[k] || `N°${String(k).slice(1)}`;
+async function postOnlineRecap(guildId, r) {
+  const ch = await findWinsChannel(guildId);
+  if (!ch) return;
+  const MAXL = 15;
+  const icon = (net) => (net > 0 ? '🟢' : net < 0 ? '🔴' : '⚪');
+  let embed;
+  if (r.game === 'blackjack') {
+    const lines = r.players.slice(0, MAXL).map((p) => {
+      const tag = p.outcome === 'bj' ? ' · BLACKJACK' : '';
+      return `${icon(p.net)} **${escapeMarkdown(p.name)}** · mise ${fmt(p.bet)} · **${signed(p.net)}**${tag}`;
+    });
+    if (r.players.length > MAXL) lines.push(`… et ${r.players.length - MAXL} autre(s)`);
+    const d = r.dealer;
+    const dTxt = `${d.cards.join(' ')} → ${d.bj ? 'Blackjack' : d.bust ? `bust (${d.total})` : d.total}`;
+    const net = round2(r.players.reduce((s, p) => s + p.net, 0));
+    embed = new EmbedBuilder()
+      .setColor(COLORS.violet)
+      .setTitle('🃏 Blackjack en ligne — récap de la manche')
+      .setDescription(`🎩 Croupier : **${dTxt}**\n${LINE}\n${lines.join('\n')}\n${LINE}\nBilan des joueurs : **${signed(net)}**`);
+  } else if (r.game === 'roulette') {
+    const lines = r.players.slice(0, MAXL).map((p) => {
+      const bets = Object.entries(p.bets).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([k, v]) => `${spotFr(k)} ${num(v)}`).join(', ');
+      return `${icon(p.net)} **${escapeMarkdown(p.name)}** · ${bets} · **${signed(p.net)}**`;
+    });
+    if (r.players.length > MAXL) lines.push(`… et ${r.players.length - MAXL} autre(s)`);
+    const dot = r.color === 'rouge' ? '🔴' : r.color === 'noir' ? '⚫' : '🟢';
+    const net = round2(r.players.reduce((s, p) => s + p.net, 0));
+    embed = new EmbedBuilder()
+      .setColor(COLORS.violet)
+      .setTitle('🎰 Roulette en ligne — récap du tour')
+      .setDescription(`${dot} Numéro sorti : **${r.n}** (${r.color})\n${LINE}\n${lines.join('\n')}\n${LINE}\nBilan des joueurs : **${signed(net)}**`);
+  } else return;
+  embed.setFooter({ text: 'ZNK Casino  •  Parties en ligne' }).setTimestamp();
+  await ch.send({ embeds: [embed], allowedMentions: { parse: [] } });
 }
 
 function buildPokerPanelPayload() {
