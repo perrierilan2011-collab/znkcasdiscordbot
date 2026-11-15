@@ -381,7 +381,7 @@ function init(deps) {
     if (!user) return json(res, 401, { ok: false, error: 'Lien expiré : reclique sur « Jouer » dans Discord.' });
     if (user.avatar) avatarMap.set(user.uid, user.avatar);
     const now = Date.now();
-    if (now - (lastAct.get(user.uid) || 0) < (/^[ro]/.test(String(d.action)) ? 50 : 120)) return json(res, 429, { ok: false, error: 'Doucement 🙂' });
+    if (now - (lastAct.get(user.uid) || 0) < (/^[ro]/.test(String(d.action)) ? 50 : 120)) return json(res, 429, { ok: false, error: 'Doucement.' });
     lastAct.set(user.uid, now);
     const entry = roomOf(user.guildId);
     const { roulette } = entry;
