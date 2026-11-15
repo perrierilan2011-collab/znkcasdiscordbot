@@ -63,7 +63,7 @@ function prepare(base, w, h, entry) {
   const stars = (entry.stars || []).map(([x, y, r], i) => ({
     x: x * w,
     y: y * h,
-    r: Math.max(5, r * w),
+    r: Math.max(13, r * w * 1.7),
     phase: ((i * 0.6180339) % 1),
     freq: i % 3 === 2 ? 2 : 1,
   }));
@@ -104,7 +104,7 @@ function applyFrame(px, w, h, M, t, o) {
   if (t < ACTIVE && M.gIdx.length) {
     const p = smooth(0, 1, t / ACTIVE);
     const c = -0.3 + p * 1.95;
-    const sig = 0.1;
+    const sig = 0.13;
     const gain = o.sweep;
     const { gIdx, gW, gU } = M;
     for (let k = 0; k < gIdx.length; k++) {
@@ -139,7 +139,7 @@ function applyFrame(px, w, h, M, t, o) {
         const core = Math.exp(-((dx * dx + dy * dy) / (0.3 * R) ** 2));
         const j = (y * w + x) * 4;
         // léger "éteint" du cœur quand l'étoile est au repos, puis éclat
-        const dim = 1 - 0.28 * (1 - sv) * core;
+        const dim = 1 - 0.55 * (1 - sv) * core;
         px[j] *= dim; px[j + 1] *= dim; px[j + 2] *= dim;
         const k = Math.min(1, (arm * 0.9 + core * 0.6) * e * o.star);
         if (k > 0.01) screen(px, j, k, 255, 240, 255);
@@ -148,7 +148,7 @@ function applyFrame(px, w, h, M, t, o) {
   }
 }
 
-const DEFAULTS = { frames: 32, delay: 7, sweep: 0.36, ring: 0.3, star: 1.0 };
+const DEFAULTS = { frames: 32, delay: 7, sweep: 0.95, ring: 0.85, star: 2.4 };
 
 // final / base : RGBA (Uint8ClampedArray ou Buffer) w*h*4 ; retourne un Buffer GIF (boucle infinie)
 async function encode(finalRgba, baseRgba, w, h, file, opts = {}) {
