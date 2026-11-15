@@ -6747,6 +6747,7 @@ function getWebBoards() {
 let webApp = { makeLink: () => null, enabled: false };
 try {
   webApp = require('./web/server').init({
+    supabase, // rangs / RR persistants (table player_rank)
     getBalance,
     debit,
     credit,
