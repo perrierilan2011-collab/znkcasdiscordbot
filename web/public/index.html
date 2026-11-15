@@ -242,6 +242,27 @@ th{color:var(--mut);font-size:12px}
 .lbnone{color:var(--mut);text-align:center;padding:26px 12px;font-size:13px}
 @media(max-width:600px){#topView{padding:16px 8px 64px}.lbgrid{gap:8px}.lbtitle{padding:10px}.lbtitle b{font-size:14px}.lbtitle small{display:none}
   .lbrow{grid-template-columns:24px minmax(0,1fr);gap:2px 8px;padding:8px 10px}.lbrk{width:22px;height:22px;font-size:11px}.lbval{grid-column:2;font-size:12px}}
+/* ---------- ADMIN ---------- */
+#adminView{align-items:center;padding:24px 16px 64px;overflow:auto}
+.adwrap{width:100%;max-width:760px;display:flex;flex-direction:column;gap:14px}
+.adgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.adcard{display:flex;flex-direction:column;gap:6px;align-items:flex-start;text-align:left;padding:18px;border-radius:14px;background:#0a0a0a;border:1px solid #262626;color:#fff;transition:border-color .15s,background .15s}
+.adcard:hover{border-color:#737373;background:#111}
+.adcard b{font-size:17px}.adcard small{color:var(--mut);font-size:12px;line-height:1.35}
+.adcard .nic{color:var(--gold)}
+.adbody{padding:14px 16px 16px}
+.adtypes{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.adtypes button{padding:8px 14px;border-radius:999px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);color:#fff;font-weight:700;font-size:13px}
+.adtypes button.on{background:#fff;color:#000;border-color:#fff}
+.adfields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.adfields label{display:flex;flex-direction:column;font-size:12px;color:var(--mut);font-weight:700}
+.adfields label.hide{display:none!important}
+@media(max-width:600px){#adminView{padding:16px 8px 64px}.adgrid,.adfields{grid-template-columns:1fr}}
+/* notifications d'événement */
+.nit.ev{align-items:flex-start}
+.nit .nbtn{margin-top:6px;padding:6px 14px;border-radius:999px;background:#fff;color:#000;font-weight:800;font-size:12px;border:0}
+.nit .nbtn:disabled{background:#333;color:#888}
+.nit .nt{display:block;color:#d4d4d4;font-size:12px;margin-top:2px;line-height:1.35}
 /* ---------- RANK : rang (gains cumulés) + ELO ---------- */
 #rankView{align-items:center;padding:24px 16px 64px;overflow:auto}
 .rkwrap{width:100%;max-width:760px;display:flex;flex-direction:column;gap:14px}
@@ -740,7 +761,7 @@ body.fs.vpk #pkInfo{font-size:12px}
   </div>
   <div class="pop" id="meWrap">
     <div class="me" id="me" role="button" tabindex="0" aria-haspopup="true"><div class="av" id="meAv">?</div><div id="meName" style="font-weight:700;font-size:12px">…</div><span class="car">▾</span></div>
-    <div class="ppanel" id="mePanel"><div class="mpn"><span>Solde</span><b id="meBal">—</b></div><button class="btn" id="bDaily" data-ic="sun"> Daily</button><button class="btn hide" id="bAdmin" data-ic="gift"> Ajouter de l’argent</button><button class="btn" id="bGift" data-ic="gift"> Envoyer des ZTKN</button><button class="btn" id="bLogout" data-ic="power"> Déconnexion</button></div>
+    <div class="ppanel" id="mePanel"><div class="mpn"><span>Solde</span><b id="meBal">—</b></div><button class="btn" id="bDaily" data-ic="sun"> Daily</button><button class="btn hide" id="bAdmin" data-ic="sliders"> Admin</button><button class="btn" id="bGift" data-ic="gift"> Envoyer des ZTKN</button><button class="btn" id="bLogout" data-ic="power"> Déconnexion</button></div>
   </div>
 </header>
 <div id="conn">Reconnexion…</div>
@@ -832,6 +853,27 @@ body.fs.vpk #pkInfo{font-size:12px}
     </div>
   </div>
 </main>
+<main id="adminView" class="hide">
+  <div class="adwrap">
+    <div class="lbhead"><div><h2>Administration</h2><p>Réservé à l’administrateur du casino.</p></div></div>
+    <div class="adgrid">
+      <button class="adcard" id="adMoney"><span class="nic" id="adMoneyI"></span><b>Ajouter de l’argent</b><small>Crédite n’importe quel joueur, sans rien retirer de ton solde</small></button>
+      <button class="adcard" id="adEvents"><span class="nic" id="adEventsI"></span><b>Événements</b><small>Boosts, claim, giveaway · MP Discord + notification dans la boîte de réception</small></button>
+    </div>
+    <section class="lbcol hide" id="adEvPanel">
+      <div class="lbtitle"><b>Lancer un événement</b><small id="adEvDesc">Choisis un type</small></div>
+      <div class="adbody">
+        <div id="adTypes" class="adtypes"></div>
+        <div class="adfields">
+          <label id="adFAmount">Montant par gagnant<input class="gin" id="adAmount" inputmode="decimal" autocomplete="off" placeholder="ex : 50"></label>
+          <label id="adFWinners">Nombre de gagnants<input class="gin" id="adWinners" inputmode="numeric" autocomplete="off" value="1"></label>
+          <label id="adFMinutes"><span id="adMinLbl">Durée (minutes)</span><input class="gin" id="adMinutes" inputmode="numeric" autocomplete="off" value="15"></label>
+        </div>
+        <p style="text-align:right;margin:8px 0 0"><button class="btn go" id="adLaunch">Lancer l’événement</button></p>
+      </div>
+    </section>
+  </div>
+</main>
 <main id="rankView" class="hide">
   <div class="rkwrap">
     <section class="rkme" id="rkMe"><div class="lbnone">…</div></section>
@@ -840,7 +882,7 @@ body.fs.vpk #pkInfo{font-size:12px}
       <div id="rkElo"><div class="lbnone">…</div></div>
     </section>
     <section class="lbcol">
-      <div class="lbtitle"><b>Tous les rangs</b><small>Basés sur le total des gains cumulés : les pertes ne te font jamais descendre</small></div>
+      <div class="lbtitle"><b>Tous les rangs</b><small>Basés sur le total des gains cumulés en ligne (poker, blackjack, roulette) : les pertes ne te font jamais descendre</small></div>
       <div id="rkLadder"></div>
     </section>
   </div>
@@ -1419,7 +1461,7 @@ try { Object.assign(SET, JSON.parse(localStorage.getItem('znk_set') || '{}')); }
 const cShow = (m) => m.sys !== 'win' || (me && m.uid === me.uid ? SET.winMine !== '0' : SET.winOthers !== '0');
 const CNAME = { hub: 'Accueil', bj: 'Blackjack', poker: 'Poker', roulette: 'Roulette', 'off-bj': 'Blackjack solo', 'off-fuse': 'Fusé', 'off-mine': 'Mine', 'off-coin': 'Pile ou Face', 'off-dice': 'Dés', 'off-horses': 'Chevaux', 'off-russian': 'Roulette russe', 'off-slots': 'Slots', 'off-duel': 'Duel', 'off-scratch': 'Ticket à gratter' };
 const GLAB = { blackjack: 'Blackjack', poker: 'Poker', roulette: 'Roulette', 'bj-solo': 'Blackjack solo', fuse: 'Fusé', mines: 'Mines', coin: 'Pile ou Face', dice: 'Dés', horses: 'Chevaux', russian: 'Roulette russe', slots: 'Slots', duel: 'Duel', scratch: 'Ticket à gratter' };
-const cRoom = () => (W.view === 'top' || W.view === 'rank' ? 'hub' : W.view);
+const cRoom = () => (W.view === 'top' || W.view === 'rank' || W.view === 'admin' ? 'hub' : W.view);
 function cLine(m) {
   if (m.sys === 'win') { // annonce automatique d'une victoire (tous les jeux du site)
     const d = el('div', 'cm win' + (me && m.uid === me.uid ? ' mine' : '')), t = new Date(m.t);
@@ -1921,15 +1963,16 @@ function setView(v) {
   $('#ofView').classList.toggle('hide', !v.startsWith('off-'));
   $('#topView').classList.toggle('hide', v !== 'top');
   $('#rankView').classList.toggle('hide', v !== 'rank');
+  $('#adminView').classList.toggle('hide', v !== 'admin');
   document.body.classList.toggle('vpk', v === 'poker');
   lbWatch(v === 'top');
   rkWatch(v === 'rank');
   pFitSoon();
   document.querySelectorAll('.mitem').forEach((t) => t.classList.toggle('on', t.dataset.g === v));
   menuSync(v);
-  document.title = v.startsWith('off-') ? 'Casino · Jeux offline' : v === 'roulette' ? 'Casino · Roulette' : v === 'bj' ? 'Casino · Blackjack' : v === 'poker' ? 'Casino · Poker' : v === 'top' ? 'Casino · Classement' : v === 'rank' ? 'Casino · Rank' : 'Casino · Jeux';
+  document.title = v.startsWith('off-') ? 'Casino · Jeux offline' : v === 'roulette' ? 'Casino · Roulette' : v === 'bj' ? 'Casino · Blackjack' : v === 'poker' ? 'Casino · Poker' : v === 'top' ? 'Casino · Classement' : v === 'rank' ? 'Casino · Rank' : v === 'admin' ? 'Casino · Admin' : 'Casino · Jeux';
   $('#bTop').classList.toggle('hide', v !== 'bj' && v !== 'poker');
-  $('#bRules').classList.toggle('hide', v === 'hub' || v === 'top' || v === 'rank' || v.startsWith('off-'));
+  $('#bRules').classList.toggle('hide', v === 'hub' || v === 'top' || v === 'rank' || v === 'admin' || v.startsWith('off-'));
   try { sessionStorage.setItem('znk_v', v); } catch {}
   C.unread = 0; cRender();
   if (v.startsWith('off-')) ofOpen(v);
@@ -1956,7 +1999,7 @@ $('#menuBtn').onclick = (e) => { e.stopPropagation(); const o = $('#menu').class
 document.querySelectorAll('#menuPanel .mhead').forEach((b) => (b.onclick = (e) => { e.stopPropagation(); b.parentElement.classList.toggle('open'); }));
 document.addEventListener('click', (e) => { if (!e.target.closest('#menu')) menuClose(); });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') menuClose(); });
-const MENU_LBL = { hub: 'Menu', bj: 'Blackjack', poker: 'Poker', roulette: 'Roulette', 'off-bj': 'Blackjack solo', 'off-fuse': 'Fusé', 'off-mine': 'Mine', 'off-coin': 'Pile ou Face', 'off-dice': 'Dés', 'off-horses': 'Chevaux', 'off-russian': 'Roulette russe', 'off-slots': 'Slots', 'off-duel': 'Duel', 'off-scratch': 'Ticket à gratter', top: 'Classement', rank: 'Rank' };
+const MENU_LBL = { hub: 'Menu', bj: 'Blackjack', poker: 'Poker', roulette: 'Roulette', 'off-bj': 'Blackjack solo', 'off-fuse': 'Fusé', 'off-mine': 'Mine', 'off-coin': 'Pile ou Face', 'off-dice': 'Dés', 'off-horses': 'Chevaux', 'off-russian': 'Roulette russe', 'off-slots': 'Slots', 'off-duel': 'Duel', 'off-scratch': 'Ticket à gratter', top: 'Classement', rank: 'Rank', admin: 'Admin' };
 function menuSync(v) {
   $('#menuLbl').textContent = MENU_LBL[v] || 'Menu';
   $('#msOn').classList.toggle('open', v === 'bj' || v === 'poker' || v === 'roulette');
@@ -1990,6 +2033,43 @@ function lbWatch(on) {
   if (on) { lbLoad(); LB.timer = setInterval(lbLoad, 30000); }
 }
 
+
+
+// ---- page Admin : ajout d'argent + événements (mêmes événements que le bot Discord)
+const AD_TYPES = [
+  { id: 'claim', label: 'Claim rapide', desc: 'Les N premiers qui cliquent gagnent', f: ['amount', 'winners', 'minutes'], min: 5, minLbl: 'Durée max (0 = illimité)' },
+  { id: 'giveaway', label: 'Giveaway', desc: 'Inscriptions, tirage à la fin du timer', f: ['amount', 'winners', 'minutes'], min: 10, minLbl: 'Durée avant tirage (min)' },
+  { id: 'x2win', label: 'x2 Gains', desc: 'Tous les gains sont doublés pendant X min', f: ['minutes'], min: 15 },
+  { id: 'x2lose', label: 'x2 Pertes', desc: 'Les pertes sont doublées pendant X min', f: ['minutes'], min: 15 },
+  { id: 'x2both', label: 'x2 Gains & Pertes', desc: 'Gains et pertes x2 pendant X min', f: ['minutes'], min: 15 },
+  { id: 'lucky', label: 'Heure chanceuse', desc: 'Gains x1.5 pendant X min', f: ['minutes'], min: 15 },
+  { id: 'goldrush', label: 'Ruée vers l’or', desc: 'Gains x3 pendant X min', f: ['minutes'], min: 15 },
+];
+const AD = { kind: 'claim' };
+function adPick(id) {
+  AD.kind = id; const t = AD_TYPES.find((x) => x.id === id);
+  document.querySelectorAll('#adTypes button').forEach((b) => b.classList.toggle('on', b.dataset.id === id));
+  $('#adEvDesc').textContent = t.desc;
+  $('#adFAmount').classList.toggle('hide', !t.f.includes('amount')); $('#adFWinners').classList.toggle('hide', !t.f.includes('winners'));
+  $('#adMinutes').value = String(t.min); $('#adMinLbl').textContent = t.minLbl || 'Durée (minutes)';
+}
+function adInit() {
+  $('#adMoneyI').innerHTML = icon('gift', 24); $('#adEventsI').innerHTML = icon('bell', 24);
+  const box = $('#adTypes');
+  AD_TYPES.forEach((t) => { const b = el('button', '', t.label); b.dataset.id = t.id; b.onclick = () => adPick(t.id); box.append(b); });
+  adPick('claim');
+  $('#adMoney').onclick = () => gOpen(true);
+  $('#adEvents').onclick = () => $('#adEvPanel').classList.toggle('hide');
+  $('#adLaunch').onclick = async () => {
+    const t = AD_TYPES.find((x) => x.id === AD.kind), b = $('#adLaunch');
+    const body = { kind: t.id, minutes: Math.floor(Number($('#adMinutes').value) || 0) };
+    if (t.f.includes('amount')) { body.amount = parseAmt($('#adAmount').value); if (!(body.amount > 0)) return toast('Montant invalide.'); body.winners = Math.floor(Number($('#adWinners').value) || 1); }
+    if (!confirm('Lancer « ' + t.label + ' » ? Tous les joueurs recevront une notification (et un MP Discord).')) return;
+    b.disabled = true; const ok = await send('adminevent', body); b.disabled = false;
+    if (ok) { SFX.win(); toast('Événement lancé : ' + t.label); }
+  };
+}
+adInit();
 
 // ---- page Rank : rang (gains cumulés) + classement ELO
 const RK = { timer: null, busy: false, d: null };
@@ -2936,7 +3016,7 @@ async function gSearch() {
 }
 function gOpen(admin) { menuClose(); G.admin = admin === true; $('#gTitle').textContent = G.admin ? 'Ajouter de l’argent (admin)' : 'Envoyer des ZTKN'; $('#gSend').textContent = G.admin ? 'Ajouter' : 'Envoyer'; G.to = null; $('#gQ').value = ''; $('#gAmt').value = ''; $('#mGift').classList.add('on'); gSel(); gSearch(); setTimeout(() => $('#gQ').focus(), 50); }
 $('#bGift').onclick = () => { popClose(); gOpen(); };
-$('#bAdmin').onclick = () => { popClose(); gOpen(true); };
+$('#bAdmin').onclick = () => { popClose(); setView('admin'); };
 $('#bDaily').onclick = async () => {
   const b = $('#bDaily'); if (b.disabled) return; b.disabled = true;
   try {
@@ -2959,7 +3039,7 @@ $('#gSend').onclick = async () => {
 
 
 // ============================================================= BOÎTE DE RÉCEPTION (cloche) + MENU DU PSEUDO
-const N = { list: [], seen: 0 };
+const N = { list: [], seen: 0, done: new Set() };
 const nKey = () => 'znk_nseen_' + (me ? me.uid : '');
 function nBadge() {
   const c = N.list.filter((n) => n.t > N.seen).length, b = $('#bBadge');
@@ -2969,10 +3049,27 @@ function nRender() {
   const box = $('#nList'); box.textContent = '';
   if (!N.list.length) { box.append(el('div', 'rnone', 'Aucune notification.')); return; }
   N.list.forEach((n) => {
-    const r = el('div', 'nit' + (n.t > N.seen ? ' new' : '')), b = el('div'), t = new Date(n.t), p = (x) => String(x).padStart(2, '0');
-    b.append(el('b', '', n.from), document.createTextNode(' t’a envoyé '), el('b', 'cg', num(n.amount) + ' ' + COIN),
-      el('small', '', p(t.getDate()) + '/' + p(t.getMonth() + 1) + ' · ' + p(t.getHours()) + ':' + p(t.getMinutes())));
-    const ni = el('span', 'nic'); ni.innerHTML = icon('gift', 20); r.append(ni, b); box.append(r);
+    const r = el('div', 'nit' + (n.t > N.seen ? ' new' : '') + (n.type === 'event' ? ' ev' : '')), b = el('div'), t = new Date(n.t), p = (x) => String(x).padStart(2, '0');
+    const when = el('small', '', p(t.getDate()) + '/' + p(t.getMonth() + 1) + ' · ' + p(t.getHours()) + ':' + p(t.getMinutes()));
+    const ni = el('span', 'nic');
+    if (n.type === 'event') {
+      b.append(el('b', '', noEmo(n.title)), el('span', 'nt', noEmo(n.text)));
+      if (n.eventId && (n.kind === 'claim' || n.kind === 'giveaway') && (!n.expiresAt || n.expiresAt > Date.now())) {
+        const bt = el('button', 'nbtn', n.kind === 'claim' ? 'Réclamer' : 'Participer'), done = N.done.has(n.eventId);
+        if (done) { bt.disabled = true; bt.textContent = n.kind === 'claim' ? 'Réclamé' : 'Inscrit'; }
+        bt.onclick = async (e) => {
+          e.stopPropagation(); bt.disabled = true;
+          const ok = await send(n.kind === 'claim' ? 'evclaim' : 'evjoin', { eid: n.eventId });
+          if (ok) { N.done.add(n.eventId); toast((send.last && send.last.msg) || 'C’est fait !'); if (n.kind === 'claim') SFX.win(); nRender(); } else bt.disabled = false;
+        };
+        b.append(bt);
+      }
+      b.append(when); ni.innerHTML = icon(n.kind === 'boost' || n.kind === 'boost_end' ? 'bell' : 'gift', 20);
+    } else {
+      b.append(el('b', '', n.from), document.createTextNode(' t’a envoyé '), el('b', 'cg', num(n.amount) + ' ' + COIN), when);
+      ni.innerHTML = icon('gift', 20);
+    }
+    r.append(ni, b); box.append(r);
   });
 }
 function nSet(list, live) {
@@ -2983,7 +3080,7 @@ function nSet(list, live) {
 }
 function nAdd(n) {
   N.list.unshift(n); N.list.length = Math.min(N.list.length, 30);
-  SFX.win(); toast(n.from + ' t’a envoyé ' + num(n.amount) + ' ' + COIN);
+  SFX.win(); toast(n.type === 'event' ? n.title + ' · ' + n.text : n.from + ' t’a envoyé ' + num(n.amount) + ' ' + COIN);
   if ($('#bellWrap').classList.contains('open')) { nRender(); nMarkSeen(); } else { nRender(); nBadge(); }
 }
 function nMarkSeen() {
