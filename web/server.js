@@ -1,6 +1,6 @@
 'use strict';
 /*
- * web/server.js — serveur web du casino ZNK (jeux « online » EXTERNES, hors Discord) : blackjack + roue multijoueur.
+ * web/server.js — serveur web du casino ZNK (jeux « online » EXTERNES, hors Discord) : blackjack + roulette multijoueur.
  * Sans dépendance : module http de Node + Server-Sent Events (temps réel) + POST pour les actions.
  *
  * Adresse publique : variable PUBLIC_URL (défaut : https://znkcasdiscordbot-production.up.railway.app)
@@ -15,7 +15,7 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const { Room, SEATS } = require('./table');
-const { WheelRoom, INFO: WHEEL_INFO } = require('./wheel');
+const { RouletteRoom, INFO: ROULETTE_INFO } = require('./roulette');
 
 const PUBLIC_URL = String(process.env.PUBLIC_URL || 'https://znkcasdiscordbot-production.up.railway.app').replace(/\/+$/, '');
 const TOKEN_TTL_MS = 12 * 3600 * 1000;
@@ -76,7 +76,7 @@ function init(deps) {
       return null;
     }
   }
-  const makeLink = (user, guildId, game) => `${PUBLIC_URL}/?t=${makeToken(user, guildId)}${game === 'wheel' ? '&g=wheel' : ''}`;
+  const makeLink = (user, guildId, game) => `${PUBLIC_URL}/?t=${makeToken(user, guildId)}${game === 'roulette' || game === 'wheel' ? '&g=roulette' : ''}`;
 
   // ---------- argent en jeu : remboursé au redémarrage si le bot a planté en pleine manche ----------
   const PENDING_FILE = path.join(DATA_DIR, 'bj_pending.json');
@@ -138,7 +138,7 @@ function init(deps) {
   function roomOf(guildId) {
     let r = rooms.get(guildId);
     if (r) return r;
-    const entry = { clients: new Set(), conns: new Map(), room: null, wheel: null };
+    const entry = { clients: new Set(), conns: new Map(), room: null, roulette: null };
     const broadcast = (msg) => {
       for (const res of entry.clients) {
         try {
@@ -149,12 +149,12 @@ function init(deps) {
       }
     };
     entry.broadcast = broadcast;
-    entry.wheel = new WheelRoom(guildId, {
+    entry.roulette = new RouletteRoom(guildId, {
       getBalance: deps.getBalance,
       debit: deps.debit,
       credit: deps.credit,
       pending,
-      onChange: (w) => broadcast(`event: wheel\ndata: ${JSON.stringify(w.snapshot())}\n\n`),
+      onChange: (w) => broadcast(`event: roulette\ndata: ${JSON.stringify(w.snapshot())}\n\n`),
     });
     entry.room = new Room(guildId, {
       getBalance: deps.getBalance,
@@ -211,40 +211,40 @@ function init(deps) {
     const user = readToken(d.t);
     if (!user) return json(res, 401, { ok: false, error: 'Lien expiré : reclique sur « Jouer » dans Discord.' });
     const now = Date.now();
-    if (now - (lastAct.get(user.uid) || 0) < (String(d.action).startsWith('w') ? 50 : 120)) return json(res, 429, { ok: false, error: 'Doucement 🙂' });
+    if (now - (lastAct.get(user.uid) || 0) < (String(d.action).startsWith('r') ? 50 : 120)) return json(res, 429, { ok: false, error: 'Doucement 🙂' });
     lastAct.set(user.uid, now);
     const entry = roomOf(user.guildId);
-    const { room, wheel } = entry;
+    const { room, roulette } = entry;
     try {
       switch (d.action) {
-        // ---- roue
-        case 'wjoin': {
+        // ---- roulette
+        case 'rjoin': {
           const bal = await deps.getBalance(user.uid);
-          await wheel.run(async () => wheel.join(user, bal));
+          await roulette.run(async () => roulette.join(user, bal));
           break;
         }
-        case 'wleave':
-          await wheel.run(() => wheel.leave(user.uid));
+        case 'rleave':
+          await roulette.run(() => roulette.leave(user.uid));
           break;
-        case 'wbet':
-          await wheel.run(() => wheel.bet(user.uid, d.zone, d.amount));
+        case 'rbet':
+          await roulette.run(() => roulette.bet(user.uid, d.spot, d.amount));
           break;
-        case 'wrebet':
-          await wheel.run(() => wheel.rebet(user.uid));
+        case 'rrebet':
+          await roulette.run(() => roulette.rebet(user.uid));
           break;
-        case 'wclear':
-          await wheel.run(() => wheel.clear(user.uid));
+        case 'rclear':
+          await roulette.run(() => roulette.clear(user.uid));
           break;
-        case 'wemote': {
-          if (!EMOTES.has(d.e) || !wheel.players.has(user.uid)) break;
-          entry.broadcast(`event: wemote\ndata: ${JSON.stringify({ uid: user.uid, e: d.e })}\n\n`);
+        case 'remote': {
+          if (!EMOTES.has(d.e) || !roulette.players.has(user.uid)) break;
+          entry.broadcast(`event: remote\ndata: ${JSON.stringify({ uid: user.uid, e: d.e })}\n\n`);
           break;
         }
-        case 'wsync': {
-          const p = wheel.players.get(user.uid);
+        case 'rsync': {
+          const p = roulette.players.get(user.uid);
           if (p) {
             p.bal = await deps.getBalance(user.uid);
-            wheel.emit();
+            roulette.emit();
           }
           break;
         }
@@ -287,9 +287,9 @@ function init(deps) {
         default:
           return json(res, 400, { ok: false, error: 'Action inconnue.' });
       }
-      return json(res, 200, { ok: true, wbal: wheel.players.get(user.uid)?.bal });
+      return json(res, 200, { ok: true, rbal: roulette.players.get(user.uid)?.bal });
     } catch (e) {
-      return json(res, 200, { ok: false, error: String(e?.message || e).slice(0, 160), wbal: wheel.players.get(user.uid)?.bal });
+      return json(res, 200, { ok: false, error: String(e?.message || e).slice(0, 160), rbal: roulette.players.get(user.uid)?.bal });
     }
   }
 
@@ -307,13 +307,13 @@ function init(deps) {
       'X-Accel-Buffering': 'no',
       ...SEC,
     });
-    res.write(`retry: 2000\nevent: hello\ndata: ${JSON.stringify({ uid: user.uid, name: user.name, avatar: user.avatar, seats: SEATS, coin: deps.coin || '🪙', wheel: WHEEL_INFO })}\n\n`);
+    res.write(`retry: 2000\nevent: hello\ndata: ${JSON.stringify({ uid: user.uid, name: user.name, avatar: user.avatar, seats: SEATS, coin: deps.coin || '🪙', roulette: ROULETTE_INFO })}\n\n`);
     entry.clients.add(res);
     entry.conns.set(user.uid, (entry.conns.get(user.uid) || 0) + 1);
     entry.room.setPresence(user.uid, true);
     res.write(`event: state\ndata: ${JSON.stringify(entry.room.snapshot())}\n\n`);
-    entry.wheel.setPresence(user.uid, true);
-    res.write(`event: wheel\ndata: ${JSON.stringify(entry.wheel.snapshot())}\n\n`);
+    entry.roulette.setPresence(user.uid, true);
+    res.write(`event: roulette\ndata: ${JSON.stringify(entry.roulette.snapshot())}\n\n`);
     const hb = setInterval(() => {
       try {
         res.write(': ping\n\n');
@@ -330,7 +330,7 @@ function init(deps) {
         setTimeout(() => {
           if (!entry.conns.has(user.uid)) {
             entry.room.setPresence(user.uid, false);
-            entry.wheel.setPresence(user.uid, false);
+            entry.roulette.setPresence(user.uid, false);
           }
         }, 8000); // tolérance : rechargement de page / coupure réseau brève
       } else entry.conns.set(user.uid, n);
@@ -361,7 +361,7 @@ function init(deps) {
     }
   });
   const port = Number(process.env.PORT) || 3000;
-  server.listen(port, '0.0.0.0', () => console.log(`[web] blackjack + roue en ligne → ${PUBLIC_URL} (port ${port})`));
+  server.listen(port, '0.0.0.0', () => console.log(`[web] blackjack + roulette en ligne → ${PUBLIC_URL} (port ${port})`));
   server.on('error', (e) => console.error('[web] serveur :', e?.message || e));
 
   return { makeLink, enabled: true, rooms, server };
