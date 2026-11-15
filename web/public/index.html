@@ -414,6 +414,22 @@ body.fs header{padding-top:4px;padding-bottom:4px}
 body.fs main{padding-left:6px;padding-right:6px}
 body.fs .ftable.pk,body.fs #table{min-height:calc(100vh - 150px)}
 body.fs #chat{max-width:300px}
+
+/* classement : photos de profil */
+.pav{width:28px;height:28px;border-radius:50%;display:inline-grid;place-items:center;overflow:hidden;background:#333;font-size:12px;font-weight:800;flex:none;vertical-align:middle}
+td .pav{margin-right:8px;width:24px;height:24px}
+.lbrow{grid-template-columns:30px 30px minmax(0,1fr) auto}
+@media(max-width:760px){.lbrow{grid-template-columns:24px 28px minmax(0,1fr)}.lbrow .lbval{grid-column:3}}
+/* paramètres + envoi de pièces */
+.setrow{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:12px 0;border-bottom:1px solid rgba(255,255,255,.1)}
+.seg{display:flex;gap:6px}.seg button{padding:8px 16px;border-radius:10px;font-weight:800;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.18);color:#fff}
+.seg button.on{background:#fff;color:#000;border-color:#fff}
+.gin{width:100%;box-sizing:border-box;padding:11px 12px;border-radius:10px;background:#0a0a0a;border:1px solid #333;color:#fff;font-size:15px;margin:6px 0}
+#gList{display:flex;flex-direction:column;gap:4px;max-height:210px;overflow:auto;margin:6px 0}
+.gp{display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:10px;background:rgba(255,255,255,.06);border:1px solid transparent;color:#fff;text-align:left;font-weight:700}
+.gp:hover{background:rgba(255,255,255,.14)}.gp.on{border-color:var(--gold);background:rgba(251,191,36,.14)}
+#gTo{font-weight:800;margin:8px 0;min-height:20px;color:var(--gold)}
+.gq{display:flex;gap:6px;flex-wrap:wrap;margin:4px 0 10px}
 /* ---------- sélecteur de tables ---------- */
 .tbar{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;align-items:center;padding:6px 10px 0}
 .tbtn{display:inline-flex;align-items:center;gap:7px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);border-radius:999px;padding:6px 14px;font-weight:700;font-size:13px;color:#fff}
@@ -423,6 +439,26 @@ body.fs #chat{max-width:300px}
 .tbtn.on{background:#fff;color:#000;border-color:#fff}.tbtn.on small{color:#166534}.tbtn.on.full small{color:#b91c1c}
 .tbtn.mine{box-shadow:0 0 0 2px var(--gold)}
 .tbtn.hands{background:linear-gradient(90deg,#f59e0b,#fde047);color:#3a2300;border-color:#fde68a;margin-left:10px}
+.tbar{gap:10px}
+.tnav{display:flex;align-items:center;gap:10px}
+.tarrow{width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.22);color:#fff;font-size:26px;line-height:1;display:grid;place-items:center;padding:0 0 3px;transition:background .15s,transform .15s}
+.tarrow:hover{background:#fff;color:#000}
+.tarrow:active{transform:scale(.88)}
+.tarrow.l{animation:nudgeL 1.8s ease-in-out infinite}.tarrow.r{animation:nudgeR 1.8s ease-in-out infinite}
+.tarrow:hover,.tarrow:active{animation:none}
+@keyframes nudgeL{0%,100%{transform:translateX(0)}50%{transform:translateX(-4px)}}
+@keyframes nudgeR{0%,100%{transform:translateX(0)}50%{transform:translateX(4px)}}
+.tlabel{min-width:130px;text-align:center;font-weight:800;font-size:15px;display:flex;flex-direction:column;align-items:center;gap:1px}
+.tlabel small{font-size:11px;font-weight:800;color:#86efac;font-variant-numeric:tabular-nums}
+.tlabel.full small{color:#fca5a5}.tlabel.mine{color:var(--gold)}
+.tlabel.inR{animation:lblR .3s ease}.tlabel.inL{animation:lblL .3s ease}
+@keyframes lblR{from{opacity:0;transform:translateX(26px)}to{opacity:1;transform:none}}
+@keyframes lblL{from{opacity:0;transform:translateX(-26px)}to{opacity:1;transform:none}}
+.slR{animation:lblR .35s ease}.slL{animation:lblL .35s ease}
+.tdots{display:flex;gap:6px;width:100%;justify-content:center}
+.tdot{width:8px;height:8px;border-radius:50%;padding:0;background:rgba(255,255,255,.28);border:0;transition:transform .2s,background .2s}
+.tdot.on{background:#fff;transform:scale(1.35)}.tdot.mine{box-shadow:0 0 0 2px var(--gold)}
+.tbtn.new{background:rgba(34,197,94,.18);border-color:rgba(34,197,94,.55)}
 /* nom de la main sous les cartes (poker) */
 .ftable.pk .seat.mine{z-index:6}
 .ftable.pk .hand .pill{position:relative;z-index:7;white-space:normal;text-align:center;font-size:11px;line-height:1.25;max-width:calc(var(--cw)*3.2)}
@@ -562,11 +598,13 @@ body.fs.vpk #pkInfo{font-size:12px}
       </div>
       <div class="msep"></div>
       <button class="mitem" data-g="top">Classement</button>
+      <button class="mitem" data-act="gift">Envoyer des ZTKN</button>
     </div>
   </div>
   <div class="sp"></div>
   <button class="hb hide" id="bTop" title="Top gains de ce jeu">Top gains</button>
   <button class="hb hide" id="bRules" title="Règles">Règles</button>
+  <button class="hb" id="bSet" title="Paramètres">⚙ Paramètres</button>
   <button class="hb" id="bSnd" title="Son">Son</button>
   <button class="hb" id="bFs" title="Plein écran">Plein écran</button>
   <div class="me" id="me"><div class="av" id="meAv">?</div><div><div id="meName" style="font-weight:700;font-size:12px">…</div><b id="meBal">—</b></div></div>
@@ -791,6 +829,16 @@ body.fs.vpk #pkInfo{font-size:12px}
 <li>Raccourcis : <kbd>F</kbd> se coucher · <kbd>C</kbd> check / suivre.</li>
 </ul><p style="text-align:right"><button class="btn" data-close>Fermer</button></p></div></div>
 <div class="modal" id="mPHands"><div class="box"><h2>Classement des mains au poker</h2><p style="color:rgba(255,255,255,.65);font-size:13px;margin:0 0 6px">Du plus fort (1) au plus faible (10). Les cartes éclairées forment la combinaison.</p><div id="hList"></div><p style="text-align:right"><button class="btn" data-close>Fermer</button></p></div></div>
+<div class="modal" id="mSet"><div class="box"><h2>Paramètres</h2>
+  <div class="setrow"><b>Langue</b><div class="seg" id="langSeg"><button data-lang="fr">Français</button><button data-lang="en">English</button></div></div>
+  <p style="text-align:right"><button class="btn" data-close>Fermer</button></p></div></div>
+<div class="modal" id="mGift"><div class="box"><h2>Envoyer des ZTKN</h2>
+  <input class="gin" id="gQ" placeholder="Chercher un joueur…" autocomplete="off" maxlength="32">
+  <div id="gList"></div>
+  <div id="gTo"></div>
+  <input class="gin" id="gAmt" placeholder="Montant" inputmode="decimal" autocomplete="off">
+  <div class="gq"><button class="btn" data-q="100">100</button><button class="btn" data-q="1k">1k</button><button class="btn" data-q="10k">10k</button><button class="btn" data-q="100k">100k</button></div>
+  <p style="text-align:right"><button class="btn" data-close>Annuler</button> <button class="btn go" id="gSend">Envoyer</button></p></div></div>
 <div class="modal" id="mTop"><div class="box"><h2 id="topTitle">Classement du blackjack (gains nets)</h2><div id="topBody">…</div><p style="text-align:right"><button class="btn" data-close>Fermer</button></p></div></div>
 <div class="modal" id="mRules"><div class="box"><h2>Règles du blackjack</h2><ul>
 <li>Bats le croupier sans dépasser <b>21</b>. Figures = 10, As = 1 ou 11.</li>
@@ -892,7 +940,7 @@ async function send(action, extra = {}) {
   try {
     if (extra.tid == null) { if (/^p/.test(action)) extra = { ...extra, tid: P.cur }; else if (BJ_ACTS.has(action)) extra = { ...extra, tid: W.btid }; }
     const r = await fetch('/api/act', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ t: TOKEN, action, ...extra }) });
-    const d = await r.json();
+    const d = await r.json(); send.last = d;
     if (d.rbal != null) W.bal = d.rbal;
     if (!d.ok) { toast(d.error || 'Erreur'); if (r.status === 401) showGate('Ta session a expiré : reconnecte-toi avec Discord.'); }
     return d.ok;
@@ -907,7 +955,8 @@ function connect() {
     $('#meName').textContent = d.name; setAvatar($('#meAv'), d.avatar, d.name); $('#conn').style.display = 'none'; BJT.clear(); P.tables.clear(); rOnHello(d); pOnHello(d); });
   es.addEventListener('roulette', (e) => { const st = JSON.parse(e.data); offset = st.now - Date.now(); rRender(st); });
   es.addEventListener('poker', (e) => { const st = JSON.parse(e.data); offset = st.now - Date.now(); pUpdate(st); });
-  es.addEventListener('bal', (e) => { W.bal = JSON.parse(e.data).bal; pHeader(); });
+  es.addEventListener('bal', (e) => { W.bal = JSON.parse(e.data).bal; pHeader(); if (!O.hold && W.bal != null) $('#meBal').textContent = num(W.bal) + ' ' + COIN; });
+  es.addEventListener('gift', (e) => { const d = JSON.parse(e.data); SFX.win(); toast('🎁 ' + d.from + ' t’a envoyé ' + num(d.amount) + ' ' + COIN); });
   es.addEventListener('chathist', (e) => { C.msgs = JSON.parse(e.data); cRender(); });
   es.addEventListener('chat', (e) => cOnMsg(JSON.parse(e.data)));
   es.addEventListener('state', (e) => { $('#conn').style.display = 'none'; const st = JSON.parse(e.data); offset = st.now - Date.now(); bjUpdate(st); });
@@ -1162,7 +1211,7 @@ $('#bTop').onclick = async () => {
     if (!d.top.length) { box.textContent = 'Personne n’a encore terminé de manche.'; return; }
     const t = el('table'); t.innerHTML = '<tr><th>#</th><th>Joueur</th><th>Gains nets</th><th>Manches</th><th>Victoires</th></tr>';
     d.top.forEach((r, i) => { const tr = el('tr'); const c = (x, cl) => { const td = el('td', cl, x); tr.append(td); };
-      c(String(i + 1)); c(r.name); c((r.net > 0 ? '+' : '') + num(r.net) + ' ' + COIN, r.net >= 0 ? 'pos' : 'neg'); c(String(r.rounds)); c(Math.round((r.wins / r.rounds) * 100) + ' %'); t.append(tr); });
+      c(String(i + 1)); { const td = el('td'), av = el('span', 'pav'); setAvatar(av, r.avatar, r.name); td.append(av, document.createTextNode(r.name)); tr.append(td); } c((r.net > 0 ? '+' : '') + num(r.net) + ' ' + COIN, r.net >= 0 ? 'pos' : 'neg'); c(String(r.rounds)); c(Math.round((r.wins / r.rounds) * 100) + ' %'); t.append(tr); });
     box.textContent = ''; box.append(t);
   } catch { box.textContent = 'Classement indisponible.'; }
 };
@@ -1307,16 +1356,43 @@ function pHub() {
 }
 
 // ---- tables multiples (blackjack + poker) : si une table est pleine, on joue sur une autre
-function tabsRender(box, tables, cur, pick, extra) {
-  const rows = [...tables.entries()].sort((a, b) => a[0] - b[0]);
-  const sig = rows.map(([t, s]) => t + ':' + s.seats.filter(Boolean).length + ':' + (s.seats.some((p) => p && me && p.uid === me.uid) ? 1 : 0)).join('|') + '#' + cur;
-  if (box.dataset.sig === sig) return; box.dataset.sig = sig; box.textContent = '';
-  rows.forEach(([tid, st]) => {
-    const n = st.seats.filter(Boolean).length, N = st.seats.length, mine = st.seats.some((p) => p && me && p.uid === me.uid);
-    const b = el('button', 'tbtn' + (tid === cur ? ' on' : '') + (n >= N ? ' full' : '') + (mine ? ' mine' : ''), 'Table ' + tid);
-    b.append(el('small', '', n >= N ? 'pleine' : n + '/' + N)); b.onclick = () => pick(tid); box.append(b);
-  });
+function tabsRender(box, tables, cur, pick, extra, onNew) {
+  const ids = [...tables.keys()].sort((a, b) => a - b);
+  const mineOf = (s) => !!(s && me && s.seats.some((p) => p && p.uid === me.uid));
+  const sig = ids.map((t) => t + ':' + tables.get(t).seats.filter(Boolean).length + ':' + (mineOf(tables.get(t)) ? 1 : 0)).join('|') + '#' + cur;
+  if (box.dataset.sig === sig) return; box.dataset.sig = sig;
+  const prevCur = box.dataset.cur; box.dataset.cur = String(cur);
+  const dir = Number(box.dataset.dir || 0); box.dataset.dir = '0';
+  box.textContent = '';
+  const st = tables.get(cur), i = Math.max(0, ids.indexOf(cur));
+  const go = (d) => {
+    if (ids.length < 2) return;
+    box.dataset.dir = String(d);
+    const tb = box.nextElementSibling;
+    if (tb) { tb.classList.remove('slL', 'slR'); void tb.offsetWidth; tb.classList.add(d > 0 ? 'slR' : 'slL'); }
+    pick(ids[(i + d + ids.length * 2) % ids.length]);
+  };
+  const n = st ? st.seats.filter(Boolean).length : 0, N = st ? st.seats.length : 0, full = N > 0 && n >= N;
+  const nav = el('div', 'tnav');
+  const l = el('button', 'tarrow l', '‹'), r = el('button', 'tarrow r', '›');
+  l.title = 'Table précédente'; r.title = 'Table suivante'; l.onclick = () => go(-1); r.onclick = () => go(1);
+  const lab = el('div', 'tlabel' + (mineOf(st) ? ' mine' : '') + (full ? ' full' : '') + (dir && String(cur) !== prevCur ? (dir > 0 ? ' inR' : ' inL') : ''), 'Table ' + cur);
+  lab.append(el('small', '', full ? 'pleine' : n + '/' + N));
+  nav.append(l, lab, r); box.append(nav);
+  if (ids.length > 1) {
+    const dots = el('div', 'tdots');
+    ids.forEach((t, k) => { const d = el('button', 'tdot' + (t === cur ? ' on' : '') + (mineOf(tables.get(t)) ? ' mine' : '')); d.title = 'Table ' + t; d.onclick = () => go(k - i); dots.append(d); });
+    box.append(dots);
+  }
+  if (onNew) { const b = el('button', 'tbtn new', '＋ Nouvelle table'); b.onclick = onNew; box.append(b); }
   if (extra) box.append(extra());
+}
+// crée une table vide puis s'y place (marche même si les autres tables ne sont pas pleines)
+async function newTable(game) {
+  const ok = await send('tnew', { game }), t = send.last && send.last.tid;
+  if (!ok || !t) return;
+  if (game === 'bj') { W.btid = t; W.bman = true; bjReset(); if (BJT.has(t)) render(BJT.get(t)); bjTabs(); }
+  else { P.cur = t; P.man = true; pReset(); if (P.tables.has(t)) pRender(P.tables.get(t)); pTabs(); pHub(); }
 }
 function chooseTable(tables, cur, manual) {
   for (const [t, st] of tables) if (me && st.seats.some((p) => p && p.uid === me.uid)) return t; // ma place passe avant tout
@@ -1329,7 +1405,7 @@ function bjReset() {
   $('#dcards').textContent = '';
   seatEls.forEach((se) => { se.hands.textContent = ''; se.hEls = []; se.bet.textContent = ''; se.bet.dataset.k = ''; });
 }
-function bjTabs() { tabsRender($('#bjTabs'), BJT, W.btid, (t) => { W.btid = t; W.bman = true; bjReset(); render(BJT.get(t)); bjTabs(); }); }
+function bjTabs() { tabsRender($('#bjTabs'), BJT, W.btid, (t) => { W.btid = t; W.bman = true; bjReset(); render(BJT.get(t)); bjTabs(); }, null, () => newTable('bj')); }
 function bjUpdate(st) {
   BJT.set(st.tid, st);
   const want = chooseTable(BJT, W.btid, W.bman), changed = want !== W.btid;
@@ -1344,7 +1420,7 @@ function pReset() {
 }
 function pTabs() {
   tabsRender($('#pkTabs'), P.tables, P.cur, (t) => { P.cur = t; P.man = true; pReset(); pRender(P.tables.get(t)); pTabs(); pHub(); },
-    () => { const b = el('button', 'tbtn hands', '🃏 Mains'); b.onclick = () => $('#mPHands').classList.add('on'); return b; });
+    () => { const b = el('button', 'tbtn hands', '🃏 Mains'); b.onclick = () => $('#mPHands').classList.add('on'); return b; }, () => newTable('poker'));
 }
 function pUpdate(st) {
   P.tables.set(st.tid, st);
@@ -1682,7 +1758,8 @@ function lbFill(sel, rows) {
   if (!rows || !rows.length) { box.replaceChildren(el('div', 'lbnone', 'Aucun joueur pour le moment.')); return; }
   box.replaceChildren(...rows.map((r, i) => {
     const row = el('div', 'lbrow' + (i < 3 ? ' r' + (i + 1) : '') + (me && r.uid === me.uid ? ' me' : ''));
-    row.append(el('span', 'lbrk', String(i + 1)), el('span', 'lbname', r.name), el('span', 'lbval', num(r.value) + ' ' + COIN));
+    const av = el('span', 'pav'); setAvatar(av, r.avatar, r.name);
+    row.append(el('span', 'lbrk', String(i + 1)), av, el('span', 'lbname', r.name), el('span', 'lbval', num(r.value) + ' ' + COIN));
     return row;
   }));
 }
@@ -1712,7 +1789,7 @@ function pFit() {
 }
 try { new MutationObserver(pFitSoon).observe(document.getElementById('pTable'), { childList: true, subtree: true }); } catch {}
 hubRoulette(false); hubPoker(false); setInterval(() => { updHub(); pHub(); }, 1000); updHub();
-document.querySelectorAll('.mitem').forEach((t) => (t.onclick = () => { ac(); menuClose(); setView(t.dataset.g); }));
+document.querySelectorAll('.mitem[data-g]').forEach((t) => (t.onclick = () => { ac(); menuClose(); setView(t.dataset.g); }));
 $('#bRules').onclick = () => $(W.view === 'roulette' ? '#mRRules' : W.view === 'poker' ? '#mPRules' : '#mRules').classList.add('on');
 function rOnHello(d) { W.info = d.roulette; W.joined = false; if (W.info) rBuild(); if (W.view === 'roulette') rEnter(); hubRoulette(!!W.info); updHub(); }
 
@@ -2325,6 +2402,82 @@ async function aRussian(st, tok) {
 }
 function ofLoop() { if (W.view.startsWith('off-') && O.game === 'fuse') ofFuseTick(); requestAnimationFrame(ofLoop); }
 requestAnimationFrame(ofLoop);
+
+
+// ============================================================= PARAMÈTRES (langue)
+const EN_DICT = {"Casino": "Casino", "Connecte-toi avec ton compte Discord pour jouer avec ton solde du casino.": "Log in with your Discord account to play with your casino balance.", "Se connecter avec Discord": "Log in with Discord", "Menu": "Menu", "Accueil": "Home", "Online": "Online", "Offline": "Offline", "Blackjack": "Blackjack", "Poker": "Poker", "Roulette": "Roulette", "Fusé": "Crash", "Mine": "Mines", "Mines": "Mines", "Pile ou Face": "Coin Flip", "Dés": "Dice", "Chevaux": "Horses", "Roulette russe": "Russian Roulette", "Classement": "Leaderboard", "Top gains": "Top wins", "Règles": "Rules", "Son": "Sound", "Muet": "Muted", "Plein écran": "Fullscreen", "Reconnexion…": "Reconnecting…", "Connexion…": "Connecting…", "Tables partagées avec tous les joueurs du serveur.": "Tables shared with every player on the server.", "Table à 5 places · mise libre · blackjack payé 3:2": "5-seat table · free bet · blackjack pays 3:2", "Jouer": "Play", "Texas Hold'em No-Limit · 5 places · relances libres et tapis": "Texas Hold'em No-Limit · 5 seats · free raises and all-in", "Roulette européenne · rouge, noir, pair, impair, numéros pleins": "European roulette · red, black, even, odd, straight numbers", "Jouables directement en MP Discord, et aussi sur le site.": "Playable in Discord DMs, and on the site too.", "Parties solo contre le croupier": "Solo games against the dealer", "Encaisse avant que la fusée explose": "Cash out before the rocket explodes", "Évite les mines, encaisse quand tu veux": "Avoid the mines, cash out whenever you want", "Une chance sur deux, gain x1.95": "50/50 chance, win x1.95", "Parie sur la somme de 2 dés": "Bet on the sum of 2 dice", "Course à 5 chevaux, jusqu’à x15.8": "5-horse race, up to x15.8", "Survis au barillet, plus de balles = plus de gain": "Survive the cylinder, more bullets = bigger win", "Les plus gros joueurs du casino.": "The biggest players of the casino.", "Classement actuel": "Current ranking", "Soldes actuels, du plus riche au moins riche": "Current balances, richest first", "Classement all-time": "All-time ranking", "Plus haut solde jamais atteint": "Highest balance ever reached", "CROUPIER": "DEALER", "TOI": "YOU", "Blackjack paie 3 pour 2 · le croupier tient sur 17": "Blackjack pays 3 to 2 · dealer stands on 17", "Tapis": "All-in", "Dernière mise": "Last bet", "Miser": "Bet", "Retirer la mise": "Remove bet", "Tirer": "Hit", "Rester": "Stand", "Doubler": "Double", "Séparer": "Split", "Quitter la table": "Leave table", "Cave min": "Min buy-in", "Max": "Max", "Se coucher": "Fold", "Check": "Check", "Min": "Min", "½ pot": "½ pot", "¾ pot": "¾ pot", "Pot": "Pot", "Relancer": "Raise", "Suivre": "Call", "Ajouter des jetons (entre deux mains)": "Add chips (between hands)", "Ajouter": "Add", "Rejouer mes mises": "Rebet", "Retirer mes mises": "Clear my bets", "Joueurs": "Players", "Réduire ✕": "Collapse ✕", "Fermer": "Close", "Annuler": "Cancel", "Chat": "Chat", "a gagné": "won", "Envoyer": "Send", "Règles du blackjack": "Blackjack rules", "Règles du poker (Texas Hold'em No-Limit)": "Poker rules (Texas Hold'em No-Limit)", "Classement des mains au poker": "Poker hand rankings", "Classement du blackjack (gains nets)": "Blackjack ranking (net winnings)", "Classement du poker (gains nets)": "Poker ranking (net winnings)", "Du plus fort (1) au plus faible (10). Les cartes éclairées forment la combinaison.": "Strongest (1) to weakest (10). Highlighted cards form the hand.", "Joueur": "Player", "Gains nets": "Net winnings", "Manches": "Rounds", "Victoires": "Wins", "Personne n’a encore terminé de manche.": "Nobody has finished a round yet.", "Classement indisponible.": "Leaderboard unavailable.", "Aucun joueur pour le moment.": "No players yet.", "Paramètres": "Settings", "⚙ Paramètres": "⚙ Settings", "Langue": "Language", "Envoyer des ZTKN": "Send ZTKN", "Chercher un joueur…": "Search a player…", "Montant": "Amount", "Aucun joueur trouvé.": "No player found.", "Destinataire : ": "Recipient: ", "Choisis un joueur.": "Pick a player.", "Montant invalide.": "Invalid amount.", "Solde insuffisant.": "Insufficient balance.", "Connexion perdue…": "Connection lost…", "Doucement 🙂": "Easy there 🙂", "Table libre": "Table free", "pleine": "full", "Une partie est déjà en cours.": "A game is already in progress.", "Aucune partie en cours.": "No game in progress.", "Cette table n’existe plus.": "This table no longer exists.", "Action inconnue.": "Unknown action.", "Tu ne peux pas t’envoyer de pièces à toi-même.": "You can't send coins to yourself.", "Montant minimum : 1.": "Minimum amount: 1.", "Ce joueur n’est pas sur le serveur.": "This player isn't on the server.", "Envoi impossible, réessaie.": "Couldn't send, try again.", "Nouvelle table": "New table", "＋ Nouvelle table": "＋ New table", "🃏 Mains": "🃏 Hands", "Table précédente": "Previous table", "Table suivante": "Next table", "Ton solde": "Your balance", "Mise": "Bet", "Mise :": "Bet:", "Distribuer": "Deal", "Encaisser": "Cash out", "Lancer": "Start", "Pile": "Heads", "Face": "Tails", "Moins de 7": "Under 7", "Plus de 7": "Over 7", "Exactement 7": "Exactly 7", "À toi de jouer": "Your turn", "Choisis ta mise puis distribue": "Pick your bet then deal", "Montant de la mise": "Bet amount", "Mise par clic": "Bet per click", "Écrire un message": "Write a message", "Message": "Message", "Agrandir la roue": "Enlarge the wheel", "Top gains de ce jeu": "Top wins of this game"};
+const EN_RE = [["^Table (\\d+)$", "Table $1"], ["^Mis à jour à (.+)$", "Updated at $1"], ["^Chat · (.+)$", "@Chat · $1"], ["^(\\d+) joueurs? à table$", "$1 player(s) at the table"], ["^🎁 (.+) t’a envoyé (.+)$", "🎁 $1 sent you $2"], ["^Mise minimale : (.+)$", "Minimum bet: $1"], ["^Mise maximale : (.+)$", "Maximum bet: $1"], ["^Tu es déjà assis à la table (\\d+) : quitte-la d’abord\\.$", "You're already seated at table $1: leave it first."], ["^Maximum (\\d+) tables\\.$", "Maximum $1 tables."], ["^à (.+?) · mise (.+)$", "@at $1 · bet $2"], ["^blinds (.+)$", "blinds $1"], ["^Ta session a expiré : reconnecte-toi avec Discord\\.$", "Your session expired: log in with Discord again."]].map(([a, b]) => [new RegExp(a), b]);
+let LANG = 'fr'; try { LANG = localStorage.getItem('znk_lang') === 'en' ? 'en' : 'fr'; } catch {}
+const trWords = (s) => {
+  const m = /^(\s*)([\s\S]*?)(\s*)$/.exec(s), core = m[2];
+  if (!core) return s;
+  let t = EN_DICT[core];
+  if (t == null) for (const [re, rp] of EN_RE) if (re.test(core)) { t = core.replace(re, rp.replace(/^@/, '')); if (rp[0] === '@') t = t.replace(/Blackjack solo|Fusé|Pile ou Face|Dés|Chevaux|Roulette russe|Accueil|Mines?\b/g, (w) => EN_DICT[w] || w); break; }
+  return t == null ? s : m[1] + t + m[3];
+};
+const I18 = { nodes: new WeakMap(), busy: false };
+function i18Node(n) {
+  if (n.nodeType === 3) {
+    const v = n.nodeValue, rec = I18.nodes.get(n);
+    if (rec && v === rec.t) return;
+    const t = trWords(v); I18.nodes.set(n, { o: v, t }); if (t !== v) n.nodeValue = t;
+  } else if (n.nodeType === 1 && !/^(SCRIPT|STYLE)$/.test(n.tagName)) {
+    for (const a of ['title', 'placeholder', 'aria-label']) if (n.hasAttribute(a)) {
+      const k = 'o' + a, cur = n.getAttribute(a); if (n[k] && n[k].t === cur) continue;
+      const t = trWords(cur); n[k] = { o: cur, t }; if (t !== cur) n.setAttribute(a, t);
+    }
+    for (const c of n.childNodes) i18Node(c);
+  }
+}
+function i18Undo(n) {
+  if (n.nodeType === 3) { const rec = I18.nodes.get(n); if (rec && n.nodeValue === rec.t) n.nodeValue = rec.o; I18.nodes.delete(n); }
+  else if (n.nodeType === 1) {
+    for (const a of ['title', 'placeholder', 'aria-label']) { const k = 'o' + a; if (n[k] && n.getAttribute(a) === n[k].t) n.setAttribute(a, n[k].o); delete n[k]; }
+    for (const c of n.childNodes) i18Undo(c);
+  }
+}
+const i18Obs = new MutationObserver((ms) => {
+  if (LANG !== 'en' || I18.busy) return; I18.busy = true;
+  try { for (const m of ms) { if (m.type === 'characterData') i18Node(m.target); else if (m.type === 'attributes') i18Node(m.target); else m.addedNodes.forEach(i18Node); } } finally { I18.busy = false; }
+});
+function setLang(l, silent) {
+  LANG = l === 'en' ? 'en' : 'fr'; try { localStorage.setItem('znk_lang', LANG); } catch {}
+  document.documentElement.lang = LANG; I18.busy = true;
+  try { if (LANG === 'en') i18Node(document.body); else i18Undo(document.body); } finally { I18.busy = false; }
+  document.querySelectorAll('#langSeg button').forEach((b) => b.classList.toggle('on', b.dataset.lang === LANG));
+}
+i18Obs.observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['title', 'placeholder'] });
+document.querySelectorAll('#langSeg button').forEach((b) => (b.onclick = () => setLang(b.dataset.lang)));
+$('#bSet').onclick = () => $('#mSet').classList.add('on');
+if (LANG === 'en') setLang('en'); else document.querySelectorAll('#langSeg button').forEach((b) => b.classList.toggle('on', b.dataset.lang === 'fr'));
+
+// ============================================================= ENVOYER DES ZTKN (menu)
+const G = { to: null, t: 0 };
+function gSel() { const b = $('#gTo'); b.textContent = G.to ? 'Destinataire : ' + G.to.name : ''; document.querySelectorAll('#gList .gp').forEach((x) => x.classList.toggle('on', !!G.to && x.dataset.uid === G.to.uid)); }
+async function gSearch() {
+  const q = $('#gQ').value.trim(), box = $('#gList');
+  try {
+    const d = await (await fetch('/api/players?t=' + encodeURIComponent(TOKEN) + '&q=' + encodeURIComponent(q))).json();
+    box.textContent = '';
+    if (!d.players || !d.players.length) { box.append(el('div', 'lbnone', 'Aucun joueur trouvé.')); return; }
+    d.players.forEach((p) => { const b = el('button', 'gp'), av = el('span', 'pav'); b.dataset.uid = p.uid; setAvatar(av, p.avatar, p.name); b.append(av, document.createTextNode(p.name)); b.onclick = () => { G.to = p; gSel(); $('#gAmt').focus(); }; box.append(b); });
+    gSel();
+  } catch { box.textContent = ''; }
+}
+function gOpen() { menuClose(); G.to = null; $('#gQ').value = ''; $('#gAmt').value = ''; $('#mGift').classList.add('on'); gSel(); gSearch(); setTimeout(() => $('#gQ').focus(), 50); }
+document.querySelector('.mitem[data-act="gift"]').onclick = gOpen;
+$('#gQ').oninput = () => { clearTimeout(G.t); G.t = setTimeout(gSearch, 250); };
+document.querySelectorAll('#mGift [data-q]').forEach((b) => (b.onclick = () => { $('#gAmt').value = b.dataset.q; }));
+$('#gSend').onclick = async () => {
+  if (!G.to) return toast('Choisis un joueur.');
+  const amt = parseAmt($('#gAmt').value); if (!(amt >= 1)) return toast('Montant invalide.');
+  $('#gSend').disabled = true;
+  const ok = await send('gift', { to: G.to.uid, amount: amt });
+  $('#gSend').disabled = false;
+  if (!ok) return;
+  SFX.chip(); $('#mGift').classList.remove('on'); toast('✅ ' + num(amt) + ' ' + COIN + ' → ' + G.to.name);
+  if (W.bal != null && !O.hold) $('#meBal').textContent = num(W.bal) + ' ' + COIN;
+};
 
 connect(); tick();
 })();
