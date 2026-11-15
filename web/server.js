@@ -22,8 +22,10 @@ const { create: createOffline } = require('./offline');
 const PUBLIC_URL = String(process.env.PUBLIC_URL || 'https://znkcasdiscordbot-production.up.railway.app').replace(/\/+$/, '');
 const TOKEN_TTL_MS = 12 * 3600 * 1000;
 // chat en direct : un salon par jeu (par serveur Discord), historique gardé en mémoire
-const CHAT_ROOMS = new Set(['hub', 'bj', 'poker', 'roulette', 'off-bj', 'off-fuse', 'off-mine']);
+const CHAT_ROOMS = new Set(['hub', 'bj', 'poker', 'roulette', 'off-bj', 'off-fuse', 'off-mine', 'off-coin', 'off-dice', 'off-horses', 'off-russian']);
 const CHAT_KEEP = 60;
+// salon de chat de chaque jeu : les victoires y sont annoncées automatiquement (+ dans l'accueil)
+const GAME_ROOM = { blackjack: 'bj', poker: 'poker', roulette: 'roulette', 'bj-solo': 'off-bj', fuse: 'off-fuse', mines: 'off-mine', coin: 'off-coin', dice: 'off-dice', horses: 'off-horses', russian: 'off-russian' };
 const EMOTES = new Set(['🔥', '👏', '😈', '🍀', '😱', '😂', '💸', '🎉']);
 const DATA_DIR = path.join(__dirname, '..', 'data');
 
@@ -114,8 +116,32 @@ function init(deps) {
     }
   })();
 
-  // ---------- jeux offline solo (mines, fusé, blackjack) ----------
-  const offline = createOffline({ getBalance: deps.getBalance, debit: deps.debit, credit: deps.credit, onRoundEnd: (guildId, r) => deps.onRoundEnd && deps.onRoundEnd(guildId, r) }, pending);
+  // ---------- fin de manche : récap Discord + annonce des gagnants dans le chat du site ----------
+  function roundEnd(guildId, r) {
+    try {
+      const room = GAME_ROOM[r && r.game];
+      if (room) {
+        const entry = roomOf(guildId);
+        const now = Date.now();
+        for (const p of (r.players || []).filter((x) => x.net > 0)) {
+          const mult = p.mult || (p.bet > 0 ? Math.floor(((p.bet + p.net) / p.bet) * 100) / 100 : 0);
+          const base = { sys: 'win', game: r.game, uid: p.uid, name: p.name, role: '', text: '', bet: p.bet, net: p.net, mult, detail: p.detail || (p.outcome === 'bj' ? 'BLACKJACK' : ''), t: now };
+          for (const rm of [room, 'hub']) {
+            const msg = { ...base, room: rm };
+            const list = entry.chat.get(rm) || [];
+            list.push(msg);
+            if (list.length > CHAT_KEEP) list.shift();
+            entry.chat.set(rm, list);
+            entry.broadcast(`event: chat\ndata: ${JSON.stringify(msg)}\n\n`);
+          }
+        }
+      }
+    } catch (e) { console.error('[web] annonce victoire', e?.message || e); }
+    if (deps.onRoundEnd) deps.onRoundEnd(guildId, r);
+  }
+
+  // ---------- jeux offline solo (mines, fusé, blackjack, pile ou face, dés, chevaux, roulette russe) ----------
+  const offline = createOffline({ getBalance: deps.getBalance, debit: deps.debit, credit: deps.credit, onRoundEnd: (guildId, r) => roundEnd(guildId, r) }, pending);
 
   // ---------- statistiques / classement (un fichier par jeu : blackjack, poker) ----------
   function makeStats(file) {
@@ -154,7 +180,7 @@ function init(deps) {
       credit: deps.credit,
       pending,
       stats: pokerStats,
-      onRoundEnd: (r) => deps.onRoundEnd && deps.onRoundEnd(entry.guildId, r),
+      onRoundEnd: (r) => roundEnd(entry.guildId, r),
       // snapshot PERSONNALISÉ (chaque joueur ne reçoit que ses propres cartes) => un envoi par connexion
       onChange: (p) => {
         for (const res of entry.clients) {
@@ -176,7 +202,7 @@ function init(deps) {
       credit: deps.credit,
       pending,
       stats: statsApi,
-      onRoundEnd: (x) => deps.onRoundEnd && deps.onRoundEnd(entry.guildId, x),
+      onRoundEnd: (x) => roundEnd(entry.guildId, x),
       onChange: (room) => {
         const msg = `event: state\ndata: ${JSON.stringify({ ...room.snapshot(), tid })}\n\n`;
         for (const res of entry.clients) {
@@ -242,7 +268,7 @@ function init(deps) {
       debit: deps.debit,
       credit: deps.credit,
       pending,
-      onRoundEnd: (r) => deps.onRoundEnd && deps.onRoundEnd(guildId, r),
+      onRoundEnd: (r) => roundEnd(guildId, r),
       onChange: (w) => broadcast(`event: roulette\ndata: ${JSON.stringify(w.snapshot())}\n\n`),
     });
     entry.bjs = new Map(); // tid -> Room (blackjack)
@@ -251,6 +277,58 @@ function init(deps) {
     syncTables(entry);
     rooms.set(guildId, entry);
     return entry;
+  }
+
+
+  // ---------- connexion « Se connecter avec Discord » (OAuth2) : un seul lien public pour tout le monde ----------
+  // À configurer : DISCORD_CLIENT_SECRET (Discord Developer Portal → OAuth2) + ajouter l'URL de redirection  PUBLIC_URL/auth/callback
+  const CLIENT_SECRET = String(process.env.DISCORD_CLIENT_SECRET || '').trim();
+  const clientId = () => String(process.env.DISCORD_CLIENT_ID || (deps.clientId && deps.clientId()) || '').trim();
+  const REDIRECT = PUBLIC_URL + '/auth/callback';
+  const oauthOn = () => !!(CLIENT_SECRET && clientId() && deps.resolveMember);
+  const SECURE = /^https:/.test(PUBLIC_URL) ? '; Secure' : '';
+  const cookieOf = (req, k) => { const m = String(req.headers.cookie || '').split(/;\s*/).find((c) => c.startsWith(k + '=')); return m ? m.slice(k.length + 1) : ''; };
+  const esc = (t) => String(t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const page = (res, code, body, extra = {}) => {
+    res.writeHead(code, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', ...SEC, ...extra });
+    res.end(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Casino</title><body style="margin:0;min-height:100vh;display:grid;place-items:center;background:#000;color:#f2f2f2;font:15px system-ui,sans-serif;text-align:center;padding:24px"><div style="max-width:420px">${body}</div>`);
+  };
+  const BTN = 'display:block;margin:10px 0;padding:13px 18px;border-radius:12px;background:#5865f2;color:#fff;text-decoration:none;font-weight:800';
+  const goHome = (res, user, guildId) => { res.writeHead(302, { Location: '/?t=' + makeToken(user, guildId), 'Cache-Control': 'no-store', 'Set-Cookie': 'znk_oauth=; Path=/auth; Max-Age=0', ...SEC }); res.end(); };
+  const seal = (obj) => { const p = b64(JSON.stringify({ ...obj, e: Date.now() + 10 * 60 * 1000 })); return p + '.' + sign(p); };
+  const unseal = (t) => {
+    try { const [p, sg] = String(t || '').split('.'); if (!p || !sg || sign(p) !== sg) return null; const d = JSON.parse(unb64(p)); return d.e > Date.now() ? d : null; } catch { return null; }
+  };
+  async function handleAuth(req, res, url) {
+    if (!oauthOn()) return page(res, 503, '<h2>Connexion Discord indisponible</h2><p>L’administrateur doit configurer <b>DISCORD_CLIENT_SECRET</b> sur le serveur.</p>');
+    if (url.pathname === '/login') {
+      const state = crypto.randomBytes(16).toString('base64url');
+      const q = new URLSearchParams({ client_id: clientId(), response_type: 'code', redirect_uri: REDIRECT, scope: 'identify guilds', state, prompt: 'none' });
+      res.writeHead(302, { Location: 'https://discord.com/oauth2/authorize?' + q, 'Cache-Control': 'no-store', 'Set-Cookie': `znk_oauth=${state}; Path=/auth; Max-Age=600; HttpOnly; SameSite=Lax${SECURE}`, ...SEC });
+      return res.end();
+    }
+    if (url.pathname === '/auth/guild') { // choix du serveur (si le joueur est dans plusieurs serveurs du casino)
+      const t = unseal(url.searchParams.get('k')), c = t && t.o.find((x) => x.guildId === url.searchParams.get('g'));
+      if (!c) return page(res, 400, '<h2>Session expirée</h2><a style="' + BTN + '" href="/login">Se connecter avec Discord</a>');
+      return goHome(res, { id: t.u, name: c.name, avatar: c.avatar, role: c.role }, c.guildId);
+    }
+    // /auth/callback
+    const state = url.searchParams.get('state') || '', code = url.searchParams.get('code');
+    const fail = (m) => page(res, 400, `<h2>Connexion impossible</h2><p>${esc(m)}</p><a style="${BTN}" href="/login">Réessayer</a>`);
+    if (url.searchParams.get('error')) return fail('Connexion annulée.');
+    if (!code || !state || state !== cookieOf(req, 'znk_oauth')) return fail('Session invalide, réessaie.');
+    try {
+      const tk = await fetch('https://discord.com/api/oauth2/token', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ client_id: clientId(), client_secret: CLIENT_SECRET, grant_type: 'authorization_code', code, redirect_uri: REDIRECT }) }).then((r) => r.json());
+      if (!tk.access_token) throw new Error('refus de Discord');
+      const H = { Authorization: 'Bearer ' + tk.access_token };
+      const [u, gl] = await Promise.all([fetch('https://discord.com/api/users/@me', { headers: H }).then((r) => r.json()), fetch('https://discord.com/api/users/@me/guilds', { headers: H }).then((r) => r.json())]);
+      if (!u || !u.id) throw new Error('profil introuvable');
+      const opts = await deps.resolveMember(String(u.id), Array.isArray(gl) ? gl.map((g) => String(g.id)) : []);
+      if (!opts || !opts.length) return page(res, 403, '<h2>Accès refusé</h2><p>Tu dois être membre du serveur Discord du casino pour jouer.</p>');
+      if (opts.length === 1) return goHome(res, { id: u.id, name: opts[0].name, avatar: opts[0].avatar, role: opts[0].role }, opts[0].guildId);
+      const k = seal({ u: String(u.id), o: opts.slice(0, 20).map((o) => ({ guildId: String(o.guildId), name: String(o.name), avatar: String(o.avatar || ''), role: String(o.role || ''), gn: String(o.guildName || o.guildId) })) });
+      return page(res, 200, '<h2>Choisis ton serveur</h2>' + opts.slice(0, 20).map((o) => `<a style="${BTN}" href="/auth/guild?k=${encodeURIComponent(k)}&g=${encodeURIComponent(o.guildId)}">${esc(o.guildName || o.guildId)}</a>`).join(''), { 'Set-Cookie': 'znk_oauth=; Path=/auth; Max-Age=0' });
+    } catch (e) { console.error('[web] oauth', e?.message || e); return fail('Discord n’a pas répondu, réessaie.'); }
   }
 
   // ---------- http ----------
@@ -494,9 +572,11 @@ function init(deps) {
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', ...SEC });
         return res.end(loadHtml());
       }
+      if (req.method === 'GET' && (url.pathname === '/login' || url.pathname === '/auth/callback' || url.pathname === '/auth/guild')) return await handleAuth(req, res, url);
       if (req.method === 'GET' && url.pathname === '/healthz') return json(res, 200, { ok: true });
       if (req.method === 'GET' && url.pathname === '/api/stream') return handleStream(req, res, url);
       if (req.method === 'GET' && url.pathname === '/api/top') return json(res, 200, { top: (url.searchParams.get('g') === 'poker' ? pokerStats : statsApi).top() });
+      if (req.method === 'GET' && url.pathname === '/api/boards') return json(res, 200, await Promise.resolve(deps.getBoards ? deps.getBoards() : null).catch(() => null) || { rich: [], alltime: [] });
       if (req.method === 'POST' && url.pathname === '/api/act') return await handleAct(req, res);
       res.writeHead(404, SEC);
       res.end('Not found');
@@ -514,7 +594,7 @@ function init(deps) {
   server.listen(port, '0.0.0.0', () => console.log(`[web] blackjack + poker + roulette en ligne → ${PUBLIC_URL} (port ${port})`));
   server.on('error', (e) => console.error('[web] serveur :', e?.message || e));
 
-  return { makeLink, enabled: true, rooms, server };
+  return { makeLink, enabled: true, rooms, server, publicUrl: PUBLIC_URL, oauth: oauthOn };
 }
 
 module.exports = { init };
