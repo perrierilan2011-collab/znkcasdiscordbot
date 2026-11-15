@@ -430,6 +430,43 @@ td .pav{margin-right:8px;width:24px;height:24px}
 .gp:hover{background:rgba(255,255,255,.14)}.gp.on{border-color:var(--gold);background:rgba(251,191,36,.14)}
 #gTo{font-weight:800;margin:8px 0;min-height:20px;color:var(--gold)}
 .gq{display:flex;gap:6px;flex-wrap:wrap;margin:4px 0 10px}
+
+/* en-tête : icônes seules, cloche, menu du pseudo */
+.hb.ico:not(.hide){width:38px;height:38px;padding:0;display:grid;place-items:center;font-size:17px;line-height:1;position:relative}
+.pop{position:relative}
+.ppanel{display:none;position:absolute;right:0;top:calc(100% + 8px);z-index:25;background:#0a0a0a;border:1px solid #262626;border-radius:14px;box-shadow:0 14px 40px rgba(0,0,0,.6)}
+.pop.open>.ppanel{display:block}
+#nPanel{width:300px;max-width:calc(100vw - 20px)}
+#nPanel h3{margin:0;padding:12px 14px;font-size:14px;border-bottom:1px solid #1f1f1f}
+#nList{max-height:320px;overflow:auto}
+.nit{display:flex;gap:10px;padding:10px 14px;border-bottom:1px solid #1a1a1a;font-size:13px;align-items:flex-start}
+.nit:last-child{border-bottom:0}
+.nit.new{background:rgba(251,191,36,.09);box-shadow:inset 3px 0 0 var(--gold)}
+.nit small{display:block;color:var(--mut);font-size:11px;margin-top:2px}
+.nic{font-size:18px}
+.nit .cg{color:var(--gold)}
+#bBadge{position:absolute;top:-5px;right:-5px;min-width:17px;height:17px;border-radius:9px;background:#ef4444;color:#fff;font-size:10px;font-weight:800;display:none;place-items:center;padding:0 4px;pointer-events:none}
+#bBadge.on{display:grid}
+.pop.open>#mePanel{display:flex}
+#mePanel{min-width:220px;flex-direction:column;gap:12px;padding:14px}
+.mpn{display:flex;justify-content:space-between;align-items:center;gap:16px;font-size:13px}
+.mpn b{color:var(--gold);font-size:17px}
+.me{cursor:pointer;user-select:none}
+.me .car{font-size:10px;opacity:.7}
+
+/* barres de défilement noires comme le site */
+*{scrollbar-width:thin;scrollbar-color:#3a3a3a #000}
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-track{background:#000}
+::-webkit-scrollbar-thumb{background:#3a3a3a;border-radius:8px;border:2px solid #000}
+::-webkit-scrollbar-thumb:hover{background:#555}
+::-webkit-scrollbar-button,::-webkit-scrollbar-corner{display:none;background:#000}
+#chatList{scrollbar-color:#3a3a3a #0a0a0a}
+#chatList::-webkit-scrollbar-track{background:#0a0a0a}#chatList::-webkit-scrollbar-thumb{border-color:#0a0a0a}
+/* petite notification de message */
+.cpop{position:fixed;right:12px;bottom:66px;max-width:300px;z-index:16;background:#0a0a0a;border:1px solid #525252;border-radius:12px;padding:9px 12px;font-size:13px;box-shadow:0 10px 30px rgba(0,0,0,.6);cursor:pointer;animation:cpin .25s ease;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cpop b{margin-right:6px}
+@keyframes cpin{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 /* ---------- sélecteur de tables ---------- */
 .tbar{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;align-items:center;padding:6px 10px 0}
 .tbtn{display:inline-flex;align-items:center;gap:7px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);border-radius:999px;padding:6px 14px;font-weight:700;font-size:13px;color:#fff}
@@ -602,12 +639,19 @@ body.fs.vpk #pkInfo{font-size:12px}
     </div>
   </div>
   <div class="sp"></div>
-  <button class="hb hide" id="bTop" title="Top gains de ce jeu">Top gains</button>
-  <button class="hb hide" id="bRules" title="Règles">Règles</button>
-  <button class="hb" id="bSet" title="Paramètres">⚙ Paramètres</button>
-  <button class="hb" id="bSnd" title="Son">Son</button>
-  <button class="hb" id="bFs" title="Plein écran">Plein écran</button>
-  <div class="me" id="me"><div class="av" id="meAv">?</div><div><div id="meName" style="font-weight:700;font-size:12px">…</div><b id="meBal">—</b></div></div>
+  <button class="hb ico hide" id="bTop" title="Top gains de ce jeu">🏆</button>
+  <button class="hb ico hide" id="bRules" title="Règles">📖</button>
+  <button class="hb ico" id="bSnd" title="Son">🔊</button>
+  <button class="hb ico" id="bFs" title="Plein écran">⛶</button>
+  <button class="hb ico" id="bSet" title="Paramètres">⚙</button>
+  <div class="pop" id="bellWrap">
+    <button class="hb ico" id="bBell" title="Notifications" aria-haspopup="true">🔔<span id="bBadge"></span></button>
+    <div class="ppanel" id="nPanel"><h3>Notifications</h3><div id="nList"></div></div>
+  </div>
+  <div class="pop" id="meWrap">
+    <div class="me" id="me" role="button" tabindex="0" aria-haspopup="true"><div class="av" id="meAv">?</div><div id="meName" style="font-weight:700;font-size:12px">…</div><span class="car">▾</span></div>
+    <div class="ppanel" id="mePanel"><div class="mpn"><span>Solde</span><b id="meBal">—</b></div><button class="btn" id="bLogout">⏻ Déconnexion</button></div>
+  </div>
 </header>
 <div id="conn">Reconnexion…</div>
 <main id="hubView">
@@ -831,6 +875,9 @@ body.fs.vpk #pkInfo{font-size:12px}
 <div class="modal" id="mPHands"><div class="box"><h2>Classement des mains au poker</h2><p style="color:rgba(255,255,255,.65);font-size:13px;margin:0 0 6px">Du plus fort (1) au plus faible (10). Les cartes éclairées forment la combinaison.</p><div id="hList"></div><p style="text-align:right"><button class="btn" data-close>Fermer</button></p></div></div>
 <div class="modal" id="mSet"><div class="box"><h2>Paramètres</h2>
   <div class="setrow"><b>Langue</b><div class="seg" id="langSeg"><button data-lang="fr">Français</button><button data-lang="en">English</button></div></div>
+  <div class="setrow"><b>Victoires des autres joueurs</b><div class="seg" data-set="winOthers"><button data-v="1">Afficher</button><button data-v="0">Masquer</button></div></div>
+  <div class="setrow"><b>Mes victoires</b><div class="seg" data-set="winMine"><button data-v="1">Afficher</button><button data-v="0">Masquer</button></div></div>
+  <div class="setrow"><b>Notification de message</b><div class="seg" data-set="chatNotif"><button data-v="off">Aucune</button><button data-v="silent">Silencieuse</button><button data-v="sound">Avec son</button></div></div>
   <p style="text-align:right"><button class="btn" data-close>Fermer</button></p></div></div>
 <div class="modal" id="mGift"><div class="box"><h2>Envoyer des ZTKN</h2>
   <input class="gin" id="gQ" placeholder="Chercher un joueur…" autocomplete="off" maxlength="32">
@@ -956,7 +1003,8 @@ function connect() {
   es.addEventListener('roulette', (e) => { const st = JSON.parse(e.data); offset = st.now - Date.now(); rRender(st); });
   es.addEventListener('poker', (e) => { const st = JSON.parse(e.data); offset = st.now - Date.now(); pUpdate(st); });
   es.addEventListener('bal', (e) => { W.bal = JSON.parse(e.data).bal; pHeader(); if (!O.hold && W.bal != null) $('#meBal').textContent = num(W.bal) + ' ' + COIN; });
-  es.addEventListener('gift', (e) => { const d = JSON.parse(e.data); SFX.win(); toast('🎁 ' + d.from + ' t’a envoyé ' + num(d.amount) + ' ' + COIN); });
+  es.addEventListener('inbox', (e) => nSet(JSON.parse(e.data), false));
+  es.addEventListener('notif', (e) => nAdd(JSON.parse(e.data)));
   es.addEventListener('chathist', (e) => { C.msgs = JSON.parse(e.data); cRender(); });
   es.addEventListener('chat', (e) => cOnMsg(JSON.parse(e.data)));
   es.addEventListener('state', (e) => { $('#conn').style.display = 'none'; const st = JSON.parse(e.data); offset = st.now - Date.now(); bjUpdate(st); });
@@ -1215,7 +1263,7 @@ $('#bTop').onclick = async () => {
     box.textContent = ''; box.append(t);
   } catch { box.textContent = 'Classement indisponible.'; }
 };
-const sndBtn = $('#bSnd'); const refreshSnd = () => (sndBtn.textContent = sndOn ? 'Son' : 'Muet'); refreshSnd();
+const sndBtn = $('#bSnd'); const refreshSnd = () => { sndBtn.textContent = sndOn ? '🔊' : '🔇'; sndBtn.title = sndOn ? 'Son' : 'Muet'; }; refreshSnd();
 sndBtn.onclick = () => { sndOn = !sndOn; try { localStorage.setItem('znk_snd', sndOn ? '1' : '0'); } catch {} refreshSnd(); if (sndOn) SFX.chip(); };
 document.addEventListener('pointerdown', () => ac(), { once: true });
 // retour sur l'onglet : resynchronise le solde
@@ -1223,6 +1271,9 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden && my
 
 // ============================================================= CHAT EN DIRECT (un salon par jeu)
 const C = { msgs: {}, open: false, unread: 0 };
+const SET = { winOthers: '1', winMine: '1', chatNotif: 'silent' };
+try { Object.assign(SET, JSON.parse(localStorage.getItem('znk_set') || '{}')); } catch {}
+const cShow = (m) => m.sys !== 'win' || (me && m.uid === me.uid ? SET.winMine !== '0' : SET.winOthers !== '0');
 const CNAME = { hub: 'Accueil', bj: 'Blackjack', poker: 'Poker', roulette: 'Roulette', 'off-bj': 'Blackjack solo', 'off-fuse': 'Fusé', 'off-mine': 'Mine', 'off-coin': 'Pile ou Face', 'off-dice': 'Dés', 'off-horses': 'Chevaux', 'off-russian': 'Roulette russe' };
 const GLAB = { blackjack: 'Blackjack', poker: 'Poker', roulette: 'Roulette', 'bj-solo': 'Blackjack solo', fuse: 'Fusé', mines: 'Mines', coin: 'Pile ou Face', dice: 'Dés', horses: 'Chevaux', russian: 'Roulette russe' };
 const cRoom = () => (W.view === 'top' ? 'hub' : W.view);
@@ -1240,7 +1291,7 @@ function cLine(m) {
   return d;
 }
 function cRender() {
-  const room = cRoom(), list = $('#chatList'), arr = C.msgs[room] || [];
+  const room = cRoom(), list = $('#chatList'), arr = (C.msgs[room] || []).filter(cShow);
   setTxtC($('#chatTitle'), 'Chat · ' + (CNAME[room] || ''));
   const b = $('#chatBadge'); b.classList.toggle('hide', !C.unread || C.open); b.textContent = String(C.unread);
   list.replaceChildren(...(arr.length ? arr.map(cLine) : [el('div', 'cempty', 'Aucun message. Lance la discussion.')]));
@@ -1250,8 +1301,18 @@ const setTxtC = (n, t) => { if (n.textContent !== t) n.textContent = t; };
 function cOnMsg(m) {
   (C.msgs[m.room] = C.msgs[m.room] || []).push(m); if (C.msgs[m.room].length > 60) C.msgs[m.room].shift();
   if (m.room !== cRoom()) return;
-  if (!C.open && !(me && m.uid === me.uid)) C.unread++;
+  if (!cShow(m)) return;
+  const mine = me && m.uid === me.uid;
+  if (!C.open && !mine) C.unread++;
   cRender();
+  if (!mine && m.sys !== 'win' && !C.open && SET.chatNotif !== 'off') cNotify(m);
+}
+function cNotify(m) { // petite bulle (avec ou sans son selon les paramètres)
+  document.querySelectorAll('.cpop').forEach((x) => x.remove());
+  const p = el('div', 'cpop'); p.append(el('b', '', '💬 ' + m.name), document.createTextNode(m.text.slice(0, 80)));
+  p.onclick = () => { p.remove(); if (!C.open) $('#chatHead').click(); };
+  document.body.append(p); setTimeout(() => p.remove(), 4000);
+  if (SET.chatNotif === 'sound') { const was = sndOn; sndOn = true; try { tone(880, .09, 'sine', .07); tone(1175, .12, 'sine', .06, .09); } finally { sndOn = was; } }
 }
 $('#chatHead').onclick = () => { C.open = !C.open; $('#chat').classList.toggle('open', C.open); if (C.open) { C.unread = 0; cRender(); $('#chatIn').focus(); } };
 $('#chatForm').onsubmit = async (e) => {
@@ -1442,7 +1503,7 @@ function tableDel(d) {
 }
 
 // ---- plein écran (API native, sinon plein écran « simulé » sur iPhone)
-function fsUpd() { setTimeout(pFitSoon, 0); const on = !!document.fullscreenElement || !!document.webkitFullscreenElement || document.body.classList.contains('pfs'); document.body.classList.toggle('fs', on); $('#bFs').textContent = on ? 'Quitter le plein écran' : 'Plein écran'; }
+function fsUpd() { setTimeout(pFitSoon, 0); const on = !!document.fullscreenElement || !!document.webkitFullscreenElement || document.body.classList.contains('pfs'); document.body.classList.toggle('fs', on); $('#bFs').textContent = on ? '🗗' : '⛶'; $('#bFs').title = on ? 'Quitter le plein écran' : 'Plein écran'; }
 $('#bFs').onclick = async () => {
   const d = document.documentElement, b = document.body;
   try {
@@ -2405,7 +2466,7 @@ requestAnimationFrame(ofLoop);
 
 
 // ============================================================= PARAMÈTRES (langue)
-const EN_DICT = {"Casino": "Casino", "Connecte-toi avec ton compte Discord pour jouer avec ton solde du casino.": "Log in with your Discord account to play with your casino balance.", "Se connecter avec Discord": "Log in with Discord", "Menu": "Menu", "Accueil": "Home", "Online": "Online", "Offline": "Offline", "Blackjack": "Blackjack", "Poker": "Poker", "Roulette": "Roulette", "Fusé": "Crash", "Mine": "Mines", "Mines": "Mines", "Pile ou Face": "Coin Flip", "Dés": "Dice", "Chevaux": "Horses", "Roulette russe": "Russian Roulette", "Classement": "Leaderboard", "Top gains": "Top wins", "Règles": "Rules", "Son": "Sound", "Muet": "Muted", "Plein écran": "Fullscreen", "Reconnexion…": "Reconnecting…", "Connexion…": "Connecting…", "Tables partagées avec tous les joueurs du serveur.": "Tables shared with every player on the server.", "Table à 5 places · mise libre · blackjack payé 3:2": "5-seat table · free bet · blackjack pays 3:2", "Jouer": "Play", "Texas Hold'em No-Limit · 5 places · relances libres et tapis": "Texas Hold'em No-Limit · 5 seats · free raises and all-in", "Roulette européenne · rouge, noir, pair, impair, numéros pleins": "European roulette · red, black, even, odd, straight numbers", "Jouables directement en MP Discord, et aussi sur le site.": "Playable in Discord DMs, and on the site too.", "Parties solo contre le croupier": "Solo games against the dealer", "Encaisse avant que la fusée explose": "Cash out before the rocket explodes", "Évite les mines, encaisse quand tu veux": "Avoid the mines, cash out whenever you want", "Une chance sur deux, gain x1.95": "50/50 chance, win x1.95", "Parie sur la somme de 2 dés": "Bet on the sum of 2 dice", "Course à 5 chevaux, jusqu’à x15.8": "5-horse race, up to x15.8", "Survis au barillet, plus de balles = plus de gain": "Survive the cylinder, more bullets = bigger win", "Les plus gros joueurs du casino.": "The biggest players of the casino.", "Classement actuel": "Current ranking", "Soldes actuels, du plus riche au moins riche": "Current balances, richest first", "Classement all-time": "All-time ranking", "Plus haut solde jamais atteint": "Highest balance ever reached", "CROUPIER": "DEALER", "TOI": "YOU", "Blackjack paie 3 pour 2 · le croupier tient sur 17": "Blackjack pays 3 to 2 · dealer stands on 17", "Tapis": "All-in", "Dernière mise": "Last bet", "Miser": "Bet", "Retirer la mise": "Remove bet", "Tirer": "Hit", "Rester": "Stand", "Doubler": "Double", "Séparer": "Split", "Quitter la table": "Leave table", "Cave min": "Min buy-in", "Max": "Max", "Se coucher": "Fold", "Check": "Check", "Min": "Min", "½ pot": "½ pot", "¾ pot": "¾ pot", "Pot": "Pot", "Relancer": "Raise", "Suivre": "Call", "Ajouter des jetons (entre deux mains)": "Add chips (between hands)", "Ajouter": "Add", "Rejouer mes mises": "Rebet", "Retirer mes mises": "Clear my bets", "Joueurs": "Players", "Réduire ✕": "Collapse ✕", "Fermer": "Close", "Annuler": "Cancel", "Chat": "Chat", "a gagné": "won", "Envoyer": "Send", "Règles du blackjack": "Blackjack rules", "Règles du poker (Texas Hold'em No-Limit)": "Poker rules (Texas Hold'em No-Limit)", "Classement des mains au poker": "Poker hand rankings", "Classement du blackjack (gains nets)": "Blackjack ranking (net winnings)", "Classement du poker (gains nets)": "Poker ranking (net winnings)", "Du plus fort (1) au plus faible (10). Les cartes éclairées forment la combinaison.": "Strongest (1) to weakest (10). Highlighted cards form the hand.", "Joueur": "Player", "Gains nets": "Net winnings", "Manches": "Rounds", "Victoires": "Wins", "Personne n’a encore terminé de manche.": "Nobody has finished a round yet.", "Classement indisponible.": "Leaderboard unavailable.", "Aucun joueur pour le moment.": "No players yet.", "Paramètres": "Settings", "⚙ Paramètres": "⚙ Settings", "Langue": "Language", "Envoyer des ZTKN": "Send ZTKN", "Chercher un joueur…": "Search a player…", "Montant": "Amount", "Aucun joueur trouvé.": "No player found.", "Destinataire : ": "Recipient: ", "Choisis un joueur.": "Pick a player.", "Montant invalide.": "Invalid amount.", "Solde insuffisant.": "Insufficient balance.", "Connexion perdue…": "Connection lost…", "Doucement 🙂": "Easy there 🙂", "Table libre": "Table free", "pleine": "full", "Une partie est déjà en cours.": "A game is already in progress.", "Aucune partie en cours.": "No game in progress.", "Cette table n’existe plus.": "This table no longer exists.", "Action inconnue.": "Unknown action.", "Tu ne peux pas t’envoyer de pièces à toi-même.": "You can't send coins to yourself.", "Montant minimum : 1.": "Minimum amount: 1.", "Ce joueur n’est pas sur le serveur.": "This player isn't on the server.", "Envoi impossible, réessaie.": "Couldn't send, try again.", "Nouvelle table": "New table", "＋ Nouvelle table": "＋ New table", "🃏 Mains": "🃏 Hands", "Table précédente": "Previous table", "Table suivante": "Next table", "Ton solde": "Your balance", "Mise": "Bet", "Mise :": "Bet:", "Distribuer": "Deal", "Encaisser": "Cash out", "Lancer": "Start", "Pile": "Heads", "Face": "Tails", "Moins de 7": "Under 7", "Plus de 7": "Over 7", "Exactement 7": "Exactly 7", "À toi de jouer": "Your turn", "Choisis ta mise puis distribue": "Pick your bet then deal", "Montant de la mise": "Bet amount", "Mise par clic": "Bet per click", "Écrire un message": "Write a message", "Message": "Message", "Agrandir la roue": "Enlarge the wheel", "Top gains de ce jeu": "Top wins of this game"};
+const EN_DICT = {"Casino": "Casino", "Connecte-toi avec ton compte Discord pour jouer avec ton solde du casino.": "Log in with your Discord account to play with your casino balance.", "Se connecter avec Discord": "Log in with Discord", "Menu": "Menu", "Accueil": "Home", "Online": "Online", "Offline": "Offline", "Blackjack": "Blackjack", "Poker": "Poker", "Roulette": "Roulette", "Fusé": "Crash", "Mine": "Mines", "Mines": "Mines", "Pile ou Face": "Coin Flip", "Dés": "Dice", "Chevaux": "Horses", "Roulette russe": "Russian Roulette", "Classement": "Leaderboard", "Top gains": "Top wins", "Règles": "Rules", "Son": "Sound", "Muet": "Muted", "Muet": "Muted", "Plein écran": "Fullscreen", "Reconnexion…": "Reconnecting…", "Connexion…": "Connecting…", "Tables partagées avec tous les joueurs du serveur.": "Tables shared with every player on the server.", "Table à 5 places · mise libre · blackjack payé 3:2": "5-seat table · free bet · blackjack pays 3:2", "Jouer": "Play", "Texas Hold'em No-Limit · 5 places · relances libres et tapis": "Texas Hold'em No-Limit · 5 seats · free raises and all-in", "Roulette européenne · rouge, noir, pair, impair, numéros pleins": "European roulette · red, black, even, odd, straight numbers", "Jouables directement en MP Discord, et aussi sur le site.": "Playable in Discord DMs, and on the site too.", "Parties solo contre le croupier": "Solo games against the dealer", "Encaisse avant que la fusée explose": "Cash out before the rocket explodes", "Évite les mines, encaisse quand tu veux": "Avoid the mines, cash out whenever you want", "Une chance sur deux, gain x1.95": "50/50 chance, win x1.95", "Parie sur la somme de 2 dés": "Bet on the sum of 2 dice", "Course à 5 chevaux, jusqu’à x15.8": "5-horse race, up to x15.8", "Survis au barillet, plus de balles = plus de gain": "Survive the cylinder, more bullets = bigger win", "Les plus gros joueurs du casino.": "The biggest players of the casino.", "Classement actuel": "Current ranking", "Soldes actuels, du plus riche au moins riche": "Current balances, richest first", "Classement all-time": "All-time ranking", "Plus haut solde jamais atteint": "Highest balance ever reached", "CROUPIER": "DEALER", "TOI": "YOU", "Blackjack paie 3 pour 2 · le croupier tient sur 17": "Blackjack pays 3 to 2 · dealer stands on 17", "Tapis": "All-in", "Dernière mise": "Last bet", "Miser": "Bet", "Retirer la mise": "Remove bet", "Tirer": "Hit", "Rester": "Stand", "Doubler": "Double", "Séparer": "Split", "Quitter la table": "Leave table", "Cave min": "Min buy-in", "Max": "Max", "Se coucher": "Fold", "Check": "Check", "Min": "Min", "½ pot": "½ pot", "¾ pot": "¾ pot", "Pot": "Pot", "Relancer": "Raise", "Suivre": "Call", "Ajouter des jetons (entre deux mains)": "Add chips (between hands)", "Ajouter": "Add", "Rejouer mes mises": "Rebet", "Retirer mes mises": "Clear my bets", "Joueurs": "Players", "Réduire ✕": "Collapse ✕", "Fermer": "Close", "Annuler": "Cancel", "Chat": "Chat", "Victoires des autres joueurs": "Other players’ wins", "Mes victoires": "My wins", "Afficher": "Show", "Masquer": "Hide", "Notification de message": "Message notification", "Aucune": "None", "Silencieuse": "Silent", "Avec son": "With sound", "Aucun message. Lance la discussion.": "No messages. Start the conversation.", "Notifications": "Notifications", "Aucune notification.": "No notifications.", "t’a envoyé": "sent you", "Solde": "Balance", "⏻ Déconnexion": "⏻ Log out", "a gagné": "won", "Envoyer": "Send", "Règles du blackjack": "Blackjack rules", "Règles du poker (Texas Hold'em No-Limit)": "Poker rules (Texas Hold'em No-Limit)", "Classement des mains au poker": "Poker hand rankings", "Classement du blackjack (gains nets)": "Blackjack ranking (net winnings)", "Classement du poker (gains nets)": "Poker ranking (net winnings)", "Du plus fort (1) au plus faible (10). Les cartes éclairées forment la combinaison.": "Strongest (1) to weakest (10). Highlighted cards form the hand.", "Joueur": "Player", "Gains nets": "Net winnings", "Manches": "Rounds", "Victoires": "Wins", "Personne n’a encore terminé de manche.": "Nobody has finished a round yet.", "Classement indisponible.": "Leaderboard unavailable.", "Aucun joueur pour le moment.": "No players yet.", "Paramètres": "Settings", "⚙ Paramètres": "⚙ Settings", "Langue": "Language", "Envoyer des ZTKN": "Send ZTKN", "Chercher un joueur…": "Search a player…", "Montant": "Amount", "Aucun joueur trouvé.": "No player found.", "Destinataire : ": "Recipient: ", "Choisis un joueur.": "Pick a player.", "Montant invalide.": "Invalid amount.", "Solde insuffisant.": "Insufficient balance.", "Connexion perdue…": "Connection lost…", "Doucement 🙂": "Easy there 🙂", "Table libre": "Table free", "pleine": "full", "Une partie est déjà en cours.": "A game is already in progress.", "Aucune partie en cours.": "No game in progress.", "Cette table n’existe plus.": "This table no longer exists.", "Action inconnue.": "Unknown action.", "Tu ne peux pas t’envoyer de pièces à toi-même.": "You can't send coins to yourself.", "Montant minimum : 1.": "Minimum amount: 1.", "Ce joueur n’est pas sur le serveur.": "This player isn't on the server.", "Envoi impossible, réessaie.": "Couldn't send, try again.", "Nouvelle table": "New table", "＋ Nouvelle table": "＋ New table", "🃏 Mains": "🃏 Hands", "Table précédente": "Previous table", "Table suivante": "Next table", "Ton solde": "Your balance", "Mise": "Bet", "Mise :": "Bet:", "Distribuer": "Deal", "Encaisser": "Cash out", "Lancer": "Start", "Pile": "Heads", "Face": "Tails", "Moins de 7": "Under 7", "Plus de 7": "Over 7", "Exactement 7": "Exactly 7", "À toi de jouer": "Your turn", "Choisis ta mise puis distribue": "Pick your bet then deal", "Montant de la mise": "Bet amount", "Mise par clic": "Bet per click", "Écrire un message": "Write a message", "Message": "Message", "Agrandir la roue": "Enlarge the wheel", "Top gains de ce jeu": "Top wins of this game"};
 const EN_RE = [["^Table (\\d+)$", "Table $1"], ["^Mis à jour à (.+)$", "Updated at $1"], ["^Chat · (.+)$", "@Chat · $1"], ["^(\\d+) joueurs? à table$", "$1 player(s) at the table"], ["^🎁 (.+) t’a envoyé (.+)$", "🎁 $1 sent you $2"], ["^Mise minimale : (.+)$", "Minimum bet: $1"], ["^Mise maximale : (.+)$", "Maximum bet: $1"], ["^Tu es déjà assis à la table (\\d+) : quitte-la d’abord\\.$", "You're already seated at table $1: leave it first."], ["^Maximum (\\d+) tables\\.$", "Maximum $1 tables."], ["^à (.+?) · mise (.+)$", "@at $1 · bet $2"], ["^blinds (.+)$", "blinds $1"], ["^Ta session a expiré : reconnecte-toi avec Discord\\.$", "Your session expired: log in with Discord again."]].map(([a, b]) => [new RegExp(a), b]);
 let LANG = 'fr'; try { LANG = localStorage.getItem('znk_lang') === 'en' ? 'en' : 'fr'; } catch {}
 const trWords = (s) => {
@@ -2478,6 +2539,61 @@ $('#gSend').onclick = async () => {
   SFX.chip(); $('#mGift').classList.remove('on'); toast('✅ ' + num(amt) + ' ' + COIN + ' → ' + G.to.name);
   if (W.bal != null && !O.hold) $('#meBal').textContent = num(W.bal) + ' ' + COIN;
 };
+
+
+// ============================================================= BOÎTE DE RÉCEPTION (cloche) + MENU DU PSEUDO
+const N = { list: [], seen: 0 };
+const nKey = () => 'znk_nseen_' + (me ? me.uid : '');
+function nBadge() {
+  const c = N.list.filter((n) => n.t > N.seen).length, b = $('#bBadge');
+  b.textContent = c > 9 ? '9+' : String(c); b.classList.toggle('on', c > 0);
+}
+function nRender() {
+  const box = $('#nList'); box.textContent = '';
+  if (!N.list.length) { box.append(el('div', 'rnone', 'Aucune notification.')); return; }
+  N.list.forEach((n) => {
+    const r = el('div', 'nit' + (n.t > N.seen ? ' new' : '')), b = el('div'), t = new Date(n.t), p = (x) => String(x).padStart(2, '0');
+    b.append(el('b', '', n.from), document.createTextNode(' t’a envoyé '), el('b', 'cg', num(n.amount) + ' ' + COIN),
+      el('small', '', p(t.getDate()) + '/' + p(t.getMonth() + 1) + ' · ' + p(t.getHours()) + ':' + p(t.getMinutes())));
+    r.append(el('span', 'nic', '🎁'), b); box.append(r);
+  });
+}
+function nSet(list, live) {
+  try { N.seen = Number(localStorage.getItem(nKey())) || 0; } catch {}
+  N.list = (Array.isArray(list) ? list : []).slice(0, 30);
+  if ($('#bellWrap').classList.contains('open')) nMarkSeen();
+  nRender(); nBadge();
+}
+function nAdd(n) {
+  N.list.unshift(n); N.list.length = Math.min(N.list.length, 30);
+  SFX.win(); toast('🎁 ' + n.from + ' t’a envoyé ' + num(n.amount) + ' ' + COIN);
+  if ($('#bellWrap').classList.contains('open')) { nRender(); nMarkSeen(); } else { nRender(); nBadge(); }
+}
+function nMarkSeen() {
+  N.seen = N.list.reduce((m, n) => Math.max(m, n.t), N.seen);
+  try { localStorage.setItem(nKey(), String(N.seen)); } catch {}
+  nBadge();
+}
+function popClose(except) { document.querySelectorAll('.pop.open').forEach((p) => { if (p !== except) p.classList.remove('open'); }); }
+$('#bBell').onclick = (e) => {
+  e.stopPropagation(); const w = $('#bellWrap'); popClose(w); menuClose();
+  const open = w.classList.toggle('open');
+  if (open) { nRender(); setTimeout(nMarkSeen, 1200); } // les nouvelles restent surlignées un instant
+};
+$('#me').onclick = (e) => { e.stopPropagation(); const w = $('#meWrap'); popClose(w); menuClose(); w.classList.toggle('open'); };
+$('#me').onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $('#me').click(); } };
+document.querySelectorAll('.ppanel').forEach((p) => (p.onclick = (e) => e.stopPropagation()));
+document.addEventListener('click', () => popClose());
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') popClose(); });
+$('#bLogout').onclick = () => { try { localStorage.removeItem('znk_t'); } catch {} try { if (es) es.close(); } catch {} location.replace(location.pathname); };
+
+
+// réglages : victoires affichées dans le chat + notification de message
+function setSync() { document.querySelectorAll('.seg[data-set]').forEach((g) => g.querySelectorAll('button').forEach((b) => b.classList.toggle('on', b.dataset.v === String(SET[g.dataset.set])))); }
+document.querySelectorAll('.seg[data-set]').forEach((g) => g.querySelectorAll('button').forEach((b) => (b.onclick = () => {
+  SET[g.dataset.set] = b.dataset.v; try { localStorage.setItem('znk_set', JSON.stringify(SET)); } catch {} setSync(); cRender();
+})));
+setSync();
 
 connect(); tick();
 })();
