@@ -38,8 +38,12 @@ const localImg = (file) => {
   }
 };
 // Bannière de fond (image sans texte) au-dessus d'un panneau : images/panel_*.png (ignorée si le fichier n'existe pas)
+// CARD_GIF=off : retour aux images fixes PNG (aucune animation)
+const CARD_GIF = !/^(off|0|false|non|no)$/i.test(String(process.env.CARD_GIF || '').trim());
 function withBanner(payload, file) {
   try {
+    const gifFile = String(file).replace(/\.png$/i, '.gif');
+    if (CARD_GIF && localImg(gifFile)) file = gifFile; // version animée de la bannière
     const p = localImg(file);
     const e = payload.embeds?.[0];
     if (!p || !e) return payload;
@@ -71,6 +75,18 @@ try {
   canvasLib = require('@napi-rs/canvas');
 } catch {
   console.warn('[stats] @napi-rs/canvas absent : la bannière de stats sera remplacée par un embed texte (npm i @napi-rs/canvas).');
+}
+
+// Cartes animées : le décor (étoiles, halo, reflets) bouge en douceur, le texte reste fixe.
+// Renvoie un GIF en boucle, ou le PNG classique si l'animation est coupée / impossible.
+const fxAnim = require('./games/fx');
+const imgExt = (b) => (b && b[0] === 0x47 && b[1] === 0x49 && b[2] === 0x46 ? 'gif' : 'png');
+async function animOrPng(cv, file, src) {
+  if (CARD_GIF && canvasLib && file && src && src === localImg(file)) {
+    const gif = await fxAnim.animateCard(canvasLib, cv, file, IMG_DIR);
+    if (gif) return gif;
+  }
+  return cv.toBuffer('image/png');
 }
 
 // Police embarquée (dossier ./fonts) : indispensable sur les serveurs sans polices système (Railway...)
@@ -108,7 +124,7 @@ const COIN_PLAIN = String(process.env.COIN_TEXT || COIN).trim() || COIN;
 const plain = (s) => String(s).split(COIN).join(COIN_PLAIN);
 console.log(`[coin] ${COIN} (texte : ${COIN_PLAIN})`);
 
-const DAILY_AMOUNT = 30;
+const DAILY_AMOUNT = 4;
 const INVITE_REWARD = 1;
 const LEADERBOARD_REFRESH_MS = 60_000;
 const IDLE_MS = 90_000;
@@ -881,7 +897,7 @@ async function recordResult({ guildId, user, game, bet, mult, payout, detail }) 
     }
     if (buf) {
       try {
-        const fname = `win-${Date.now()}.png`;
+        const fname = `win-${Date.now()}.${imgExt(buf)}`;
         const imgEmbed = new EmbedBuilder().setColor(COLORS.violet).setImage(`attachment://${fname}`);
         await ch.send({
           content: mention,
@@ -1243,7 +1259,7 @@ async function renderStatsBanner(user, st, balance, lang) {
     g.fillText(fitText(g, value.replace(/\s/g, ' '), b.w - px * 2), b.x + px, b.y + (T ? 38 : 49));
   });
 
-  return cv.toBuffer('image/png');
+  return T ? await animOrPng(cv, 'stats_card.png', STATS_BG_URL) : cv.toBuffer('image/png');
 }
 
 async function buildStatsPayload(user, lang, viewerNote = '') {
@@ -1255,10 +1271,11 @@ async function buildStatsPayload(user, lang, viewerNote = '') {
     console.error('[stats] bannière', e?.message || e);
   }
   if (buf) {
-    const attachment = new AttachmentBuilder(buf, { name: 'stats.png' });
+    const sName = `stats.${imgExt(buf)}`;
+    const attachment = new AttachmentBuilder(buf, { name: sName });
     const embed = new EmbedBuilder()
       .setColor(COLORS.violet)
-      .setImage('attachment://stats.png')
+      .setImage(`attachment://${sName}`)
       .setFooter({ text: `ZNK Casino • ${user.globalName || user.username}${viewerNote}` });
     return { embeds: [embed], files: [attachment] };
   }
@@ -8441,7 +8458,8 @@ async function renderBoardImage({ kind, title, rows, bgUrl }) {
     }
     g.textAlign = 'left';
   }
-  return cv.toBuffer('image/png');
+  const boardFile = { rich: 'richest_leaderboard.png', alltime: 'alltime_leaderboard.png', invites: 'top_inviters_leaderboard.png' }[kind];
+  return TPL ? await animOrPng(cv, boardFile, bgUrl) : cv.toBuffer('image/png');
 }
 
 const cleanTxt = (s) => String(s || '').replace(/[\u0000-\u001F\u007F]/g, '').trim();
@@ -8608,14 +8626,16 @@ async function renderCard(kind, d) {
     while (fs > 11 && g.measureText(v).width > b.w - 28) { fs -= 1; g.font = `bold ${fs}px ${FONT}`; }
     g.fillText(fitText(g, v, b.w - 28), b.x + 14, b.y + 38);
   });
-  return cv.toBuffer('image/png');
+  return bgImg
+    ? await animOrPng(cv, CARD_FILE[kind], CARD_BG[kind] || localImg(CARD_FILE[kind]))
+    : cv.toBuffer('image/png');
 }
 
 async function makeCard(kind, d) {
   try {
     const buf = await renderCard(kind, d);
     if (!buf) return null;
-    const name = `${kind}-${Date.now()}-${randomInt(1000, 9999)}.png`;
+    const name = `${kind}-${Date.now()}-${randomInt(1000, 9999)}.${imgExt(buf)}`;
     return { name, file: new AttachmentBuilder(buf, { name }) };
   } catch (e) {
     console.error(`[carte ${kind}]`, e?.message || e);
@@ -8875,7 +8895,7 @@ async function renderInviteNotif(inviter, invited, lang = 'fr') {
     g.font = `bold 52px ${FONT}`;
     g.fillText(fitText(g, `+${plainNum(INVITE_REWARD)} ${COIN_PLAIN}`, 500), 387, 302);
     g.textAlign = 'left';
-    return cv.toBuffer('image/png');
+    return await animOrPng(cv, 'invite_notification.png', BOARD_BG.inviteNotif);
   }
 
   // titre
@@ -9019,7 +9039,7 @@ async function renderBoard(kind, { lang = 'fr', guild = null } = {}) {
   return out;
 }
 
-const boardFileName = (kind) => `board-${kind}-${Date.now()}.png`;
+const boardFileName = (kind, buf) => `board-${kind}-${Date.now()}.${imgExt(buf)}`;
 
 // Payload prêt à envoyer : { embeds, files, sig }. Retombe sur l'ancien embed texte si le canvas échoue.
 async function buildBoardPayload(kind, { lang = 'fr', guild = null } = {}) {
@@ -9032,7 +9052,7 @@ async function buildBoardPayload(kind, { lang = 'fr', guild = null } = {}) {
   try {
     const r = await renderBoard(kind, { lang, guild });
     if (!r?.buf) return textFallback();
-    const name = boardFileName(kind);
+    const name = boardFileName(kind, r.buf);
     const embed = new EmbedBuilder()
       .setColor(kind === 'rich' ? COLORS.gold : COLORS.violet)
       .setImage(`attachment://${name}`)
@@ -9059,7 +9079,7 @@ async function buildInvitesPayload(guild, targetId, lang = 'fr') {
   try {
     const r = await renderBoard('invites', { lang, guild });
     if (!r?.buf) return { embeds: [textEmbed], files: [] };
-    const name = boardFileName('invites');
+    const name = boardFileName('invites', r.buf);
     textEmbed.setColor(COLORS.violet).setImage(`attachment://${name}`);
     return { embeds: [textEmbed], files: [new AttachmentBuilder(r.buf, { name })] };
   } catch (e) {
@@ -9478,7 +9498,7 @@ client.on(Events.GuildMemberAdd, async (member) => {
       try {
         const buf = await renderInviteNotif(inviter, member.user, 'fr');
         if (buf) {
-          const fname = `invite-${Date.now()}.png`;
+          const fname = `invite-${Date.now()}.${imgExt(buf)}`;
           embed.setImage(`attachment://${fname}`);
           payload.files = [new AttachmentBuilder(buf, { name: fname })];
         } else {
