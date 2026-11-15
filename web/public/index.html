@@ -634,6 +634,11 @@ main{padding-bottom:56px!important}
 #chatBadge{background:#fff;color:#000;border-radius:999px;font-size:11px;font-weight:800;padding:1px 7px}
 #chatBody{display:none;flex-direction:column;border-top:1px solid #262626}
 #chat.open #chatBody{display:flex}
+#chat:not(.open){width:auto;background:none;border:0;box-shadow:none;border-radius:50%}
+#chat:not(.open) #chatHead{position:relative;width:52px;height:52px;padding:0;justify-content:center;border-radius:50%;background:#0a0a0a;border:1px solid #333;box-shadow:0 6px 20px rgba(0,0,0,.6);transition:transform .15s,border-color .15s}
+#chat:not(.open) #chatHead:hover{transform:scale(1.08);border-color:#fff}
+#chat:not(.open) #chatTitle{font-size:0;width:24px;height:24px;display:block;background:no-repeat center/contain url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 12a8 8 0 0 1-11.6 7.1L3 21l1.9-5.4A8 8 0 1 1 21 12z'/%3E%3C/svg%3E")}
+#chat:not(.open) #chatBadge{position:absolute;top:-4px;right:-4px;box-shadow:0 0 0 2px #000}
 #chatList{height:260px;overflow-y:auto;padding:8px 12px;display:flex;flex-direction:column;gap:6px;font-size:13px;word-break:break-word}
 .cm .cn{font-weight:700;margin-right:6px}.cm.mine .cn{color:#fbbf24}.cm small{color:var(--mut);font-size:10px;margin-left:6px}
 .crole{font-weight:600;color:var(--mut);font-size:11px;margin-left:0}
@@ -710,6 +715,9 @@ body.fs.vpk #pkDock .btn{padding:6px 12px}
 body.fs.vpk #pkDock .btn.big{padding:8px 18px;font-size:15px;min-width:0}
 body.fs.vpk #pkInfo{font-size:12px}
 @media(max-width:760px){body.fs.vpk .ftable.pk{flex:none;min-height:640px}}
+/* ---------- PLINKO ---------- */
+.plk{width:100%;max-width:580px;aspect-ratio:10/11;min-height:0;padding:0;display:block;margin:0 auto}
+.plk canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
 </style>
 </head>
 <body>
@@ -741,6 +749,7 @@ body.fs.vpk #pkInfo{font-size:12px}
           <button class="mitem" data-g="off-russian">Roulette russe</button>
           <button class="mitem" data-g="off-slots">Slots</button>
           <button class="mitem" data-g="off-duel">Duel</button>
+          <button class="mitem" data-g="off-plinko">Plinko</button>
           <button class="mitem" data-g="off-scratch">Ticket à gratter</button>
         </div>
       </div>
@@ -834,6 +843,11 @@ body.fs.vpk #pkInfo{font-size:12px}
       <button class="gcard" data-go="off-duel">
         <span class="gname">Duel</span>
         <span class="gdesc">Dégaine plus vite que ton adversaire</span>
+        <span class="glive"></span><span class="gplay">Jouer</span>
+      </button>
+      <button class="gcard" data-go="off-plinko">
+        <span class="gname">Plinko</span>
+        <span class="gdesc">Lâche la bille dans les piquets, jusqu’à x130 · 1 à 10 billes</span>
         <span class="glive"></span><span class="gplay">Jouer</span>
       </button>
       <button class="gcard" data-go="off-scratch">
@@ -1061,6 +1075,7 @@ body.fs.vpk #pkInfo{font-size:12px}
 <aside id="chat"><div id="chatHead"><span id="chatTitle">Chat</span><span id="chatBadge" class="hide"></span></div>
 <div id="chatBody"><div id="chatList" aria-live="polite"></div><form id="chatForm" autocomplete="off"><input id="chatIn" maxlength="200" placeholder="Écrire un message" aria-label="Message"><button class="btn" type="submit">Envoyer</button></form></div></aside>
 <div id="toast"></div>
+<div class="modal" id="mEvent"><div class="box"><h2 id="evT"></h2><p id="evX"></p><div id="evB"></div><p style="text-align:right"><button class="btn" data-close>Fermer</button></p></div></div>
 <script>
 'use strict';
 (() => {
@@ -1459,8 +1474,8 @@ const C = { msgs: {}, open: false, unread: 0 };
 const SET = { winOthers: '1', winMine: '1', chatNotif: 'silent' };
 try { Object.assign(SET, JSON.parse(localStorage.getItem('znk_set') || '{}')); } catch {}
 const cShow = (m) => m.sys !== 'win' || (me && m.uid === me.uid ? SET.winMine !== '0' : SET.winOthers !== '0');
-const CNAME = { hub: 'Accueil', bj: 'Blackjack', poker: 'Poker', roulette: 'Roulette', 'off-bj': 'Blackjack solo', 'off-fuse': 'Fusé', 'off-mine': 'Mine', 'off-coin': 'Pile ou Face', 'off-dice': 'Dés', 'off-horses': 'Chevaux', 'off-russian': 'Roulette russe', 'off-slots': 'Slots', 'off-duel': 'Duel', 'off-scratch': 'Ticket à gratter' };
-const GLAB = { blackjack: 'Blackjack', poker: 'Poker', roulette: 'Roulette', 'bj-solo': 'Blackjack solo', fuse: 'Fusé', mines: 'Mines', coin: 'Pile ou Face', dice: 'Dés', horses: 'Chevaux', russian: 'Roulette russe', slots: 'Slots', duel: 'Duel', scratch: 'Ticket à gratter' };
+const CNAME = { hub: 'Accueil', bj: 'Blackjack', poker: 'Poker', roulette: 'Roulette', 'off-bj': 'Blackjack solo', 'off-fuse': 'Fusé', 'off-mine': 'Mine', 'off-coin': 'Pile ou Face', 'off-dice': 'Dés', 'off-horses': 'Chevaux', 'off-russian': 'Roulette russe', 'off-slots': 'Slots', 'off-duel': 'Duel', 'off-scratch': 'Ticket à gratter', 'off-plinko': 'Plinko' };
+const GLAB = { blackjack: 'Blackjack', poker: 'Poker', roulette: 'Roulette', 'bj-solo': 'Blackjack solo', fuse: 'Fusé', mines: 'Mines', coin: 'Pile ou Face', dice: 'Dés', horses: 'Chevaux', russian: 'Roulette russe', slots: 'Slots', duel: 'Duel', scratch: 'Ticket à gratter', plinko: 'Plinko' };
 const cRoom = () => (W.view === 'top' || W.view === 'rank' || W.view === 'admin' ? 'hub' : W.view);
 function cLine(m) {
   if (m.sys === 'win') { // annonce automatique d'une victoire (tous les jeux du site)
@@ -1471,7 +1486,7 @@ function cLine(m) {
     return d;
   }
   const d = el('div', 'cm' + (me && m.uid === me.uid ? ' mine' : '')), t = new Date(m.t);
-  const cn = el('span', 'cn', m.name); if (m.role) { const cr = el('span', 'crole', ' ' + m.role); if (m.rc) { cr.style.background = 'linear-gradient(90deg,' + m.rc[0] + ',' + rkMix(m.rc[1], .45) + ')'; cr.style.webkitBackgroundClip = 'text'; cr.style.backgroundClip = 'text'; cr.style.color = 'transparent'; cr.style.fontWeight = '800'; } cn.append(cr); }
+  const cn = el('span', 'cn'); if (m.rk) { const lg = rkLogoEl(m.rk, 18); lg.style.verticalAlign = 'middle'; lg.style.marginRight = '5px'; cn.append(lg); } cn.append(document.createTextNode(m.name));
   d.append(cn, document.createTextNode(m.text), el('small', '', String(t.getHours()).padStart(2, '0') + ':' + String(t.getMinutes()).padStart(2, '0')));
   return d;
 }
@@ -1999,7 +2014,7 @@ $('#menuBtn').onclick = (e) => { e.stopPropagation(); const o = $('#menu').class
 document.querySelectorAll('#menuPanel .mhead').forEach((b) => (b.onclick = (e) => { e.stopPropagation(); b.parentElement.classList.toggle('open'); }));
 document.addEventListener('click', (e) => { if (!e.target.closest('#menu')) menuClose(); });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') menuClose(); });
-const MENU_LBL = { hub: 'Menu', bj: 'Blackjack', poker: 'Poker', roulette: 'Roulette', 'off-bj': 'Blackjack solo', 'off-fuse': 'Fusé', 'off-mine': 'Mine', 'off-coin': 'Pile ou Face', 'off-dice': 'Dés', 'off-horses': 'Chevaux', 'off-russian': 'Roulette russe', 'off-slots': 'Slots', 'off-duel': 'Duel', 'off-scratch': 'Ticket à gratter', top: 'Classement', rank: 'Rank', admin: 'Admin' };
+const MENU_LBL = { hub: 'Menu', bj: 'Blackjack', poker: 'Poker', roulette: 'Roulette', 'off-bj': 'Blackjack solo', 'off-fuse': 'Fusé', 'off-mine': 'Mine', 'off-coin': 'Pile ou Face', 'off-dice': 'Dés', 'off-horses': 'Chevaux', 'off-russian': 'Roulette russe', 'off-slots': 'Slots', 'off-duel': 'Duel', 'off-scratch': 'Ticket à gratter', 'off-plinko': 'Plinko', top: 'Classement', rank: 'Rank', admin: 'Admin' };
 function menuSync(v) {
   $('#menuLbl').textContent = MENU_LBL[v] || 'Menu';
   $('#msOn').classList.toggle('open', v === 'bj' || v === 'poker' || v === 'roulette');
@@ -2544,8 +2559,9 @@ function scAuto() {
 }
 // ============================================================= JEUX OFFLINE (solo, serveur : offline.js)
 const O = { game: null, st: null, bal: null, bet: '100', mines: 3, auto: '', hist: { fuse: [], mines: [], bj: [], coin: [], dice: [], horses: [], russian: [], slots: [], duel: [], scratch: [] }, timer: 0, pp: [], run: 0, anim: false, hold: false, pick: { coin: 'pile', dice: 'over', horses: '1', russian: '1', slots: '1', duel: '0' } };
-const OMAP = { 'off-bj': 'bj', 'off-fuse': 'fuse', 'off-mine': 'mines', 'off-coin': 'coin', 'off-dice': 'dice', 'off-horses': 'horses', 'off-russian': 'russian', 'off-slots': 'slots', 'off-duel': 'duel', 'off-scratch': 'scratch' };
-const OT = { bj: 'BLACKJACK SOLO', fuse: 'FUSÉ', mines: 'MINES', coin: 'PILE OU FACE', dice: 'DÉS', horses: 'COURSE DE CHEVAUX', russian: 'ROULETTE RUSSE', slots: 'SLOTS', duel: 'DUEL', scratch: 'TICKET À GRATTER' };
+const OMAP = { 'off-bj': 'bj', 'off-fuse': 'fuse', 'off-mine': 'mines', 'off-coin': 'coin', 'off-dice': 'dice', 'off-horses': 'horses', 'off-russian': 'russian', 'off-slots': 'slots', 'off-duel': 'duel', 'off-scratch': 'scratch', 'off-plinko': 'plinko' };
+O.hist.plinko = []; O.pick.plinko = 'med'; O.balls = 1;
+const OT = { bj: 'BLACKJACK SOLO', fuse: 'FUSÉ', mines: 'MINES', coin: 'PILE OU FACE', dice: 'DÉS', horses: 'COURSE DE CHEVAUX', russian: 'ROULETTE RUSSE', slots: 'SLOTS', duel: 'DUEL', scratch: 'TICKET À GRATTER', plinko: 'PLINKO' };
 const GEM = '<svg viewBox="0 0 24 24"><path d="M6 3h12l4 6-10 12L2 9z" fill="#bbf7d0" stroke="#fff" stroke-width="1.2" stroke-linejoin="round"/><path d="M2 9h20M9 3l3 6 3-6M12 9v12" fill="none" stroke="#16a34a" stroke-width="1"/></svg>';
 const BOMB = '<svg viewBox="0 0 24 24"><circle cx="11" cy="14" r="7.5" fill="#1c1c1c" stroke="#fca5a5" stroke-width="1.4"/><path d="M16 8l3-3M18 3v3M17 4h3" stroke="#fbbf24" stroke-width="1.6" stroke-linecap="round"/><circle cx="8.5" cy="11.5" r="1.8" fill="#fff" opacity=".5"/></svg>';
 async function osend(action, extra = {}) {
@@ -2589,7 +2605,7 @@ async function ofStart() {
   const x = { bet };
   if (O.game === 'mines') x.mines = O.mines;
   if (O.game === 'fuse') x.auto = Number(String(O.auto).replace(',', '.')) || 0;
-  if (INST[O.game]) { if (O.anim) return; x.choice = O.pick[O.game]; O.hold = true; }
+  if (INST[O.game]) { if (O.anim) return; x.choice = O.pick[O.game]; if (O.game === 'plinko') x.balls = O.balls; O.hold = true; }
   const d = await osend('ostart', x); if (!d) { O.hold = false; return; }
   if (INST[O.game]) { SFX.chip(); return ofInstant(d.g); }
   SFX.chip(); O.pp = []; ['#oDc', '#oPc'].forEach((s) => { const b = $(s); if (b) b.textContent = ''; });
@@ -2782,12 +2798,13 @@ function ofDock() {
   }
   if (INST[O.game]) {
     const r = row(); if (O.game !== 'slots') CH[O.game].forEach(([v, l, m, sub]) => { const b = el('button', 'cbtn' + (O.pick[O.game] === v ? ' on' : '')); b.append(el('b', '', l), el('small', '', 'x' + m + (sub ? ' · ' + sub : ''))); b.onclick = () => { SFX.chip(); O.pick[O.game] = v; ofSel(); }; r.append(b); });
+    if (O.game === 'plinko') { const rb = row(el('span', 'note', 'Billes')); [1, 3, 5, 10].forEach((n) => { const b = el('button', 'rchip' + (n === O.balls ? ' on' : ''), String(n)); b.onclick = () => { SFX.chip(); O.balls = n; ofDock(); ofStatsInst(); }; rb.append(b); }); }
     const gb = act('go', 'Lancer', ofStart); gb.id = 'oGo'; row(gb); ofGoLabel(); return;
   }
   row(act('go', O.game === 'scratch' ? 'Acheter un ticket' : s ? 'Rejouer' : 'Jouer', ofStart));
 }
 // ---- jeux « un coup » : pile ou face, dés, chevaux, roulette russe (tirage côté serveur, animation côté site)
-const INST = { coin: 1, dice: 1, horses: 1, russian: 1, slots: 1, duel: 1 };
+const INST = { coin: 1, dice: 1, horses: 1, russian: 1, slots: 1, duel: 1, plinko: 1 };
 const FOES = [{ n: 'Recrue', p: 60, m: 1.6 }, { n: 'Pistolero', p: 45, m: 2.1 }, { n: 'Légende', p: 25, m: 3.8 }, { n: 'Fantôme', p: 10, m: 9.6 }];
 const HM = [2.4, 3.8, 5.3, 8.6, 15.8], HP = [40, 25, 18, 11, 6], HCOL = ['#ef4444', '#3b82f6', '#22c55e', '#f59e0b', '#a855f7'];
 const rusM = (k) => Math.floor(0.96 * 6 / (6 - k) * 100) / 100;
@@ -2796,11 +2813,12 @@ const CH = {
   dice: [['under', 'Moins de 7', 2.3], ['seven', 'Exactement 7', 5.8], ['over', 'Plus de 7', 2.3]],
   horses: HM.map((m, i) => [String(i + 1), 'Cheval ' + (i + 1), m, HP[i] + ' %']),
   slots: [['1', '5 lignes', 0]],
+  plinko: [['low', 'Faible', 5.6, 'gain max'], ['med', 'Moyen', 26, 'gain max'], ['high', 'Élevé', 130, 'gain max']],
   duel: FOES.map((f, i) => [String(i), f.n, f.m, f.p + ' % de réussite']),
   russian: [1, 2, 3, 4, 5].map((k) => [String(k), k + ' balle' + (k > 1 ? 's' : ''), rusM(k), Math.round(k / 6 * 100) + ' % de risque']),
 };
-const IDLE = { coin: 'Choisis pile ou face, puis lance la pièce', dice: 'Choisis ton pari, puis lance les dés', horses: 'Clique sur ton cheval, puis lance la course', russian: 'Choisis le nombre de balles, puis tire', slots: 'Lance les rouleaux : trois Z violets = jackpot', duel: 'Choisis ton adversaire, puis dégaine' };
-const BUSY = { coin: 'La pièce tourne…', dice: 'Les dés roulent…', horses: 'La course est lancée…', russian: 'Le barillet tourne…', slots: 'Les rouleaux tournent…', duel: 'Le duel commence…' };
+const IDLE = { coin: 'Choisis pile ou face, puis lance la pièce', dice: 'Choisis ton pari, puis lance les dés', horses: 'Clique sur ton cheval, puis lance la course', russian: 'Choisis le nombre de balles, puis tire', slots: 'Lance les rouleaux : trois Z violets = jackpot', duel: 'Choisis ton adversaire, puis dégaine', plinko: 'Choisis le risque et le nombre de billes, puis lâche-les' };
+const BUSY = { coin: 'La pièce tourne…', dice: 'Les dés roulent…', horses: 'La course est lancée…', russian: 'Le barillet tourne…', slots: 'Les rouleaux tournent…', duel: 'Le duel commence…', plinko: 'Les billes tombent…' };
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 const alive = (tok) => O.run === tok;
 const flr2 = (x) => Math.floor(x * 100 + 1e-9) / 100;
@@ -2823,6 +2841,7 @@ function ofStatsInst() {
   const c = CH[O.game].find((x) => x[0] === O.pick[O.game]);
   if (s && s.over) { box('Mise', num(s.bet) + ' ' + COIN); box('Multiplicateur', (s.mult || 0) + 'x'); box(s.win > 0 ? 'Gain' : 'Perdu', s.win > 0 ? num(s.win) + ' ' + COIN : '−' + num(s.bet) + ' ' + COIN, s.win > 0); }
   else if (O.game === 'slots') { box('Lignes', '5'); box('Jackpot', 'x' + JP, true); }
+  else if (O.game === 'plinko') { box('Risque', c[1]); box('Billes', String(O.balls)); box('Gain max', 'x' + c[2], true); }
   else if (c) { box('Ton choix', c[1]); box('Multiplicateur', 'x' + c[2], true); }
 }
 function rInst(s) {
@@ -2831,14 +2850,14 @@ function rInst(s) {
   else if (!s) msg.replaceChildren(el('span', '', IDLE[O.game]));
   else {
     const net = Math.round((s.win - s.bet) * 100) / 100;
-    const head = s.type === 'slots' ? (s.mult ? 'x' + s.mult : 'Pas de ligne') : s.type === 'duel' ? (s.win > 0 ? 'Tu dégaines le premier !' : 'Trop lent…') : s.type === 'coin' ? (s.side === 'pile' ? 'PILE' : 'FACE') : s.type === 'dice' ? s.a + ' + ' + s.b + ' = ' + s.sum : s.type === 'horses' ? 'Cheval n°' + (s.winner + 1) + ' vainqueur' : s.dead ? 'BANG !' : 'Clic… tu survis';
+    const head = s.type === 'plinko' ? (s.n + ' bille' + (s.n > 1 ? 's' : '') + ' · x' + s.mult) : s.type === 'slots' ? (s.mult ? 'x' + s.mult : 'Pas de ligne') : s.type === 'duel' ? (s.win > 0 ? 'Tu dégaines le premier !' : 'Trop lent…') : s.type === 'coin' ? (s.side === 'pile' ? 'PILE' : 'FACE') : s.type === 'dice' ? s.a + ' + ' + s.b + ' = ' + s.sum : s.type === 'horses' ? 'Cheval n°' + (s.winner + 1) + ' vainqueur' : s.dead ? 'BANG !' : 'Clic… tu survis';
     msg.replaceChildren(el('span', s.win > 0 ? 'win' : 'lose', head + ' · ' + (net > 0 ? '+' : '') + num(net) + ' ' + COIN));
   }
   ofStatsInst();
 }
 async function ofInstant(st) {
   const tok = ++O.run; O.anim = true; O.st = null; ofRender();
-  try { await ({ coin: aCoin, dice: aDice, horses: aHorses, russian: aRussian, slots: aSlots, duel: aDuel })[st.type](st, tok); } catch (e) { console.error(e); }
+  try { await ({ coin: aCoin, dice: aDice, horses: aHorses, russian: aRussian, slots: aSlots, duel: aDuel, plinko: aPlinko })[st.type](st, tok); } catch (e) { console.error(e); }
   if (!alive(tok)) return;
   ofRelease(); O.st = st; ofDone(null, st); ofRender();
 }
@@ -2872,6 +2891,7 @@ function ofBuildInst(b) {
       l.onclick = () => { if (O.anim) return; SFX.chip(); O.pick.horses = String(i + 1); ofSel(); }; tr.append(l);
     });
   } else if (g === 'slots') { b.innerHTML = '<div class="sc"><div class="slm" id="oSlm"><div class="slj">JACKPOT <b>x' + JP + '</b></div><div class="slr" id="oSlr"></div><div class="jpf" id="oJpf"></div></div></div>' + foot; slInit();
+  } else if (g === 'plinko') { b.innerHTML = '<div class="sc plk" id="oPlkBox"><canvas id="oPlk"></canvas><div class="jpf" id="oJpf"></div></div>' + foot; plkReset();
   } else if (g === 'duel') { b.innerHTML = '<div class="sc"><div class="arena"><div class="sun"></div><div class="dnm" id="oFoeN"></div><div class="dban" id="oDban"></div><div class="fgt fme" id="oMe">' + FIGHTER('#1d4ed8', '#1e40af') + '</div><div class="fgt ffoe" id="oFoe">' + FIGHTER('#991b1b', '#7f1d1d') + '</div><div class="gnd"></div><div class="dms" id="oDms"></div></div></div>' + foot; duelPre();
   } else { b.innerHTML = '<div class="sc"><div class="rus"><div class="hmr"></div>' + cylSVG() + '</div><div class="flash" id="oFlash"></div></div>' + foot; rusPre(); }
 }
@@ -2950,7 +2970,167 @@ async function aRussian(st, tok) {
   bul.forEach((b, i) => b.classList.toggle('on', !!st.chambers[i]));
   await wait(st.dead ? 1200 : 1000);
 }
-function ofLoop() { if (W.view.startsWith('off-') && O.game === 'fuse') ofFuseTick(); requestAnimationFrame(ofLoop); }
+// ============================================================= PLINKO (offline) : le serveur tire les chemins, le canvas ne fait que les révéler
+const PL_R = 12;
+const PL_HALF = { low: [5.6, 3.2, 1.6, 1.4, 1.1, 0.9, 0.6], med: [26, 9, 4, 2, 1.1, 0.5, 0.4], high: [130, 18, 6, 2.5, 0.7, 0.3, 0.2] };
+const PL_TAB = {}; for (const k in PL_HALF) PL_TAB[k] = [...PL_HALF[k], ...PL_HALF[k].slice(0, -1).reverse()];
+const PL_NOTES = [262, 294, 330, 392, 440, 523, 587, 659, 784, 880, 988, 1047, 1175];
+const PL_COL = ['#fde68a', '#e9d5ff', '#86efac', '#fca5a5', '#93c5fd'];
+const PLK = { balls: [], parts: [], pops: [], glow: {}, binGlow: [], shake: 0, last: 0, snd: 0, bg: null, bgKey: '', risk: null };
+const plkCol = (m) => (m < 1 ? ['#4a0f1c', '#b91c1c'] : m < 2 ? ['#3b0f8c', '#7c3aed'] : m < 10 ? ['#064e32', '#16a34a'] : ['#92400e', '#fbbf24']);
+function plkReset() { PLK.balls = []; PLK.parts = []; PLK.pops = []; PLK.glow = {}; PLK.binGlow = []; PLK.shake = 0; PLK.risk = null; PLK.bgKey = ''; PLK.last = 0; }
+function plkGeo(cw, ch) {
+  const dx = cw * 0.94 / (PL_R + 1);
+  return { cw, ch, dx, cx: cw / 2, rowH: ch * 0.062, y0: ch * 0.125, rp: Math.max(2.2, dx * 0.105), rb: Math.max(4.5, dx * 0.2), binTop: ch * 0.125 + (PL_R - 1) * ch * 0.062 + ch * 0.062 * 0.95, binH: ch * 0.085, spawnY: ch * 0.055 };
+}
+const plkPegX = (g, r, i) => g.cx + (i - r / 2) * g.dx;
+const plkPegY = (g, r) => g.y0 + r * g.rowH;
+const plkBinX = (g, j) => g.cx + (j - PL_R / 2) * g.dx;
+function plkPoints(g, b) {
+  const q = [{ x: g.cx, y: g.spawnY }]; let j = 0;
+  for (let k = 0; k < PL_R; k++) { q.push({ x: plkPegX(g, k, j), y: plkPegY(g, k) - (g.rp + g.rb) * 0.95, j }); j += b.d.path[k]; }
+  q.push({ x: plkBinX(g, b.d.bin) + ((b.slot * 3) % 5 - 2) * g.rb * 0.28, y: g.binTop + g.binH * 0.58 - (b.slot % 3) * g.rb * 1.1 });
+  return q;
+}
+function plkTimes(big) { // durées des segments (le ralenti ne sert qu'au suspense : le résultat est déjà joué côté serveur)
+  const T = []; let t = 0;
+  for (let s = 0; s <= PL_R; s++) {
+    let dur = s === 0 ? 0.3 : 0.2 + Math.random() * 0.02;
+    if (big && s >= PL_R - 3) dur *= s === PL_R ? 2.3 : 1.7;
+    t += dur; T.push(t);
+  }
+  return T;
+}
+function plkAt(g, b, q, t) {
+  const T = b.T; let s = 0;
+  while (s <= PL_R && t >= T[s]) s++;
+  if (s > PL_R) { const tau = t - T[PL_R], e = q[PL_R + 1]; return { x: e.x, y: e.y - Math.abs(Math.sin(tau * 12)) * Math.exp(-tau * 5.5) * g.rowH * 0.55, s, done: true }; }
+  const t0 = s ? T[s - 1] : 0, u = (t - t0) / (T[s] - t0), a = q[s], c = q[s + 1];
+  let y;
+  if (s === 0) y = a.y + (c.y - a.y) * u * u;
+  else { const h = g.rowH * (s === PL_R ? 0.32 : 0.42); y = a.y + (c.y - a.y) * u - h * 4 * u * (1 - u); }
+  return { x: a.x + (c.x - a.x) * u, y, s };
+}
+function plkMakeBg(g, dpr) {
+  const c = document.createElement('canvas'); c.width = Math.round(g.cw * dpr); c.height = Math.round(g.ch * dpr);
+  const x = c.getContext('2d'); x.scale(dpr, dpr);
+  const gr = x.createRadialGradient(g.cw / 2, g.ch * 1.05, 0, g.cw / 2, g.ch * 1.05, g.ch * 1.1);
+  gr.addColorStop(0, '#5b21b6'); gr.addColorStop(0.38, '#2e1065'); gr.addColorStop(0.75, '#0b0720'); gr.addColorStop(1, '#05030f');
+  x.fillStyle = gr; x.fillRect(0, 0, g.cw, g.ch);
+  for (let i = 0; i < 55; i++) { const h = ((i * 9301 + 49297) % 233280) / 233280, h2 = ((i * 7919 + 1234) % 10007) / 10007; x.fillStyle = 'rgba(255,255,255,' + (0.15 + (i % 4) * 0.1) + ')'; x.fillRect(h * g.cw, h2 * g.ch * 0.9, 1.4, 1.4); }
+  x.font = '900 ' + Math.round(g.cw * 0.24) + 'px system-ui,sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
+  x.lineWidth = 2; x.strokeStyle = 'rgba(255,255,255,.07)'; x.strokeText('ZNK', g.cw / 2, g.ch * 0.5);
+  x.strokeStyle = 'rgba(251,191,36,.2)'; x.lineWidth = 1.5; x.beginPath();
+  const ex = ((PL_R - 1) / 2) * g.dx + g.dx * 0.6, ey = plkPegY(g, PL_R - 1) + g.rowH * 0.4;
+  x.moveTo(g.cx, plkPegY(g, 0) - g.rb * 1.6); x.lineTo(g.cx - ex, ey); x.moveTo(g.cx, plkPegY(g, 0) - g.rb * 1.6); x.lineTo(g.cx + ex, ey); x.stroke();
+  const mr = g.rb * 2.3, mg = x.createRadialGradient(g.cx - mr * 0.3, g.spawnY - mr * 0.3, 1, g.cx, g.spawnY, mr);
+  mg.addColorStop(0, '#a78bfa'); mg.addColorStop(1, '#2e1065');
+  x.fillStyle = mg; x.beginPath(); x.arc(g.cx, g.spawnY, mr, 0, 7); x.fill();
+  x.strokeStyle = '#fbbf24'; x.lineWidth = 2; x.stroke();
+  x.font = '900 ' + Math.round(mr * 1.15) + 'px Georgia,serif'; x.fillStyle = 'rgba(253,230,138,.9)'; x.fillText('Z', g.cx, g.spawnY + mr * 0.06);
+  return c;
+}
+function plkHit(g, b, k, j) {
+  PLK.glow[k * 20 + j] = 1;
+  const px = plkPegX(g, k, j), py = plkPegY(g, k);
+  for (let n = 0; n < 4; n++) PLK.parts.push({ x: px, y: py - g.rp, vx: (Math.random() - 0.5) * 90, vy: -30 - Math.random() * 70, life: 1, dec: 2.2 + Math.random(), col: b.col, sz: 1.4 + Math.random() * 1.4, g: 260 });
+  const now = performance.now();
+  if (now - PLK.snd > 28) { PLK.snd = now; tone(PL_NOTES[Math.min(PL_NOTES.length - 1, k)] * (1 + (j - k / 2) * 0.012) * (b.big && k >= PL_R - 3 ? 0.5 : 1), 0.1, 'triangle', 0.035); }
+}
+function plkLand(g, b) {
+  const m = b.d.m, bx = plkBinX(g, b.d.bin), cols = plkCol(m), box = $('#oPlkBox');
+  PLK.binGlow[b.d.bin] = 1;
+  PLK.pops.push({ x: bx, y: g.binTop - 8, txt: 'x' + m, col: m >= 10 ? '#fde047' : m >= 2 ? '#86efac' : m >= 1 ? '#e9d5ff' : '#fca5a5', life: 1, big: m >= 10 });
+  for (let n = 0; n < 16; n++) PLK.parts.push({ x: bx + (Math.random() - 0.5) * g.dx * 0.6, y: g.binTop, vx: (Math.random() - 0.5) * 150, vy: -60 - Math.random() * 150, life: 1, dec: 1.4 + Math.random(), col: cols[1], sz: 1.6 + Math.random() * 2, g: 340 });
+  if (m >= 20) {
+    PLK.shake = 1.4; if (box) { confetti(box, 90, ['#a855f7', '#fde047', '#e9d5ff', '#c084fc', '#fff']); const f = $('#oJpf'); if (f) { f.textContent = 'x' + m; f.classList.remove('on'); void f.offsetWidth; f.classList.add('on'); } }
+    [523, 659, 784, 1047, 1319, 1568].forEach((q, i) => tone(q, 0.3, 'triangle', 0.07, i * 0.1)); SFX.bj();
+  } else if (m >= 10) { PLK.shake = 1; if (box) confetti(box, 45, ['#fde047', '#fbbf24', '#e9d5ff']); SFX.bj(); }
+  else if (m >= 3) { PLK.shake = 0.35; if (box) confetti(box, 14, ['#86efac', '#fde047', '#fff']); SFX.win(); }
+  else if (m >= 1) { tone(660, 0.12, 'triangle', 0.06); tone(880, 0.14, 'triangle', 0.05, 0.08); }
+  else tone(220, 0.25, 'sawtooth', 0.04, 0, -90);
+}
+function plkRR(x, px, py, w, h, r) { x.beginPath(); x.moveTo(px + r, py); x.arcTo(px + w, py, px + w, py + h, r); x.arcTo(px + w, py + h, px, py + h, r); x.arcTo(px, py + h, px, py, r); x.arcTo(px, py, px + w, py, r); x.closePath(); }
+function plkDraw() {
+  const cv = $('#oPlk'); if (!cv) return;
+  const box = cv.parentNode, cw = box.clientWidth, ch = box.clientHeight; if (cw < 60 || ch < 60) return;
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  if (cv.width !== Math.round(cw * dpr) || cv.height !== Math.round(ch * dpr)) { cv.width = Math.round(cw * dpr); cv.height = Math.round(ch * dpr); PLK.bgKey = ''; }
+  const x = cv.getContext('2d'), g = plkGeo(cw, ch), now = performance.now() / 1000, dt = Math.min(0.05, now - (PLK.last || now)); PLK.last = now;
+  if (!O.anim && PLK.risk && PLK.risk !== O.pick.plinko) { PLK.balls = []; PLK.binGlow = []; PLK.risk = null; } // nouveau niveau de risque : on vide le plateau
+  const key = cw + 'x' + ch + 'x' + dpr; if (PLK.bgKey !== key) { PLK.bg = plkMakeBg(g, dpr); PLK.bgKey = key; }
+  x.setTransform(dpr, 0, 0, dpr, 0, 0); x.clearRect(0, 0, cw, ch);
+  x.save();
+  if (PLK.shake > 0.01) { x.translate((Math.random() - 0.5) * 9 * PLK.shake, (Math.random() - 0.5) * 9 * PLK.shake); PLK.shake *= Math.exp(-dt * 7); }
+  x.drawImage(PLK.bg, 0, 0, cw, ch);
+  // cases de gain
+  const tab = PL_TAB[(O.anim && PLK.risk) || O.pick.plinko || 'med'];
+  x.textAlign = 'center'; x.textBaseline = 'middle';
+  for (let j = 0; j <= PL_R; j++) {
+    const m = tab[j], c = plkCol(m), gl = PLK.binGlow[j] || 0, bx = plkBinX(g, j) - g.dx * 0.46, bw = g.dx * 0.92;
+    const gr = x.createLinearGradient(0, g.binTop, 0, g.binTop + g.binH); gr.addColorStop(0, c[1]); gr.addColorStop(1, c[0]);
+    x.save();
+    if (gl > 0.03) { x.shadowColor = c[1]; x.shadowBlur = 22 * gl; }
+    x.globalAlpha = 0.82 + 0.18 * gl; x.fillStyle = gr; plkRR(x, bx, g.binTop + (gl > 0.03 ? -gl * 4 : 0), bw, g.binH, g.dx * 0.16); x.fill();
+    x.globalAlpha = 0.3 + 0.6 * gl; x.strokeStyle = '#fff'; x.lineWidth = 1.2; x.stroke(); x.restore();
+    x.fillStyle = m >= 10 ? '#3a2300' : '#fff'; x.font = '800 ' + Math.max(8, Math.round(g.dx * 0.27)) + 'px system-ui,sans-serif';
+    x.fillText(m + 'x', bx + bw / 2, g.binTop + g.binH * 0.5 + (gl > 0.03 ? -gl * 4 : 0));
+    if (gl > 0) PLK.binGlow[j] = gl * Math.exp(-dt * 2.2);
+  }
+  // piquets (scintillement discret + éclat quand une bille les touche)
+  for (let r = 0; r < PL_R; r++) for (let i = 0; i <= r; i++) {
+    const px = plkPegX(g, r, i), py = plkPegY(g, r), id = r * 20 + i, gl = PLK.glow[id] || 0;
+    x.save();
+    if (gl > 0.05) { x.shadowColor = '#fbbf24'; x.shadowBlur = 16 * gl; x.fillStyle = 'rgb(255,' + Math.round(235 - 40 * gl) + ',' + Math.round(220 - 150 * gl) + ')'; }
+    else x.fillStyle = 'rgba(233,213,255,' + (0.62 + 0.2 * Math.sin(now * 1.6 + r * 0.55 + i * 0.8)).toFixed(2) + ')';
+    x.beginPath(); x.arc(px, py, g.rp * (1 + gl * 0.9), 0, 7); x.fill(); x.restore();
+    if (gl > 0) { PLK.glow[id] = gl * Math.exp(-dt * 5); if (PLK.glow[id] < 0.02) delete PLK.glow[id]; }
+  }
+  // billes
+  for (const b of PLK.balls) {
+    const t = now - b.t0; if (t < 0) continue;
+    const q = plkPoints(g, b);
+    if (!b.started) { b.started = true; tone(1100, 0.05, 'square', 0.025); }
+    while (b.ev <= PL_R && t >= b.T[b.ev]) { if (b.ev < PL_R) plkHit(g, b, b.ev, q[b.ev + 1].j); else plkLand(g, b); b.ev++; }
+    const p = plkAt(g, b, q, t);
+    if (!p.done) {
+      for (let k = 8; k >= 1; k--) { const tk = t - k * 0.022; if (tk <= 0) continue; const o = plkAt(g, b, q, tk); x.globalAlpha = 0.3 * (1 - k / 9); x.fillStyle = b.col; x.beginPath(); x.arc(o.x, o.y, g.rb * (1 - k * 0.07), 0, 7); x.fill(); }
+      x.globalAlpha = 1;
+      if (b.big && p.s >= PL_R - 3) { const hr = g.rb * (3.2 + 0.6 * Math.sin(now * 14)), hg = x.createRadialGradient(p.x, p.y, 0, p.x, p.y, hr); hg.addColorStop(0, 'rgba(251,191,36,.55)'); hg.addColorStop(1, 'rgba(251,191,36,0)'); x.fillStyle = hg; x.beginPath(); x.arc(p.x, p.y, hr, 0, 7); x.fill(); }
+    }
+    x.save(); x.shadowColor = b.col; x.shadowBlur = 12;
+    const bg2 = x.createRadialGradient(p.x - g.rb * 0.35, p.y - g.rb * 0.35, g.rb * 0.1, p.x, p.y, g.rb);
+    bg2.addColorStop(0, '#fff'); bg2.addColorStop(0.45, b.col); bg2.addColorStop(1, '#7c3aed');
+    x.fillStyle = bg2; x.beginPath(); x.arc(p.x, p.y, g.rb, 0, 7); x.fill(); x.restore();
+  }
+  // étincelles
+  for (let i = PLK.parts.length - 1; i >= 0; i--) {
+    const a = PLK.parts[i]; a.life -= a.dec * dt; if (a.life <= 0) { PLK.parts.splice(i, 1); continue; }
+    a.vy += a.g * dt; a.x += a.vx * dt; a.y += a.vy * dt;
+    x.globalAlpha = Math.max(0, a.life); x.fillStyle = a.col; x.beginPath(); x.arc(a.x, a.y, a.sz, 0, 7); x.fill();
+  }
+  x.globalAlpha = 1;
+  // gains qui montent au-dessus des cases
+  for (let i = PLK.pops.length - 1; i >= 0; i--) {
+    const a = PLK.pops[i]; a.life -= dt * 0.7; if (a.life <= 0) { PLK.pops.splice(i, 1); continue; }
+    a.y -= dt * 38; x.globalAlpha = Math.min(1, a.life * 1.6); x.fillStyle = a.col; x.shadowColor = '#000'; x.shadowBlur = 6;
+    x.font = '900 ' + Math.round(g.dx * (a.big ? 0.62 : 0.46)) + 'px system-ui,sans-serif'; x.fillText(a.txt, a.x, a.y); x.shadowBlur = 0;
+  }
+  x.globalAlpha = 1; x.restore();
+}
+async function aPlinko(st, tok) {
+  if (!$('#oPlk')) return;
+  PLK.risk = st.risk; PLK.balls = []; PLK.parts = []; PLK.pops = []; PLK.binGlow = []; PLK.glow = {};
+  const now = performance.now() / 1000, cnt = {}; let end = 0;
+  st.drops.forEach((d, i) => {
+    const big = d.m >= 5, slot = (cnt[d.bin] = (cnt[d.bin] ?? -1) + 1);
+    const b = { d, big, slot, col: PL_COL[i % PL_COL.length], t0: now + 0.2 + i * (st.drops.length > 5 ? 0.26 : 0.4), T: plkTimes(big), ev: 0, started: false };
+    PLK.balls.push(b); end = Math.max(end, b.t0 + b.T[PL_R]);
+  });
+  while (performance.now() / 1000 < end + 0.9) { if (!alive(tok)) return; await wait(50); }
+}
+
+function ofLoop() { if (W.view.startsWith('off-') && O.game === 'fuse') ofFuseTick(); if (W.view === 'off-plinko' && O.game === 'plinko') plkDraw(); requestAnimationFrame(ofLoop); }
 requestAnimationFrame(ofLoop);
 
 
@@ -3072,16 +3252,38 @@ function nRender() {
     r.append(ni, b); box.append(r);
   });
 }
+// popup d'événement (boost / claim / giveaway) : remplace les MP Discord
+function evPop(n) {
+  if (!n || n.type !== 'event') return;
+  $('#evT').textContent = noEmo(n.title || 'Événement'); $('#evX').textContent = noEmo(n.text || '');
+  const B = $('#evB'); B.textContent = '';
+  if (n.eventId && (n.kind === 'claim' || n.kind === 'giveaway') && (!n.expiresAt || n.expiresAt > Date.now())) {
+    const bt = el('button', 'btn go', n.kind === 'claim' ? 'Réclamer' : 'Participer');
+    if (N.done.has(n.eventId)) { bt.disabled = true; bt.textContent = n.kind === 'claim' ? 'Réclamé' : 'Inscrit'; }
+    bt.onclick = async () => {
+      bt.disabled = true;
+      const ok = await send(n.kind === 'claim' ? 'evclaim' : 'evjoin', { eid: n.eventId });
+      if (ok) { N.done.add(n.eventId); toast((send.last && send.last.msg) || 'C’est fait !'); if (n.kind === 'claim') SFX.win(); $('#mEvent').classList.remove('on'); nRender(); } else bt.disabled = false;
+    };
+    B.append(bt);
+  }
+  $('#mEvent').classList.add('on');
+}
 function nSet(list, live) {
   try { N.seen = Number(localStorage.getItem(nKey())) || 0; } catch {}
   N.list = (Array.isArray(list) ? list : []).slice(0, 30);
   if ($('#bellWrap').classList.contains('open')) nMarkSeen();
   nRender(); nBadge();
+  // à la connexion : popup du dernier événement encore actif et jamais affiché
+  let lastPop = 0; try { lastPop = Number(localStorage.getItem('znk_npop_' + (me ? me.uid : ''))) || 0; } catch {}
+  const ev = N.list.find((n) => n.type === 'event' && n.t > Math.max(N.seen, lastPop) && n.expiresAt && n.expiresAt > Date.now());
+  if (ev) { try { localStorage.setItem('znk_npop_' + (me ? me.uid : ''), String(ev.t)); } catch {} evPop(ev); }
 }
 function nAdd(n) {
   N.list.unshift(n); N.list.length = Math.min(N.list.length, 30);
   SFX.win(); toast(n.type === 'event' ? n.title + ' · ' + n.text : n.from + ' t’a envoyé ' + num(n.amount) + ' ' + COIN);
   if ($('#bellWrap').classList.contains('open')) { nRender(); nMarkSeen(); } else { nRender(); nBadge(); }
+  if (n.type === 'event') { try { localStorage.setItem('znk_npop_' + (me ? me.uid : ''), String(n.t)); } catch {} evPop(n); }
 }
 function nMarkSeen() {
   N.seen = N.list.reduce((m, n) => Math.max(m, n.t), N.seen);
