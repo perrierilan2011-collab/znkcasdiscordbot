@@ -154,6 +154,7 @@ function init(deps) {
       debit: deps.debit,
       credit: deps.credit,
       pending,
+      onRoundEnd: (r) => deps.onRoundEnd && deps.onRoundEnd(guildId, r),
       onChange: (w) => broadcast(`event: roulette\ndata: ${JSON.stringify(w.snapshot())}\n\n`),
     });
     entry.room = new Room(guildId, {
@@ -162,6 +163,7 @@ function init(deps) {
       credit: deps.credit,
       pending,
       stats: statsApi,
+      onRoundEnd: (r) => deps.onRoundEnd && deps.onRoundEnd(guildId, r),
       onChange: (room) => {
         const msg = `event: state\ndata: ${JSON.stringify(room.snapshot())}\n\n`;
         for (const res of entry.clients) {
