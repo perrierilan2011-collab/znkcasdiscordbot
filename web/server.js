@@ -113,7 +113,7 @@ function init(deps) {
   })();
 
   // ---------- jeux offline solo (mines, fusé, blackjack) ----------
-  const offline = createOffline({ getBalance: deps.getBalance, debit: deps.debit, credit: deps.credit }, pending);
+  const offline = createOffline({ getBalance: deps.getBalance, debit: deps.debit, credit: deps.credit, onRoundEnd: (guildId, r) => deps.onRoundEnd && deps.onRoundEnd(guildId, r) }, pending);
 
   // ---------- statistiques / classement ----------
   const STATS_FILE = path.join(DATA_DIR, 'bj_stats.json');

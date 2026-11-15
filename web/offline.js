@@ -42,9 +42,18 @@ function create(deps, pending) {
   }
   const stake = (u, g, amt) => { g.staked = floor2((g.staked || 0) + amt); pending.set(pk(u, g.type), g.staked); };
   async function end(u, g, back) {
+    const stake = g.staked || g.bet;
     g.over = true; g.win = floor2(back);
     if (g.win > 0) g.bal = await deps.credit(u.uid, g.win);
     g.staked = 0; pending.del(pk(u, g.type));
+    // récap dans le salon des victoires : uniquement si le joueur a gagné (jamais de message sur une perte / égalité)
+    const net = floor2(g.win - stake);
+    if (net > 0 && deps.onRoundEnd) {
+      const detail = g.type === 'mines' ? `${g.picks.length} case(s) · ${g.m} mine(s)` : g.type === 'fuse' ? `encaissé à ${g.at}x` : g.outcome === 'bj' ? 'BLACKJACK' : '';
+      try {
+        deps.onRoundEnd(u.guildId, { game: g.type === 'bj' ? 'bj-solo' : g.type, players: [{ uid: u.uid, name: u.name, bet: stake, win: g.win, net, mult: floor2(g.win / stake), detail }] });
+      } catch (e) { console.error('[offline] recap', e?.message || e); }
+    }
   }
 
   const snaps = {
