@@ -178,7 +178,7 @@ th{color:var(--mut);font-size:12px}
   header{padding:6px 8px}.logo small{display:none}
   #seats{grid-template-columns:repeat(3,minmax(0,1fr));row-gap:14px}
   .seat:nth-child(n){transform:none}
-  #table{min-height:640px;border-width:10px;padding-bottom:34px;border-radius:26px 26px 44px 44px/26px 26px 44px 44px}
+  #table{min-height:720px;border-width:10px;padding-bottom:64px;border-radius:26px 26px 44px 44px/26px 26px 44px 44px}
   #table::after{inset:6px;border-radius:20px 20px 36px 36px/20px 20px 36px 36px}
   #table::before{font-size:min(24vw,118px)}
   #center{position:static;transform:none;margin:6px 0 4px}
@@ -315,6 +315,11 @@ th{color:var(--mut);font-size:12px}
 .ofsel{background:#0f0f0f;color:#fff;border:1px solid #3a3a3a;border-radius:8px;padding:9px 10px;font:inherit}
 .dockp .btn.big{min-width:150px}.dockp .hint{color:var(--mut);font-size:13px;text-align:center}
 
+/* plein écran */
+body.fs header{padding-top:4px;padding-bottom:4px}
+body.fs main{padding-left:6px;padding-right:6px}
+body.fs .ftable.pk,body.fs #table{min-height:calc(100vh - 150px)}
+body.fs #chat{max-width:300px}
 /* ---------- sélecteur de tables ---------- */
 .tbar{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;align-items:center;padding:6px 10px 0}
 .tbtn{display:inline-flex;align-items:center;gap:7px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);border-radius:999px;padding:6px 14px;font-weight:700;font-size:13px;color:#fff}
@@ -325,7 +330,8 @@ th{color:var(--mut);font-size:12px}
 .tbtn.mine{box-shadow:0 0 0 2px var(--gold)}
 .tbtn.hands{background:linear-gradient(90deg,#f59e0b,#fde047);color:#3a2300;border-color:#fde68a;margin-left:10px}
 /* nom de la main sous les cartes (poker) */
-.ftable.pk .hand .pill{white-space:normal;text-align:center;font-size:11px;line-height:1.25;max-width:calc(var(--cw)*3.2)}
+.ftable.pk .seat.mine{z-index:6}
+.ftable.pk .hand .pill{position:relative;z-index:7;white-space:normal;text-align:center;font-size:11px;line-height:1.25;max-width:calc(var(--cw)*3.2)}
 .ftable.pk .hand .pill.live{background:rgba(0,0,0,.72);border-color:rgba(251,191,36,.7);color:#fde68a}
 /* classement des mains */
 #mPHands .box{max-width:620px}
@@ -355,6 +361,7 @@ main{padding-bottom:56px!important}
 #chat.open #chatBody{display:flex}
 #chatList{height:260px;overflow-y:auto;padding:8px 12px;display:flex;flex-direction:column;gap:6px;font-size:13px;word-break:break-word}
 .cm .cn{font-weight:700;margin-right:6px}.cm.mine .cn{color:#fbbf24}.cm small{color:var(--mut);font-size:10px;margin-left:6px}
+.crole{font-weight:600;color:var(--mut);font-size:11px;margin-left:0}
 .cempty{color:var(--mut);text-align:center;padding:20px 8px;font-size:12px}
 #chatForm{display:flex;gap:6px;padding:8px;border-top:1px solid #262626}
 #chatIn{flex:1;min-width:0;background:#0f0f0f;border:1px solid #3a3a3a;border-radius:8px;color:#fff;padding:8px 10px;font:inherit;outline:0}
@@ -372,6 +379,7 @@ main{padding-bottom:56px!important}
 .pslot{width:var(--cw);height:var(--ch);border:2px dashed rgba(255,255,255,.16);border-radius:calc(var(--cw)*.13);flex:none}
 #pBoard{position:absolute;inset:0;display:flex;gap:calc(var(--cw)*.14)}
 #pCenter{text-align:center;pointer-events:none;width:min(92%,520px)}
+#pMyHand{margin-top:6px;min-height:0}#pMyHand .pill{font-size:13px;padding:4px 14px;background:rgba(0,0,0,.78);border-color:#fbbf24;color:#fde68a}
 #pMsg{display:inline-block;background:rgba(0,0,0,0.72);border:1px solid rgba(255,255,255,0.12);padding:7px 18px;border-radius:999px;font-weight:700;font-size:clamp(12px,1.6vw,16px);backdrop-filter:blur(3px)}
 #pCd{display:block;margin:4px auto 0;min-height:36px;font-size:30px;font-weight:900;color:var(--gold);text-shadow:0 0 16px rgba(251,191,36,.7);font-variant-numeric:tabular-nums}
 #pSeats{width:100%;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;align-items:end;padding:0 4px}
@@ -408,6 +416,7 @@ main{padding-bottom:56px!important}
   <button class="hb hide" id="bTop" title="Classement">Classement</button>
   <button class="hb hide" id="bRules" title="Règles">Règles</button>
   <button class="hb" id="bSnd" title="Son">Son</button>
+  <button class="hb" id="bFs" title="Plein écran">Plein écran</button>
   <div class="me" id="me"><div class="av" id="meAv">?</div><div><div id="meName" style="font-weight:700;font-size:12px">…</div><b id="meBal">—</b></div></div>
 </header>
 <div id="conn">Reconnexion…</div>
@@ -498,7 +507,7 @@ main{padding-bottom:56px!important}
       <div id="pStreet"></div>
       <div id="pPot"></div>
       <div class="pbox"><span class="pslot"></span><span class="pslot"></span><span class="pslot"></span><span class="pslot"></span><span class="pslot"></span><div id="pBoard"></div></div>
-      <div id="pCenter"><div id="pMsg">Connexion…</div><span id="pCd"></span></div>
+      <div id="pCenter"><div id="pMsg">Connexion…</div><div id="pMyHand"></div><span id="pCd"></span></div>
     </div>
     <div class="shoe" id="pDeck"></div>
     <div class="rule">Texas Hold'em No-Limit · <span id="pBlinds"></span></div>
@@ -988,7 +997,8 @@ const CNAME = { hub: 'Accueil', bj: 'Blackjack', poker: 'Poker', roulette: 'Roul
 const cRoom = () => W.view;
 function cLine(m) {
   const d = el('div', 'cm' + (me && m.uid === me.uid ? ' mine' : '')), t = new Date(m.t);
-  d.append(el('span', 'cn', m.name), document.createTextNode(m.text), el('small', '', String(t.getHours()).padStart(2, '0') + ':' + String(t.getMinutes()).padStart(2, '0')));
+  const cn = el('span', 'cn', m.name); if (m.role) cn.append(el('span', 'crole', ' (' + m.role + ')'));
+  d.append(cn, document.createTextNode(m.text), el('small', '', String(t.getHours()).padStart(2, '0') + ':' + String(t.getMinutes()).padStart(2, '0')));
   return d;
 }
 function cRender() {
@@ -1166,6 +1176,22 @@ function tableDel(d) {
   }
 }
 
+// ---- plein écran (API native, sinon plein écran « simulé » sur iPhone)
+function fsUpd() { const on = !!document.fullscreenElement || !!document.webkitFullscreenElement || document.body.classList.contains('pfs'); document.body.classList.toggle('fs', on); $('#bFs').textContent = on ? 'Quitter le plein écran' : 'Plein écran'; }
+$('#bFs').onclick = async () => {
+  const d = document.documentElement, b = document.body;
+  try {
+    if (document.fullscreenElement) await document.exitFullscreen();
+    else if (document.webkitFullscreenElement) document.webkitExitFullscreen();
+    else if (b.classList.contains('pfs')) b.classList.remove('pfs');
+    else if (d.requestFullscreen) await d.requestFullscreen({ navigationUI: 'hide' });
+    else if (d.webkitRequestFullscreen) d.webkitRequestFullscreen();
+    else b.classList.add('pfs');
+  } catch { b.classList.toggle('pfs'); }
+  fsUpd();
+};
+document.addEventListener('fullscreenchange', fsUpd); document.addEventListener('webkitfullscreenchange', fsUpd);
+
 // ---- classement des mains
 const HANDS = [
   ['Quinte flush royale', '10, valet, dame, roi, as de la même couleur : la main imbattable.', 'A♠ K♠ Q♠ J♠ 10♠', 5],
@@ -1238,6 +1264,7 @@ function pRender(st) {
     syncCards(se.cards, p.cards, P.cardEls, '#pDeck');
     se.hand.classList.toggle('fold', !!p.folded);
     se.hname.textContent = '';
+    if (mine) { const mh = $('#pMyHand'); mh.textContent = ''; if (p.live && !p.folded) mh.append(el('span', 'pill live', 'Ta main : ' + p.live)); }
     if (!p.folded) { if (p.hand) se.hname.append(el('span', 'pill t21', p.hand)); else if (mine && p.live) se.hname.append(el('span', 'pill live', p.live)); }
     // dernière action
     let t = '', c = '';
@@ -1274,6 +1301,7 @@ function pRender(st) {
   if (tk && tk !== P.lastTurnKey && myTurn) { SFX.turn(); try { navigator.vibrate && navigator.vibrate(120); } catch {} }
   P.lastTurnKey = tk;
   pHeader();
+  if (mi < 0) $('#pMyHand').textContent = '';
   const feed = $('#pFeed'); feed.textContent = ''; st.feed.slice(-4).forEach((f) => feed.append(el('div', '', f.text)));
   $('#pMsg').textContent = pMsgText(st, mi, myTurn);
   pDock(st, mi, myTurn);
