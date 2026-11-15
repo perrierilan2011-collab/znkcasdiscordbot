@@ -6723,38 +6723,39 @@ try {
 const SPOT_FR = { red: 'Rouge', black: 'Noir', even: 'Pair', odd: 'Impair', low: '1-18', high: '19-36', d1: '1re 12', d2: '2e 12', d3: '3e 12', c1: 'Col. 1', c2: 'Col. 2', c3: 'Col. 3' };
 const spotFr = (k) => SPOT_FR[k] || `N°${String(k).slice(1)}`;
 async function postOnlineRecap(guildId, r) {
+  // Récap = uniquement les GAGNANTS. Si personne n'a gagné : aucun message.
+  const winners = (r.players || []).filter((p) => p.net > 0).sort((a, b) => b.net - a.net);
+  if (!winners.length) return;
   const ch = await findWinsChannel(guildId);
   if (!ch) return;
   const MAXL = 15;
-  const icon = (net) => (net > 0 ? '🟢' : net < 0 ? '🔴' : '⚪');
-  let embed;
+  const lines = winners.slice(0, MAXL).map((p) => {
+    let extra = '';
+    if (r.game === 'roulette') extra = ' · ' + Object.entries(p.bets || {}).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k, v]) => `${spotFr(k)} ${num(v)}`).join(', ');
+    else if (r.game === 'blackjack') extra = p.outcome === 'bj' ? ' · BLACKJACK' : '';
+    else if (p.detail) extra = ` · ${p.detail}`;
+    return `🟢 **${escapeMarkdown(p.name)}** · mise ${fmt(p.bet)} · **${signed(p.net)}**${extra}`;
+  });
+  if (winners.length > MAXL) lines.push(`… et ${winners.length - MAXL} autre(s)`);
+  let title, head = '';
   if (r.game === 'blackjack') {
-    const lines = r.players.slice(0, MAXL).map((p) => {
-      const tag = p.outcome === 'bj' ? ' · BLACKJACK' : '';
-      return `${icon(p.net)} **${escapeMarkdown(p.name)}** · mise ${fmt(p.bet)} · **${signed(p.net)}**${tag}`;
-    });
-    if (r.players.length > MAXL) lines.push(`… et ${r.players.length - MAXL} autre(s)`);
     const d = r.dealer;
-    const dTxt = `${d.cards.join(' ')} → ${d.bj ? 'Blackjack' : d.bust ? `bust (${d.total})` : d.total}`;
-    const net = round2(r.players.reduce((s, p) => s + p.net, 0));
-    embed = new EmbedBuilder()
-      .setColor(COLORS.violet)
-      .setTitle('🃏 Blackjack en ligne — récap de la manche')
-      .setDescription(`🎩 Croupier : **${dTxt}**\n${LINE}\n${lines.join('\n')}\n${LINE}\nBilan des joueurs : **${signed(net)}**`);
+    title = '🃏 Blackjack en ligne — victoires';
+    head = `🎩 Croupier : **${d.cards.join(' ')} → ${d.bj ? 'Blackjack' : d.bust ? `bust (${d.total})` : d.total}**\n`;
   } else if (r.game === 'roulette') {
-    const lines = r.players.slice(0, MAXL).map((p) => {
-      const bets = Object.entries(p.bets).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([k, v]) => `${spotFr(k)} ${num(v)}`).join(', ');
-      return `${icon(p.net)} **${escapeMarkdown(p.name)}** · ${bets} · **${signed(p.net)}**`;
-    });
-    if (r.players.length > MAXL) lines.push(`… et ${r.players.length - MAXL} autre(s)`);
     const dot = r.color === 'rouge' ? '🔴' : r.color === 'noir' ? '⚫' : '🟢';
-    const net = round2(r.players.reduce((s, p) => s + p.net, 0));
-    embed = new EmbedBuilder()
-      .setColor(COLORS.violet)
-      .setTitle('🎰 Roulette en ligne — récap du tour')
-      .setDescription(`${dot} Numéro sorti : **${r.n}** (${r.color})\n${LINE}\n${lines.join('\n')}\n${LINE}\nBilan des joueurs : **${signed(net)}**`);
-  } else return;
-  embed.setFooter({ text: 'ZNK Casino  •  Parties en ligne' }).setTimestamp();
+    title = '🎰 Roulette en ligne — victoires';
+    head = `${dot} Numéro sorti : **${r.n}** (${r.color})\n`;
+  } else if (r.game === 'mines') title = '💣 Mines — victoire';
+  else if (r.game === 'fuse') title = '🚀 Fusé — victoire';
+  else if (r.game === 'bj-solo') title = '🃏 Blackjack solo — victoire';
+  else return;
+  const embed = new EmbedBuilder()
+    .setColor(COLORS.violet)
+    .setTitle(title)
+    .setDescription(`${head}${LINE}\n${lines.join('\n')}`)
+    .setFooter({ text: 'ZNK Casino  •  Parties en ligne' })
+    .setTimestamp();
   await ch.send({ embeds: [embed], allowedMentions: { parse: [] } });
 }
 
