@@ -367,9 +367,10 @@ function receipt(rows) {
 }
 
 // ============================================================
-//  ANIMATIONS EN IMAGES  (dossier ./games : style néon violet, une image par étape)
-//  Jeux couverts pour l'instant : mines, bj, roulette, coinflip, dice, slots, wheel, duel, suit, zone.
-//  Les autres jeux gardent l'animation texte. Désactiver : variable GAME_IMAGES=off
+//  ANIMATIONS EN IMAGES  (dossier ./games : style néon violet)
+//  GIF animés : bj, roulette, wheel, plinko, horses, crash (la fusée). Couper les GIF : GAME_GIF=off
+//  Images fixes : mines, coinflip, dice, slots, duel, suit, zone.
+//  Les autres jeux gardent l'animation texte. Tout désactiver : variable GAME_IMAGES=off
 // ============================================================
 let gameAnimator = null;
 let gameAnimatorFailed = false;
@@ -4492,6 +4493,23 @@ function genericFrames(emoji, res) {
   }
 })();
 
+// ============================================================
+//  CATALOGUE : seuls les 20 premiers jeux sont gardés
+//  mines · bj · roulette · coinflip · dice · slots · wheel · duel · suit · zone · plinko · crash ·
+//  scratch · die · chest · russian · horses · limbo · higher · rps
+//  Les autres jeux sont retirés du casino (menu, règles, multiplicateurs, paris).
+//  Variable MAX_GAMES : 20 par défaut ; 30 = garder 30 jeux ; 0 = tout le catalogue d'origine.
+// ============================================================
+let GAME_LIMIT = Number.parseInt(process.env.MAX_GAMES ?? '20', 10);
+if (!Number.isFinite(GAME_LIMIT) || GAME_LIMIT < 0) GAME_LIMIT = 20;
+if (GAME_LIMIT > 0) {
+  const keep = new Set(Object.keys(GAME_NAMES).slice(0, GAME_LIMIT));
+  for (const k of Object.keys(GAME_NAMES)) if (!keep.has(k)) delete GAME_NAMES[k];
+  for (const k of Object.keys(INSTANT)) if (!keep.has(k)) delete INSTANT[k];
+  for (const k of Object.keys(ANIMS)) if (!keep.has(k)) delete ANIMS[k];
+  console.log(`[games] catalogue limité aux ${keep.size} premiers jeux : ${[...keep].join(', ')}`);
+}
+
 async function playInstant(i, key, bet, choice) {
   const G = INSTANT[key];
   if (!G || !G.choices.includes(choice)) return respondText(i, 'Pari invalide.');
@@ -4557,7 +4575,7 @@ async function playInstant(i, key, bet, choice) {
       outcome: kind,
       resultText: animResultText(kind, mult),
       sub: `Mise ${coinTxt(bet)} · ${noEmoji(res.pick || '')}`,
-      data: { wheel: WHEEL },
+      data: { wheel: WHEEL, horses: HORSES },
     });
     if (!imgDone) await animate(i, frames, G.title, `Mise **${fmt(bet)}** · ${res.pick || ''}\n`, key);
 
@@ -4844,7 +4862,7 @@ const GAME_MENU = [
 
 function buildGameMenuPayload(userId = null, page = 0, mode = 'all', query = '') {
   const favs = userId ? getFavs(userId) : new Set();
-  let list = GAME_MENU.slice();
+  let list = GAME_MENU.filter(([key]) => GAME_NAMES[key]);
   if (mode === 'favs') {
     list = list.filter(([key]) => favs.has(key));
   } else if (mode === 'search' && query) {
@@ -4957,7 +4975,7 @@ function buildSettingsPayload(userId) {
 function buildRulesPayload(userId) {
   const lang = getLang(userId);
   const fr = lang !== 'en';
-  const lines = [
+  let lines = [
     ['💣 Mines', fr ? 'Choisis une difficulté. Clique sur les cases pour trouver des diamants. Évite les mines. Encaisse quand tu veux : plus tu trouves de diamants, plus le multiplicateur monte.' : 'Pick a difficulty. Click tiles for diamonds. Avoid mines. Cash out anytime: more diamonds = higher multiplier.'],
     ['🃏 Blackjack', fr ? 'Bats le croupier sans dépasser 21. Tirer = nouvelle carte, Rester = s’arrêter, Doubler = double la mise et tire une seule carte. Blackjack naturel paie x2.5.' : 'Beat the dealer without going over 21. Hit, Stand or Double. Natural blackjack pays x2.5.'],
     ['🎡 Roulette', fr ? 'Mise sur rouge/noir/pair/impair (x2) ou un numéro / vert (x36). La bille tourne puis s’arrête.' : 'Bet on red/black/even/odd (x2) or a number / green (x36). The ball spins then stops.'],
@@ -5015,6 +5033,7 @@ function buildRulesPayload(userId) {
     ['📦 Triple coffre', fr ? '1 trésor sur 3 coffres.' : '1 treasure in 3 chests.'],
     ['🎨 Roue couleur', fr ? 'Roue à 6 couleurs.' : '6-color wheel.'],
   ];
+  if (GAME_LIMIT > 0) lines = lines.slice(0, GAME_LIMIT); // mêmes jeux que le catalogue
   // Plusieurs embeds si trop long
   const chunks = [];
   let buf = [];
