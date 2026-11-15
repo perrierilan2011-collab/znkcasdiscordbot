@@ -1016,19 +1016,6 @@ async function startBoost(guildId, { winMult, loseMult, label, minutes }) {
     entry.timer = setTimeout(() => {
       activeBoosts.delete(guildId);
       webEvent(guildId, { kind: 'boost_end', title: '⏰ Boost terminé', text: `L’événement ${label} est terminé. Retour aux gains normaux.` });
-      client.guilds
-        .fetch(guildId)
-        .then((guild) =>
-          dmGuildEveryone(guild, {
-            embeds: [
-              new EmbedBuilder()
-                .setTitle('⏰ Boost terminé')
-                .setColor(COLORS.grey)
-                .setDescription(`L’événement **${label}** est terminé. Retour aux gains normaux.`),
-            ],
-          })
-        )
-        .catch(() => {});
     }, expiresAt - Date.now());
   }
   activeBoosts.set(guildId, entry);
@@ -5934,35 +5921,11 @@ async function finishGiveaway(eventId) {
     ev.winners.add(uid);
     try {
       await credit(uid, ev.amount);
-      await dmUser(uid, {
-        embeds: [
-          new EmbedBuilder()
-            .setColor(COLORS.green)
-            .setTitle('🎉 Giveaway — tu as gagné !')
-            .setDescription(`Tu reçois **${fmt(ev.amount)}**.`)
-            .setTimestamp(),
-        ],
-      });
     } catch (e) {
       console.error('[giveaway] credit', e?.message || e);
     }
   }
   webEvent(ev.guildId, { kind: 'giveaway_end', title: '🎉 Giveaway terminé', text: `Gagnant(s) : ${[...ev.winners].map((id) => { const u = client.users.cache.get(id); return u ? u.globalName || u.username : id; }).join(', ') || 'personne'} · ${num(ev.amount)} chacun` });
-  // Notifie les perdants inscrits
-  for (const uid of pool) {
-    if (ev.winners.has(uid)) continue;
-    await dmUser(uid, {
-      embeds: [
-        new EmbedBuilder()
-          .setColor(COLORS.grey)
-          .setTitle('🎉 Giveaway terminé')
-          .setDescription(
-            `Tirage terminé. Gagnant(s) : ${[...ev.winners].map((id) => `<@${id}>`).join(', ') || 'personne'}.`
-          )
-          .setTimestamp(),
-      ],
-    });
-  }
   activeEvents.delete(eventId);
 }
 
@@ -6046,25 +6009,7 @@ async function postBoostEvent(i, kind, minutes) {
 
   await startBoost(i.guild.id, { ...p, minutes });
   webEvent(i.guild.id, { kind: 'boost', title: `⚡ Boost : ${p.label}`, text: boostText(p, minutes), expiresAt: Date.now() + minutes * 60_000 });
-  const ends = Math.floor((Date.now() + minutes * 60_000) / 1000);
-  const payload = {
-    embeds: [
-      new EmbedBuilder()
-        .setTitle(`⚡ Boost : ${p.label}`)
-        .setColor(COLORS.gold)
-        .setDescription(
-          `👤 Lancé par <@${i.user.id}>\n` +
-            `Un boost est actif pendant **${minutes} min** (fin <t:${ends}:R>) !\n` +
-            (p.winMult !== 1 ? `• Gains × **${p.winMult}**\n` : '') +
-            (p.loseMult !== 1 ? `• Pertes × **${p.loseMult}** (mise perdue ×${p.loseMult})\n` : '') +
-            `\nJoue maintenant pour en profiter !`
-        )
-        .setTimestamp(),
-    ],
-  };
-  await i.reply({ content: `✅ Boost **${p.label}** lancé · envoi des MP en cours…`, flags: EPH });
-  const { ok, fail } = await dmGuildEveryone(i.guild, payload);
-  return i.followUp({ content: `📬 Boost notifié en MP : **${ok}** ok · **${fail}** échecs (MP fermés).`, flags: EPH }).catch(() => {});
+  return i.reply({ content: `✅ Boost **${p.label}** lancé · popup affiché sur le site.`, flags: EPH });
 }
 
 async function createClaimOrGiveaway(i, type, amount, winners, minutes) {
@@ -6097,22 +6042,15 @@ async function createClaimOrGiveaway(i, type, amount, winners, minutes) {
   activeEvents.set(eventId, ev);
   webEvent(ev.guildId, evNotif(ev, eventId));
 
-  const payload = {
-    embeds: [type === 'giveaway' ? giveawayEmbed(ev) : claimEventEmbed(ev)],
-    components: [eventActionRow(eventId, type, false)],
-  };
-
-  await i.reply({
+  return i.reply({
     content:
       type === 'giveaway'
-        ? `✅ Giveaway créé : **${fmt(amount)}** × ${maxWinners} · tirage dans **${minutes} min** · MP en cours…`
+        ? `✅ Giveaway créé : **${fmt(amount)}** × ${maxWinners} · tirage dans **${minutes} min** · popup affiché sur le site.`
         : `✅ Claim créé : **${fmt(amount)}** × ${maxWinners}` +
           (minutes > 0 ? ` · expire dans **${minutes} min**` : '') +
-          ' · MP en cours…',
+          ' · popup affiché sur le site.',
     flags: EPH,
   });
-  const { ok, fail } = await dmGuildEveryone(i.guild, payload);
-  return i.followUp({ content: `📬 Envoyé en MP : **${ok}** ok · **${fail}** échecs.`, flags: EPH }).catch(() => {});
 }
 
 // ---------- Événements lancés / utilisés depuis le site ----------
@@ -6124,11 +6062,6 @@ async function webLaunchBoost(guildId, hostId, kind, minutes) {
   if (!guild) throw new Error('Serveur introuvable.');
   await startBoost(guildId, { ...p, minutes });
   webEvent(guildId, { kind: 'boost', title: `⚡ Boost : ${p.label}`, text: boostText(p, minutes), expiresAt: Date.now() + minutes * 60_000 });
-  const ends = Math.floor((Date.now() + minutes * 60_000) / 1000);
-  const payload = { embeds: [new EmbedBuilder().setTitle(`⚡ Boost : ${p.label}`).setColor(COLORS.gold).setDescription(
-    `👤 Lancé par <@${hostId}>\nUn boost est actif pendant **${minutes} min** (fin <t:${ends}:R>) !\n` +
-    (p.winMult !== 1 ? `• Gains × **${p.winMult}**\n` : '') + (p.loseMult !== 1 ? `• Pertes × **${p.loseMult}** (mise perdue ×${p.loseMult})\n` : '') + `\nJoue maintenant pour en profiter !`).setTimestamp()] };
-  dmGuildEveryone(guild, payload).catch((e) => console.error('[boost web] MP', e?.message || e));
   return { label: p.label, minutes };
 }
 
@@ -6147,8 +6080,6 @@ async function webLaunchEvent(guildId, hostId, type, amount, winners, minutes) {
   else if (expiresAt) ev.timer = setTimeout(() => expireClaimEvent(eventId), expiresAt - Date.now());
   activeEvents.set(eventId, ev);
   webEvent(guildId, evNotif(ev, eventId));
-  const payload = { embeds: [type === 'giveaway' ? giveawayEmbed(ev) : claimEventEmbed(ev)], components: [eventActionRow(eventId, type, false)] };
-  dmGuildEveryone(guild, payload).catch((e) => console.error('[event web] MP', e?.message || e));
   return { type, amount, winners: ev.maxWinners, minutes };
 }
 
@@ -6899,6 +6830,7 @@ async function postOnlineRecap(guildId, r) {
   else if (r.game === 'russian') title = '🔫 Roulette russe — victoire';
   else if (r.game === 'slots') title = '🎰 Slots — victoire';
   else if (r.game === 'duel') title = '🤠 Duel — victoire';
+  else if (r.game === 'plinko') title = '🎱 Plinko — victoire';
   else if (r.game === 'scratch') title = '🎟️ Ticket à gratter — victoire';
   else return;
   const embed = new EmbedBuilder()
