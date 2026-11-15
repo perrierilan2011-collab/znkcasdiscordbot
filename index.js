@@ -108,7 +108,7 @@ const COIN_PLAIN = String(process.env.COIN_TEXT || COIN).trim() || COIN;
 const plain = (s) => String(s).split(COIN).join(COIN_PLAIN);
 console.log(`[coin] ${COIN} (texte : ${COIN_PLAIN})`);
 
-const DAILY_AMOUNT = 4;
+const DAILY_AMOUNT = 30;
 const INVITE_REWARD = 1;
 const LEADERBOARD_REFRESH_MS = 60_000;
 const IDLE_MS = 90_000;
