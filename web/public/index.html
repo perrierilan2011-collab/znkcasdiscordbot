@@ -2133,7 +2133,7 @@ function rkRenderMe(d) {
   const st = el('div', 'rkstats');
   const cell = (k, v, cls, sub) => { const c = el('div', 'rkst'); c.append(el('small', '', k)); const b = el('b', cls || '', v); if (sub) { b.append(document.createTextNode(' ')); b.append(el('i', '', sub)); } c.append(b); return c; };
   st.append(
-    cell('RR', m.games ? String(m.elo) : '—', 'elo', m.games && m.prov ? 'provisoire' : ''),
+    cell('Elo', m.games ? String(m.elo) : '—', 'elo', m.games && m.prov ? 'RR' : ''),
     cell('Position', m.pos ? '#' + m.pos : '—', '', m.pos ? '/ ' + m.total : ''),
     cell('Manches classées', String(m.games)),
     cell('Meilleur RR', m.games ? String(m.peak) : '—')
