@@ -61,6 +61,7 @@ function init(deps) {
         u: String(user.id),
         n: String(user.name || 'Joueur').slice(0, 24),
         a: String(user.avatar || ''),
+        r: String(user.role || '').replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, 32),
         g: String(guildId),
         e: Date.now() + TOKEN_TTL_MS,
       })
@@ -76,7 +77,7 @@ function init(deps) {
       const d = JSON.parse(unb64(payload));
       if (!d || d.e < Date.now() || !d.u || !d.g) return null;
       const avatar = /^https:\/\/(cdn|media)\.discordapp\.(com|net)\//.test(d.a) ? d.a : '';
-      return { uid: d.u, name: d.n, avatar, guildId: d.g };
+      return { uid: d.u, name: d.n, avatar, role: String(d.r || ''), guildId: d.g };
     } catch {
       return null;
     }
@@ -310,7 +311,7 @@ function init(deps) {
           if (!text) break;
           if (now - (lastChat.get(user.uid) || 0) < 1200) throw new Error('Doucement : un message par seconde maximum.');
           lastChat.set(user.uid, now);
-          const msg = { room: chatRoom, uid: user.uid, name: user.name, avatar: user.avatar, text, t: now };
+          const msg = { room: chatRoom, uid: user.uid, name: user.name, role: user.role || '', avatar: user.avatar, text, t: now };
           const list = entry.chat.get(chatRoom) || [];
           list.push(msg);
           if (list.length > CHAT_KEEP) list.shift();
