@@ -263,7 +263,7 @@ th{color:var(--mut);font-size:12px}
 .nit .nbtn{margin-top:6px;padding:6px 14px;border-radius:999px;background:#fff;color:#000;font-weight:800;font-size:12px;border:0}
 .nit .nbtn:disabled{background:#333;color:#888}
 .nit .nt{display:block;color:#d4d4d4;font-size:12px;margin-top:2px;line-height:1.35}
-/* ---------- RANK : rang (gains cumulés) + ELO ---------- */
+/* ---------- RANK : rang (gains cumulés) + RR ---------- */
 #rankView{align-items:center;padding:24px 16px 64px;overflow:auto}
 .rkwrap{width:100%;max-width:760px;display:flex;flex-direction:column;gap:14px}
 .rkme{background:#0a0a0a;border:1px solid #262626;border-radius:16px;padding:20px;display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px 22px;align-items:center;background-image:radial-gradient(120% 90% at 0% 0%,color-mix(in srgb,var(--c1,#888) 14%,transparent),transparent 60%)}
@@ -847,7 +847,7 @@ body.fs.vpk #pkInfo{font-size:12px}
       </button>
       <button class="gcard" data-go="off-plinko">
         <span class="gname">Plinko</span>
-        <span class="gdesc">Lâche la bille dans les piquets, jusqu’à x130 · 1 à 10 billes</span>
+        <span class="gdesc">Lâche la bille dans les piquets, jusqu’à x130 · 1 à 10 billes (mise = prix d’une bille)</span>
         <span class="glive"></span><span class="gplay">Jouer</span>
       </button>
       <button class="gcard" data-go="off-scratch">
@@ -892,7 +892,7 @@ body.fs.vpk #pkInfo{font-size:12px}
   <div class="rkwrap">
     <section class="rkme" id="rkMe"><div class="lbnone">…</div></section>
     <section class="lbcol">
-      <div class="lbtitle"><b>Classement ELO</b><small>Se joue contre les autres joueurs : poker, blackjack et roulette en ligne</small></div>
+      <div class="lbtitle"><b>Classement RR</b><small>Se joue contre les autres joueurs : poker, blackjack et roulette en ligne</small></div>
       <div id="rkElo"><div class="lbnone">…</div></div>
     </section>
     <section class="lbcol">
@@ -2086,7 +2086,7 @@ function adInit() {
 }
 adInit();
 
-// ---- page Rank : rang (gains cumulés) + classement ELO
+// ---- page Rank : rang (gains cumulés) + classement RR
 const RK = { timer: null, busy: false, d: null };
 const rkMix = (hex, t) => { const n = parseInt(hex.slice(1), 16), c = [n >> 16, (n >> 8) & 255, n & 255].map((v) => Math.round(v + (255 - v) * t)); return '#' + c.map((v) => v.toString(16).padStart(2, '0')).join(''); };
 function rkFmt(n) {
@@ -2133,10 +2133,10 @@ function rkRenderMe(d) {
   const st = el('div', 'rkstats');
   const cell = (k, v, cls, sub) => { const c = el('div', 'rkst'); c.append(el('small', '', k)); const b = el('b', cls || '', v); if (sub) { b.append(document.createTextNode(' ')); b.append(el('i', '', sub)); } c.append(b); return c; };
   st.append(
-    cell('ELO', m.games ? String(m.elo) : '—', 'elo', m.games && m.prov ? 'provisoire' : ''),
+    cell('RR', m.games ? String(m.elo) : '—', 'elo', m.games && m.prov ? 'provisoire' : ''),
     cell('Position', m.pos ? '#' + m.pos : '—', '', m.pos ? '/ ' + m.total : ''),
     cell('Manches classées', String(m.games)),
-    cell('Meilleur ELO', m.games ? String(m.peak) : '—')
+    cell('Meilleur RR', m.games ? String(m.peak) : '—')
   );
   box.append(st);
 }
@@ -2153,8 +2153,8 @@ function rkRenderElo(d) {
   if (!d.elo.length) { box.replaceChildren(el('div', 'lbnone', 'Personne n’est encore classé. Joue une manche à plusieurs (poker, blackjack ou roulette) pour apparaître ici.')); return; }
   const rows = d.elo.map(mk);
   if (d.meRow) { rows.push(el('div', 'rksep', '···'), mk(d.meRow)); }
-  else if (!d.me.games) rows.push(el('div', 'lbnone', 'Tu n’es pas encore classé : joue une manche à plusieurs pour obtenir un ELO.'));
-  const note = el('div', 'lbnone', 'Un « ? » indique un ELO provisoire (moins de ' + d.provisional + ' manches classées).'); note.style.padding = '10px';
+  else if (!d.me.games) rows.push(el('div', 'lbnone', 'Tu n’es pas encore classé : joue une manche à plusieurs pour obtenir un RR.'));
+  const note = el('div', 'lbnone', 'Un « ? » indique un RR provisoire (moins de ' + d.provisional + ' manches classées).'); note.style.padding = '10px';
   box.replaceChildren(...rows, note);
 }
 function rkRenderLadder(d) {
@@ -2663,7 +2663,7 @@ function rMines(s) {
   O.pp = s ? s.picks.slice() : [];
   const st = $('#oStats'); st.textContent = '';
   const box = (l, v, gold) => { const d = el('div', 'stat' + (gold ? ' gold' : '')); d.append(el('small', '', l), el('b', '', v)); st.append(d); };
-  if (!s) return box('Première case', 'x' + (Math.floor(O.mines ? 100 * 0.97 * 25 / (25 - O.mines) : 0) / 100));
+  if (!s) return box('Première case', 'x' + (Math.floor(O.mines ? 100 * 0.94 * 25 / (25 - O.mines) : 0) / 100));
   box('Mise', num(s.bet) + ' ' + COIN); box('Multiplicateur', s.mult + 'x');
   if (live) { box('Prochaine case', s.next ? s.next + 'x' : 'Dernière'); box('Gain actuel', num(s.cash) + ' ' + COIN, true); }
   else box(s.win > 0 ? 'Encaissé' : 'Mine touchée', s.win > 0 ? num(s.win) + ' ' + COIN : 'Mise perdue', s.win > 0);
@@ -2825,6 +2825,7 @@ const flr2 = (x) => Math.floor(x * 100 + 1e-9) / 100;
 function ofRelease() { O.anim = false; if (O.hold) { O.hold = false; if (O.bal != null) $('#meBal').textContent = num(O.bal) + ' ' + COIN; } }
 function ofGoLabel() {
   const b = $('#oGo'); if (!b || !INST[O.game]) return;
+  if (O.game === 'plinko') { const bt = parseAmt(O.bet) || 0; b.textContent = (O.st ? 'Relancer' : 'Lancer') + (bt ? ' · ' + O.balls + ' bille' + (O.balls > 1 ? 's' : '') + ' × ' + num(bt) + ' = ' + num(flr2(bt * O.balls)) + ' ' + COIN : ''); return; }
   const c = CH[O.game].find((x) => x[0] === O.pick[O.game]), bet = parseAmt(O.bet) || 0;
   b.textContent = (O.st ? 'Relancer' : 'Lancer') + (bet && c && c[2] ? ' · gain possible ' + num(flr2(bet * c[2])) + ' ' + COIN : '');
 }
@@ -2841,7 +2842,7 @@ function ofStatsInst() {
   const c = CH[O.game].find((x) => x[0] === O.pick[O.game]);
   if (s && s.over) { box('Mise', num(s.bet) + ' ' + COIN); box('Multiplicateur', (s.mult || 0) + 'x'); box(s.win > 0 ? 'Gain' : 'Perdu', s.win > 0 ? num(s.win) + ' ' + COIN : '−' + num(s.bet) + ' ' + COIN, s.win > 0); }
   else if (O.game === 'slots') { box('Lignes', '5'); box('Jackpot', 'x' + JP, true); }
-  else if (O.game === 'plinko') { box('Risque', c[1]); box('Billes', String(O.balls)); box('Gain max', 'x' + c[2], true); }
+  else if (O.game === 'plinko') { box('Risque', c[1]); box('Billes', String(O.balls)); box('Coût total', num(flr2((parseAmt(O.bet) || 0) * O.balls)) + ' ' + COIN); box('Gain max', 'x' + c[2], true); }
   else if (c) { box('Ton choix', c[1]); box('Multiplicateur', 'x' + c[2], true); }
 }
 function rInst(s) {
@@ -3189,7 +3190,8 @@ async function gSearch() {
   try {
     const d = await (await fetch('/api/players?t=' + encodeURIComponent(TOKEN) + '&q=' + encodeURIComponent(q))).json();
     box.textContent = '';
-    if (!d.players || !d.players.length) { box.append(el('div', 'lbnone', 'Aucun joueur trouvé.')); return; }
+    if (G.admin && me && (!q || String(me.name || '').toLowerCase().includes(q) || 'moi'.startsWith(q))) { const b = el('button', 'gp'), av = el('span', 'pav'); b.dataset.uid = me.uid; setAvatar(av, me.avatar, me.name); b.append(av, document.createTextNode((me.name || 'Moi') + ' (moi)')); b.onclick = () => { G.to = { uid: me.uid, name: me.name || 'Moi', avatar: me.avatar }; gSel(); $('#gAmt').focus(); }; box.append(b); }
+    if (!d.players || !d.players.length) { if (!box.children.length) box.append(el('div', 'lbnone', 'Aucun joueur trouvé.')); return; }
     d.players.forEach((p) => { const b = el('button', 'gp'), av = el('span', 'pav'); b.dataset.uid = p.uid; setAvatar(av, p.avatar, p.name); b.append(av, document.createTextNode(p.name)); b.onclick = () => { G.to = p; gSel(); $('#gAmt').focus(); }; box.append(b); });
     gSel();
   } catch { box.textContent = ''; }
