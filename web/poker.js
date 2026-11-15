@@ -108,6 +108,20 @@ function bestHand(cards) {
   return { s: best.s, cat: best.cat, name: handName(best.cat, best.tb) };
 }
 
+/** nom de la main « en cours » (2 à 7 cartes) : sert à l'afficher sous tes cartes */
+function liveHandName(cards) {
+  if (cards.length >= 5) return bestHand(cards).name;
+  const vals = cards.map((c) => RV[c.r]).sort((a, b) => b - a);
+  const cnt = {};
+  for (const v of vals) cnt[v] = (cnt[v] || 0) + 1;
+  const g = Object.entries(cnt).map(([v, c]) => [c, Number(v)]).sort((a, b) => b[0] - a[0] || b[1] - a[1]);
+  if (g[0][0] === 4) return `Carré de ${RL(g[0][1])}`;
+  if (g[0][0] === 3) return `Brelan de ${RL(g[0][1])}`;
+  if (g[0][0] === 2 && g[1] && g[1][0] === 2) return `Double paire ${RL(g[0][1])} et ${RL(g[1][1])}`;
+  if (g[0][0] === 2) return `Paire de ${RL(g[0][1])}`;
+  return `Carte haute ${RL(vals[0])}`;
+}
+
 class PokerRoom {
   /**
    * deps : { getBalance(uid), debit(uid, amt) -> newBal|null, credit(uid, amt) -> newBal,
@@ -257,6 +271,7 @@ class PokerRoom {
               last: p.last,
               cards: p.cards.map((c) => (p.uid === uid || p.show ? { id: c.id, r: c.r, s: c.s } : { id: c.id, h: 1 })),
               hand: p.show ? p.handName : null,
+              live: p.uid === uid && p.inHand && !p.folded && p.cards.length >= 2 ? liveHandName([...p.cards, ...this.board]) : null,
               won: p.won || 0,
               net: p.net,
             }

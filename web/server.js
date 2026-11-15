@@ -144,12 +144,88 @@ function init(deps) {
   const statsApi = makeStats(path.join(DATA_DIR, 'bj_stats.json'));
   const pokerStats = makeStats(path.join(DATA_DIR, 'poker_stats.json'));
 
-  // ---------- tables (une par serveur Discord) ----------
-  const rooms = new Map(); // guildId -> { room, clients:Set<res>, conns: Map<uid, n> }
+  // ---------- tables multiples : quand toutes les tables d'un jeu sont pleines, une nouvelle s'ouvre ----------
+  const MAX_TABLES = 12;
+  function makePoker(entry, tid) {
+    const pr = new PokerRoom(entry.guildId, {
+      getBalance: deps.getBalance,
+      debit: deps.debit,
+      credit: deps.credit,
+      pending,
+      stats: pokerStats,
+      onRoundEnd: (r) => deps.onRoundEnd && deps.onRoundEnd(entry.guildId, r),
+      // snapshot PERSONNALISÉ (chaque joueur ne reçoit que ses propres cartes) => un envoi par connexion
+      onChange: (p) => {
+        for (const res of entry.clients) {
+          try {
+            res.write(`event: poker\ndata: ${JSON.stringify({ ...p.snapshot(res.uid), tid })}\n\n`);
+          } catch {
+            /* connexion fermée */
+          }
+        }
+      },
+    });
+    pr.tid = tid;
+    return pr;
+  }
+  function makeBj(entry, tid) {
+    const r = new Room(entry.guildId, {
+      getBalance: deps.getBalance,
+      debit: deps.debit,
+      credit: deps.credit,
+      pending,
+      stats: statsApi,
+      onRoundEnd: (x) => deps.onRoundEnd && deps.onRoundEnd(entry.guildId, x),
+      onChange: (room) => {
+        const msg = `event: state\ndata: ${JSON.stringify({ ...room.snapshot(), tid })}\n\n`;
+        for (const res of entry.clients) {
+          try {
+            res.write(msg);
+          } catch {
+            /* connexion fermée */
+          }
+        }
+      },
+    });
+    r.tid = tid;
+    return r;
+  }
+  const isFull = (r) => r.seats.every(Boolean);
+  /** garde toujours au moins une table avec une place libre, et supprime les tables vides en trop */
+  function syncOne(entry, map, make, kind) {
+    const empties = [...map.entries()].filter(([, r]) => r.isEmpty()).map(([t]) => t).sort((x, y) => x - y);
+    const spare = [...map.values()].some((r) => !r.isEmpty() && !isFull(r)); // une table partiellement remplie accueille déjà les nouveaux
+    for (const t of spare ? empties : empties.slice(1)) {
+      const r = map.get(t);
+      try { r.clearTimer(); } catch { /* ignore */ }
+      map.delete(t);
+      entry.broadcast(`event: tabledel\ndata: ${JSON.stringify({ game: kind, tid: t })}\n\n`);
+    }
+    if (!map.size || ([...map.values()].every(isFull) && map.size < MAX_TABLES)) {
+      let tid = 1;
+      while (map.has(tid)) tid++;
+      const r = make(entry, tid);
+      map.set(tid, r);
+      r.emit();
+    }
+  }
+  function syncTables(entry) {
+    syncOne(entry, entry.bjs, makeBj, 'bj');
+    syncOne(entry, entry.pokers, makePoker, 'poker');
+  }
+  setInterval(() => { for (const e of rooms.values()) syncTables(e); }, 4000).unref();
+  const tidOf = (d) => (Number.isInteger(Number(d.tid)) && Number(d.tid) > 0 ? Number(d.tid) : 1);
+  function otherSeat(map, uid, tid) {
+    for (const [t, r] of map) if (t !== tid && r.findSeat(uid) >= 0) return t;
+    return 0;
+  }
+
+  // ---------- tables (plusieurs par serveur Discord) ----------
+  const rooms = new Map(); // guildId -> { bjs, pokers, roulette, clients:Set<res>, conns: Map<uid, n> }
   function roomOf(guildId) {
     let r = rooms.get(guildId);
     if (r) return r;
-    const entry = { clients: new Set(), conns: new Map(), room: null, poker: null, roulette: null, chat: new Map() };
+    const entry = { guildId, clients: new Set(), conns: new Map(), roulette: null, chat: new Map() };
     const broadcast = (msg) => {
       for (const res of entry.clients) {
         try {
@@ -168,42 +244,10 @@ function init(deps) {
       onRoundEnd: (r) => deps.onRoundEnd && deps.onRoundEnd(guildId, r),
       onChange: (w) => broadcast(`event: roulette\ndata: ${JSON.stringify(w.snapshot())}\n\n`),
     });
-    // poker : le snapshot est PERSONNALISÉ (chaque joueur ne reçoit que ses propres cartes) => un envoi par connexion
-    entry.poker = new PokerRoom(guildId, {
-      getBalance: deps.getBalance,
-      debit: deps.debit,
-      credit: deps.credit,
-      pending,
-      stats: pokerStats,
-      onRoundEnd: (r) => deps.onRoundEnd && deps.onRoundEnd(guildId, r),
-      onChange: (pr) => {
-        for (const res of entry.clients) {
-          try {
-            res.write(`event: poker\ndata: ${JSON.stringify(pr.snapshot(res.uid))}\n\n`);
-          } catch {
-            /* connexion fermée */
-          }
-        }
-      },
-    });
-    entry.room = new Room(guildId, {
-      getBalance: deps.getBalance,
-      debit: deps.debit,
-      credit: deps.credit,
-      pending,
-      stats: statsApi,
-      onRoundEnd: (r) => deps.onRoundEnd && deps.onRoundEnd(guildId, r),
-      onChange: (room) => {
-        const msg = `event: state\ndata: ${JSON.stringify(room.snapshot())}\n\n`;
-        for (const res of entry.clients) {
-          try {
-            res.write(msg);
-          } catch {
-            /* connexion fermée */
-          }
-        }
-      },
-    });
+    entry.bjs = new Map(); // tid -> Room (blackjack)
+    entry.pokers = new Map(); // tid -> PokerRoom
+    entry.syncTables = () => syncTables(entry);
+    syncTables(entry);
     rooms.set(guildId, entry);
     return entry;
   }
@@ -246,7 +290,14 @@ function init(deps) {
     if (now - (lastAct.get(user.uid) || 0) < (/^[ro]/.test(String(d.action)) ? 50 : 120)) return json(res, 429, { ok: false, error: 'Doucement 🙂' });
     lastAct.set(user.uid, now);
     const entry = roomOf(user.guildId);
-    const { room, roulette, poker } = entry;
+    const { roulette } = entry;
+    const tid = tidOf(d);
+    const act = String(d.action);
+    const needBj = ['sit', 'leave', 'bet', 'clear', 'hit', 'stand', 'double', 'split', 'emote', 'sync'].includes(act);
+    const needPk = /^p/.test(act);
+    const room = needBj ? entry.bjs.get(tid) : null;
+    const poker = needPk ? entry.pokers.get(tid) : null;
+    if ((needBj && !room) || (needPk && !poker)) return json(res, 200, { ok: false, error: 'Cette table n’existe plus.' });
     let walBal; // solde du portefeuille renvoyé après une action de poker
     try {
       if (String(d.action).startsWith('o')) return json(res, 200, { ok: true, ...(await offline.handle(user, d)) });
@@ -300,6 +351,8 @@ function init(deps) {
         }
         // ---- poker (Texas Hold'em)
         case 'psit': {
+          const o = otherSeat(entry.pokers, user.uid, tid);
+          if (o) throw new Error(`Tu es déjà assis à la table ${o} : quitte-la d’abord.`);
           await poker.run(() => poker.sit(user, Number(d.seat), d.amount));
           walBal = await deps.getBalance(user.uid);
           break;
@@ -333,6 +386,8 @@ function init(deps) {
           break;
         // ---- blackjack
         case 'sit': {
+          const o = otherSeat(entry.bjs, user.uid, tid);
+          if (o) throw new Error(`Tu es déjà assis à la table ${o} : quitte-la d’abord.`);
           const seat = Number(d.seat);
           const bal = await deps.getBalance(user.uid);
           await room.run(async () => room.sit(user, seat, bal));
@@ -355,7 +410,7 @@ function init(deps) {
           break;
         case 'emote': {
           if (!EMOTES.has(d.e) || room.findSeat(user.uid) < 0) break;
-          const msg = `event: emote\ndata: ${JSON.stringify({ uid: user.uid, e: d.e })}\n\n`;
+          const msg = `event: emote\ndata: ${JSON.stringify({ uid: user.uid, e: d.e, tid })}\n\n`;
           for (const c of roomOf(user.guildId).clients) c.write(msg);
           break;
         }
@@ -370,6 +425,7 @@ function init(deps) {
         default:
           return json(res, 400, { ok: false, error: 'Action inconnue.' });
       }
+      entry.syncTables();
       return json(res, 200, { ok: true, rbal: walBal ?? roulette.players.get(user.uid)?.bal });
     } catch (e) {
       return json(res, 200, { ok: false, error: String(e?.message || e).slice(0, 160), rbal: walBal ?? roulette.players.get(user.uid)?.bal });
@@ -394,10 +450,14 @@ function init(deps) {
     res.uid = user.uid; // sert au snapshot personnalisé du poker
     entry.clients.add(res);
     entry.conns.set(user.uid, (entry.conns.get(user.uid) || 0) + 1);
-    entry.room.setPresence(user.uid, true);
-    res.write(`event: state\ndata: ${JSON.stringify(entry.room.snapshot())}\n\n`);
-    entry.poker.setPresence(user.uid, true);
-    res.write(`event: poker\ndata: ${JSON.stringify(entry.poker.snapshot(user.uid))}\n\n`);
+    for (const [t, r] of entry.bjs) {
+      r.setPresence(user.uid, true);
+      res.write(`event: state\ndata: ${JSON.stringify({ ...r.snapshot(), tid: t })}\n\n`);
+    }
+    for (const [t, r] of entry.pokers) {
+      r.setPresence(user.uid, true);
+      res.write(`event: poker\ndata: ${JSON.stringify({ ...r.snapshot(user.uid), tid: t })}\n\n`);
+    }
     deps.getBalance(user.uid).then((b) => { try { res.write(`event: bal\ndata: ${JSON.stringify({ bal: b })}\n\n`); } catch { /* fermée */ } }).catch(() => {});
     entry.roulette.setPresence(user.uid, true);
     res.write(`event: roulette\ndata: ${JSON.stringify(entry.roulette.snapshot())}\n\n`);
@@ -417,8 +477,8 @@ function init(deps) {
         entry.conns.delete(user.uid);
         setTimeout(() => {
           if (!entry.conns.has(user.uid)) {
-            entry.room.setPresence(user.uid, false);
-            entry.poker.setPresence(user.uid, false);
+            for (const r of entry.bjs.values()) r.setPresence(user.uid, false);
+            for (const r of entry.pokers.values()) r.setPresence(user.uid, false);
             entry.roulette.setPresence(user.uid, false);
           }
         }, 8000); // tolérance : rechargement de page / coupure réseau brève
