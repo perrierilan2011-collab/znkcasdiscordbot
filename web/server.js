@@ -20,6 +20,9 @@ const { create: createOffline } = require('./offline');
 
 const PUBLIC_URL = String(process.env.PUBLIC_URL || 'https://znkcasdiscordbot-production.up.railway.app').replace(/\/+$/, '');
 const TOKEN_TTL_MS = 12 * 3600 * 1000;
+// chat en direct : un salon par jeu (par serveur Discord), historique gardé en mémoire
+const CHAT_ROOMS = new Set(['hub', 'bj', 'roulette', 'off-bj', 'off-fuse', 'off-mine']);
+const CHAT_KEEP = 60;
 const EMOTES = new Set(['🔥', '👏', '😈', '🍀', '😱', '😂', '💸', '🎉']);
 const DATA_DIR = path.join(__dirname, '..', 'data');
 
@@ -142,7 +145,7 @@ function init(deps) {
   function roomOf(guildId) {
     let r = rooms.get(guildId);
     if (r) return r;
-    const entry = { clients: new Set(), conns: new Map(), room: null, roulette: null };
+    const entry = { clients: new Set(), conns: new Map(), room: null, roulette: null, chat: new Map() };
     const broadcast = (msg) => {
       for (const res of entry.clients) {
         try {
@@ -201,6 +204,7 @@ function init(deps) {
     res.end(JSON.stringify(obj));
   };
   const lastAct = new Map();
+  const lastChat = new Map();
 
   async function handleAct(req, res) {
     let body = '';
@@ -224,6 +228,22 @@ function init(deps) {
     try {
       if (String(d.action).startsWith('o')) return json(res, 200, { ok: true, ...(await offline.handle(user, d)) });
       switch (d.action) {
+        // ---- chat en direct
+        case 'chatsend': {
+          const chatRoom = String(d.room);
+          if (!CHAT_ROOMS.has(chatRoom)) throw new Error('Salon inconnu.');
+          const text = String(d.text || '').replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 200);
+          if (!text) break;
+          if (now - (lastChat.get(user.uid) || 0) < 1200) throw new Error('Doucement : un message par seconde maximum.');
+          lastChat.set(user.uid, now);
+          const msg = { room: chatRoom, uid: user.uid, name: user.name, avatar: user.avatar, text, t: now };
+          const list = entry.chat.get(chatRoom) || [];
+          list.push(msg);
+          if (list.length > CHAT_KEEP) list.shift();
+          entry.chat.set(chatRoom, list);
+          entry.broadcast(`event: chat\ndata: ${JSON.stringify(msg)}\n\n`);
+          break;
+        }
         // ---- roulette
         case 'rjoin': {
           const bal = await deps.getBalance(user.uid);
@@ -321,6 +341,7 @@ function init(deps) {
     res.write(`event: state\ndata: ${JSON.stringify(entry.room.snapshot())}\n\n`);
     entry.roulette.setPresence(user.uid, true);
     res.write(`event: roulette\ndata: ${JSON.stringify(entry.roulette.snapshot())}\n\n`);
+    res.write(`event: chathist\ndata: ${JSON.stringify(Object.fromEntries(entry.chat))}\n\n`);
     const hb = setInterval(() => {
       try {
         res.write(': ping\n\n');
