@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0b0716">
-<title>ZNK Casino · Blackjack &amp; Roue en ligne</title>
+<title>ZNK Casino · Jeux en ligne</title>
 <style>
 :root{
   --bg:#0b0716; --violet:#7c3aed; --violet2:#a78bfa; --gold:#fbbf24; --green:#22c55e; --red:#ef4444;
@@ -28,6 +28,33 @@ header{display:flex;align-items:center;gap:10px;padding:8px 14px;background:rgba
 .me b{font-variant-numeric:tabular-nums;color:var(--gold)}
 .hb{background:rgba(124,58,237,.22);border:1px solid rgba(167,139,250,.3);border-radius:10px;padding:6px 10px}
 .hb:hover:not(:disabled){background:rgba(124,58,237,.4)}
+/* ---------- accueil : choix du jeu ---------- */
+#hubView{position:relative;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:26px;padding:22px 14px 34px;overflow:hidden}
+#hubView::before{content:"ZNK";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:0;font-size:min(34vw,380px);font-weight:900;line-height:1;letter-spacing:.14em;padding-left:.14em;white-space:nowrap;
+  color:transparent;-webkit-text-stroke:2px rgba(255,255,255,.07);pointer-events:none}
+.hubhead,#games{position:relative;z-index:1}
+.hubhead{text-align:center}
+.hubhead h1{margin:0;font-size:clamp(28px,5.4vw,50px);font-weight:900;letter-spacing:.06em;text-transform:uppercase;background:linear-gradient(90deg,#e9d5ff,#a78bfa 40%,#f0abfc);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 0 18px rgba(124,58,237,.55))}
+.hubhead p{margin:8px 0 0;color:var(--mut)}
+#games{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,310px));gap:20px;justify-content:center;width:100%;max-width:1000px}
+.gcard{position:relative;display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;padding:28px 18px 20px;border-radius:26px;color:var(--ink);overflow:hidden;
+  background:radial-gradient(ellipse at 50% 0%,rgba(167,139,250,.38),rgba(30,12,70,.88) 70%),#150b30;border:1px solid rgba(196,181,253,.42);
+  box-shadow:0 16px 44px rgba(0,0,0,.55),0 0 34px rgba(124,58,237,.28);transition:transform .18s,box-shadow .18s,border-color .18s}
+.gcard::after{content:"";position:absolute;top:0;left:-60%;width:40%;height:100%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.16),transparent);transform:skewX(-18deg);animation:gshine 5.5s ease-in-out infinite;pointer-events:none}
+@keyframes gshine{0%,55%{left:-60%}100%{left:130%}}
+.gcard:hover:not(:disabled){transform:translateY(-7px) scale(1.025);border-color:#ddd6fe;box-shadow:0 22px 54px rgba(0,0,0,.6),0 0 46px rgba(167,139,250,.55)}
+.gcard:active:not(:disabled){transform:translateY(-2px) scale(1)}
+.gico{font-size:68px;line-height:1;filter:drop-shadow(0 8px 16px rgba(124,58,237,.75));animation:gfloat 3.4s ease-in-out infinite}
+@keyframes gfloat{0%,100%{transform:translateY(0) rotate(-3deg)}50%{transform:translateY(-8px) rotate(3deg)}}
+.gname{font-size:25px;font-weight:900;letter-spacing:.1em;text-transform:uppercase}
+.gdesc{color:var(--mut);font-size:13px;min-height:38px}
+.gplay{margin-top:6px;padding:10px 28px;border-radius:999px;font-weight:900;letter-spacing:.06em;background:linear-gradient(180deg,#8b5cf6,#5b21b6);border:1px solid #ddd6fe;box-shadow:0 0 18px rgba(124,58,237,.6)}
+.glive{font-size:12px;font-weight:700;color:#86efac;min-height:16px}
+.gcard:disabled{cursor:not-allowed;filter:grayscale(.55) brightness(.8)}
+.gcard:disabled .gplay{background:#3b3355;border-color:#6b5f94;box-shadow:none}
+.gcard:disabled .gico,.gcard:disabled::after{animation:none}
+@media(prefers-reduced-motion:reduce){.gico,.gcard::after{animation:none}}
+.logo{cursor:pointer}
 /* ---------- table ---------- */
 main{flex:1;display:flex;flex-direction:column;min-height:0;padding:10px 10px 0;gap:8px}
 #table{position:relative;flex:1;min-height:420px;border:14px solid transparent;
@@ -283,18 +310,33 @@ th{color:var(--mut);font-size:12px}
 </style>
 </head>
 <body>
-<div id="gate"><div><h1>🃏 ZNK Casino</h1><p id="gatemsg">Ouvre ce jeu depuis Discord : clique sur le bouton <b>Jouer</b> du salon « online » pour recevoir ton lien personnel.</p></div></div>
+<div id="gate"><div><h1>🃏 ZNK Casino</h1><p id="gatemsg">Ouvre ce jeu depuis Discord : clique sur le bouton <b>Play Online</b> du salon « online » pour recevoir ton lien personnel.</p></div></div>
 <header>
-  <div class="logo">ZNK CASINO<small id="subtitle">BLACKJACK · TABLE EN LIGNE</small></div>
-  <nav id="tabs"><button class="tab on" data-g="bj">🃏 Blackjack</button><button class="tab" data-g="wheel">🎡 Roue</button></nav>
+  <div class="logo">ZNK CASINO<small id="subtitle">CHOISIS TON JEU</small></div>
+  <nav id="tabs"><button class="tab on" data-g="hub">🏠 Jeux</button><button class="tab" data-g="bj">🃏 Blackjack</button><button class="tab" data-g="wheel">🎡 Roue</button></nav>
   <div class="sp"></div>
-  <button class="hb" id="bTop" title="Classement">🏆</button>
-  <button class="hb" id="bRules" title="Règles">📖</button>
+  <button class="hb hide" id="bTop" title="Classement">🏆</button>
+  <button class="hb hide" id="bRules" title="Règles">📖</button>
   <button class="hb" id="bSnd" title="Son">🔊</button>
   <div class="me" id="me"><div class="av" id="meAv">?</div><div><div id="meName" style="font-weight:700;font-size:12px">…</div><b id="meBal">—</b></div></div>
 </header>
 <div id="conn">Reconnexion…</div>
-<main id="bjView">
+<main id="hubView">
+  <div class="hubhead"><h1>Choisis ton jeu</h1><p>Un seul compte : ton solde du casino est utilisé partout.</p></div>
+  <div id="games">
+    <button class="gcard" data-go="bj" id="gcBj">
+      <span class="gico">🃏</span><span class="gname">Blackjack</span>
+      <span class="gdesc">Table à 5 places · mise libre · blackjack payé 3:2</span>
+      <span class="glive" id="gBjLive"></span><span class="gplay">JOUER ▶</span>
+    </button>
+    <button class="gcard" data-go="wheel" id="gcWheel">
+      <span class="gico">🎡</span><span class="gname">Roue</span>
+      <span class="gdesc">Une roue pour tout le monde · zones x2, x3, x6 et jackpot x24</span>
+      <span class="glive" id="gWhLive"></span><span class="gplay">JOUER ▶</span>
+    </button>
+  </div>
+</main>
+<main id="bjView" class="hide">
   <section id="table">
     <div id="dealer"><div class="dname">CROUPIER</div><div class="cards" id="dcards"></div><div id="dtot"></div></div>
     <div id="shoe"><span id="shoeN"></span></div>
@@ -742,7 +784,7 @@ document.addEventListener('pointerdown', () => ac(), { once: true });
 document.addEventListener('visibilitychange', () => { if (!document.hidden && mySeat()) send('sync'); });
 
 // ============================================================= ROUE MULTIJOUEUR
-const W = { info: null, S: null, view: 'bj', bal: null, joined: false, startedRound: -1, shownRound: -1, lastIdx: -1, lastTick: 0, lastPtr: 0, lastCd: -1, rows: new Map(), parts: [], hist: '', cache: {} };
+const W = { info: null, S: null, view: 'hub', bal: null, joined: false, startedRound: -1, shownRound: -1, lastIdx: -1, lastTick: 0, lastPtr: 0, lastCd: -1, rows: new Map(), parts: [], hist: '', cache: {} };
 const ZCOL = { 2: '#60a5fa', 3: '#4ade80', 6: '#c084fc', 24: '#fde047' };
 const SEGCOL = { 2: [['#3b82f6', '#1e3a8a'], ['#2563eb', '#172554']], 3: [['#22c55e', '#14532d']], 6: [['#a855f7', '#4c1d95']], 24: [['#fde047', '#a16207']] };
 const TAUW = Math.PI * 2;
@@ -816,22 +858,41 @@ function setView(v) {
     wLeaveNow();
   }
   W.view = v;
+  $('#hubView').classList.toggle('hide', v !== 'hub');
   $('#bjView').classList.toggle('hide', v !== 'bj');
   $('#whView').classList.toggle('hide', v !== 'wheel');
   document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('on', t.dataset.g === v));
-  $('#subtitle').textContent = v === 'wheel' ? 'ROUE · TABLE EN LIGNE' : 'BLACKJACK · TABLE EN LIGNE';
-  document.title = v === 'wheel' ? 'ZNK Casino · Roue en ligne' : 'ZNK Casino · Blackjack en ligne';
-  $('#bTop').classList.toggle('hide', v === 'wheel');
+  $('#subtitle').textContent = v === 'wheel' ? 'ROUE · TABLE EN LIGNE' : v === 'bj' ? 'BLACKJACK · TABLE EN LIGNE' : 'CHOISIS TON JEU';
+  document.title = v === 'wheel' ? 'ZNK Casino · Roue en ligne' : v === 'bj' ? 'ZNK Casino · Blackjack en ligne' : 'ZNK Casino · Jeux en ligne';
+  $('#bTop').classList.toggle('hide', v !== 'bj');
+  $('#bRules').classList.toggle('hide', v === 'hub');
   try { sessionStorage.setItem('znk_v', v); } catch {}
   if (v === 'wheel') { wEnter(); wResize(); if (W.S) wRender(W.S, true); const m = mySeat(); if (!m) $('#meBal').textContent = num(wBal()) + ' ' + COIN; }
-  else { const m = mySeat(); $('#meBal').textContent = m ? num(m.bal) + ' ' + COIN : 'Spectateur'; }
+  else if (v === 'bj') { const m = mySeat(); $('#meBal').textContent = m ? num(m.bal) + ' ' + COIN : 'Spectateur'; }
+  else { const m = mySeat(); $('#meBal').textContent = m ? num(m.bal) + ' ' + COIN : (W.bal != null ? num(W.bal) + ' ' + COIN : 'Casino'); }
 }
+// accueil : cartes des jeux, logo, état « en direct »
+document.querySelectorAll('.gcard').forEach((c) => (c.onclick = () => { ac(); setView(c.dataset.go); }));
+$('.logo').onclick = () => { ac(); setView('hub'); };
+function hubWheel(ok) { $('#gcWheel').disabled = !ok; const t = document.querySelector('.tab[data-g="wheel"]'); if (t) t.disabled = !ok; }
+function updHub() {
+  const plural = (n, a) => n + ' ' + a + (n > 1 ? 's' : '');
+  const n = S && S.seats ? S.seats.filter(Boolean).length : null;
+  $('#gBjLive').textContent = n == null ? '' : n ? '🟢 ' + plural(n, 'joueur') + ' à table' : 'Table libre';
+  const w = $('#gWhLive');
+  if (!W.info) { w.textContent = 'Bientôt disponible'; w.style.color = '#fbbf24'; return; }
+  const m = W.S && W.S.players ? W.S.players.length : null;
+  w.style.color = '';
+  w.textContent = m == null ? '' : m ? '🟢 ' + plural(m, 'joueur') + ' en jeu' : 'Roue ouverte';
+}
+hubWheel(false); setInterval(updHub, 1000); updHub();
 document.querySelectorAll('.tab').forEach((t) => (t.onclick = () => { ac(); setView(t.dataset.g); }));
 $('#bRules').onclick = () => $(W.view === 'wheel' ? '#mWRules' : '#mRules').classList.add('on');
 function wOnHello(d) {
   W.info = d.wheel; W.joined = false; $('#wCoin').textContent = COIN;
   if (W.info) wBuildZones(W.info);
   if (W.view === 'wheel') wEnter();
+  hubWheel(!!W.info); updHub();
 }
 
 // ---- confettis
@@ -1096,7 +1157,7 @@ function wLoop(ts) {
 }
 requestAnimationFrame(wLoop);
 document.addEventListener('visibilitychange', () => { if (!document.hidden && W.view === 'wheel' && W.joined) send('wsync'); });
-{ let v = params.get('t') ? params.get('g') : null; if (!params.get('t')) { try { v = sessionStorage.getItem('znk_v'); } catch {} } if (v === 'wheel') setView('wheel'); }
+{ let v = null; try { v = params.get('t') ? params.get('g') : sessionStorage.getItem('znk_v'); } catch {} if (v === 'roulette') v = 'wheel'; if (v === 'wheel' || v === 'bj') setView(v); }
 
 connect(); tick();
 })();
