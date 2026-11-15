@@ -18,6 +18,7 @@ const { Room, SEATS } = require('./table');
 const { PokerRoom, INFO: POKER_INFO } = require('./poker');
 const { RouletteRoom, INFO: ROULETTE_INFO } = require('./roulette');
 const { create: createOffline } = require('./offline');
+const { create: createRank } = require('./rank');
 
 const PUBLIC_URL = String(process.env.PUBLIC_URL || 'https://znkcasdiscordbot-production.up.railway.app').replace(/\/+$/, '');
 const TOKEN_TTL_MS = 12 * 3600 * 1000;
@@ -116,8 +117,13 @@ function init(deps) {
     }
   })();
 
-  // ---------- fin de manche : récap Discord + annonce des gagnants dans le chat du site ----------
+  // ---------- rangs (gains cumulés) + ELO ----------
+  const avatarMap = new Map(); // uid -> avatar (affiché dans les classements)
+  const rankApi = createRank(path.join(DATA_DIR, 'rank.json'));
+
+  // ---------- fin de manche : rang / ELO + récap Discord + annonce des gagnants dans le chat du site ----------
   function roundEnd(guildId, r) {
+    try { rankApi.record(r, (uid) => avatarMap.get(uid)); } catch (e) { console.error('[web] rang/elo', e?.message || e); }
     try {
       const room = GAME_ROOM[r && r.game];
       if (room) {
@@ -154,7 +160,6 @@ function init(deps) {
     clearTimeout(inboxTimer);
     inboxTimer = setTimeout(() => saveJson(INBOX_FILE, inbox), 1500);
   }
-  const avatarMap = new Map(); // uid -> avatar (affiché dans les classements)
   // ---------- statistiques / classement (un fichier par jeu : blackjack, poker) ----------
   function makeStats(file) {
     const stats = readJson(file, {});
@@ -231,12 +236,18 @@ function init(deps) {
     return r;
   }
   const isFull = (r) => r.seats.every(Boolean);
-  /** garde toujours au moins une table avec une place libre, et supprime les tables vides en trop */
+  /** garde toujours au moins une table avec une place libre ; une table restée VIDE plus de 5 min est supprimée */
+  const EMPTY_TTL_MS = 5 * 60 * 1000;
   function syncOne(entry, map, make, kind) {
     const nowMs = Date.now();
-    const empties = [...map.entries()].filter(([, r]) => r.isEmpty() && !(r.keepUntil > nowMs)).map(([t]) => t).sort((x, y) => x - y); // une table créée à la main reste 15 min même vide
-    const spare = [...map.values()].some((r) => !r.isEmpty() && !isFull(r)); // une table partiellement remplie accueille déjà les nouveaux
-    for (const t of spare ? empties : empties.slice(1)) {
+    for (const r of map.values()) {
+      if (r.isEmpty()) { if (!r.emptySince) r.emptySince = nowMs; } // le chrono démarre quand la dernière personne part
+      else r.emptySince = 0; // quelqu'un est assis : chrono remis à zéro
+    }
+    const expired = [...map.entries()].filter(([, r]) => r.isEmpty() && nowMs - r.emptySince >= EMPTY_TTL_MS).map(([t]) => t).sort((x, y) => y - x); // les plus hautes d'abord
+    for (const t of expired) {
+      if (map.size <= 1) break; // on garde toujours au moins une table
+      if (![...map.entries()].some(([k, x]) => k !== t && !isFull(x))) continue; // toutes les autres sont pleines : celle-ci reste la table d'accueil
       const r = map.get(t);
       try { r.clearTimer(); } catch { /* ignore */ }
       map.delete(t);
@@ -394,6 +405,7 @@ function init(deps) {
     if ((needBj && !room) || (needPk && !poker)) return json(res, 200, { ok: false, error: 'Cette table n’existe plus.' });
     let walBal; // solde du portefeuille renvoyé après une action de poker
     let created; // numéro de la table créée par un joueur (action tnew)
+    let daily; // résultat du daily (action daily)
     try {
       if (String(d.action).startsWith('o')) return json(res, 200, { ok: true, ...(await offline.handle(user, d)) });
       switch (d.action) {
@@ -426,6 +438,42 @@ function init(deps) {
           }
           break;
         }
+        // ---- admin : créer de l'argent pour n'importe quel joueur (réservé au(x) compte(s) admin)
+        case 'admingive': {
+          if (!deps.isAdmin || !(await deps.isAdmin(user.uid))) throw new Error('Action réservée à l’administrateur.');
+          const to = String(d.to || '');
+          const amt = Math.floor(Number(d.amount) * 100 + 1e-6) / 100;
+          if (!/^\d{5,25}$/.test(to)) throw new Error('Choisis un joueur.');
+          if (!Number.isFinite(amt) || amt < 1 || amt > 1e12) throw new Error('Montant invalide.');
+          const nb = await deps.credit(to, amt);
+          console.log(`[web] ADMIN ${user.name} (${user.uid}) ajoute ${amt} à ${to}`);
+          const notif = { id: crypto.randomBytes(6).toString('hex'), t: Date.now(), type: 'gift', from: user.name, amount: amt };
+          pushNotif(to, notif);
+          const rb = typeof nb === 'number' ? nb : await deps.getBalance(to).catch(() => null);
+          for (const c of entry.clients) {
+            if (c.uid !== to) continue;
+            try {
+              c.write(`event: notif\ndata: ${JSON.stringify(notif)}\n\n`);
+              if (rb !== null) c.write(`event: bal\ndata: ${JSON.stringify({ bal: rb })}\n\n`);
+            } catch { /* fermée */ }
+          }
+          break;
+        }
+        // ---- daily : récompense quotidienne (même règle que le bouton Discord)
+        case 'daily': {
+          if (!deps.claimDaily) throw new Error('Daily indisponible pour le moment.');
+          const r = await deps.claimDaily(user.uid);
+          if (!r) throw new Error('Daily indisponible, réessaie.');
+          daily = { claimed: !!r.claimed, amount: r.amount };
+          if (r.balance != null) {
+            walBal = r.balance;
+            for (const c of entry.clients) {
+              if (c.uid !== user.uid) continue;
+              try { c.write(`event: bal\ndata: ${JSON.stringify({ bal: r.balance })}\n\n`); } catch { /* fermée */ }
+            }
+          }
+          break;
+        }
         // ---- créer une table (même si les autres ne sont pas remplies)
         case 'tnew': {
           const kind = d.game === 'poker' ? 'poker' : 'bj';
@@ -434,7 +482,7 @@ function init(deps) {
           let nt = 1;
           while (map.has(nt)) nt++;
           const r = (kind === 'poker' ? makePoker : makeBj)(entry, nt);
-          r.keepUntil = Date.now() + 15 * 60 * 1000;
+          r.emptySince = Date.now();
           map.set(nt, r);
           r.emit();
           created = nt;
@@ -448,7 +496,8 @@ function init(deps) {
           if (!text) break;
           if (now - (lastChat.get(user.uid) || 0) < 1200) throw new Error('Doucement : un message par seconde maximum.');
           lastChat.set(user.uid, now);
-          const msg = { room: chatRoom, uid: user.uid, name: user.name, role: user.role || '', avatar: user.avatar, text, t: now };
+          const rk = rankApi.info(user.uid); // le rang du casino remplace le rôle Discord
+          const msg = { room: chatRoom, uid: user.uid, name: user.name, role: rk.name, rc: [rk.c1, rk.c2], avatar: user.avatar, text, t: now };
           const list = entry.chat.get(chatRoom) || [];
           list.push(msg);
           if (list.length > CHAT_KEEP) list.shift();
@@ -564,7 +613,7 @@ function init(deps) {
           return json(res, 400, { ok: false, error: 'Action inconnue.' });
       }
       entry.syncTables();
-      return json(res, 200, { ok: true, tid: created, rbal: walBal ?? roulette.players.get(user.uid)?.bal });
+      return json(res, 200, { ok: true, tid: created, daily, rbal: walBal ?? roulette.players.get(user.uid)?.bal });
     } catch (e) {
       return json(res, 200, { ok: false, error: String(e?.message || e).slice(0, 160), rbal: walBal ?? roulette.players.get(user.uid)?.bal });
     }
@@ -586,6 +635,7 @@ function init(deps) {
     });
     res.write(`retry: 2000\nevent: hello\ndata: ${JSON.stringify({ uid: user.uid, name: user.name, avatar: user.avatar, seats: SEATS, coin: deps.coin || '🪙', roulette: ROULETTE_INFO, poker: POKER_INFO })}\n\n`);
     res.uid = user.uid; // sert au snapshot personnalisé du poker
+    Promise.resolve(deps.isAdmin ? deps.isAdmin(user.uid) : false).then((a) => { if (a) try { res.write(`event: admin\ndata: {"admin":true}\n\n`); } catch { /* fermée */ } }).catch(() => {});
     if (user.avatar) avatarMap.set(user.uid, user.avatar);
     entry.seen.set(user.uid, { uid: user.uid, name: user.name, avatar: user.avatar });
     if (entry.seen.size > 300) entry.seen.delete(entry.seen.keys().next().value);
@@ -639,6 +689,13 @@ function init(deps) {
       if (req.method === 'GET' && url.pathname === '/healthz') return json(res, 200, { ok: true });
       if (req.method === 'GET' && url.pathname === '/api/stream') return handleStream(req, res, url);
       if (req.method === 'GET' && url.pathname === '/api/top') return json(res, 200, { top: (url.searchParams.get('g') === 'poker' ? pokerStats : statsApi).top() });
+      if (req.method === 'GET' && url.pathname === '/api/rank') { // page « Rank » : mon rang + classement ELO
+        const u = readToken(url.searchParams.get('t'));
+        if (!u) return json(res, 401, { error: 'expired' });
+        if (u.avatar) avatarMap.set(u.uid, u.avatar);
+        rankApi.touch(u.uid, u.name, u.avatar);
+        return json(res, 200, rankApi.view(u.uid));
+      }
       if (req.method === 'GET' && url.pathname === '/api/boards') return json(res, 200, await Promise.resolve(deps.getBoards ? deps.getBoards() : null).catch(() => null) || { rich: [], alltime: [] });
       if (req.method === 'GET' && url.pathname === '/api/players') { // recherche d'un joueur (menu « Envoyer des pièces »)
         const u = readToken(url.searchParams.get('t'));

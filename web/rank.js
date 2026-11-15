@@ -129,7 +129,8 @@ function create(file) {
       provisional: PROVISIONAL,
     };
   }
-  return { record, view, touch: (uid, name, avatar) => { if (users[uid]) get(uid, name, avatar); } };
+  const info = (uid) => LADDER[rankIndex((users[uid] && users[uid].earned) || 0)];
+  return { info, record, view, touch: (uid, name, avatar) => { if (users[uid]) get(uid, name, avatar); } };
 }
 
 module.exports = { create, LADDER, progress, rankIndex };
