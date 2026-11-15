@@ -18,12 +18,16 @@ const CELLS = 25; // mines : grille 5x5
 const RATE = 0.00012; // fusé : le multiplicateur vaut exp(RATE * ms)
 const LEAD_MS = 900; // fusé : délai avant décollage
 const MAX_CRASH = 10000;
-const TYPES = { mines: 'mines', fuse: 'fuse', bj: 'bj', coin: 'coin', dice: 'dice', horses: 'horses', russian: 'russian', slots: 'slots', duel: 'duel', scratch: 'scratch' };
-const INSTANT = new Set(['coin', 'dice', 'horses', 'russian', 'slots', 'duel']); // jeux « un coup » : résolus d'un coup côté serveur, animés côté site
+const TYPES = { mines: 'mines', fuse: 'fuse', bj: 'bj', coin: 'coin', dice: 'dice', horses: 'horses', russian: 'russian', slots: 'slots', duel: 'duel', scratch: 'scratch', plinko: 'plinko' };
+const INSTANT = new Set(['coin', 'dice', 'horses', 'russian', 'slots', 'duel', 'plinko']); // jeux « un coup » : résolus d'un coup côté serveur, animés côté site
 const COIN_MULT = 1.95;
 const DICE_MULT = { under: 2.3, over: 2.3, seven: 5.8 };
 const HORSES = [{ p: 0.4, mult: 2.4 }, { p: 0.25, mult: 3.8 }, { p: 0.18, mult: 5.3 }, { p: 0.11, mult: 8.6 }, { p: 0.06, mult: 15.8 }];
 
+// ---- plinko : 12 rangées, 13 cases, 3 niveaux de risque (retour ≈ 96-97 %), 1 à 10 billes (la mise est répartie à parts égales)
+const PL_ROWS = 12, PL_MAXBALLS = 10;
+const PL_HALF = { low: [5.6, 3.2, 1.6, 1.4, 1.1, 0.9, 0.6], med: [26, 9, 4, 2, 1.1, 0.5, 0.4], high: [130, 18, 6, 2.5, 0.7, 0.3, 0.2] };
+const PLINKO = {}; for (const k of Object.keys(PL_HALF)) PLINKO[k] = [...PL_HALF[k], ...PL_HALF[k].slice(0, -1).reverse()];
 // ---- slots : 3 rouleaux x 3 rangées, 5 lignes (3 horizontales + 2 diagonales), mise totale répartie sur les lignes. Retour ≈ 96,8 %.
 // symboles : 0 cerise, 1 citron, 2 cloche, 3 diamant, 4 sept, 5 Z violet (JACKPOT : 3 Z sur une ligne = x400 la mise)
 const SLOT_COUNT = [7, 5, 4, 2, 1, 1], SLOT_PAY = [5, 9, 18, 45, 120, 2000], SLOT_PAY2 = 2; // gains par ligne (x mise/ligne) ; 2 cerises à gauche = x2
@@ -75,6 +79,17 @@ function rollInstant(g) {
       else if (a === 0 && b === 0) { tot += SLOT_PAY2; g.wins.push({ line: li, sym: 0, rows: ln, n: 2 }); }
     });
     g.mult = tot / 5;
+  } else if (g.type === 'plinko') {
+    const tbl = PLINKO[g.choice];
+    if (!tbl) throw new Error('Niveau de risque invalide.');
+    const n = g.balls == null ? 1 : Number(g.balls);
+    if (!Number.isInteger(n) || n < 1 || n > PL_MAXBALLS) throw new Error('Nombre de billes invalide (1 à ' + PL_MAXBALLS + ').');
+    g.n = n; g.risk = g.choice; g.drops = []; let tot = 0;
+    for (let k = 0; k < n; k++) {
+      const path = Array.from({ length: PL_ROWS }, () => randomInt(2)), bin = path.reduce((a, b) => a + b, 0), m = tbl[bin];
+      tot += m; g.drops.push({ path, bin, m });
+    }
+    g.mult = tot / n;
   } else if (g.type === 'duel') {
     const f = Number(g.choice);
     if (!Number.isInteger(f) || f < 0 || f >= FOES.length) throw new Error('Adversaire invalide.');
@@ -120,7 +135,7 @@ function create(deps, pending) {
     if (net > 0 && deps.onRoundEnd) {
       const detail = g.type === 'mines' ? `${g.picks.length} case(s) · ${g.m} mine(s)` : g.type === 'fuse' ? `encaissé à ${g.at}x`
         : g.type === 'coin' ? NAMES[g.side] : g.type === 'dice' ? `${g.a}+${g.b}=${g.sum} (${NAMES[g.choice]})`
-        : g.type === 'horses' ? `cheval n°${g.winner + 1}` : g.type === 'slots' ? `x${g.mult}` : g.type === 'duel' ? FOES[g.foe].n : g.type === 'scratch' ? `ticket x${g.mult}` : g.type === 'russian' ? `${g.k} balle${g.k > 1 ? 's' : ''}, survécu` : g.outcome === 'bj' ? 'BLACKJACK' : '';
+        : g.type === 'horses' ? `cheval n°${g.winner + 1}` : g.type === 'slots' ? `x${g.mult}` : g.type === 'duel' ? FOES[g.foe].n : g.type === 'scratch' ? `ticket x${g.mult}` : g.type === 'plinko' ? `${g.n} bille${g.n > 1 ? 's' : ''} · x${round2(g.mult)}` : g.type === 'russian' ? `${g.k} balle${g.k > 1 ? 's' : ''}, survécu` : g.outcome === 'bj' ? 'BLACKJACK' : '';
       try {
         deps.onRoundEnd(u.guildId, { game: g.type === 'bj' ? 'bj-solo' : g.type, players: [{ uid: u.uid, name: u.name, bet: stake, win: g.win, net, mult: floor2(g.win / stake), detail }] });
       } catch (e) { console.error('[offline] recap', e?.message || e); }
@@ -139,6 +154,7 @@ function create(deps, pending) {
     horses: (g) => ({ type: 'horses', bet: g.bet, want: g.want, winner: g.winner, mult: g.mult, over: true, win: g.win || 0, outcome: g.win > 0 ? 'win' : 'lose' }),
     russian: (g) => ({ type: 'russian', bet: g.bet, k: g.k, dead: g.dead, chambers: g.chambers, mult: g.mult, over: true, win: g.win || 0, outcome: g.win > 0 ? 'win' : 'lose' }),
     slots: (g) => ({ type: 'slots', bet: g.bet, grid: g.grid, wins: g.wins, mult: g.mult, over: true, win: g.win || 0, outcome: g.win > 0 ? 'win' : 'lose' }),
+    plinko: (g) => ({ type: 'plinko', bet: g.bet, risk: g.risk, n: g.n, drops: g.drops, mult: round2(g.mult), over: true, win: g.win || 0, outcome: g.win > 0 ? 'win' : 'lose' }),
     duel: (g) => ({ type: 'duel', bet: g.bet, foe: g.foe, me: g.me, foeMs: g.foeMs, mult: g.mult, over: true, win: g.win || 0, outcome: g.win > 0 ? 'win' : 'lose' }),
     scratch: (g) => ({ type: 'scratch', id: g.id, bet: g.bet, cells: g.cells.map((v, i) => (g.seen.has(i) ? v : null)), over: g.over, mult: g.over ? g.mult : undefined, hit: g.over ? g.hit : undefined, win: g.win || 0, outcome: g.win > 0 ? 'win' : 'lose' }),
     bj: (g) => {
@@ -207,7 +223,7 @@ function create(deps, pending) {
         } else if (type === 'scratch') {
           genTicket(ng);
         } else if (INSTANT.has(type)) {
-          ng.choice = String(d.choice); rollInstant(ng);
+          ng.choice = String(d.choice); ng.balls = d.balls; rollInstant(ng);
         } else {
           ng.deck = newDeck(); ng.player = [ng.deck.pop()]; ng.dealer = [ng.deck.pop()]; ng.player.push(ng.deck.pop()); ng.dealer.push(ng.deck.pop());
         }
