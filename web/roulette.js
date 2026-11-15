@@ -326,6 +326,7 @@ class RouletteRoom {
     this.history.unshift(n);
     if (this.history.length > 24) this.history.pop();
     this.say(`La bille s'arrête sur le ${n}`);
+    const recapPlayers = [];
     for (const p of this.players.values()) {
       const stake = totalOf(p.bets);
       if (stake <= 0) continue;
@@ -347,6 +348,7 @@ class RouletteRoom {
       if (paid) await this.setStaked(p, -p.staked);
       p.win = back;
       p.net = floor2(back - stake);
+      recapPlayers.push({ uid: p.uid, name: p.name, bet: stake, win: back, net: p.net, bets: { ...p.bets } });
       if (p.net > 0) this.say(`${p.name} gagne ${p.net}`);
       else if (p.net < 0) this.say(`${p.name} perd ${-p.net}`);
       else this.say(`${p.name} récupère sa mise`);
@@ -354,6 +356,12 @@ class RouletteRoom {
     this.phase = 'result';
     this.setTimer(RESULT_MS, () => this.newRound());
     this.emit();
+    // récap envoyé dans le salon des victoires (jamais bloquant)
+    try {
+      if (recapPlayers.length && this.deps.onRoundEnd) this.deps.onRoundEnd({ game: 'roulette', round: this.round, n, color: n === 0 ? 'vert' : REDSET.has(n) ? 'rouge' : 'noir', players: recapPlayers });
+    } catch (e) {
+      console.error('[roulette] recap', e?.message || e);
+    }
   }
 
   async newRound() {
