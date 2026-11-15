@@ -16,6 +16,7 @@ const fs = require('fs');
 const path = require('path');
 const { Room, SEATS } = require('./table');
 const { RouletteRoom, INFO: ROULETTE_INFO } = require('./roulette');
+const { create: createOffline } = require('./offline');
 
 const PUBLIC_URL = String(process.env.PUBLIC_URL || 'https://znkcasdiscordbot-production.up.railway.app').replace(/\/+$/, '');
 const TOKEN_TTL_MS = 12 * 3600 * 1000;
@@ -107,6 +108,9 @@ function init(deps) {
       }
     }
   })();
+
+  // ---------- jeux offline solo (mines, fusé, blackjack) ----------
+  const offline = createOffline({ getBalance: deps.getBalance, debit: deps.debit, credit: deps.credit }, pending);
 
   // ---------- statistiques / classement ----------
   const STATS_FILE = path.join(DATA_DIR, 'bj_stats.json');
@@ -213,11 +217,12 @@ function init(deps) {
     const user = readToken(d.t);
     if (!user) return json(res, 401, { ok: false, error: 'Lien expiré : reclique sur « Jouer » dans Discord.' });
     const now = Date.now();
-    if (now - (lastAct.get(user.uid) || 0) < (String(d.action).startsWith('r') ? 50 : 120)) return json(res, 429, { ok: false, error: 'Doucement 🙂' });
+    if (now - (lastAct.get(user.uid) || 0) < (/^[ro]/.test(String(d.action)) ? 50 : 120)) return json(res, 429, { ok: false, error: 'Doucement 🙂' });
     lastAct.set(user.uid, now);
     const entry = roomOf(user.guildId);
     const { room, roulette } = entry;
     try {
+      if (String(d.action).startsWith('o')) return json(res, 200, { ok: true, ...(await offline.handle(user, d)) });
       switch (d.action) {
         // ---- roulette
         case 'rjoin': {
