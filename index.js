@@ -6705,14 +6705,56 @@ function lbSameSig(id, sig) {
   return false;
 }
 
+// Classements affichés sur le site (page « Classement ») : plus riches (solde actuel) + all-time (solde max), cache 30 s
+const webBoardCache = { t: 0, data: null, p: null };
+function getWebBoards() {
+  if (webBoardCache.data && Date.now() - webBoardCache.t < 30000) return Promise.resolve(webBoardCache.data);
+  if (webBoardCache.p) return webBoardCache.p;
+  webBoardCache.p = (async () => {
+    try {
+      const out = {};
+      for (const kind of ['rich', 'alltime']) {
+        const rows = await getBoardData(kind, null);
+        out[kind] = await Promise.all(
+          rows.map(async (r) => {
+            const u = await client.users.fetch(r.id).catch(() => null);
+            return { uid: r.id, name: u ? u.globalName || u.username : 'Utilisateur inconnu', value: r.value };
+          })
+        );
+      }
+      webBoardCache.data = out;
+      webBoardCache.t = Date.now();
+      return out;
+    } finally {
+      webBoardCache.p = null;
+    }
+  })();
+  return webBoardCache.p;
+}
+
 let webApp = { makeLink: () => null, enabled: false };
 try {
   webApp = require('./web/server').init({
     getBalance,
     debit,
     credit,
+    getBoards: getWebBoards,
     coin: /^<a?:\w+:\d+>$/.test(COIN_PLAIN) ? '🪙' : COIN_PLAIN, // un emoji perso Discord ne s'affiche pas sur le web
     secretSeed: DISCORD_TOKEN,
+    clientId: () => client.user?.id,
+    // « Se connecter avec Discord » : serveurs du casino où le joueur est membre (nom, avatar, rôle le plus haut)
+    resolveMember: async (userId, guildIds) => {
+      const out = [];
+      for (const gid of guildIds) {
+        const guild = client.guilds.cache.get(gid);
+        if (!guild) continue;
+        const m = await guild.members.fetch(userId).catch(() => null);
+        if (!m) continue;
+        const r = m.roles?.highest;
+        out.push({ guildId: gid, guildName: guild.name, name: m.displayName || m.user.globalName || m.user.username, avatar: m.user.displayAvatarURL({ extension: 'png', size: 128 }), role: r && r.id !== guild.id ? r.name : '' });
+      }
+      return out;
+    },
     onRoundEnd: (guildId, recap) => postOnlineRecap(guildId, recap).catch((e) => console.error('[online recap]', e?.message || e)),
   });
 } catch (e) {
@@ -6752,6 +6794,10 @@ async function postOnlineRecap(guildId, r) {
   } else if (r.game === 'mines') title = '💣 Mines — victoire';
   else if (r.game === 'fuse') title = '🚀 Fusé — victoire';
   else if (r.game === 'bj-solo') title = '🃏 Blackjack solo — victoire';
+  else if (r.game === 'coin') title = '🪙 Pile ou Face — victoire';
+  else if (r.game === 'dice') title = '🎲 Dés — victoire';
+  else if (r.game === 'horses') title = '🏇 Course de chevaux — victoire';
+  else if (r.game === 'russian') title = '🔫 Roulette russe — victoire';
   else return;
   const embed = new EmbedBuilder()
     .setColor(COLORS.violet)
@@ -6817,7 +6863,8 @@ async function handlePokerButton(i) {
   if (!i.guild) return respondText(i, 'Utilise ce bouton dans le serveur.');
   if (!webApp.enabled) return respondText(i, '⚠️ Les jeux en ligne sont désactivés pour le moment.');
   // Un seul lien pour tous les boutons (y compris ceux des anciens panneaux) : il ouvre la page d'accueil des jeux.
-  const url = webApp.makeLink({
+  const shared = !!(webApp.oauth && webApp.oauth()); // connexion Discord configurée : même lien pour tout le monde
+  const url = shared ? webApp.publicUrl : webApp.makeLink({
     id: i.user.id,
     name: i.member?.displayName || i.user.globalName || i.user.username,
     avatar: i.user.displayAvatarURL({ extension: 'png', size: 128 }),
@@ -6831,7 +6878,7 @@ async function handlePokerButton(i) {
     .setTitle('🎮 Les jeux t’attendent')
     .setDescription(
       `Clique sur le bouton pour ouvrir le site, puis choisis ton jeu${bal !== null ? ` (solde : **${fmt(bal)}**)` : ''}.\n\n` +
-        `🔒 Ce lien est **personnel** (il te connecte à ton compte) : ne le partage pas. Valable 12 h.`
+        (shared ? '🔐 Sur le site, clique sur **Se connecter avec Discord** : tu es reconnu automatiquement.' : `🔒 Ce lien est **personnel** (il te connecte à ton compte) : ne le partage pas. Valable 12 h.`)
     );
   return i.reply({
     embeds: [embed],
