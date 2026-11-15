@@ -44,7 +44,7 @@ header{display:flex;align-items:center;gap:10px;padding:8px 14px;background:#000
 .gcard:disabled .gplay{background:#262626;color:#a3a3a3}
 /* ---------- table ---------- */
 main{flex:1;display:flex;flex-direction:column;min-height:0;padding:10px 10px 0;gap:8px}
-#table{position:relative;flex:1;min-height:420px;border:14px solid transparent;
+#table,.ftable{position:relative;flex:1;min-height:420px;border:14px solid transparent;
   border-radius:30px 30px 50% 50%/30px 30px 22% 22%;
   /* vrai tapis violet : spot de lumière + grain de feutre, rebord capitonné violet autour */
   background:
@@ -54,19 +54,19 @@ main{flex:1;display:flex;flex-direction:column;min-height:0;padding:10px 10px 0;
   box-shadow:inset 0 0 70px rgba(10,2,40,.7),inset 0 0 0 1px rgba(255,255,255,.08),0 0 0 1px rgba(196,181,253,.4),0 26px 60px rgba(0,0,0,.65),0 0 70px rgba(139,92,246,.38);
   display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:14px 8px 62px;overflow:hidden}
 /* liseré doré imprimé sur le tapis */
-#table::after{content:"";position:absolute;inset:9px;border:2px solid rgba(251,191,36,.4);border-radius:22px 22px 50% 50%/22px 22px 21% 21%;box-shadow:0 0 0 5px rgba(0,0,0,0),inset 0 0 22px rgba(251,191,36,.1);pointer-events:none;z-index:0}
+#table::after,.ftable::after{content:"";position:absolute;inset:9px;border:2px solid rgba(251,191,36,.4);border-radius:22px 22px 50% 50%/22px 22px 21% 21%;box-shadow:0 0 0 5px rgba(0,0,0,0),inset 0 0 22px rgba(251,191,36,.1);pointer-events:none;z-index:0}
 /* ZNK transparent (lettres de verre : contour + reflet qui glisse), centré sur la table, sous les cartes et les joueurs */
-#table::before{content:"ZNK";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:0;
+#table::before,.ftable::before{content:"ZNK";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:0;
   font-size:min(15vw,165px);font-weight:900;line-height:1;letter-spacing:.16em;padding-left:.16em;white-space:nowrap;
   color:transparent;-webkit-text-stroke:2px rgba(255,255,255,.22);
   background:linear-gradient(105deg,rgba(255,255,255,.04) 0%,rgba(255,255,255,.04) 38%,rgba(255,255,255,.26) 50%,rgba(240,171,252,.1) 58%,rgba(255,255,255,.04) 70%,rgba(255,255,255,.04) 100%) 0 0/300% 100%;
   -webkit-background-clip:text;background-clip:text;filter:drop-shadow(0 0 16px rgba(196,181,253,.3));
   animation:znkShine 7s linear infinite;pointer-events:none}
 @keyframes znkShine{from{background-position:100% 0}to{background-position:-100% 0}}
-@media(prefers-reduced-motion:reduce){#table::before{animation:none}}
+@media(prefers-reduced-motion:reduce){#table::before,.ftable::before{animation:none}}
 #dealer,#seats{position:relative;z-index:1}
 .rule{position:absolute;left:50%;bottom:22px;transform:translateX(-50%);font-size:11px;letter-spacing:.2em;color:rgba(253,230,138,.5);text-shadow:0 1px 2px rgba(0,0,0,.5);text-transform:uppercase;text-align:center;white-space:nowrap;pointer-events:none;z-index:1}
-#shoe{position:absolute;right:4%;top:12px;width:calc(var(--cw)*1.15);height:calc(var(--ch)*1.05);border-radius:8px;
+#shoe,.shoe{position:absolute;right:4%;top:12px;width:calc(var(--cw)*1.15);height:calc(var(--ch)*1.05);border-radius:8px;
   background:repeating-linear-gradient(45deg,#5b21b6,#5b21b6 5px,#4c1d95 5px,#4c1d95 10px);border:2px solid #c4b5fd;box-shadow:4px 4px 0 #2e1065,8px 8px 0 #1e0b45,0 10px 20px rgba(0,0,0,.5)}
 #shoe span{position:absolute;left:0;right:0;bottom:-20px;text-align:center;font-size:11px;color:var(--mut)}
 #dealer{display:flex;flex-direction:column;align-items:center;gap:6px;margin-top:2px}
@@ -134,7 +134,7 @@ main{flex:1;display:flex;flex-direction:column;min-height:0;padding:10px 10px 0;
 #msg{display:inline-block;background:rgba(0,0,0,0.72);border:1px solid rgba(255,255,255,0.12);padding:7px 18px;border-radius:999px;font-weight:700;font-size:clamp(12px,1.6vw,16px);backdrop-filter:blur(3px)}
 #cd{display:block;margin:6px auto 0;font-size:30px;font-weight:900;color:var(--gold);text-shadow:0 0 16px rgba(251,191,36,.7);font-variant-numeric:tabular-nums}
 /* dock */
-#dock{background:rgba(0,0,0,0.85);border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:10px 12px;margin-bottom:10px;display:flex;flex-direction:column;gap:8px}
+#dock,.dockp{background:rgba(0,0,0,0.85);border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:10px 12px;margin-bottom:10px;display:flex;flex-direction:column;gap:8px}
 .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:center}
 .chip{width:46px;height:46px;border-radius:50%;font-weight:900;font-size:12px;color:#fff;border:3px dashed rgba(255,255,255,.8);box-shadow:0 4px 0 rgba(0,0,0,.45),inset 0 0 8px rgba(0,0,0,.35);transition:transform .12s}
 .chip:active:not(:disabled){transform:translateY(3px);box-shadow:0 1px 0 rgba(0,0,0,.45)}
@@ -241,24 +241,44 @@ th{color:var(--mut);font-size:12px}
 #rFloat{position:absolute;left:50%;top:44%;transform:translateX(-50%);font-weight:800;font-size:28px;pointer-events:none;animation:flt 1.9s ease-out forwards}
 @media(max-width:1000px){#rStage{grid-template-columns:1fr}#rPlayers{max-height:240px}}
 @media(max-width:760px){#tabs{margin-left:0}.tab{padding:6px 8px;font-size:12px}#meName{display:none}}
-/* ---------- jeux offline (solo) ---------- */
-#ofView{flex:1;display:flex;flex-direction:column;align-items:center;padding:12px;overflow:auto}
-#ofPanel{width:100%;max-width:760px;padding:20px;display:flex;flex-direction:column;gap:14px}
-#ofPanel h2{margin:0;font-size:20px}
-.ofsub{color:var(--mut);font-size:13px;margin:0}
-.ofrow{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+/* ---------- jeux offline (solo) : même tapis que les tables online ---------- */
+#ofView{flex:1;align-items:center;padding:10px 10px 56px;gap:10px;overflow:auto}
+.ftable.of{width:100%;max-width:900px;flex:none;min-height:0;justify-content:flex-start;align-items:stretch;gap:12px;padding:16px 16px 22px}
+.ftable.of>*{position:relative;z-index:1}
+.ftable.of>.shoe{position:absolute;right:4%;top:56px;z-index:1}
+.otop{display:flex;align-items:center;gap:10px}.otop .grow{flex:1}
+.ohist{display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end}
+.hc.z0{background:#334155}
+.obody{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;min-height:320px}
+.dockp{width:100%;max-width:900px;background:rgba(0,0,0,.85);border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:12px;display:flex;flex-direction:column;gap:10px;align-items:center}
+.stats{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.stat{background:rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.14);border-radius:12px;padding:6px 14px;text-align:center;min-width:104px}
+.stat small{display:block;color:rgba(255,255,255,.55);font-size:11px}
+.stat b{font-size:16px;font-variant-numeric:tabular-nums}.stat.gold b{color:var(--gold)}
+.omsg{min-height:34px}
+.omsg span{display:inline-block;background:rgba(0,0,0,.72);border:1px solid rgba(255,255,255,.12);padding:7px 18px;border-radius:999px;font-weight:700;backdrop-filter:blur(3px);animation:pop2 .35s cubic-bezier(.2,1.6,.4,1)}
+.omsg span.win,.omsg span.bj{background:rgba(22,101,52,.92);border-color:#86efac}
+.omsg span.lose,.omsg span.bust{background:rgba(127,29,29,.93);border-color:#fca5a5}
+.omsg span.push{background:rgba(51,65,85,.93);border-color:#cbd5e1}
+/* mines */
+.gems{display:grid;grid-template-columns:repeat(5,1fr);gap:9px;width:min(100%,400px)}
+.gem{aspect-ratio:1;border-radius:14px;border:2px solid #c4b5fd;background:linear-gradient(160deg,#7c3aed,#3b0f8c);box-shadow:0 4px 0 #1e0b45,inset 0 0 14px rgba(255,255,255,.14);display:grid;place-items:center;transition:transform .12s,filter .12s}
+.gem:hover:not(:disabled){transform:translateY(-2px);filter:brightness(1.25)}
+.gem:disabled{opacity:1;cursor:default;filter:none}
+.gem svg{width:58%;height:58%;filter:drop-shadow(0 2px 4px rgba(0,0,0,.5))}
+.gem.safe{background:linear-gradient(160deg,#16a34a,#064e32);border-color:#86efac;box-shadow:0 4px 0 #022c1a,0 0 16px rgba(34,197,94,.45)}
+.gem.mine{background:linear-gradient(160deg,#b91c1c,#450a0a);border-color:#fca5a5;box-shadow:0 4px 0 #2a0505}
+.gem.ghost{opacity:.5}.gem.new{animation:pop2 .35s cubic-bezier(.2,1.6,.4,1)}.gem.boom{animation:shk .5s}
+@keyframes pop2{from{transform:scale(.55);opacity:.3}to{transform:scale(1);opacity:1}}
+@keyframes shk{20%{transform:translateX(-7px)}40%{transform:translateX(7px)}60%{transform:translateX(-5px)}80%{transform:translateX(5px)}}
+/* fusé */
+.fz{position:relative;width:100%;height:310px;border-radius:14px;background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.14);overflow:hidden}
+#oCv{position:absolute;inset:0;width:100%;height:100%}
+.bigm{position:absolute;left:50%;top:38%;transform:translate(-50%,-50%);font-size:clamp(40px,9vw,84px);font-weight:900;color:#fff;font-variant-numeric:tabular-nums;text-shadow:0 0 26px rgba(251,191,36,.55);white-space:nowrap}
+.bigm.cash{color:#86efac;text-shadow:0 0 26px rgba(34,197,94,.6)}.bigm.dead{color:#fca5a5;text-shadow:0 0 26px rgba(239,68,68,.7)}
+.fst{position:absolute;left:0;right:0;bottom:10px;text-align:center;font-weight:700;font-size:13px;color:rgba(255,255,255,.75)}
 .ofsel{background:#0f0f0f;color:#fff;border:1px solid #3a3a3a;border-radius:8px;padding:9px 10px;font:inherit}
-.mgrid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;max-width:420px;width:100%}
-.mt{aspect-ratio:1;border-radius:10px;border:1px solid #2a2a2a;background:#111;font-weight:800;font-size:15px;color:#fff}
-.mt:hover:not(:disabled){border-color:#fff}
-.mt:disabled{opacity:1;cursor:default;filter:none}
-.mt.safe{background:#14532d;border-color:#22c55e}.mt.mine{background:#7f1d1d;border-color:#ef4444}.mt.ghost{opacity:.5}
-.ofbig{font-size:56px;font-weight:800;text-align:center;font-variant-numeric:tabular-nums;padding:10px 0}
-.ofbig.dead{color:#ef4444}.ofbig.cash{color:#22c55e}
-.ofcards{display:flex;gap:6px;flex-wrap:wrap;min-height:64px}
-.pc{width:46px;height:64px;border-radius:7px;background:#f5f5f5;color:#111;font-weight:800;display:grid;place-items:center;font-size:16px}
-.pc.red{color:#c01a1a}.pc.hid{background:#262626;color:#737373}
-.ofres{font-weight:700;min-height:22px}.ofres.pos{color:#86efac}.ofres.neg{color:#fca5a5}
+.dockp .btn.big{min-width:150px}.dockp .hint{color:var(--mut);font-size:13px;text-align:center}
 /* ---------- chat en direct ---------- */
 main{padding-bottom:56px!important}
 #chat{position:fixed;right:12px;bottom:12px;width:330px;max-width:calc(100vw - 24px);z-index:15;background:#0a0a0a;border:1px solid #333;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.6)}
@@ -360,7 +380,7 @@ main{padding-bottom:56px!important}
     <div class="row"><button class="btn" id="bLeave" style="display:none;padding:6px 12px;font-size:12px">Quitter la table</button></div>
   </section>
 </main>
-<main id="ofView" class="hide"><section class="panel" id="ofPanel"></section></main>
+<main id="ofView" class="hide"><section class="ftable of" id="ofTable"></section><section class="dockp" id="ofDock"></section></main>
 <main id="rlView" class="hide">
   <div id="rStage">
     <section class="panel" id="rLeft">
@@ -986,8 +1006,11 @@ requestAnimationFrame(rLoop);
 { let v = null; try { v = params.get('t') ? params.get('g') : sessionStorage.getItem('znk_v'); } catch {} if (v === 'wheel') v = 'roulette'; if (v === 'roulette' || v === 'bj') setView(v); }
 
 // ============================================================= JEUX OFFLINE (solo, serveur : offline.js)
-const O = { game: null, st: null, bal: null, bet: '100', mines: 3, auto: '', hist: [], timer: 0 };
+const O = { game: null, st: null, bal: null, bet: '100', mines: 3, auto: '', hist: { fuse: [], mines: [], bj: [] }, timer: 0, pp: [] };
 const OMAP = { 'off-bj': 'bj', 'off-fuse': 'fuse', 'off-mine': 'mines' };
+const OT = { bj: 'BLACKJACK SOLO', fuse: 'FUSÉ', mines: 'MINES' };
+const GEM = '<svg viewBox="0 0 24 24"><path d="M6 3h12l4 6-10 12L2 9z" fill="#bbf7d0" stroke="#fff" stroke-width="1.2" stroke-linejoin="round"/><path d="M2 9h20M9 3l3 6 3-6M12 9v12" fill="none" stroke="#16a34a" stroke-width="1"/></svg>';
+const BOMB = '<svg viewBox="0 0 24 24"><circle cx="11" cy="14" r="7.5" fill="#1c1c1c" stroke="#fca5a5" stroke-width="1.4"/><path d="M16 8l3-3M18 3v3M17 4h3" stroke="#fbbf24" stroke-width="1.6" stroke-linecap="round"/><circle cx="8.5" cy="11.5" r="1.8" fill="#fff" opacity=".5"/></svg>';
 async function osend(action, extra = {}) {
   try {
     const r = await fetch('/api/act', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ t: TOKEN, action, game: O.game, ...extra }) });
@@ -1000,9 +1023,9 @@ async function osend(action, extra = {}) {
 }
 const ofStop = () => { clearInterval(O.timer); O.timer = 0; };
 async function ofOpen(view) {
-  ofStop(); O.game = OMAP[view]; O.st = null; ofDraw();
+  ofStop(); O.game = OMAP[view]; O.st = null; O.pp = []; ofBuild(); ofRender();
   const g = O.game, d = await osend('ostate');
-  if (d && O.game === g) { O.st = d.g; ofDraw(); ofWatch(); }
+  if (d && O.game === g) { O.st = d.g; ofRender(); ofWatch(); }
 }
 function ofWatch() {
   ofStop();
@@ -1012,15 +1035,17 @@ function ofWatch() {
     const d = await osend('ostate', { poll: true });
     if (!d || O.game !== g) return;
     const was = O.st; O.st = d.g;
-    if (!d.g || d.g.over) { ofStop(); ofDone(was, d.g); ofDraw(); }
+    if (!d.g || d.g.over) { ofStop(); ofDone(was, d.g); ofRender(); }
   }, 400);
 }
 function ofDone(prev, st) {
   if (!st || !st.over || (prev && prev.over)) return;
-  if (st.type === 'fuse') { O.hist.unshift(st.crash); O.hist.length = Math.min(O.hist.length, 12); }
-  if (st.outcome === 'push') SFX.push(); else if (st.win > 0) SFX.win(); else SFX.lose();
+  const net = Math.round((st.win - st.bet) * 100) / 100;
+  const h = O.hist[st.type]; h.unshift(st.type === 'fuse' ? st.crash : net); h.length = Math.min(h.length, 10);
+  if (st.outcome === 'push') SFX.push(); else if (st.outcome === 'bj') SFX.bj(); else if (st.win > 0) SFX.win(); else SFX.lose();
+  floatText($('#ofTable'), (net > 0 ? '+' : '') + num(net) + ' ' + COIN, net > 0 ? 'pos' : net < 0 ? 'neg' : 'neu');
 }
-async function ofMove(move, extra = {}) { ac(); const was = O.st, d = await osend('omove', { move, ...extra }); if (!d) return; O.st = d.g; ofDone(was, d.g); ofDraw(); ofWatch(); }
+async function ofMove(move, extra = {}) { ac(); const was = O.st, d = await osend('omove', { move, ...extra }); if (!d) return; O.st = d.g; ofDone(was, d.g); ofRender(); ofWatch(); }
 async function ofStart() {
   ac(); const bet = parseAmt(O.bet);
   if (!(bet > 0)) return toast('Montant invalide.');
@@ -1028,86 +1053,133 @@ async function ofStart() {
   if (O.game === 'mines') x.mines = O.mines;
   if (O.game === 'fuse') x.auto = Number(String(O.auto).replace(',', '.')) || 0;
   const d = await osend('ostart', x); if (!d) return;
-  SFX.chip(); O.st = d.g; ofDone(null, d.g); ofDraw(); ofWatch();
+  SFX.chip(); O.pp = []; ['#oDc', '#oPc'].forEach((s) => { const b = $(s); if (b) b.textContent = ''; });
+  O.st = d.g; ofDone(null, d.g); ofRender(); ofWatch();
 }
-function ofForm(p, extra) {
-  const row = el('div', 'ofrow'), w = el('div', 'amt'), inp = document.createElement('input');
-  inp.inputMode = 'decimal'; inp.autocomplete = 'off'; inp.placeholder = 'Mise'; inp.value = O.bet; inp.oninput = () => { O.bet = inp.value; };
-  w.append(inp, el('span', '', COIN));
-  const set = (n) => { n = Math.max(0, Math.floor(n * 100) / 100); inp.value = n ? String(n) : ''; O.bet = inp.value; };
-  const b1 = el('button', 'btn', '½'); b1.onclick = () => set((parseAmt(inp.value) || 0) / 2);
-  const b2 = el('button', 'btn', '×2'); b2.onclick = () => set((parseAmt(inp.value) || 0) * 2);
-  const b3 = el('button', 'btn', 'Tapis'); b3.onclick = () => set(O.bal ?? W.bal ?? 0);
-  row.append(w, b1, b2, b3); p.append(row);
-  if (extra) extra(p);
-  const go = el('button', 'btn go', 'Jouer'); go.onclick = ofStart; const r2 = el('div', 'ofrow'); r2.append(go); p.append(r2);
+// ---- structure du tapis (une fois par jeu)
+function ofBuild() {
+  const t = $('#ofTable'); t.textContent = '';
+  const top = el('div', 'otop'), hist = el('div', 'ohist'); hist.id = 'oHist';
+  top.append(el('span', 'dname', OT[O.game]), el('span', 'grow'), hist);
+  const b = el('div', 'obody'); t.append(top, b);
+  if (O.game === 'bj') {
+    t.append(el('div', 'shoe'));
+    b.innerHTML = '<div class="dname">CROUPIER</div><div class="cards" id="oDc"></div><div id="oDt"></div><div class="omsg" id="oMsg"></div><div class="dname">TOI</div><div class="cards" id="oPc"></div><div id="oPt"></div><div class="betspot" id="oBs"></div>';
+  } else if (O.game === 'fuse') b.innerHTML = '<div class="fz"><canvas id="oCv"></canvas><div class="bigm" id="oMult">1.00x</div><div class="fst" id="oStat"></div></div>';
+  else b.innerHTML = '<div class="gems" id="oGems"></div><div class="stats" id="oStats"></div>';
 }
-function ofDraw() {
-  const p = $('#ofPanel'); p.textContent = '';
-  const s = O.st, live = !!(s && !s.over);
-  p.append(el('h2', '', { bj: 'Blackjack', fuse: 'Fusé', mines: 'Mine' }[O.game]),
-    el('p', 'ofsub', { bj: 'Bats le croupier sans dépasser 21. Blackjack payé 3:2, le croupier tient sur 17.', fuse: 'Encaisse avant que la fusée explose : plus tu attends, plus le gain monte.', mines: 'Révèle des cases sûres : chaque case augmente le gain. Encaisse avant de toucher une mine.' }[O.game]));
-  if (O.game === 'bj') drawBj(p, s, live); else if (O.game === 'fuse') drawFuse(p, s, live); else drawMines(p, s, live);
+function ofRender() {
+  const s = O.st, h = $('#oHist'); if (!h) return; h.textContent = '';
+  O.hist[O.game].forEach((v) => h.append(O.game === 'fuse' ? el('span', 'hc ' + (v >= 2 ? 'g' : 'r'), v.toFixed(2) + 'x') : el('span', 'hc ' + (v > 0 ? 'g' : v < 0 ? 'r' : 'z0'), (v > 0 ? '+' : '') + num(v))));
+  if (O.game === 'bj') rBj(s); else if (O.game === 'mines') rMines(s); else ofFuseTick();
+  ofDock();
 }
-function drawMines(p, s, live) {
-  if (!live) ofForm(p, (q) => {
-    const r = el('div', 'ofrow'), sel = el('select', 'ofsel'); r.append(el('span', 'ofsub', 'Nombre de mines'));
-    for (let i = 1; i <= 24; i++) { const o = el('option', '', String(i)); o.value = i; if (i === O.mines) o.selected = true; sel.append(o); }
-    sel.onchange = () => { O.mines = Number(sel.value); }; r.append(sel); q.append(r);
+// ---- blackjack
+function ofCards(box, arr) {
+  const shoe = $('.shoe'); let k = 0;
+  while (box.children.length > arr.length) box.lastChild.remove();
+  arr.forEach((c, i) => {
+    const hid = c === '?', r = hid ? undefined : c.slice(0, -1), sy = hid ? '♠' : c.slice(-1); let d = box.children[i];
+    if (!d) { d = makeCard({ id: 'o' + i, r, s: sy }); box.append(d); flyFrom(d, shoe, k++ * 320); SFX.deal(); if (!hid) requestAnimationFrame(() => requestAnimationFrame(() => d.classList.remove('down'))); }
+    else if (!hid && !d.dataset.shown) { fillCard(d, { r, s: sy }); requestAnimationFrame(() => requestAnimationFrame(() => { d.classList.remove('down'); SFX.flip(); })); }
   });
-  const g = el('div', 'mgrid');
+}
+function rBj(s) {
+  const tot = (box, v, cls, extra) => { box.textContent = ''; if (v != null) box.append(el('span', 'pill' + (cls ? ' ' + cls : ''), String(v) + (extra || ''))); };
+  if (!s) { ['#oDc', '#oPc', '#oBs'].forEach((q) => ($(q).textContent = '')); tot($('#oDt')); tot($('#oPt')); $('#oMsg').replaceChildren(el('span', '', 'Choisis ta mise puis distribue')); return; }
+  ofCards($('#oDc'), s.dealer); ofCards($('#oPc'), s.player);
+  tot($('#oDt'), s.dv, s.dv > 21 ? 'bust' : '', s.over ? '' : ' + ?');
+  tot($('#oPt'), s.pv, s.outcome === 'bj' ? 'bj' : s.pv > 21 ? 'bust' : s.pv === 21 ? 't21' : '', s.outcome === 'bj' ? ' · BLACKJACK' : '');
+  const bs = $('#oBs'); bs.textContent = ''; const c = el('div', 'chips'); c.innerHTML = chipsHTML(s.bet); bs.append(c, el('div', 'betamt', num(s.bet)));
+  const net = Math.round((s.win - s.bet) * 100) / 100;
+  $('#oMsg').replaceChildren(s.over ? el('span', s.outcome, RES[s.outcome] + (net ? ' · ' + (net > 0 ? '+' : '') + num(net) + ' ' + COIN : '')) : el('span', '', 'À toi de jouer'));
+}
+// ---- mines
+function rMines(s) {
+  const g = $('#oGems'), live = !!(s && !s.over); g.textContent = '';
   for (let i = 0; i < 25; i++) {
-    const b = el('button', 'mt'), picked = s && s.picks.includes(i), isMine = s && s.over && s.mineAt.includes(i);
-    if (picked) { b.classList.add('safe'); b.textContent = '+'; } else if (isMine) { b.classList.add('mine'); b.textContent = 'x'; if (i !== s.hit) b.classList.add('ghost'); }
-    b.disabled = !live || picked; b.onclick = () => ofMove('pick', { i }); g.append(b);
+    const b = el('button', 'gem'), picked = s && s.picks.includes(i), isMine = s && s.over && s.mineAt.includes(i);
+    if (picked) { b.classList.add('safe'); b.innerHTML = GEM; if (!O.pp.includes(i)) b.classList.add('new'); }
+    else if (isMine) { b.classList.add('mine'); b.innerHTML = BOMB; if (i === s.hit) b.classList.add('boom'); else b.classList.add('ghost'); }
+    b.disabled = !live || picked; b.onclick = () => { SFX.chip(); ofMove('pick', { i }); }; g.append(b);
   }
-  p.append(g);
-  if (!s) return;
-  if (live) {
-    p.append(el('div', 'ofres', 'Multiplicateur ' + s.mult + 'x · prochaine case ' + (s.next ? s.next + 'x' : 'dernière')));
-    const c = el('button', 'btn go', 'Encaisser ' + num(s.cash) + ' ' + COIN); c.disabled = !s.picks.length; c.onclick = () => ofMove('cash'); const r = el('div', 'ofrow'); r.append(c); p.append(r);
-  } else p.append(el('div', 'ofres ' + (s.win > 0 ? 'pos' : 'neg'), s.win > 0 ? 'Encaissé ' + num(s.win) + ' ' + COIN + ' (' + s.mult + 'x)' : 'Mine touchée : mise perdue'));
+  O.pp = s ? s.picks.slice() : [];
+  const st = $('#oStats'); st.textContent = '';
+  const box = (l, v, gold) => { const d = el('div', 'stat' + (gold ? ' gold' : '')); d.append(el('small', '', l), el('b', '', v)); st.append(d); };
+  if (!s) return box('Première case', 'x' + (Math.floor(O.mines ? 100 * 0.97 * 25 / (25 - O.mines) : 0) / 100));
+  box('Mise', num(s.bet) + ' ' + COIN); box('Multiplicateur', s.mult + 'x');
+  if (live) { box('Prochaine case', s.next ? s.next + 'x' : 'Dernière'); box('Gain actuel', num(s.cash) + ' ' + COIN, true); }
+  else box(s.win > 0 ? 'Encaissé' : 'Mine touchée', s.win > 0 ? num(s.win) + ' ' + COIN : 'Mise perdue', s.win > 0);
 }
-function drawFuse(p, s, live) {
-  const big = el('div', 'ofbig', '1.00x'); big.id = 'oMult'; const st = el('div', 'ofres'); st.id = 'oStat'; p.append(big, st);
-  if (!live) ofForm(p, (q) => {
-    const r = el('div', 'ofrow'), a = document.createElement('input'); r.append(el('span', 'ofsub', 'Encaissement auto (facultatif)'));
-    a.className = 'ofsel'; a.style.width = '90px'; a.inputMode = 'decimal'; a.placeholder = 'ex. 2'; a.value = O.auto; a.oninput = () => { O.auto = a.value; }; r.append(a); q.append(r);
-  });
-  else { const c = el('button', 'btn go', 'Encaisser'); c.onclick = () => ofMove('cash'); const r = el('div', 'ofrow'); r.append(c); p.append(r); }
-  if (O.hist.length) { const h = el('div', 'ofrow'); O.hist.forEach((v) => h.append(el('span', 'hc ' + (v >= 2 ? 'g' : 'r'), v.toFixed(2) + 'x'))); p.append(h); }
-  ofFuseTick();
+// ---- fusé
+function fuseCanvas(tEnd, RT, crashed, live) {
+  const cv = $('#oCv'); if (!cv) return;
+  const w = cv.clientWidth, h = cv.clientHeight, dpr = window.devicePixelRatio || 1;
+  if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+  const x = cv.getContext('2d'); x.setTransform(dpr, 0, 0, dpr, 0, 0); x.clearRect(0, 0, w, h);
+  const T = Math.max(8000, tEnd * 1.12), M = Math.max(2, Math.exp(RT * tEnd) * 1.18), pad = 34;
+  const px = (t) => pad + (w - pad - 14) * t / T, py = (v) => h - pad - (h - pad - 16) * (v - 1) / (M - 1);
+  x.font = '11px system-ui'; x.fillStyle = 'rgba(255,255,255,.4)'; x.strokeStyle = 'rgba(255,255,255,.1)'; x.lineWidth = 1;
+  const step = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 5000].find((q) => (M - 1) / q <= 6) || 5000;
+  for (let v = step; v < M; v += step) { x.beginPath(); x.moveTo(pad, py(v)); x.lineTo(w - 8, py(v)); x.stroke(); x.fillText(v + 'x', 4, py(v) + 4); }
+  if (tEnd <= 0) return;
+  const pts = []; for (let i = 0; i <= 90; i++) { const t = tEnd * i / 90; pts.push([px(t), py(Math.exp(RT * t))]); }
+  const col = crashed ? '#ef4444' : '#fbbf24';
+  x.beginPath(); pts.forEach((p, i) => (i ? x.lineTo(p[0], p[1]) : x.moveTo(p[0], p[1])));
+  x.lineTo(pts[90][0], h - pad); x.lineTo(pts[0][0], h - pad); x.closePath();
+  const gr = x.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, crashed ? 'rgba(239,68,68,.35)' : 'rgba(196,181,253,.38)'); gr.addColorStop(1, 'rgba(124,58,237,0)'); x.fillStyle = gr; x.fill();
+  x.beginPath(); pts.forEach((p, i) => (i ? x.lineTo(p[0], p[1]) : x.moveTo(p[0], p[1]))); x.strokeStyle = col; x.lineWidth = 3.5; x.lineCap = 'round'; x.shadowColor = col; x.shadowBlur = 12; x.stroke(); x.shadowBlur = 0;
+  const [ex, ey] = pts[90], [bx, by] = pts[84], a = Math.atan2(ey - by, ex - bx);
+  x.save(); x.translate(ex, ey);
+  if (crashed) { x.strokeStyle = '#fca5a5'; x.lineWidth = 3; for (let i = 0; i < 10; i++) { const r = i * Math.PI / 5; x.beginPath(); x.moveTo(Math.cos(r) * 8, Math.sin(r) * 8); x.lineTo(Math.cos(r) * (i % 2 ? 20 : 30), Math.sin(r) * (i % 2 ? 20 : 30)); x.stroke(); } }
+  else { x.rotate(a); x.fillStyle = '#fff'; x.beginPath(); x.moveTo(16, 0); x.lineTo(-8, -8); x.lineTo(-4, 0); x.lineTo(-8, 8); x.closePath(); x.fill();
+    if (live) { x.fillStyle = '#f97316'; x.beginPath(); x.moveTo(-6, -4); x.lineTo(-20 - Math.random() * 8, 0); x.lineTo(-6, 4); x.closePath(); x.fill(); } }
+  x.restore();
 }
 function ofFuseTick() {
   const big = $('#oMult'); if (!big || O.game !== 'fuse') return;
-  const s = O.st, stat = $('#oStat'); big.className = 'ofbig';
-  if (!s) { setTxt(big, '1.00x'); setTxt(stat, 'Choisis ta mise puis lance la fusée.'); return; }
-  if (s.over) {
-    if (s.win > 0) { big.classList.add('cash'); setTxt(big, s.at.toFixed(2) + 'x'); setTxt(stat, 'Encaissé ' + num(s.win) + ' ' + COIN + ' · explosion à ' + s.crash.toFixed(2) + 'x'); }
-    else { big.classList.add('dead'); setTxt(big, s.crash.toFixed(2) + 'x'); setTxt(stat, 'Explosion : mise perdue'); }
+  const s = O.st, stat = $('#oStat'), RT = s ? s.rate : 0.00012; let tEnd = 0, crashed = false, live = false; big.className = 'bigm';
+  if (!s) { setTxt(big, '1.00x'); setTxt(stat, 'Choisis ta mise puis lance la fusée.'); }
+  else if (s.over) {
+    crashed = !(s.win > 0); tEnd = Math.log(Math.max(1, crashed ? s.crash : s.at)) / RT;
+    if (crashed) { big.classList.add('dead'); setTxt(big, s.crash.toFixed(2) + 'x'); setTxt(stat, 'Explosion : mise perdue'); }
+    else { big.classList.add('cash'); setTxt(big, s.at.toFixed(2) + 'x'); setTxt(stat, 'Encaissé ' + num(s.win) + ' ' + COIN + ' · explosion à ' + s.crash.toFixed(2) + 'x'); }
+  } else {
+    const dt = nowS() - s.start;
+    if (dt < 0) { setTxt(big, '1.00x'); setTxt(stat, 'Décollage dans ' + Math.ceil(-dt / 1000) + ' s'); }
+    else {
+      live = true; tEnd = dt; const m = Math.exp(RT * dt), pot = num(Math.floor(s.bet * m * 100) / 100);
+      setTxt(big, (Math.floor(m * 100) / 100).toFixed(2) + 'x'); setTxt(stat, 'Gain potentiel ' + pot + ' ' + COIN + (s.auto ? ' · encaissement auto à ' + s.auto + 'x' : ''));
+      const c = $('#oCash'); if (c) setTxt(c, 'Encaisser ' + pot + ' ' + COIN);
+    }
+  }
+  fuseCanvas(tEnd, RT, crashed, live);
+}
+// ---- dock : mise ou actions
+function ofSet(n) { n = Math.max(0, Math.floor(n * 100) / 100); O.bet = n ? String(n) : ''; const i = $('#oAmt'); if (i) i.value = O.bet; }
+function ofDock() {
+  const d = $('#ofDock'); d.textContent = ''; const s = O.st, live = !!(s && !s.over), row = (...c) => { const r = el('div', 'row'); r.append(...c); d.append(r); return r; };
+  const act = (cls, label, fn, on = true) => { const b = el('button', 'btn big ' + cls, label); b.disabled = !on; b.onclick = fn; return b; };
+  if (live) {
+    if (O.game === 'mines') { row(act('go', 'Encaisser ' + num(s.cash) + ' ' + COIN, () => ofMove('cash'), s.picks.length)); d.append(el('div', 'hint', s.picks.length ? 'Chaque case sûre augmente le gain : encaisse avant de toucher une mine.' : 'Révèle au moins une case pour pouvoir encaisser.')); }
+    else if (O.game === 'fuse') { const b = act('go', 'Encaisser', () => ofMove('cash')); b.id = 'oCash'; row(b); d.append(el('div', 'hint', 'Encaisse avant que la fusée explose.')); }
+    else { row(act('hit', 'Tirer', () => ofMove('hit')), act('std', 'Rester', () => ofMove('stand')), act('dbl', 'Doubler', () => ofMove('double'), s.canDouble)); }
     return;
   }
-  const dt = nowS() - s.start;
-  if (dt < 0) { setTxt(big, '1.00x'); setTxt(stat, 'Décollage dans ' + Math.ceil(-dt / 1000) + ' s'); return; }
-  const m = Math.exp(s.rate * dt); setTxt(big, (Math.floor(m * 100) / 100).toFixed(2) + 'x');
-  setTxt(stat, 'Gain potentiel ' + num(Math.floor(s.bet * m * 100) / 100) + ' ' + COIN + (s.auto ? ' · encaissement auto à ' + s.auto + 'x' : ''));
-}
-function drawBj(p, s, live) {
-  if (!live) ofForm(p);
-  if (!s) return;
-  const sec = (lab, cards, v) => {
-    p.append(el('div', 'ofsub', lab + ' · ' + v)); const r = el('div', 'ofcards');
-    cards.forEach((c) => r.append(el('div', 'pc' + (c === '?' ? ' hid' : /[♥♦]/.test(c) ? ' red' : ''), c))); p.append(r);
-  };
-  sec('Croupier', s.dealer, s.dv); sec('Toi', s.player, s.pv);
-  if (live) {
-    const r = el('div', 'ofrow');
-    [['Tirer', 'hit', true], ['Rester', 'stand', true], ['Doubler', 'double', s.canDouble]].forEach(([l, m, on]) => { const b = el('button', 'btn', l); b.disabled = !on; b.onclick = () => ofMove(m); r.append(b); });
-    p.append(r);
-  } else {
-    const L = { win: 'Gagné', bj: 'Blackjack', push: 'Égalité, mise rendue', lose: 'Perdu', bust: 'Bust : perdu' }[s.outcome], net = Math.round((s.win - s.bet) * 100) / 100;
-    p.append(el('div', 'ofres ' + (net > 0 ? 'pos' : net < 0 ? 'neg' : ''), L + (net ? ' · ' + (net > 0 ? '+' : '') + num(net) + ' ' + COIN : '')));
+  const chips = [[1, 'c1', '1'], [10, 'c10', '10'], [100, 'c100', '100'], [1000, 'c1k', '1K'], [10000, 'c10k', '10K'], [100000, 'c100k', '100K']].map(([v, c, t]) => { const b = el('button', 'chip ' + c, t); b.title = '+' + num(v); b.onclick = () => { ofSet((parseAmt(O.bet) || 0) + v); SFX.chip(); }; return b; });
+  row(...chips);
+  const w = el('div', 'amt'), inp = document.createElement('input'); inp.id = 'oAmt'; inp.inputMode = 'decimal'; inp.autocomplete = 'off'; inp.placeholder = 'Mise'; inp.value = O.bet; inp.oninput = () => { O.bet = inp.value; }; w.append(inp, el('span', '', COIN));
+  const bt = (l, f) => { const b = el('button', 'btn', l); b.onclick = f; return b; };
+  row(bt('½', () => ofSet((parseAmt(O.bet) || 0) / 2)), w, bt('×2', () => ofSet((parseAmt(O.bet) || 0) * 2)), bt('Tapis', () => ofSet(O.bal ?? W.bal ?? 0)));
+  if (O.game === 'mines') {
+    const r = row(el('span', 'note', 'Mines'));
+    [1, 3, 5, 10, 15, 24].forEach((n) => { const b = el('button', 'rchip' + (n === O.mines ? ' on' : ''), String(n)); b.onclick = () => { O.mines = n; ofDock(); rMines(O.st); }; r.append(b); });
   }
+  if (O.game === 'fuse') {
+    const a = document.createElement('input'); a.className = 'ofsel'; a.style.width = '90px'; a.inputMode = 'decimal'; a.placeholder = 'ex. 2'; a.value = O.auto; a.oninput = () => { O.auto = a.value; };
+    row(el('span', 'note', 'Encaissement auto (facultatif)'), a);
+  }
+  row(act('go', s ? 'Rejouer' : 'Jouer', ofStart));
 }
 function ofLoop() { if (W.view.startsWith('off-') && O.game === 'fuse') ofFuseTick(); requestAnimationFrame(ofLoop); }
 requestAnimationFrame(ofLoop);
