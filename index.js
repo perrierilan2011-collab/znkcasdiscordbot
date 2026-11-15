@@ -6718,7 +6718,7 @@ function getWebBoards() {
         out[kind] = await Promise.all(
           rows.map(async (r) => {
             const u = await client.users.fetch(r.id).catch(() => null);
-            return { uid: r.id, name: u ? u.globalName || u.username : 'Utilisateur inconnu', avatar: u ? u.displayAvatarURL({ extension: 'png', size: 64 }) : '', value: r.value };
+            return { uid: r.id, name: u ? u.globalName || u.username : 'Utilisateur inconnu', value: r.value };
           })
         );
       }
@@ -6754,18 +6754,6 @@ try {
         out.push({ guildId: gid, guildName: guild.name, name: m.displayName || m.user.globalName || m.user.username, avatar: m.user.displayAvatarURL({ extension: 'png', size: 128 }), role: r && r.id !== guild.id ? r.name : '' });
       }
       return out;
-    },
-    // envoi de pièces entre joueurs (menu du site) : recherche d'un membre du serveur + vérification
-    searchMembers: async (gid, q) => {
-      const guild = client.guilds.cache.get(gid);
-      if (!guild) return [];
-      const ms = await guild.members.search({ query: q, limit: 8 }).catch(() => null);
-      return ms ? [...ms.values()].filter((m) => !m.user.bot).map((m) => ({ uid: m.id, name: m.displayName || m.user.globalName || m.user.username, avatar: m.user.displayAvatarURL({ extension: 'png', size: 64 }) })) : [];
-    },
-    isMember: async (gid, uid) => {
-      const guild = client.guilds.cache.get(gid);
-      const m = guild ? await guild.members.fetch(uid).catch(() => null) : null;
-      return !!m && !m.user.bot;
     },
     onRoundEnd: (guildId, recap) => postOnlineRecap(guildId, recap).catch((e) => console.error('[online recap]', e?.message || e)),
   });
@@ -6810,6 +6798,9 @@ async function postOnlineRecap(guildId, r) {
   else if (r.game === 'dice') title = '🎲 Dés — victoire';
   else if (r.game === 'horses') title = '🏇 Course de chevaux — victoire';
   else if (r.game === 'russian') title = '🔫 Roulette russe — victoire';
+  else if (r.game === 'slots') title = '🎰 Slots — victoire';
+  else if (r.game === 'duel') title = '🤠 Duel — victoire';
+  else if (r.game === 'scratch') title = '🎟️ Ticket à gratter — victoire';
   else return;
   const embed = new EmbedBuilder()
     .setColor(COLORS.violet)
