@@ -3,10 +3,11 @@
  * games/ — animations des jeux (style néon violet ZNK)
  * ---------------------------------------------------------------------------
  * GIF animés (une seule image GIF envoyée, joue une fois) :
+ *   coinflip (pièce lancée) · dice (dés qui rebondissent) ·
  *   bj · roulette · wheel · plinko · horses · crash (la fusée)
  *
  * Images fixes (une image par étape, en éditant le message) :
- *   mines · coinflip · dice · slots · duel · suit · zone
+ *   mines · slots · duel · suit · zone
  *
  * Pour ajouter un jeu : créer games/<cle>.js (voir coinflip.js pour des images fixes,
  * plinko.js pour un GIF : exporter gif(res, ctx) => { dur, cap(t), draw(S, t) }),

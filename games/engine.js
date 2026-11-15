@@ -18,7 +18,8 @@ const { createEncoder } = require('./gif');
 const W = 800;
 const H = 400;
 const SC = 1.25; // images fixes (JPEG)
-const GS = 1; // échelle des GIF (800x400 : léger et net)
+// échelle des GIF : 1 = 800x400 (léger) · 1.25 = 1000x500 (défaut, net en plein écran) · 1.5 = 1200x600. Variable GAME_GIF_SCALE.
+const GS = Math.min(1.5, Math.max(1, Number(process.env.GAME_GIF_SCALE) || 1.25));
 const GIF_DELAY = 8; // centièmes de seconde entre deux images (12,5 images/s)
 const GIF_HOLD = 180; // pause sur la dernière image (centièmes de seconde)
 const GIF_MAX_BYTES = 7.2 * 1024 * 1024; // sous la limite d'envoi Discord
@@ -227,13 +228,18 @@ function create(deps, GAMES) {
       if (out.buf.length > GIF_MAX_BYTES) return false;
       const name = `znk-${key}-${Date.now()}.gif`;
       const embed = new deps.EmbedBuilder().setColor(deps.color ? deps.color(1, 2) : 0xa81cfd).setImage(`attachment://${name}`);
-      await i.editReply({
+      if (typeof ctx.decorate === 'function') ctx.decorate(embed); // texte sous le GIF (mise, consigne...)
+      // ctx.deliver : envoi personnalisé (ex. bouton déjà différé) ; ctx.components : boutons gardés sous le GIF
+      const deliver = ctx.deliver || ((p) => i.editReply(p));
+      const keep = Array.isArray(ctx.components) ? ctx.components : [];
+      await deliver({
         embeds: [embed],
         files: [new deps.AttachmentBuilder(out.buf, { name })],
-        components: [],
+        components: keep,
         attachments: [],
       });
-      await sleep(out.ms + 900); // durée du GIF + temps d'affichage côté client
+      ctx.gifName = name;
+      if (!ctx.noWait) await sleep(out.ms + 900); // durée du GIF + temps d'affichage côté client
       return true;
     } catch (e) {
       console.error(`[games] GIF « ${key} » :`, e?.message || e);

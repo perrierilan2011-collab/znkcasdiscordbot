@@ -152,7 +152,7 @@ const DEFAULTS = { frames: 32, delay: 7, sweep: 0.95, ring: 0.85, star: 2.4 };
 
 // final / base : RGBA (Uint8ClampedArray ou Buffer) w*h*4 ; retourne un Buffer GIF (boucle infinie)
 async function encode(finalRgba, baseRgba, w, h, file, opts = {}) {
-  const entry = MAP[file];
+  const entry = opts.entry || MAP[file];
   if (!entry) return null;
   const o = { ...DEFAULTS, ...opts };
   const M = prepare(baseRgba, w, h, entry);
@@ -170,10 +170,23 @@ async function encode(finalRgba, baseRgba, w, h, file, opts = {}) {
 }
 
 const _baseCache = new Map();
-async function getBase(canvasLib, file, imgDir, w, h) {
-  const key = `${file}|${w}x${h}`;
+async function readSource(canvasLib, src, timeoutMs = 8000) {
+  if (!/^https?:\/\//i.test(src)) return canvasLib.loadImage(fs.readFileSync(src));
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), timeoutMs);
+  try {
+    const res = await fetch(src, { signal: ctl.signal });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await canvasLib.loadImage(Buffer.from(await res.arrayBuffer()));
+  } finally {
+    clearTimeout(timer);
+  }
+}
+async function getBase(canvasLib, file, imgDir, w, h, src) {
+  const from = src || path.join(imgDir, file);
+  const key = `${from}|${w}x${h}`;
   if (_baseCache.has(key)) return _baseCache.get(key);
-  const img = await canvasLib.loadImage(fs.readFileSync(path.join(imgDir, file)));
+  const img = await readSource(canvasLib, from);
   const cv = canvasLib.createCanvas(w, h);
   const g = cv.getContext('2d');
   // même recadrage "cover" que le bot
@@ -186,16 +199,39 @@ async function getBase(canvasLib, file, imgDir, w, h) {
 }
 
 const MAX_BYTES = 7.5 * 1024 * 1024;
+const _warned = new Set();
+const warnOnce = (k, msg) => {
+  if (_warned.has(k)) return;
+  _warned.add(k);
+  console.warn(msg);
+};
 // canvas du bot -> Buffer GIF animé, ou null (le bot garde alors son PNG)
+//  opts.src : fond réellement utilisé par le bot (fichier local OU lien *_BG_URL). Si ce n'est pas
+//             images/<file>, on anime quand même (reflet lumineux calculé sur CE fond).
 async function animateCard(canvasLib, cv, file, imgDir, opts = {}) {
   try {
-    if (!MAP[file] || !canvasLib) return null;
+    if (!canvasLib) return null;
+    const localPath = path.join(imgDir, file);
+    const src = opts.src && String(opts.src).trim() ? String(opts.src).trim() : '';
+    const custom = !!src && src !== localPath;
+    let entry = MAP[file];
+    if (custom || !entry) entry = { stars: [], ring: null }; // positions inconnues : reflet seulement
+    if (!custom && !MAP[file]) {
+      warnOnce(`nomap|${file}`, `[fx] ${file} absent de fx-map.json : image fixe.`);
+      return null;
+    }
     const w = cv.width, h = cv.height;
-    const base = await getBase(canvasLib, file, imgDir, w, h);
+    const base = await getBase(canvasLib, file, imgDir, w, h, custom ? src : '');
     const fin = cv.getContext('2d').getImageData(0, 0, w, h).data;
-    let buf = await encode(fin, base, w, h, file, opts);
-    if (buf && buf.length > MAX_BYTES) buf = await encode(fin, base, w, h, file, { ...opts, frames: 16, delay: 14 });
-    return buf && buf.length <= MAX_BYTES ? buf : null;
+    const o2 = { ...opts, entry };
+    delete o2.src;
+    let buf = await encode(fin, base, w, h, file, o2);
+    if (buf && buf.length > MAX_BYTES) buf = await encode(fin, base, w, h, file, { ...o2, frames: 16, delay: 14 });
+    if (!buf || buf.length > MAX_BYTES) {
+      warnOnce(`big|${file}`, `[fx] ${file} : GIF trop lourd, image fixe conservée.`);
+      return null;
+    }
+    return buf;
   } catch (e) {
     console.warn('[fx] animation impossible, image fixe conservée :', e?.message || e);
     return null;

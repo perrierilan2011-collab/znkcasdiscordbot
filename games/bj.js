@@ -128,7 +128,9 @@ function dealtHand(g, cards, hidden, prevCards, prevHidden, cx, y, f, shoe) {
     const tx = handX(count, cx) + i * FAN;
     if (i < prevCount) {
       const px = handX(prevCount, cx) + i * FAN;
-      D.drawCard(g, D.lerp(px, tx, f), y, CW, CH, card, { flip: faceUp ? 1 : 0 });
+      const wasUp = i < prevCards.length;
+      const fl = wasUp === faceUp ? (faceUp ? 1 : 0) : faceUp ? D.ease(f) : 1 - D.ease(f); // retournement
+      D.drawCard(g, D.lerp(px, tx, f), y, CW, CH, card, { flip: fl });
     } else {
       flying.push({ i, faceUp, card, tx });
     }
@@ -147,19 +149,23 @@ function dealtHand(g, cards, hidden, prevCards, prevHidden, cx, y, f, shoe) {
   });
 }
 
+// ctx.data.noShuffle : pas de battage (tirage / tour du croupier : la table reste à l'écran, seule la nouvelle carte bouge)
 function gif(res, ctx) {
-  const steps = (ctx.data && ctx.data.steps) || [];
+  const data = ctx.data || {};
+  const steps = data.steps || [];
   const n = steps.length;
-  const dur = SHUFFLE_S + Math.max(0, n - 1) * DEAL_S + 0.35;
+  const shuffleS = data.noShuffle ? 0.3 : SHUFFLE_S;
+  const dur = shuffleS + Math.max(0, n - 1) * DEAL_S + 0.35;
   const at = (t) => {
     const T = Math.min(t, 1) * dur;
-    if (T < SHUFFLE_S || n < 2) return { k: 0, u: Math.min(1, T / SHUFFLE_S) };
-    const k = 1 + Math.min(n - 2, Math.floor((T - SHUFFLE_S) / DEAL_S));
-    const u = Math.min(1, (T - SHUFFLE_S - (k - 1) * DEAL_S) / DEAL_S);
+    if (T < shuffleS || n < 2) return { k: 0, u: Math.min(1, T / shuffleS) };
+    const k = 1 + Math.min(n - 2, Math.floor((T - shuffleS) / DEAL_S));
+    const u = Math.min(1, (T - shuffleS - (k - 1) * DEAL_S) / DEAL_S);
     return { k, u };
   };
   return {
     dur,
+    hold: data.noShuffle ? 90 : undefined,
     cap: (t) => (steps[at(t).k] || {}).cap || '',
     draw(S, t) {
       const { g, w, h, cx } = S;
@@ -176,7 +182,7 @@ function gif(res, ctx) {
       for (let j = 2; j >= 0; j--) D.drawCard(g, shoe.x, shoe.y - j * 2, 40, 56, null, { flip: 0 });
 
       // battage au début
-      if (k === 0) {
+      if (k === 0 && !data.noShuffle) {
         const amp = Math.sin(Math.min(1, u) * Math.PI);
         for (let j = 0; j < 6; j++) {
           const off = Math.sin(u * 26 + j * 1.7) * 22 * amp;

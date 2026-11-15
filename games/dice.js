@@ -79,9 +79,97 @@ function build(res, ctx) {
   return { frames };
 }
 
+
+// ---------- GIF : les dés sont lancés, rebondissent et roulent sur la table avant de s'arrêter ----------
+const hash = (n) => {
+  const x = Math.sin(n * 127.1 + 311.7) * 43758.5453;
+  return x - Math.floor(x);
+};
+function gif(res, ctx) {
+  const a = res.a;
+  const b = res.b;
+  const sum = res.sum;
+  const STOP = 0.78; // les dés sont immobiles à 78 %
+  const BASE = 92;
+  // dé i : position finale, départ hors champ à gauche, rebonds qui diminuent
+  const dice = [
+    { fx: null, off: 0, spin: 1, bounces: 4.5, amp: 92 },
+    { fx: null, off: 0.06, spin: -1, bounces: 4, amp: 78 },
+  ];
+  const pos = (i, t, cx) => {
+    const d = dice[i];
+    const finalX = i === 0 ? cx - 96 : cx + 74;
+    const m = D.clamp((t - d.off) / (STOP - d.off));
+    const x = D.lerp(-50, finalX, D.ease(m));
+    const env = Math.pow(1 - m, 1.4);
+    const y = BASE - d.amp * env * Math.abs(Math.sin(Math.PI * m * d.bounces));
+    const rot = d.spin * env * 15 + (m >= 1 ? (i === 0 ? -0.08 : 0.1) : 0);
+    return { x, y, rot, m };
+  };
+  return {
+    dur: 4.2,
+    cap: (t) => (t < 0.1 ? 'Les dés sont lancés' : t < 0.4 ? 'Ils rebondissent...' : t < 0.62 ? 'Ils roulent sur la table' : t < STOP ? 'Ils ralentissent' : `${a} + ${b} = ${sum}`),
+    draw(S, t) {
+      const { g, w, h, cx } = S;
+      const done = t >= STOP;
+      const glow = S.last && S.accent ? S.accent : undefined;
+      D.floorGlow(g, cx - 40, h - 20, 190, 20, 'rgba(165,243,252,0.35)');
+      const P = [pos(0, t, cx), pos(1, t, cx)];
+      const vals = [a, b];
+      P.forEach((q, i) => {
+        // ombre
+        const air = D.clamp((BASE - q.y) / 60);
+        g.fillStyle = `rgba(0,0,0,${0.5 - air * 0.3})`;
+        g.beginPath();
+        g.ellipse(q.x + (i === 0 ? 0 : 0), h - 22, 38 - air * 8, 7, 0, 0, D.TAU);
+        g.fill();
+      });
+      P.forEach((q, i) => {
+        const v = done ? vals[i] : 1 + Math.floor(hash(Math.floor(Math.pow(q.m, 0.6) * 24) + i * 9.7) * 6);
+        // traînée de mouvement
+        if (!done && q.m < 0.65) {
+          const back = pos(i, t - 0.04, cx);
+          D.drawDie(g, back.x, back.y, 66, v, back.rot - 0.2, { alpha: 0.16 });
+        }
+        D.drawDie(g, q.x, q.y, 66, v, q.rot, { glow });
+      });
+      // pastille somme (cadran)
+      const sx = cx + 210;
+      const sy = h / 2 + 4;
+      g.save();
+      g.beginPath();
+      g.arc(sx, sy, 44, 0, D.TAU);
+      const rg = g.createRadialGradient(sx - 10, sy - 12, 4, sx, sy, 46);
+      rg.addColorStop(0, 'rgba(76,29,149,0.9)');
+      rg.addColorStop(1, 'rgba(14,4,36,0.95)');
+      g.fillStyle = rg;
+      if (done && S.accent) {
+        g.shadowColor = S.accent;
+        g.shadowBlur = 18;
+      }
+      g.fill();
+      g.shadowBlur = 0;
+      g.lineWidth = 2.4;
+      g.strokeStyle = done ? S.accent || '#E9D5FF' : 'rgba(192,132,252,0.7)';
+      g.stroke();
+      g.setLineDash([2, 5]);
+      g.beginPath();
+      g.arc(sx, sy, 37, 0, D.TAU);
+      g.lineWidth = 1;
+      g.strokeStyle = 'rgba(255,255,255,0.25)';
+      g.stroke();
+      g.restore();
+      D.text(g, 'SOMME', sx, sy - 25, { size: 9.5, color: 'rgba(233,213,255,0.75)' });
+      D.text(g, done ? String(sum) : '?', sx, sy + 6, { size: 38, color: done ? S.accent || '#fff' : 'rgba(255,255,255,0.45)', glow: done ? S.accent : undefined });
+      D.hud(g, 14, 14, 100, 48, 'Ton pari', String(res.pick || '-').slice(0, 12), { size: 13 });
+      void w;
+    },
+  };
+}
+
 function emblem(S, cx, cy) {
   const v = S.last ? S.res.a : 1 + Math.floor(S.rnd() * 6);
   D.drawDie(S.g, cx, cy, 54, v, S.last ? 0 : (S.rnd() - 0.5) * 1.2);
 }
 
-module.exports = { key: 'dice', title: 'Dés', theme, build, emblem };
+module.exports = { key: 'dice', title: 'Dés', theme, build, gif, emblem };
