@@ -142,6 +142,73 @@ function build(res, ctx) {
   return { frames };
 }
 
+
+// ---------- GIF : rotation continue avec ralentissement progressif ----------
+const eo4 = (t) => 1 - Math.pow(1 - D.clamp(t), 4);
+
+function gif(res, ctx) {
+  const wheel = (ctx.data && ctx.data.wheel) || [];
+  const coef = ctx.coef || 1;
+  const idx = res.idx;
+  const N = wheel.length || 24;
+  const seg = D.TAU / N;
+  const EX = N * 2.6; // nombre de cases parcourues avant l'arrêt
+  const STOP = 0.9; // la roue est arrêtée à 90 % de l'animation
+  const final = res.base === 0 ? 'x0' : lab(res.base, coef);
+  return {
+    dur: 5.2,
+    cap: (t) => (t < 0.12 ? 'La roue est lancée' : t < 0.45 ? 'Pleine vitesse' : t < 0.72 ? 'Elle ralentit' : t < STOP ? 'Presque arrêtée' : `La roue s'arrête sur ${final}`),
+    draw(S, t) {
+      const { g, w, h, cx } = S;
+      const R = 172;
+      const wy = 208;
+      const tm = Math.min(1, t / STOP);
+      const done = t >= STOP;
+      const rot = -idx * seg + EX * seg * (1 - eo4(tm));
+      const speed = Math.pow(1 - tm, 3); // 1 = très vite, 0 = arrêtée
+      D.floorGlow(g, cx, wy - R, 230, 120, 'rgba(240,171,252,0.2)');
+      drawWheel(g, cx, wy, R, rot, wheel, coef, done ? idx : -1);
+      if (speed > 0.12) {
+        g.save();
+        g.beginPath();
+        g.arc(cx, wy, R, 0, D.TAU);
+        g.clip();
+        g.fillStyle = `rgba(30,10,70,${(0.3 * Math.min(1, speed * 1.4)).toFixed(3)})`;
+        g.fillRect(0, 0, w, h);
+        g.restore();
+      }
+      // pointeur : il est repoussé à chaque case qui passe
+      const u = -rot / seg - 0.5;
+      const f = u - Math.floor(u);
+      const ang = Math.max(0, 1 - f * 4) * 0.42 * Math.min(1, 0.25 + speed);
+      g.save();
+      g.translate(cx, 8);
+      g.rotate(-ang);
+      g.translate(-cx, -8);
+      g.shadowColor = '#F0ABFC';
+      g.shadowBlur = 14;
+      const pg = g.createLinearGradient(0, 2, 0, 36);
+      pg.addColorStop(0, '#FFFFFF');
+      pg.addColorStop(1, '#E879F9');
+      g.fillStyle = pg;
+      g.beginPath();
+      g.moveTo(cx, 40);
+      g.lineTo(cx - 12, 4);
+      g.lineTo(cx + 12, 4);
+      g.closePath();
+      g.fill();
+      g.restore();
+      D.hud(g, 14, 14, 100, 50, 'Roue', `${N} cases`);
+      D.hud(g, w - 114, 14, 100, 50, 'Résultat', done ? final : '?', {
+        size: 18,
+        color: done ? S.accent || '#fff' : 'rgba(233,213,255,0.6)',
+        line: done ? S.accent || undefined : undefined,
+        glow: done ? S.accent : undefined,
+      });
+    },
+  };
+}
+
 function emblem(S, cx, cy) {
   const wheel = (S.data && S.data.wheel) || new Array(24).fill(0).map((_, i) => (i % 3 ? 0.5 : 2));
   const idx = S.res ? S.res.idx : 0;
@@ -155,4 +222,4 @@ function emblem(S, cx, cy) {
   S.g.fill();
 }
 
-module.exports = { key: 'wheel', title: 'Roue de la fortune', theme, build, emblem };
+module.exports = { key: 'wheel', title: 'Roue de la fortune', theme, build, gif, emblem };

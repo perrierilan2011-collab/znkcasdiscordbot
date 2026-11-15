@@ -17,16 +17,21 @@ const colorName = (n, reds) => (n === 0 ? 'VERT' : reds.has(n) ? 'ROUGE' : 'NOIR
 // bande de cases façon « cylindre » : les cases s'écrasent et s'assombrissent vers les bords
 function drawStrip(g, cx, cy, order, pos, reds, blur, hot) {
   const N = order.length;
-  for (let d = -6; d <= 6; d++) {
-    const i = (((Math.round(pos) + d) % N) + N) % N;
+  const base = Math.round(pos);
+  const frac = pos - base; // permet un défilement continu entre deux cases
+  for (let d = -7; d <= 7; d++) {
+    const de = d - frac; // distance réelle de la case au centre
+    if (Math.abs(de) > 6.3) continue;
+    const i = (((base + d) % N) + N) % N;
     const num = order[i];
-    const t = Math.min(1, Math.abs(d) / 6);
+    const tt = Math.max(-1, Math.min(1, de / 6));
+    const t = Math.abs(tt);
     const sc = Math.cos(t * 1.05);
-    const x = cx + Math.sign(d) * Math.sin(t * 1.05) * 6 * PITCH * 0.98;
+    const x = cx + Math.sin(tt * 1.05) * 6 * PITCH * 0.98;
     const wv = CELL_W * sc;
     const hv = CELL_H * (0.62 + 0.38 * sc);
     const [c0, c1] = numColor(num, reds);
-    const centre = d === 0;
+    const centre = Math.abs(de) < 0.5;
     g.save();
     g.globalAlpha = Math.max(0.25, sc) * (blur && !centre ? 0.9 : 1);
     D.rr(g, x - wv / 2, cy - hv / 2, wv, hv, 10 * sc);
@@ -51,9 +56,9 @@ function drawStrip(g, cx, cy, order, pos, reds, blur, hot) {
     if (blur && !centre) {
       g.save();
       g.globalAlpha = 0.5 * sc;
-      for (let s = 1; s <= 3; s++) {
-        g.fillStyle = `rgba(192,132,252,${0.13 / s})`;
-        g.fillRect(x - wv / 2 - s * 7, cy - hv / 2, 7, hv);
+      for (let sI = 1; sI <= 3; sI++) {
+        g.fillStyle = `rgba(192,132,252,${0.13 / sI})`;
+        g.fillRect(x - wv / 2 - sI * 7, cy - hv / 2, 7, hv);
       }
       g.restore();
     }
@@ -136,6 +141,71 @@ function build(res, ctx) {
   return { frames, emblem: null };
 }
 
+
+// ---------- GIF : la bande défile puis ralentit jusqu'au numéro sorti ----------
+function gif(res, ctx) {
+  const data = ctx.data || {};
+  const order = data.order || [];
+  const reds = new Set(data.reds || []);
+  const result = data.result;
+  const finalIdx = order.indexOf(result);
+  const N = order.length || 37;
+  const DIST = N * 2 + 6; // un peu plus de deux tours
+  const STOP = 0.9;
+  return {
+    dur: 5.6,
+    cap: (t) =>
+      t < 0.1 ? 'La bille est lancée' : t < 0.3 ? 'Pleine vitesse' : t < 0.55 ? 'La bille tourne...' : t < 0.75 ? 'Elle ralentit' : t < STOP ? 'Elle saute de case en case' : `Le ${result} ${colorName(result, reds).toLowerCase()}`,
+    draw(S, t) {
+      const { g, w, h, cx } = S;
+      const cy = h / 2 + 4;
+      const tm = Math.min(1, t / STOP);
+      const done = t >= STOP;
+      const speed = Math.pow(1 - tm, 3);
+      let pos = finalIdx - DIST * Math.pow(1 - tm, 4);
+      if (tm > 0.9) pos += Math.sin(((tm - 0.9) / 0.1) * D.TAU) * 0.22 * ((1 - tm) / 0.1); // petite hésitation avant l'arrêt
+      D.floorGlow(g, cx, cy + CELL_H / 2 + 8, 300, 20, 'rgba(253,230,138,0.22)');
+      g.save();
+      g.beginPath();
+      g.rect(116, 0, w - 232, h);
+      g.clip();
+      drawStrip(g, cx, cy, order, pos, reds, speed > 0.25, done ? S.accent || '#FDE68A' : null);
+      g.restore();
+      g.save();
+      D.rr(g, cx - CELL_W / 2 - 5, cy - CELL_H / 2 - 5, CELL_W + 10, CELL_H + 10, 13);
+      g.lineWidth = 3;
+      const hl = done ? S.accent || '#FDE68A' : '#FDE68A';
+      g.strokeStyle = hl;
+      g.shadowColor = hl;
+      g.shadowBlur = 16;
+      g.stroke();
+      g.restore();
+      for (const dir of [-1, 1]) {
+        g.fillStyle = '#FDE68A';
+        g.shadowColor = '#FDE68A';
+        g.shadowBlur = 10;
+        g.beginPath();
+        const py = dir < 0 ? cy - CELL_H / 2 - 8 : cy + CELL_H / 2 + 8;
+        g.moveTo(cx, py);
+        g.lineTo(cx - 8, py + dir * -13);
+        g.lineTo(cx + 8, py + dir * -13);
+        g.fill();
+        g.shadowBlur = 0;
+      }
+      D.hud(g, 12, (h - 52) / 2, 96, 52, 'Ton pari', String(ctx.pickLabel || '-').slice(0, 11), { size: 13 });
+      D.hud(g, w - 108, (h - 52) / 2, 96, 52, 'Numéro', done ? `${result} ${colorName(result, reds)}` : '?', {
+        size: 13,
+        color: done ? S.accent || '#fff' : 'rgba(233,213,255,0.6)',
+        line: done ? S.accent || undefined : undefined,
+        glow: done ? S.accent : undefined,
+      });
+      const k = Math.floor(t * 40);
+      D.bulbs(g, 130, w - 130, 9, 22, k);
+      D.bulbs(g, 130, w - 130, h - 9, 22, k + 1);
+    },
+  };
+}
+
 function emblem(S, cx, cy) {
   const { g, p } = S;
   const rot = S.last ? 0 : (1 - p) * 7;
@@ -164,4 +234,4 @@ function emblem(S, cx, cy) {
   g.fill();
 }
 
-module.exports = { key: 'roulette', title: 'Roulette', theme, build, emblem };
+module.exports = { key: 'roulette', title: 'Roulette', theme, build, gif, emblem };

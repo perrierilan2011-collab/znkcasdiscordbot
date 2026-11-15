@@ -13,10 +13,15 @@
  * bot retombe sur l'ancienne animation texte : rien ne casse.
  */
 const D = require('./draw');
+const { createEncoder } = require('./gif');
 
 const W = 800;
 const H = 400;
-const SC = 1.25;
+const SC = 1.25; // images fixes (JPEG)
+const GS = 1; // échelle des GIF (800x400 : léger et net)
+const GIF_DELAY = 8; // centièmes de seconde entre deux images (12,5 images/s)
+const GIF_HOLD = 180; // pause sur la dernière image (centièmes de seconde)
+const GIF_MAX_BYTES = 7.2 * 1024 * 1024; // sous la limite d'envoi Discord
 // scène agrandie : recouvre les 6 cases du gabarit et utilise toute la moitié basse de la carte
 const STAGE = { x: 36, y: 214, w: 728, h: 172 };
 const AV = { cx: 103, cy: 114.5, d: 84 };
@@ -39,11 +44,11 @@ function create(deps, GAMES) {
   const clean = deps.clean || ((s) => String(s ?? ''));
   const sleep = deps.sleep || ((ms) => new Promise((r) => setTimeout(r, ms)));
 
-  async function buildBase(tpl, avatarImg) {
+  async function buildBase(tpl, avatarImg, sc = SC) {
     const { createCanvas } = deps.canvasLib;
-    const cv = createCanvas(W * SC, H * SC);
+    const cv = createCanvas(Math.round(W * sc), Math.round(H * sc));
     const g = cv.getContext('2d');
-    g.scale(SC, SC);
+    g.scale(sc, sc);
     const k = Math.max(W / tpl.width, H / tpl.height);
     const sw = W / k;
     const sh = H / k;
@@ -65,11 +70,12 @@ function create(deps, GAMES) {
     return cv;
   }
 
-  function renderFrame(base, game, built, frame, k, n, ctx, seed) {
+  function renderFrame(base, game, built, frame, k, n, ctx, seed, o = {}) {
     const { createCanvas } = deps.canvasLib;
-    const cv = createCanvas(W * SC, H * SC);
+    const sc = o.sc || SC;
+    const cv = createCanvas(Math.round(W * sc), Math.round(H * sc));
     const g = cv.getContext('2d');
-    g.scale(SC, SC);
+    g.scale(sc, sc);
     g.drawImage(base, 0, 0, W, H);
     const last = k === n - 1;
     const p = n > 1 ? k / (n - 1) : 1;
@@ -99,6 +105,16 @@ function create(deps, GAMES) {
       g.font = D.font(18);
       g.fillText(fit(g, clean(ctx.resultText), 200), BAR.x + BAR.w - 16, BAR.y + BAR.h / 2 + 6);
       g.textAlign = 'left';
+    } else if (o.gif) {
+      const bw = 150;
+      const bx = BAR.x + BAR.w - 16 - bw;
+      const by = BAR.y + BAR.h / 2;
+      D.rr(g, bx, by - 3, bw, 6, 3);
+      g.fillStyle = 'rgba(255,255,255,0.3)';
+      g.fill();
+      D.rr(g, bx, by - 3, Math.max(6, bw * p), 6, 3);
+      g.fillStyle = '#FFFFFF';
+      g.fill();
     } else {
       for (let j = 0; j < n; j++) {
         const x = BAR.x + BAR.w - 16 - (n - 1 - j) * 15;
@@ -166,13 +182,70 @@ function create(deps, GAMES) {
     g.restore();
     D.stageRim(g, STAGE.w, STAGE.h, accent || (game.theme && game.theme.rim) || 'rgba(192,132,252,0.85)', accent ? 16 : 10);
     g.restore();
+    if (o.raw) return cv;
     return cv.toBuffer('image/jpeg', 90);
   }
 
+  // Images fixes de secours pour un jeu qui n'a que la version GIF : on échantillonne l'animation
+  function autoBuild(game, res, ctx) {
+    const anim = game.gif(res, ctx);
+    const ts = [0, 0.2, 0.4, 0.6, 0.8, 1];
+    return {
+      frames: ts.map((t, k) => ({
+        cap: anim.cap ? anim.cap(t) : '',
+        ms: k === ts.length - 1 ? 1300 : 850,
+        draw: (S) => anim.draw(S, t),
+      })),
+      emblem: game.emblem,
+    };
+  }
+
+  // Rend l'animation continue d'un jeu en GIF (800x400) ; renvoie { buf, ms } ou null
+  async function renderGif(game, res, ctx, baseGif, seed, step) {
+    const anim = game.gif(res, ctx);
+    const total = Math.max(8, Math.round((anim.dur * 100) / GIF_DELAY / step) + 1);
+    const delay = GIF_DELAY * step;
+    const enc = createEncoder(Math.round(W * GS), Math.round(H * GS));
+    for (let k = 0; k < total; k++) {
+      const t = k / (total - 1);
+      const frame = { cap: anim.cap ? anim.cap(t) : '', draw: (S) => anim.draw(S, t) };
+      const cv = renderFrame(baseGif, game, {}, frame, k, total, ctx, seed, { sc: GS, raw: true, gif: true });
+      const px = cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data;
+      enc.add(px, k === total - 1 ? anim.hold || GIF_HOLD : delay);
+      if (k % 6 === 5) await new Promise((r) => setImmediate(r)); // laisse respirer le bot
+    }
+    const buf = enc.finish();
+    return { buf, ms: (total - 1) * delay * 10 + Math.min(anim.hold || GIF_HOLD, 150) * 10 };
+  }
+
+  async function playGif(i, key, game, res, ctx, tpl, avatarImg) {
+    try {
+      const baseGif = await buildBase(tpl, avatarImg, GS);
+      const seed = (Date.now() & 0xffffff) + key.length;
+      let out = await renderGif(game, res, ctx, baseGif, seed, 1);
+      if (out.buf.length > GIF_MAX_BYTES) out = await renderGif(game, res, ctx, baseGif, seed, 2); // trop lourd : moitié moins d'images
+      if (out.buf.length > GIF_MAX_BYTES) return false;
+      const name = `znk-${key}-${Date.now()}.gif`;
+      const embed = new deps.EmbedBuilder().setColor(deps.color ? deps.color(1, 2) : 0xa81cfd).setImage(`attachment://${name}`);
+      await i.editReply({
+        embeds: [embed],
+        files: [new deps.AttachmentBuilder(out.buf, { name })],
+        components: [],
+        attachments: [],
+      });
+      await sleep(out.ms + 900); // durée du GIF + temps d'affichage côté client
+      return true;
+    } catch (e) {
+      console.error(`[games] GIF « ${key} » :`, e?.message || e);
+      return false;
+    }
+  }
+
   /**
-   * Joue l'animation image d'un jeu.
+   * Joue l'animation d'un jeu : GIF animé si le jeu en a un (variable GAME_GIF=off pour couper),
+   * sinon (ou en cas de problème) images fixes envoyées l'une après l'autre.
    *  i   : interaction (editReply)
-   *  key : clé du jeu (mines, bj, roulette, coinflip, dice, slots, wheel, duel, suit, zone)
+   *  key : clé du jeu
    *  res : résultat déjà tiré ; ctx : { user, bet, choice, outcome, resultText, data... }
    * Renvoie true si l'animation a été jouée (ou volontairement sautée), false sinon.
    */
@@ -187,8 +260,13 @@ function create(deps, GAMES) {
       const avatarImg = ctx.user && deps.getAvatar ? await deps.getAvatar(ctx.user).catch(() => null) : null;
       ctx.res = res;
       ctx.userName = ctx.userName || (ctx.user && deps.userName ? deps.userName(ctx.user) : 'Joueur');
-      const built = game.build(res, ctx);
-      const frames = built.frames;
+
+      const gifOn = String(process.env.GAME_GIF || 'on').toLowerCase() !== 'off' && typeof game.gif === 'function';
+      if (gifOn && (await playGif(i, key, game, res, ctx, tpl, avatarImg))) return true;
+
+      // ----- images fixes (jeux sans GIF, ou GIF impossible)
+      const built = game.build ? game.build(res, ctx) : typeof game.gif === 'function' ? autoBuild(game, res, ctx) : null;
+      const frames = built && built.frames;
       if (!frames || !frames.length) return false;
       const base = await buildBase(tpl, avatarImg);
       const n = frames.length;
