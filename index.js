@@ -296,7 +296,7 @@ const COIN_PLAIN = String(process.env.COIN_TEXT || COIN).trim() || COIN;
 const plain = (s) => String(s).split(COIN).join(COIN_PLAIN);
 console.log(`[coin] ${COIN} (texte : ${COIN_PLAIN})`);
 
-const DAILY_AMOUNT = 4;
+const DAILY_AMOUNT = 30;
 const INVITE_REWARD = 1;
 const LEADERBOARD_REFRESH_MS = 60_000;
 const IDLE_MS = 90_000;
@@ -6739,6 +6739,19 @@ try {
     debit,
     credit,
     getBoards: getWebBoards,
+    // admin du site : compte Discord @b7f5 (nom d'utilisateur unique, non usurpable) + ADMIN_IDS optionnel (ids séparés par des virgules)
+    isAdmin: async (uid) => {
+      uid = String(uid);
+      if (String(process.env.ADMIN_IDS || '').split(',').map((x) => x.trim()).filter(Boolean).includes(uid)) return true;
+      const u = await client.users.fetch(uid).catch(() => null);
+      return !!u && String(u.username).toLowerCase() === 'b7f5';
+    },
+    // bouton « Daily » du site : même RPC que le bouton Discord
+    claimDaily: async (uid) => {
+      const res = await rpc('claim_daily', { p_user_id: String(uid), p_amount: DAILY_AMOUNT });
+      if (res?.balance != null) await touchPeak(String(uid), res.balance);
+      return { claimed: !!res?.claimed, balance: res?.balance ?? null, amount: DAILY_AMOUNT };
+    },
     coin: /^<a?:\w+:\d+>$/.test(COIN_PLAIN) ? '🪙' : COIN_PLAIN, // un emoji perso Discord ne s'affiche pas sur le web
     secretSeed: DISCORD_TOKEN,
     clientId: () => client.user?.id,
