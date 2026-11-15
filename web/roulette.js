@@ -36,8 +36,10 @@ const MIN_BET = Math.max(0.01, env('ROULETTE_MIN_BET', 'WHEEL_MIN_BET', 'BJ_MIN_
 const MAX_BET = Math.max(MIN_BET, env('ROULETTE_MAX_BET', 'WHEEL_MAX_BET') || 100_000_000); // par mise et par joueur
 const BET_TIME_MS = Math.max(8, env('ROULETTE_BET_SECONDS', 'WHEEL_BET_SECONDS') || 20) * 1000;
 const LEAD_MS = 450; // délai entre l'annonce du tour et son départ (laisse le temps à tous les clients de recevoir l'ordre)
-const SPIN_MS = 8500;
-const RESULT_MS = 7000;
+const SPIN_MS = 9500; // durée du lancer de bille (la roue, elle, tourne en continu)
+const RESULT_MS = 8000;
+const REST_W = 0.3; // vitesse de la roue au repos (rad/s) : elle ne s'arrête jamais complètement
+const SPIN_W = 2.7; // vitesse de la roue juste après le lancer (rad/s)
 const OFFLINE_GRACE_MS = 8000;
 const MAX_SPECTATORS_SENT = 40;
 
@@ -75,7 +77,8 @@ class RouletteRoom {
     this.phase = 'betting'; // betting | spinning | result
     this.deadline = 0;
     this.round = 0;
-    this.rot = 0; // angle de repos de la roue (rad)
+    // la roue tourne en continu : angle(t) calculé identiquement côté client (voir wAng dans index.html)
+    this.wheel = { t0: Date.now(), a0: randomInt(1000) / 1000 * TAU, w0: REST_W, rest: REST_W, tau: 3.6, ta: 0.35 };
     this.spin = null;
     this.result = null;
     this.history = [];
@@ -86,6 +89,13 @@ class RouletteRoom {
   }
 
   // ------------------------------------------------------------------ utilitaires
+  /** angle de la roue (rad) à l'instant t (ms) : vitesse = rest + (w0 - rest)·(1 - e^(-dt/ta))·e^(-dt/tau) */
+  wheelAt(t) {
+    const w = this.wheel;
+    const dt = Math.max(0, (t - w.t0) / 1000);
+    const k = 1 / w.ta + 1 / w.tau;
+    return w.a0 + w.rest * dt + (w.w0 - w.rest) * (w.tau * (1 - Math.exp(-dt / w.tau)) - (1 - Math.exp(-dt * k)) / k);
+  }
   run(fn) {
     const p = this.q.then(fn, fn);
     this.q = p.catch(() => {});
@@ -157,7 +167,7 @@ class RouletteRoom {
       phase: this.phase,
       deadline: this.deadline,
       round: this.round,
-      rot: this.rot,
+      wheel: this.wheel,
       spin: this.spin,
       result: this.result,
       history: this.history,
@@ -296,14 +306,18 @@ class RouletteRoom {
     this.clearTimer();
     this.round++;
     const idx = randomInt(N);
-    // la case gagnante s'arrête sous le pointeur (en haut), légèrement décalée dans la case pour le réalisme
-    const jitter = (randomInt(1000) / 1000 - 0.5) * 0.7 * SEG;
-    const from = this.rot;
-    const turns = 6 + randomInt(3);
-    const aim = mod(jitter - idx * SEG - from, TAU);
-    const to = from + turns * TAU + aim;
-    const start = Date.now() + LEAD_MS;
-    this.spin = { start, dur: SPIN_MS, from, to, idx };
+    const rnd = (lo, hi) => lo + (randomInt(10000) / 10000) * (hi - lo);
+    const now = Date.now();
+    // la roue accélère à partir de sa position actuelle (aucun saut visuel) ; la bille est lancée LEAD_MS plus tard
+    this.wheel = { t0: now, a0: mod(this.wheelAt(now), TAU), w0: SPIN_W + rnd(0, 0.6), rest: REST_W, tau: 3.6, ta: 0.35 };
+    // tout est tiré ici : tous les clients rejouent exactement la même trajectoire (orbite -> chute -> rebonds -> case idx)
+    this.spin = {
+      start: now + LEAD_MS, dur: SPIN_MS, idx,
+      b0: rnd(0, TAU), // position de départ de la bille
+      v0: rnd(11.5, 13.5), v1: rnd(4.2, 5.2), // vitesse de la bille (rad/s) au lancer / au décrochage
+      t1: Math.round(rnd(5800, 6500)), // ms avant que la bille quitte la piste
+      hop: rnd(0.9, 2.2), hopf: rnd(2.2, 3.4), // amplitude (en cases) et fréquence des rebonds
+    };
     this.result = null;
     for (const p of this.players.values()) {
       p.net = null;
@@ -320,8 +334,6 @@ class RouletteRoom {
     if (this.phase !== 'spinning' || !this.spin) return;
     const idx = this.spin.idx;
     const n = ORDER[idx];
-    this.rot = mod(this.spin.to, TAU);
-    this.spin = { ...this.spin, from: this.rot, to: this.rot };
     this.result = { idx, n };
     this.history.unshift(n);
     if (this.history.length > 24) this.history.pop();
@@ -372,8 +384,7 @@ class RouletteRoom {
       if (p.leaving || p.online === false) this.players.delete(uid);
     }
     this.phase = 'betting';
-    this.spin = null;
-    this.result = null;
+    this.result = null; // this.spin reste : la bille reste dans la case gagnante jusqu'au prochain lancer
     this.clearTimer();
     this.emit();
   }
