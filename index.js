@@ -54,18 +54,176 @@ function withBanner(payload, file) {
   }
   return payload;
 }
-// Panneau / menu sans image : on lui met la bannière animée générique (images/generic_text_card.gif).
+// Panneau / menu sans image : bannière générique (images/generic_text_card) AVEC le texte du panneau écrit dessus
+// (titre, sous-titre, quelques lignes). Avant, le fond vide était envoyé tel quel : on ne voyait rien dessus.
+// - la 1re fois : image fixe avec le texte (instantanée) ; le GIF animé est calculé en arrière-plan puis réutilisé.
+// - si tout le texte tient sur l'image (pas de bloc de code, <= 5 lignes), le titre/description de l'embed sont retirés
+//   pour ne pas afficher deux fois la même chose ; sinon l'embed garde son texte.
 // attachments: [] retire l'ancienne bannière quand le panneau est mis à jour (sinon elle s'afficherait en double).
+const BANNER_FILE = 'generic_text_card.png';
+const bannerCache = new Map(); // clé texte -> { png, gif, complete }
+const bannerPending = new Set();
+let bannerBg = null;
+let bannerBgLoading = false;
+// Chargement ASYNCHRONE du fond (un décodage synchrone dessinerait une image vide). Tant qu'il n'est pas prêt : pas de bannière.
+function getBannerBg() {
+  if (bannerBg || bannerBgLoading || !canvasLib) return bannerBg;
+  const p = localImg(BANNER_FILE);
+  if (!p) return null;
+  bannerBgLoading = true;
+  canvasLib
+    .loadImage(fs.readFileSync(p))
+    .then((img) => {
+      bannerBg = img;
+    })
+    .catch((e) => console.error('[bannière] fond illisible :', e?.message || e))
+    .finally(() => {
+      bannerBgLoading = false;
+    });
+  return null;
+}
+const bannerPlain = (s) =>
+  noEmoji(
+    String(s || '')
+      .replace(/<(?:@[!&]?|#|a?:\w+:)\d*>/g, '')
+      .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+      .replace(/[*_~`|]/g, '')
+      .replace(/^\s*[>#-]+\s*/, '')
+      .replace(/[\u2190-\u21FF\u25A0-\u25FF\u2600-\u27BF\u2B00-\u2BFF]/g, '') // ✦ ★ ▶ ➜ ... (pas dans la police du bot)
+  );
+function bannerInfo(embed) {
+  const d = embed.data || {};
+  const desc = String(d.description || '');
+  const hasCode = desc.includes('```');
+  return {
+    title: bannerPlain(d.title),
+    lines: hasCode ? [] : desc.split('\n').map(bannerPlain).filter(Boolean),
+    hasCode,
+  };
+}
+function wrapLines(g, text, maxW) {
+  const out = [];
+  let cur = '';
+  for (const word of String(text).split(' ')) {
+    const t = cur ? `${cur} ${word}` : word;
+    if (cur && g.measureText(t).width > maxW) {
+      out.push(cur);
+      cur = word;
+    } else cur = t;
+  }
+  if (cur) out.push(cur);
+  return out;
+}
+// Dessine le texte sur le fond vide. Renvoie { cv, complete } (complete = rien n'a été tronqué)
+function drawPanelBanner(info, bg) {
+  const W = 800, H = 400, SC = 1.25;
+  const cv = canvasLib.createCanvas(W * SC, H * SC);
+  const g = cv.getContext('2d');
+  g.scale(SC, SC);
+  const k = Math.max(W / bg.width, H / bg.height);
+  const sw = W / k, sh = H / k;
+  g.drawImage(bg, (bg.width - sw) / 2, (bg.height - sh) / 2, sw, sh, 0, 0, W, H);
+  const FONT = STATS_FONT;
+  // avatar : étoile blanche dans le cercle du gabarit
+  g.fillStyle = 'rgba(255,255,255,0.85)';
+  drawStar(g, CARD_L.av.cx, CARD_L.av.cy, CARD_L.av.d * 0.3);
+  const tx = CARD_L.tx;
+  const tmax = 520 - tx;
+  let complete = true;
+  g.textAlign = 'left';
+  g.textBaseline = 'alphabetic';
+  g.fillStyle = 'rgba(255,255,255,0.7)';
+  g.font = `bold 13px ${FONT}`;
+  g.fillText('ZNK CASINO', tx, 94);
+  g.fillStyle = '#FFFFFF';
+  let tfs = 28;
+  g.font = `bold ${tfs}px ${FONT}`;
+  while (tfs > 17 && g.measureText(info.title).width > tmax) {
+    tfs -= 1;
+    g.font = `bold ${tfs}px ${FONT}`;
+  }
+  if (g.measureText(info.title).width > tmax) complete = false;
+  g.fillText(fitText(g, info.title || 'ZNK CASINO', tmax), tx, 121);
+  g.fillStyle = 'rgba(255,255,255,0.75)';
+  g.font = `15px ${FONT}`;
+  const hasSub = !!info.lines[0] && g.measureText(info.lines[0]).width <= tmax;
+  if (hasSub) g.fillText(info.lines[0], tx, 145);
+  // grand cadre : les autres lignes (retour à la ligne automatique)
+  g.font = `17px ${FONT}`;
+  const body = info.lines.slice(hasSub ? 1 : 0).flatMap((l) => wrapLines(g, l, 600));
+  const MAXL = 4;
+  if (body.length > MAXL) complete = false;
+  const shown = body.slice(0, MAXL);
+  g.textAlign = 'center';
+  if (shown.length) {
+    const lh = 27;
+    const y0 = 246 - ((shown.length - 1) * lh) / 2 + 6;
+    g.fillStyle = 'rgba(255,255,255,0.92)';
+    shown.forEach((l, n) => g.fillText(shown.length === MAXL && n === MAXL - 1 && body.length > MAXL ? fitText(g, `${l}…`, 600) : l, 386, y0 + n * lh));
+  } else {
+    // rien d'autre à dire : le titre en grand dans le cadre
+    g.fillStyle = '#FFFFFF';
+    g.font = `bold 30px ${FONT}`;
+    g.fillText(fitText(g, info.title || 'ZNK CASINO', 600), 386, 258);
+  }
+  g.textAlign = 'left';
+  return { cv, complete: complete && !info.hasCode && !!info.title && info.lines.length > 0 };
+}
+function panelBanner(embed) {
+  const bg = getBannerBg();
+  if (!bg) return null; // pas d'image de fond : aucune bannière (jamais un fond vide)
+  const info = bannerInfo(embed);
+  const key = `${info.title}\n${info.lines.join('\n')}\n${info.hasCode}`;
+  let entry = bannerCache.get(key);
+  if (!entry) {
+    const { cv, complete } = drawPanelBanner(info, bg);
+    entry = { png: cv.toBuffer('image/png'), gif: null, complete };
+    if (bannerCache.size >= 80) bannerCache.delete(bannerCache.keys().next().value);
+    bannerCache.set(key, entry);
+    if (CARD_GIF && !bannerPending.has(key)) {
+      bannerPending.add(key);
+      fxAnim
+        .animateCard(canvasLib, cv, BANNER_FILE, IMG_DIR, { src: localImg(BANNER_FILE) })
+        .then((buf) => {
+          if (buf) entry.gif = buf;
+        })
+        .catch((e) => console.error('[fx] bannière :', e?.message || e))
+        .finally(() => bannerPending.delete(key));
+    }
+  }
+  const buf = CARD_GIF && entry.gif ? entry.gif : entry.png;
+  const name = `panel-${Date.now().toString(36)}${randomInt(100, 999)}.${imgExt(buf)}`;
+  return { name, buf, complete: entry.complete };
+}
 function animPanel(payload) {
   try {
     const e = payload.embeds?.[0];
     if (!e || e.data?.image || payload.files?.length) return payload;
-    withBanner(payload, 'generic_text_card.png');
+    const b = panelBanner(e);
+    if (!b) return payload;
+    e.setImage(`attachment://${b.name}`);
+    if (b.complete) {
+      // tout le texte est sur l'image : on ne le répète pas dans l'embed
+      delete e.data.title;
+      delete e.data.description;
+    }
+    payload.files = [new AttachmentBuilder(b.buf, { name: b.name })];
     payload.attachments = [];
   } catch {
     /* bannière facultative */
   }
   return payload;
+}
+// Prépare les GIF des panneaux principaux au démarrage (le 1er clic sur « Jouer » est alors déjà animé)
+function warmPanelBanners() {
+  if (!canvasLib) return;
+  for (const f of [() => buildGameMenuPayload(null, 0, 'all'), () => buildSettingsPayload(null), () => buildRulesPayload(null)]) {
+    try {
+      f();
+    } catch {
+      /* facultatif */
+    }
+  }
 }
 const bgSource = (envName, file) => String(process.env[envName] || '').trim() || localImg(file);
 // Charge une image depuis une URL http(s) ou un fichier local
@@ -4828,9 +4986,7 @@ function buildHelpEmbed() {
 function buildPanelPayload() {
   const panel = new EmbedBuilder()
     .setColor(0x7C3AED)
-    .setTitle('✦ Salon de jeu')
-    .setDescription('Clique sur **Start** pour ouvrir ton casino privé, puis choisis un jeu et ta mise.')
-    .setFooter({ text: 'Parties privées' });
+    .setDescription('Clique sur **Start** pour ouvrir ton casino privé, puis choisis un jeu et ta mise.');
 
   const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('panel_start').setLabel('Start').setEmoji('▶️').setStyle(ButtonStyle.Success),
@@ -4839,7 +4995,7 @@ function buildPanelPayload() {
     new ButtonBuilder().setCustomId('panel_rules').setLabel('Règles').setEmoji('📖').setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId('panel_invites').setLabel('Invites').setEmoji('📨').setStyle(ButtonStyle.Secondary)
   );
-  return withBanner({ content: `${COIN} **Salon de jeu**`, embeds: [panel], components: [row] }, 'panel_salon.png');
+  return withBanner({ embeds: [panel], components: [row] }, 'panel_salon.png');
 }
 
 async function buildDmPlayPayload(userId) {
@@ -9769,6 +9925,8 @@ client.once(Events.ClientReady, (c) => {
   loadPeaks();
   for (const g of c.guilds.cache.values()) cacheInvites(g);
   loadAlltimeMsgs();
+  getBannerBg();
+  setTimeout(warmPanelBanners, 4000);
   loadChannels().then(restoreChannelsByName).then(() => updateLeaderboards());
   setInterval(updateLeaderboards, LEADERBOARD_REFRESH_MS);
 });
