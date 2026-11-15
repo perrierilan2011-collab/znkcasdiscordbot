@@ -23,10 +23,10 @@ const { create: createRank } = require('./rank');
 const PUBLIC_URL = String(process.env.PUBLIC_URL || 'https://znkcasdiscordbot-production.up.railway.app').replace(/\/+$/, '');
 const TOKEN_TTL_MS = 12 * 3600 * 1000;
 // chat en direct : un salon par jeu (par serveur Discord), historique gardé en mémoire
-const CHAT_ROOMS = new Set(['hub', 'bj', 'poker', 'roulette', 'off-bj', 'off-fuse', 'off-mine', 'off-coin', 'off-dice', 'off-horses', 'off-russian', 'off-slots', 'off-duel', 'off-scratch']);
+const CHAT_ROOMS = new Set(['hub', 'bj', 'poker', 'roulette', 'off-bj', 'off-fuse', 'off-mine', 'off-coin', 'off-dice', 'off-horses', 'off-russian', 'off-slots', 'off-duel', 'off-scratch', 'off-plinko']);
 const CHAT_KEEP = 60;
 // salon de chat de chaque jeu : les victoires y sont annoncées automatiquement (+ dans l'accueil)
-const GAME_ROOM = { blackjack: 'bj', poker: 'poker', roulette: 'roulette', 'bj-solo': 'off-bj', fuse: 'off-fuse', mines: 'off-mine', coin: 'off-coin', dice: 'off-dice', horses: 'off-horses', russian: 'off-russian', slots: 'off-slots', duel: 'off-duel', scratch: 'off-scratch' };
+const GAME_ROOM = { blackjack: 'bj', poker: 'poker', roulette: 'roulette', 'bj-solo': 'off-bj', fuse: 'off-fuse', mines: 'off-mine', coin: 'off-coin', dice: 'off-dice', horses: 'off-horses', russian: 'off-russian', slots: 'off-slots', duel: 'off-duel', scratch: 'off-scratch', plinko: 'off-plinko' };
 const EMOTES = new Set(['🔥', '👏', '😈', '🍀', '😱', '😂', '💸', '🎉']);
 const DATA_DIR = path.join(__dirname, '..', 'data');
 
@@ -548,7 +548,7 @@ function init(deps) {
           if (now - (lastChat.get(user.uid) || 0) < 1200) throw new Error('Doucement : un message par seconde maximum.');
           lastChat.set(user.uid, now);
           const rk = rankApi.info(user.uid); // le rang du casino remplace le rôle Discord
-          const msg = { room: chatRoom, uid: user.uid, name: user.name, role: rk.name, rc: [rk.c1, rk.c2], avatar: user.avatar, text, t: now };
+          const msg = { room: chatRoom, uid: user.uid, name: user.name, rk: { id: rk.id, fi: rk.fi, name: rk.name, sym: rk.sym, pips: rk.pips, c1: rk.c1, c2: rk.c2 }, avatar: user.avatar, text, t: now };
           const list = entry.chat.get(chatRoom) || [];
           list.push(msg);
           if (list.length > CHAT_KEEP) list.shift();

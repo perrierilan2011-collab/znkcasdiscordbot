@@ -6,8 +6,8 @@
  *         tu as gagné 100, tu perds tout, tu regagnes 10 => 110 de gains cumulés.
  *         Chaque manche en ligne gagnée (profit net > 0) s'ajoute au total.
  * ELO   : duel « implicite » entre les joueurs d'une même manche (poker, blackjack, roulette en ligne).
- *         Les joueurs d'une manche sont comparés deux à deux (celui qui a fait le meilleur résultat « bat » l'autre).
- *         Les jeux solo n'ont pas d'adversaire : ils comptent pour le rang mais pas pour l'ELO.
+ *         Les joueurs d'une manche sont comparés deux à deux, et chacun affronte aussi la « maison » (ELO fixe 1000) :
+ *         gain net = victoire, perte = défaite. Une manche à un seul joueur compte donc aussi.
  *
  * Pour modifier la difficulté des rangs : changer uniquement les seuils (min) dans FAMILIES ci-dessous.
  */
@@ -90,17 +90,22 @@ function create(file) {
       if (net > 0) u.earned = Math.round((u.earned + net) * 100) / 100; // les pertes ne retirent jamais rien
     }
     const k = K[r.game];
-    if (k && players.length >= 2) {
+    if (k && players.length >= 1) {
       const score = players.map((p) => (r.game === 'poker' ? Number(p.net) || 0 : (Number(p.bet) > 0 ? (Number(p.net) || 0) / Number(p.bet) : 0)));
       const us = players.map((p) => get(String(p.uid)));
       const n = players.length, delta = new Array(n).fill(0);
+      const opp = n; // n-1 autres joueurs + la « maison » (adversaire virtuel à ELO_START)
       for (let i = 0; i < n; i++) {
         for (let j = 0; j < n; j++) {
           if (i === j) continue;
           const S = Math.abs(score[i] - score[j]) < 1e-9 ? 0.5 : score[i] > score[j] ? 1 : 0;
           const E = 1 / (1 + Math.pow(10, (us[j].elo - us[i].elo) / 400));
-          delta[i] += (k / (n - 1)) * (S - E);
+          delta[i] += (k / opp) * (S - E);
         }
+        // duel contre la maison : gain = victoire, perte = défaite, égalité = nul
+        const Sh = score[i] > 1e-9 ? 1 : score[i] < -1e-9 ? 0 : 0.5;
+        const Eh = 1 / (1 + Math.pow(10, (ELO_START - us[i].elo) / 400));
+        delta[i] += (k / opp) * (Sh - Eh);
       }
       for (let i = 0; i < n; i++) {
         us[i].elo = Math.max(ELO_FLOOR, us[i].elo + delta[i]);
