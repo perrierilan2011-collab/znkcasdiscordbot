@@ -1,6 +1,6 @@
 'use strict';
 /*
- * web/server.js — serveur web du casino ZNK (jeux « online » EXTERNES, hors Discord) : blackjack + roulette multijoueur.
+ * web/server.js — serveur web du casino ZNK (jeux « online » EXTERNES, hors Discord) : blackjack + poker + roulette multijoueur.
  * Sans dépendance : module http de Node + Server-Sent Events (temps réel) + POST pour les actions.
  *
  * Adresse publique : variable PUBLIC_URL (défaut : https://znkcasdiscordbot-production.up.railway.app)
@@ -15,13 +15,14 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const { Room, SEATS } = require('./table');
+const { PokerRoom, INFO: POKER_INFO } = require('./poker');
 const { RouletteRoom, INFO: ROULETTE_INFO } = require('./roulette');
 const { create: createOffline } = require('./offline');
 
 const PUBLIC_URL = String(process.env.PUBLIC_URL || 'https://znkcasdiscordbot-production.up.railway.app').replace(/\/+$/, '');
 const TOKEN_TTL_MS = 12 * 3600 * 1000;
 // chat en direct : un salon par jeu (par serveur Discord), historique gardé en mémoire
-const CHAT_ROOMS = new Set(['hub', 'bj', 'roulette', 'off-bj', 'off-fuse', 'off-mine']);
+const CHAT_ROOMS = new Set(['hub', 'bj', 'poker', 'roulette', 'off-bj', 'off-fuse', 'off-mine']);
 const CHAT_KEEP = 60;
 const EMOTES = new Set(['🔥', '👏', '😈', '🍀', '😱', '😂', '💸', '🎉']);
 const DATA_DIR = path.join(__dirname, '..', 'data');
@@ -115,37 +116,40 @@ function init(deps) {
   // ---------- jeux offline solo (mines, fusé, blackjack) ----------
   const offline = createOffline({ getBalance: deps.getBalance, debit: deps.debit, credit: deps.credit, onRoundEnd: (guildId, r) => deps.onRoundEnd && deps.onRoundEnd(guildId, r) }, pending);
 
-  // ---------- statistiques / classement ----------
-  const STATS_FILE = path.join(DATA_DIR, 'bj_stats.json');
-  const stats = readJson(STATS_FILE, {});
-  let statsTimer = null;
-  const statsApi = {
-    record(uid, name, net, outcome) {
-      const s = stats[uid] || { n: name, rounds: 0, wins: 0, bj: 0, net: 0, best: 0 };
-      s.n = name;
-      s.rounds++;
-      if (outcome === 'win' || outcome === 'bj') s.wins++;
-      if (outcome === 'bj') s.bj++;
-      s.net = Math.round((s.net + net) * 100) / 100;
-      if (net > s.best) s.best = net;
-      stats[uid] = s;
-      clearTimeout(statsTimer);
-      statsTimer = setTimeout(() => saveJson(STATS_FILE, stats), 2000);
-    },
-    top() {
-      return Object.entries(stats)
-        .map(([uid, s]) => ({ uid, name: s.n, rounds: s.rounds, wins: s.wins, bj: s.bj, net: s.net, best: s.best }))
-        .sort((a, b) => b.net - a.net)
-        .slice(0, 10);
-    },
-  };
+  // ---------- statistiques / classement (un fichier par jeu : blackjack, poker) ----------
+  function makeStats(file) {
+    const stats = readJson(file, {});
+    let statsTimer = null;
+    return {
+      record(uid, name, net, outcome) {
+        const s = stats[uid] || { n: name, rounds: 0, wins: 0, bj: 0, net: 0, best: 0 };
+        s.n = name;
+        s.rounds++;
+        if (outcome === 'win' || outcome === 'bj') s.wins++;
+        if (outcome === 'bj') s.bj++;
+        s.net = Math.round((s.net + net) * 100) / 100;
+        if (net > s.best) s.best = net;
+        stats[uid] = s;
+        clearTimeout(statsTimer);
+        statsTimer = setTimeout(() => saveJson(file, stats), 2000);
+      },
+      top() {
+        return Object.entries(stats)
+          .map(([uid, s]) => ({ uid, name: s.n, rounds: s.rounds, wins: s.wins, bj: s.bj, net: s.net, best: s.best }))
+          .sort((a, b) => b.net - a.net)
+          .slice(0, 10);
+      },
+    };
+  }
+  const statsApi = makeStats(path.join(DATA_DIR, 'bj_stats.json'));
+  const pokerStats = makeStats(path.join(DATA_DIR, 'poker_stats.json'));
 
   // ---------- tables (une par serveur Discord) ----------
   const rooms = new Map(); // guildId -> { room, clients:Set<res>, conns: Map<uid, n> }
   function roomOf(guildId) {
     let r = rooms.get(guildId);
     if (r) return r;
-    const entry = { clients: new Set(), conns: new Map(), room: null, roulette: null, chat: new Map() };
+    const entry = { clients: new Set(), conns: new Map(), room: null, poker: null, roulette: null, chat: new Map() };
     const broadcast = (msg) => {
       for (const res of entry.clients) {
         try {
@@ -163,6 +167,24 @@ function init(deps) {
       pending,
       onRoundEnd: (r) => deps.onRoundEnd && deps.onRoundEnd(guildId, r),
       onChange: (w) => broadcast(`event: roulette\ndata: ${JSON.stringify(w.snapshot())}\n\n`),
+    });
+    // poker : le snapshot est PERSONNALISÉ (chaque joueur ne reçoit que ses propres cartes) => un envoi par connexion
+    entry.poker = new PokerRoom(guildId, {
+      getBalance: deps.getBalance,
+      debit: deps.debit,
+      credit: deps.credit,
+      pending,
+      stats: pokerStats,
+      onRoundEnd: (r) => deps.onRoundEnd && deps.onRoundEnd(guildId, r),
+      onChange: (pr) => {
+        for (const res of entry.clients) {
+          try {
+            res.write(`event: poker\ndata: ${JSON.stringify(pr.snapshot(res.uid))}\n\n`);
+          } catch {
+            /* connexion fermée */
+          }
+        }
+      },
     });
     entry.room = new Room(guildId, {
       getBalance: deps.getBalance,
@@ -224,7 +246,8 @@ function init(deps) {
     if (now - (lastAct.get(user.uid) || 0) < (/^[ro]/.test(String(d.action)) ? 50 : 120)) return json(res, 429, { ok: false, error: 'Doucement 🙂' });
     lastAct.set(user.uid, now);
     const entry = roomOf(user.guildId);
-    const { room, roulette } = entry;
+    const { room, roulette, poker } = entry;
+    let walBal; // solde du portefeuille renvoyé après une action de poker
     try {
       if (String(d.action).startsWith('o')) return json(res, 200, { ok: true, ...(await offline.handle(user, d)) });
       switch (d.action) {
@@ -275,6 +298,39 @@ function init(deps) {
           }
           break;
         }
+        // ---- poker (Texas Hold'em)
+        case 'psit': {
+          await poker.run(() => poker.sit(user, Number(d.seat), d.amount));
+          walBal = await deps.getBalance(user.uid);
+          break;
+        }
+        case 'pbuy': {
+          await poker.run(() => poker.addChips(user.uid, d.amount));
+          walBal = await deps.getBalance(user.uid);
+          break;
+        }
+        case 'pleave':
+          await poker.run(() => poker.leave(user.uid));
+          walBal = await deps.getBalance(user.uid);
+          break;
+        case 'pfold':
+          await poker.run(() => poker.act(user.uid, 'fold'));
+          break;
+        case 'pcheck':
+          await poker.run(() => poker.act(user.uid, 'check'));
+          break;
+        case 'pcall':
+          await poker.run(() => poker.act(user.uid, 'call'));
+          break;
+        case 'praise':
+          await poker.run(() => poker.act(user.uid, 'raise', d.amount));
+          break;
+        case 'pallin':
+          await poker.run(() => poker.act(user.uid, 'allin'));
+          break;
+        case 'psync':
+          walBal = await deps.getBalance(user.uid);
+          break;
         // ---- blackjack
         case 'sit': {
           const seat = Number(d.seat);
@@ -314,9 +370,9 @@ function init(deps) {
         default:
           return json(res, 400, { ok: false, error: 'Action inconnue.' });
       }
-      return json(res, 200, { ok: true, rbal: roulette.players.get(user.uid)?.bal });
+      return json(res, 200, { ok: true, rbal: walBal ?? roulette.players.get(user.uid)?.bal });
     } catch (e) {
-      return json(res, 200, { ok: false, error: String(e?.message || e).slice(0, 160), rbal: roulette.players.get(user.uid)?.bal });
+      return json(res, 200, { ok: false, error: String(e?.message || e).slice(0, 160), rbal: walBal ?? roulette.players.get(user.uid)?.bal });
     }
   }
 
@@ -334,11 +390,15 @@ function init(deps) {
       'X-Accel-Buffering': 'no',
       ...SEC,
     });
-    res.write(`retry: 2000\nevent: hello\ndata: ${JSON.stringify({ uid: user.uid, name: user.name, avatar: user.avatar, seats: SEATS, coin: deps.coin || '🪙', roulette: ROULETTE_INFO })}\n\n`);
+    res.write(`retry: 2000\nevent: hello\ndata: ${JSON.stringify({ uid: user.uid, name: user.name, avatar: user.avatar, seats: SEATS, coin: deps.coin || '🪙', roulette: ROULETTE_INFO, poker: POKER_INFO })}\n\n`);
+    res.uid = user.uid; // sert au snapshot personnalisé du poker
     entry.clients.add(res);
     entry.conns.set(user.uid, (entry.conns.get(user.uid) || 0) + 1);
     entry.room.setPresence(user.uid, true);
     res.write(`event: state\ndata: ${JSON.stringify(entry.room.snapshot())}\n\n`);
+    entry.poker.setPresence(user.uid, true);
+    res.write(`event: poker\ndata: ${JSON.stringify(entry.poker.snapshot(user.uid))}\n\n`);
+    deps.getBalance(user.uid).then((b) => { try { res.write(`event: bal\ndata: ${JSON.stringify({ bal: b })}\n\n`); } catch { /* fermée */ } }).catch(() => {});
     entry.roulette.setPresence(user.uid, true);
     res.write(`event: roulette\ndata: ${JSON.stringify(entry.roulette.snapshot())}\n\n`);
     res.write(`event: chathist\ndata: ${JSON.stringify(Object.fromEntries(entry.chat))}\n\n`);
@@ -358,6 +418,7 @@ function init(deps) {
         setTimeout(() => {
           if (!entry.conns.has(user.uid)) {
             entry.room.setPresence(user.uid, false);
+            entry.poker.setPresence(user.uid, false);
             entry.roulette.setPresence(user.uid, false);
           }
         }, 8000); // tolérance : rechargement de page / coupure réseau brève
@@ -374,7 +435,7 @@ function init(deps) {
       }
       if (req.method === 'GET' && url.pathname === '/healthz') return json(res, 200, { ok: true });
       if (req.method === 'GET' && url.pathname === '/api/stream') return handleStream(req, res, url);
-      if (req.method === 'GET' && url.pathname === '/api/top') return json(res, 200, { top: statsApi.top() });
+      if (req.method === 'GET' && url.pathname === '/api/top') return json(res, 200, { top: (url.searchParams.get('g') === 'poker' ? pokerStats : statsApi).top() });
       if (req.method === 'POST' && url.pathname === '/api/act') return await handleAct(req, res);
       res.writeHead(404, SEC);
       res.end('Not found');
@@ -389,7 +450,7 @@ function init(deps) {
     }
   });
   const port = Number(process.env.PORT) || 3000;
-  server.listen(port, '0.0.0.0', () => console.log(`[web] blackjack + roulette en ligne → ${PUBLIC_URL} (port ${port})`));
+  server.listen(port, '0.0.0.0', () => console.log(`[web] blackjack + poker + roulette en ligne → ${PUBLIC_URL} (port ${port})`));
   server.on('error', (e) => console.error('[web] serveur :', e?.message || e));
 
   return { makeLink, enabled: true, rooms, server };
