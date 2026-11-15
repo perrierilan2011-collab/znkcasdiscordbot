@@ -5,6 +5,7 @@
  * Argent : débité au lancement, crédité à l'encaissement (deps.debit / deps.credit). Si le bot plante en
  * pleine partie, la mise est remboursée au redémarrage (deps.pending, même mécanisme que la roulette).
  * + pile ou face, dés, chevaux, roulette russe (mêmes règles / cotes que dans le bot Discord).
+ * + slots (jackpot Z violet), duel, ticket à gratter.
  * Variables facultatives : OFFLINE_MIN_BET, OFFLINE_MAX_BET.
  */
 const { randomInt } = require('crypto');
@@ -17,12 +18,32 @@ const CELLS = 25; // mines : grille 5x5
 const RATE = 0.00012; // fusé : le multiplicateur vaut exp(RATE * ms)
 const LEAD_MS = 900; // fusé : délai avant décollage
 const MAX_CRASH = 10000;
-const TYPES = { mines: 'mines', fuse: 'fuse', bj: 'bj', coin: 'coin', dice: 'dice', horses: 'horses', russian: 'russian' };
-const INSTANT = new Set(['coin', 'dice', 'horses', 'russian']); // jeux « un coup » : résolus d'un coup côté serveur, animés côté site
-const ANIM_MS = { coin: 3300, dice: 3300, horses: 10500, russian: 6800 }; // durée des animations côté site : l'annonce de victoire attend la fin
+const TYPES = { mines: 'mines', fuse: 'fuse', bj: 'bj', coin: 'coin', dice: 'dice', horses: 'horses', russian: 'russian', slots: 'slots', duel: 'duel', scratch: 'scratch' };
+const INSTANT = new Set(['coin', 'dice', 'horses', 'russian', 'slots', 'duel']); // jeux « un coup » : résolus d'un coup côté serveur, animés côté site
 const COIN_MULT = 1.95;
 const DICE_MULT = { under: 2.3, over: 2.3, seven: 5.8 };
 const HORSES = [{ p: 0.4, mult: 2.4 }, { p: 0.25, mult: 3.8 }, { p: 0.18, mult: 5.3 }, { p: 0.11, mult: 8.6 }, { p: 0.06, mult: 15.8 }];
+
+// ---- slots : 3 rouleaux x 3 rangées, 5 lignes (3 horizontales + 2 diagonales), mise totale répartie sur les lignes. Retour ≈ 96,8 %.
+// symboles : 0 cerise, 1 citron, 2 cloche, 3 diamant, 4 sept, 5 Z violet (JACKPOT : 3 Z sur une ligne = x400 la mise)
+const SLOT_COUNT = [7, 5, 4, 2, 1, 1], SLOT_PAY = [5, 9, 18, 45, 120, 2000], SLOT_PAY2 = 2; // gains par ligne (x mise/ligne) ; 2 cerises à gauche = x2
+const SLOT_LINES = [[0, 0, 0], [1, 1, 1], [2, 2, 2], [0, 1, 2], [2, 1, 0]];
+const SLOT_STRIP = (() => { const left = [...SLOT_COUNT], o = []; for (let i = 0; o.length < 20; i++) { const s = i % 6; if (left[s] > 0) { o.push(s); left[s]--; } } return o; })();
+const SLOT_REELS = [0, 7, 13].map((k) => SLOT_STRIP.map((_, i) => SLOT_STRIP[(i + k) % 20]));
+// ---- duel : adversaires (p = chance de dégainer en premier, retour ≈ 95-96 %)
+const FOES = [{ n: 'Recrue', p: 0.6, mult: 1.6 }, { n: 'Pistolero', p: 0.45, mult: 2.1 }, { n: 'Légende', p: 0.25, mult: 3.8 }, { n: 'Fantôme', p: 0.1, mult: 9.6 }];
+// ---- ticket à gratter : 6 cases, 3 montants identiques = gain. Le serveur garde le ticket : une case n'est envoyée au site qu'au moment où le joueur la gratte.
+const PRZ = [1, 2, 3, 5, 10, 25, 100, 1000]; // 1000 = le Z violet (jackpot)
+const PW = [0.09, 0.10, 0.055, 0.04, 0.013, 0.0035, 0.0005, 0.00005]; // chance de tomber sur chaque lot (≈ 30 % de tickets gagnants, retour ≈ 97 %)
+function genTicket(g) {
+  g.id = Date.now() * 1000 + randomInt(1000); g.seen = new Set();
+  let r = randomInt(1_000_000_000) / 1e9, w = -1;
+  for (let i = 0; i < PW.length; i++) { if (r < PW[i]) { w = i; break; } r -= PW[i]; }
+  const cnt = new Array(8).fill(0), cells = [];
+  if (w >= 0) { for (let i = 0; i < 3; i++) cells.push(w); cnt[w] = 3; }
+  while (cells.length < 6) { const v = randomInt(8); if (cnt[v] >= 2) continue; cells.push(v); cnt[v]++; } // jamais d'autre triple
+  shuffle(cells); g.cells = cells; g.mult = w >= 0 ? PRZ[w] : 0; g.hit = w >= 0 ? cells.map((v, i) => (v === w ? i : -1)).filter((i) => i >= 0) : [];
+}
 
 const shuffle = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = randomInt(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 const minesMult = (m, k) => { let r = EDGE; for (let i = 0; i < k; i++) r *= (CELLS - i) / (CELLS - m - i); return r; };
@@ -45,6 +66,20 @@ function rollInstant(g) {
     let r = randomInt(1_000_000) / 1_000_000, winner = HORSES.length - 1;
     for (let k = 0; k < HORSES.length; k++) { if (r < HORSES[k].p) { winner = k; break; } r -= HORSES[k].p; }
     g.want = want; g.winner = winner; g.mult = winner === want ? HORSES[want].mult : 0;
+  } else if (g.type === 'slots') {
+    const pos = SLOT_REELS.map((r) => randomInt(r.length));
+    g.grid = SLOT_REELS.map((r, i) => [0, 1, 2].map((k) => r[(pos[i] + k) % r.length])); g.wins = []; let tot = 0;
+    SLOT_LINES.forEach((ln, li) => {
+      const a = g.grid[0][ln[0]], b = g.grid[1][ln[1]], c = g.grid[2][ln[2]];
+      if (a === b && b === c) { tot += SLOT_PAY[a]; g.wins.push({ line: li, sym: a, rows: ln, n: 3 }); }
+      else if (a === 0 && b === 0) { tot += SLOT_PAY2; g.wins.push({ line: li, sym: 0, rows: ln, n: 2 }); }
+    });
+    g.mult = tot / 5;
+  } else if (g.type === 'duel') {
+    const f = Number(g.choice);
+    if (!Number.isInteger(f) || f < 0 || f >= FOES.length) throw new Error('Adversaire invalide.');
+    const won = randomInt(1_000_000) / 1_000_000 < FOES[f].p, fast = 170 + randomInt(110), slow = fast + 30 + randomInt(90);
+    g.foe = f; g.me = won ? fast : slow; g.foeMs = won ? slow : fast; g.mult = won ? FOES[f].mult : 0;
   } else {
     const k = Number(g.choice);
     if (!Number.isInteger(k) || k < 1 || k > 5) throw new Error('Nombre de balles invalide (1 à 5).');
@@ -85,14 +120,10 @@ function create(deps, pending) {
     if (net > 0 && deps.onRoundEnd) {
       const detail = g.type === 'mines' ? `${g.picks.length} case(s) · ${g.m} mine(s)` : g.type === 'fuse' ? `encaissé à ${g.at}x`
         : g.type === 'coin' ? NAMES[g.side] : g.type === 'dice' ? `${g.a}+${g.b}=${g.sum} (${NAMES[g.choice]})`
-        : g.type === 'horses' ? `cheval n°${g.winner + 1}` : g.type === 'russian' ? `${g.k} balle${g.k > 1 ? 's' : ''}, survécu` : g.outcome === 'bj' ? 'BLACKJACK' : '';
-      const announce = () => {
-        try {
-          deps.onRoundEnd(u.guildId, { game: g.type === 'bj' ? 'bj-solo' : g.type, players: [{ uid: u.uid, name: u.name, bet: stake, win: g.win, net, mult: floor2(g.win / stake), detail }] });
-        } catch (e) { console.error('[offline] recap', e?.message || e); }
-      };
-      if (INSTANT.has(g.type)) setTimeout(announce, ANIM_MS[g.type] || 3000); // jeu « un coup » : le résultat est connu tout de suite, mais on n'annonce la victoire qu'après l'animation
-      else announce();
+        : g.type === 'horses' ? `cheval n°${g.winner + 1}` : g.type === 'slots' ? `x${g.mult}` : g.type === 'duel' ? FOES[g.foe].n : g.type === 'scratch' ? `ticket x${g.mult}` : g.type === 'russian' ? `${g.k} balle${g.k > 1 ? 's' : ''}, survécu` : g.outcome === 'bj' ? 'BLACKJACK' : '';
+      try {
+        deps.onRoundEnd(u.guildId, { game: g.type === 'bj' ? 'bj-solo' : g.type, players: [{ uid: u.uid, name: u.name, bet: stake, win: g.win, net, mult: floor2(g.win / stake), detail }] });
+      } catch (e) { console.error('[offline] recap', e?.message || e); }
     }
   }
 
@@ -107,6 +138,9 @@ function create(deps, pending) {
     dice: (g) => ({ type: 'dice', bet: g.bet, choice: g.choice, a: g.a, b: g.b, sum: g.sum, mult: g.mult, over: true, win: g.win || 0, outcome: g.win > 0 ? 'win' : 'lose' }),
     horses: (g) => ({ type: 'horses', bet: g.bet, want: g.want, winner: g.winner, mult: g.mult, over: true, win: g.win || 0, outcome: g.win > 0 ? 'win' : 'lose' }),
     russian: (g) => ({ type: 'russian', bet: g.bet, k: g.k, dead: g.dead, chambers: g.chambers, mult: g.mult, over: true, win: g.win || 0, outcome: g.win > 0 ? 'win' : 'lose' }),
+    slots: (g) => ({ type: 'slots', bet: g.bet, grid: g.grid, wins: g.wins, mult: g.mult, over: true, win: g.win || 0, outcome: g.win > 0 ? 'win' : 'lose' }),
+    duel: (g) => ({ type: 'duel', bet: g.bet, foe: g.foe, me: g.me, foeMs: g.foeMs, mult: g.mult, over: true, win: g.win || 0, outcome: g.win > 0 ? 'win' : 'lose' }),
+    scratch: (g) => ({ type: 'scratch', id: g.id, bet: g.bet, cells: g.cells.map((v, i) => (g.seen.has(i) ? v : null)), over: g.over, mult: g.over ? g.mult : undefined, hit: g.over ? g.hit : undefined, win: g.win || 0, outcome: g.win > 0 ? 'win' : 'lose' }),
     bj: (g) => {
       const dl = g.over ? g.dealer : [g.dealer[0]];
       return { type: 'bj', bet: g.bet, player: g.player.map(cs), dealer: g.over ? g.dealer.map(cs) : [cs(g.dealer[0]), '?'], pv: bjVal(g.player), dv: bjVal(dl),
@@ -170,6 +204,8 @@ function create(deps, pending) {
           ng.auto = auto ? round2(auto) : 0;
           ng.cp = Math.min(MAX_CRASH, Math.max(1, round2(EDGE / (1 - randomInt(1_000_000_000) / 1e9))));
           ng.start = Date.now() + LEAD_MS;
+        } else if (type === 'scratch') {
+          genTicket(ng);
         } else if (INSTANT.has(type)) {
           ng.choice = String(d.choice); rollInstant(ng);
         } else {
@@ -208,6 +244,12 @@ function create(deps, pending) {
           const now = Date.now();
           await resolveFuse(u, g, now);
           if (!g.over) { const m = Math.max(1, round2(Math.exp(RATE * Math.max(0, now - g.start)))); g.at = m; await end(u, g, g.bet * m); }
+        } else if (type === 'scratch') {
+          if (mv !== 'peek') throw new Error('Action inconnue.');
+          const i = Number(d.i);
+          if (!Number.isInteger(i) || i < 0 || i > 5) throw new Error('Case invalide.');
+          g.seen.add(i); // la case grattée est révélée ; quand les 6 le sont, le ticket est payé
+          if (g.seen.size === 6) await end(u, g, g.bet * g.mult);
         } else {
           if (mv === 'hit') {
             g.player.push(g.deck.pop());

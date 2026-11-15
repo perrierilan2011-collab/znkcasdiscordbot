@@ -22,10 +22,10 @@ const { create: createOffline } = require('./offline');
 const PUBLIC_URL = String(process.env.PUBLIC_URL || 'https://znkcasdiscordbot-production.up.railway.app').replace(/\/+$/, '');
 const TOKEN_TTL_MS = 12 * 3600 * 1000;
 // chat en direct : un salon par jeu (par serveur Discord), historique gardé en mémoire
-const CHAT_ROOMS = new Set(['hub', 'bj', 'poker', 'roulette', 'off-bj', 'off-fuse', 'off-mine', 'off-coin', 'off-dice', 'off-horses', 'off-russian']);
+const CHAT_ROOMS = new Set(['hub', 'bj', 'poker', 'roulette', 'off-bj', 'off-fuse', 'off-mine', 'off-coin', 'off-dice', 'off-horses', 'off-russian', 'off-slots', 'off-duel', 'off-scratch']);
 const CHAT_KEEP = 60;
 // salon de chat de chaque jeu : les victoires y sont annoncées automatiquement (+ dans l'accueil)
-const GAME_ROOM = { blackjack: 'bj', poker: 'poker', roulette: 'roulette', 'bj-solo': 'off-bj', fuse: 'off-fuse', mines: 'off-mine', coin: 'off-coin', dice: 'off-dice', horses: 'off-horses', russian: 'off-russian' };
+const GAME_ROOM = { blackjack: 'bj', poker: 'poker', roulette: 'roulette', 'bj-solo': 'off-bj', fuse: 'off-fuse', mines: 'off-mine', coin: 'off-coin', dice: 'off-dice', horses: 'off-horses', russian: 'off-russian', slots: 'off-slots', duel: 'off-duel', scratch: 'off-scratch' };
 const EMOTES = new Set(['🔥', '👏', '😈', '🍀', '😱', '😂', '💸', '🎉']);
 const DATA_DIR = path.join(__dirname, '..', 'data');
 
