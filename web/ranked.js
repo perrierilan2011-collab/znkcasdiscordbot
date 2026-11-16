@@ -1,53 +1,113 @@
 'use strict';
 /*
- * web/ranked.js — Arène Ranked ZNK : SKILL (pas de pure chance).
- * react / timing / sequence — 5 manches — RR
+ * web/ranked.js — Arène Ranked ZNK : 100 % SKILL, zéro hasard dans le résultat.
+ *
+ * 5 épreuves (ordre mélangé à chaque match, toutes différentes) :
+ *   react    Réflexe   — clique dès que l'écran passe au vert
+ *   aim      Visée     — 6 cibles qui rétrécissent, le plus rapide et le plus précis gagne
+ *   sequence Mémoire   — rejoue une séquence de 5 signaux
+ *   timing   Précision — stoppe un curseur qui fait des allers-retours dans une zone étroite
+ *   math     Calcul    — 3 opérations mentales
+ *
+ * Le hasard ne sert qu'à générer l'épreuve (identique pour tous les joueurs d'un même match).
+ * Le classement d'une manche dépend uniquement de la performance.
+ * Chaque manche donne (n - place + 1) points ; le total des 5 manches fixe la place → RR.
+ *
+ * Correctifs par rapport à l'ancienne version :
+ *  - les clients se calent sur l'horloge serveur (le GO n'était jamais synchronisé → "Trop tôt" à tort)
+ *  - plus aucun sleep() dans la file d'actions (le serveur ne se bloquait plus pendant 4,5 s)
+ *  - le deadline est remis à zéro quand un timer se déclenche (le compte à rebours ne repartait pas)
+ *  - la phase "match_end" ne cassait plus le lobby
  */
 const { randomInt } = require('crypto');
 
 const SEATS = 8;
 const MIN_PLAYERS = 2;
 const ROUNDS = 5;
-const START_MS = 4_000;
-const RESULT_MS = 4_500;
-const REACT_MAX_MS = 2500;
-const REACT_MIN_OK = 90;
-const TIMING_WINDOW_MS = 4000;
-const SEQ_LEN_BASE = 3;
-const SEQ_SHOW_MS = 650;
-const SEQ_GAP_MS = 280;
-const SEQ_ANSWER_MS = 8000;
+const START_MS = 4000;
+const INTRO_MS = 2600;
+const RESULT_MS = 4200;
+const END_MS = 10000;
 
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const MODES = ['react', 'timing', 'sequence'];
+const REACT_MAX = 1500;
+const REACT_MIN = 100; // en dessous = anticipation
+const TIMING_PERIOD = 1500;
+const TIMING_LEAD = 1200;
+const TIMING_WINDOW = 6000;
+const AIM_N = 6;
+const AIM_LEAD = 1800;
+const AIM_WINDOW = 16000;
+const AIM_MISS_MS = 500;
+const SEQ_LEN = 5;
+const SEQ_SHOW = 550;
+const SEQ_GAP = 240;
+const SEQ_ANSWER = 10000;
+const MATH_N = 3;
+const MATH_LEAD = 1500;
+const MATH_WINDOW = 25000;
+
+const GAMES = ['react', 'aim', 'sequence', 'timing', 'math'];
+
+function shuffle(a) {
+  const r = [...a];
+  for (let i = r.length - 1; i > 0; i--) {
+    const j = randomInt(i + 1);
+    [r[i], r[j]] = [r[j], r[i]];
+  }
+  return r;
+}
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+function makeMath() {
+  const qs = [];
+  const ans = [];
+  for (let i = 0; i < MATH_N; i++) {
+    const k = i % 3;
+    if (k === 0) {
+      const a = 12 + randomInt(8), b = 3 + randomInt(7);
+      qs.push(a + ' × ' + b); ans.push(a * b);
+    } else if (k === 1) {
+      const a = 40 + randomInt(60), b = 20 + randomInt(60), c = 10 + randomInt(30);
+      qs.push(a + ' + ' + b + ' − ' + c); ans.push(a + b - c);
+    } else {
+      const a = 6 + randomInt(8), b = 4 + randomInt(6), c = 10 + randomInt(40);
+      qs.push(a + ' × ' + b + ' + ' + c); ans.push(a * b + c);
+    }
+  }
+  return { qs, ans };
+}
 
 class RankedArena {
   constructor(guildId, deps) {
     this.guildId = guildId;
     this.deps = deps;
     this.seats = Array(SEATS).fill(null);
-    this.phase = 'lobby';
+    this.phase = 'lobby'; // lobby | intro | playing | round_result | match_end
     this.deadline = 0;
     this.round = 0;
     this.match = 0;
+    this.plan = [];
     this.mode = null;
     this.challenge = null;
+    this.secret = null;
     this.answers = {};
     this.scores = {};
     this.lastRound = null;
+    this.final = null;
     this.feed = [];
     this.timer = null;
     this.q = Promise.resolve();
   }
 
+  /* ---------- infra ---------- */
   run(fn) {
-    const p = this.q.then(fn, fn);
+    const p = this.q.catch(() => {}).then(fn);
     this.q = p.catch(() => {});
     return p;
   }
   say(t) {
     this.feed.push({ t: Date.now(), text: t });
-    if (this.feed.length > 12) this.feed.shift();
+    if (this.feed.length > 10) this.feed.shift();
   }
   emit() {
     try { this.deps.onChange(this); } catch (e) { console.error('[ranked] emit', e?.message || e); }
@@ -55,7 +115,11 @@ class RankedArena {
   setTimer(ms, fn) {
     clearTimeout(this.timer);
     this.deadline = Date.now() + ms;
-    this.timer = setTimeout(() => this.run(fn).catch((e) => console.error('[ranked] timer', e)), ms);
+    this.timer = setTimeout(() => {
+      this.timer = null;
+      this.deadline = 0;
+      this.run(fn).catch((e) => console.error('[ranked] timer', e));
+    }, ms);
   }
   clearTimer() {
     clearTimeout(this.timer);
@@ -65,6 +129,7 @@ class RankedArena {
   findSeat(uid) { return this.seats.findIndex((p) => p && p.uid === uid); }
   alive() { return this.seats.filter((p) => p && p.inMatch && p.online !== false); }
   lobbyCount() { return this.seats.filter(Boolean).length; }
+  inLobby() { return this.phase === 'lobby'; }
 
   snapshot(uid) {
     const mine = this.answers[uid] || null;
@@ -77,20 +142,17 @@ class RankedArena {
       round: this.round,
       rounds: ROUNDS,
       match: this.match,
+      plan: this.plan,
       gameMode: this.mode,
-      challenge: this.challengeForClient(uid),
+      challenge: this.challenge,
       answered: !!mine,
-      myAnswer: mine,
       lastRound: this.lastRound,
+      final: this.final,
       seats: this.seats.map((p) =>
         p
           ? {
-              uid: p.uid,
-              name: p.name,
-              avatar: p.avatar,
-              online: p.online !== false,
-              inMatch: !!p.inMatch,
-              ready: !!p.ready,
+              uid: p.uid, name: p.name, avatar: p.avatar,
+              online: p.online !== false, inMatch: !!p.inMatch, ready: !!p.ready,
               score: this.scores[p.uid] || 0,
               answered: !!this.answers[p.uid],
               lastPlace: p.lastPlace || null,
@@ -104,26 +166,17 @@ class RankedArena {
     };
   }
 
-  challengeForClient(uid) {
-    if (!this.challenge) return null;
-    const c = { ...this.challenge };
-    if (this.mode === 'sequence' && this.phase === 'playing' && c.stage === 'answer') {
-      return { type: 'sequence', stage: 'answer', len: c.seq.length, inputMs: c.inputMs, startedAt: c.startedAt };
-    }
-    return c;
-  }
-
+  /* ---------- lobby ---------- */
   async join(user) {
     if (this.findSeat(user.uid) >= 0) throw new Error('Tu es déjà dans l’arène.');
-    if (this.phase !== 'lobby' && this.phase !== 'match_end') throw new Error('Match en cours — attends la fin.');
+    if (!this.inLobby()) throw new Error('Match en cours — rejoins à la fin.');
     const idx = this.seats.findIndex((s) => !s);
     if (idx < 0) throw new Error('Arène pleine (8 max).');
     this.seats[idx] = {
       uid: user.uid, name: user.name, avatar: user.avatar,
       online: true, ready: false, inMatch: false, lastPlace: null, delta: null,
     };
-    this.say('⚔️ ' + user.name + ' rejoint');
-    this.emit();
+    this.say(user.name + ' rejoint l’arène');
     this.checkStart();
   }
 
@@ -131,52 +184,48 @@ class RankedArena {
     const idx = this.findSeat(uid);
     if (idx < 0) return;
     const p = this.seats[idx];
-    if (p.inMatch && this.phase !== 'lobby' && this.phase !== 'match_end') {
-      p.online = false;
-      this.say('💨 ' + p.name + ' déco');
+    if (p.inMatch && !this.inLobby()) {
+      p.online = false; // il reste classé en dernier s'il abandonne
+      this.say(p.name + ' a abandonné');
       this.emit();
-      this.maybeCloseRound();
+      if (this.phase === 'playing') this.maybeCloseRound();
       return;
     }
     this.seats[idx] = null;
-    this.say('🚪 ' + p.name + ' part');
-    this.emit();
+    this.say(p.name + ' quitte l’arène');
     this.checkStart();
   }
 
   async ready(uid, on = true) {
-    if (this.phase !== 'lobby' && this.phase !== 'match_end') throw new Error('Pas en lobby.');
+    if (!this.inLobby()) throw new Error('Match en cours.');
     const p = this.seats[this.findSeat(uid)];
     if (!p) throw new Error('Rejoins l’arène d’abord.');
     p.ready = !!on;
-    this.emit();
     this.checkStart();
   }
 
   checkStart() {
-    if (this.phase !== 'lobby' && this.phase !== 'match_end') return;
-    const ready = this.seats.filter((p) => p && p.ready);
-    if (ready.length >= MIN_PLAYERS && ready.length === this.lobbyCount()) {
-      if (!this.deadline) this.setTimer(START_MS, () => this.startMatch());
-    } else {
-      this.clearTimer();
-      if (this.phase === 'match_end') this.phase = 'lobby';
+    if (this.inLobby()) {
+      const ready = this.seats.filter((p) => p && p.ready).length;
+      if (ready >= MIN_PLAYERS && ready === this.lobbyCount()) {
+        if (!this.deadline) this.setTimer(START_MS, () => this.startMatch());
+      } else {
+        this.clearTimer();
+      }
     }
     this.emit();
   }
 
+  /* ---------- match ---------- */
   async startMatch() {
     const players = this.seats.filter((p) => p && p.ready);
-    if (players.length < MIN_PLAYERS) {
-      this.phase = 'lobby';
-      this.clearTimer();
-      this.emit();
-      return;
-    }
+    if (!this.inLobby() || players.length < MIN_PLAYERS) return this.checkStart();
     this.match++;
     this.round = 0;
     this.scores = {};
     this.lastRound = null;
+    this.final = null;
+    this.plan = shuffle(GAMES).slice(0, ROUNDS);
     for (const p of this.seats) {
       if (!p) continue;
       p.inMatch = !!p.ready;
@@ -184,221 +233,213 @@ class RankedArena {
       p.delta = null;
       if (p.inMatch) this.scores[p.uid] = 0;
     }
-    this.say('🏆 Match #' + this.match + ' · ' + players.length + ' joueurs · ' + ROUNDS + ' manches SKILL');
-    this.phase = 'countdown';
-    this.emit();
-    await sleep(600);
+    this.say('Match #' + this.match + ' — ' + players.length + ' joueurs');
     return this.nextRound();
-  }
-
-  pickMode() {
-    return MODES[(this.round - 1) % MODES.length];
   }
 
   async nextRound() {
     this.round++;
     if (this.round > ROUNDS) return this.endMatch();
+    this.mode = this.plan[this.round - 1];
     this.answers = {};
-    this.mode = this.pickMode();
-    this.phase = 'playing';
+    this.challenge = null;
+    this.secret = null;
     this.lastRound = null;
+    this.phase = 'intro';
+    this.emit();
+    this.setTimer(INTRO_MS, () => this.beginRound());
+  }
+
+  async beginRound() {
+    if (this.phase !== 'intro') return;
+    const now = Date.now();
+    this.phase = 'playing';
+    let ms = 0;
 
     if (this.mode === 'react') {
-      const delay = 1200 + randomInt(1800);
-      const goAt = Date.now() + delay;
-      this.challenge = { type: 'react', goAt, maxMs: REACT_MAX_MS };
-      this.say('Manche ' + this.round + '/' + ROUNDS + ' · RÉFLEXE — attends le GO');
+      const goAt = now + 1400 + randomInt(2600);
+      this.challenge = { type: 'react', goAt, maxMs: REACT_MAX };
+      ms = goAt - now + REACT_MAX + 400;
+    } else if (this.mode === 'aim') {
+      const targets = [];
+      for (let i = 0; i < AIM_N; i++) targets.push({ x: 0.1 + randomInt(81) / 100, y: 0.12 + randomInt(77) / 100 });
+      this.challenge = { type: 'aim', targets, startsAt: now + AIM_LEAD, n: AIM_N };
+      ms = AIM_LEAD + AIM_WINDOW + 400;
+    } else if (this.mode === 'timing') {
+      const center = 0.2 + randomInt(61) / 100;
+      this.challenge = { type: 'timing', center, width: 0.1, period: TIMING_PERIOD, startedAt: now + TIMING_LEAD, window: TIMING_WINDOW };
+      ms = TIMING_LEAD + TIMING_WINDOW + 400;
+    } else if (this.mode === 'math') {
+      const { qs, ans } = makeMath();
+      this.secret = { ans };
+      this.challenge = { type: 'math', qs, startedAt: now + MATH_LEAD, window: MATH_WINDOW };
+      ms = MATH_LEAD + MATH_WINDOW + 400;
+    } else {
+      const seq = [];
+      for (let i = 0; i < SEQ_LEN; i++) seq.push(randomInt(4));
+      const showStart = now + 700;
+      this.secret = { seq };
+      this.challenge = { type: 'sequence', stage: 'show', seq, showStart, show: SEQ_SHOW, gap: SEQ_GAP, len: SEQ_LEN };
+      ms = 700 + SEQ_LEN * (SEQ_SHOW + SEQ_GAP) + 300;
+      this.setTimer(ms, () => this.sequenceAnswerPhase());
       this.emit();
-      this.setTimer(delay + REACT_MAX_MS + 200, () => this.scoreRound());
       return;
     }
-
-    if (this.mode === 'timing') {
-      const center = 0.25 + randomInt(50) / 100;
-      const width = 0.08 + randomInt(5) / 100;
-      const duration = TIMING_WINDOW_MS;
-      const startedAt = Date.now();
-      this.challenge = { type: 'timing', center, width, duration, startedAt };
-      this.say('Manche ' + this.round + '/' + ROUNDS + ' · PRÉCISION — zone verte');
-      this.emit();
-      this.setTimer(duration + 400, () => this.scoreRound());
-      return;
-    }
-
-    const len = SEQ_LEN_BASE + Math.min(3, Math.floor((this.round - 1) / 2));
-    const seq = [];
-    for (let i = 0; i < len; i++) seq.push(randomInt(4));
-    this.challenge = { type: 'sequence', stage: 'show', seq, len };
-    this.say('Manche ' + this.round + '/' + ROUNDS + ' · MÉMOIRE — ' + len + ' signaux');
     this.emit();
-    const showMs = len * (SEQ_SHOW_MS + SEQ_GAP_MS) + 400;
-    this.setTimer(showMs, () => this.run(() => this.sequenceAnswerPhase()));
+    this.setTimer(ms, () => this.scoreRound());
   }
 
   async sequenceAnswerPhase() {
     if (this.mode !== 'sequence' || this.phase !== 'playing') return;
-    this.challenge = {
-      type: 'sequence',
-      stage: 'answer',
-      seq: this.challenge.seq,
-      len: this.challenge.seq.length,
-      inputMs: SEQ_ANSWER_MS,
-      startedAt: Date.now(),
-    };
+    this.challenge = { type: 'sequence', stage: 'answer', len: SEQ_LEN, startedAt: Date.now(), inputMs: SEQ_ANSWER };
     this.emit();
-    this.setTimer(SEQ_ANSWER_MS + 300, () => this.scoreRound());
+    this.setTimer(SEQ_ANSWER + 300, () => this.scoreRound());
   }
 
   async act(uid, answer) {
-    if (this.phase !== 'playing') throw new Error('Pas de manche en cours.');
+    if (this.phase !== 'playing' || !this.challenge) throw new Error('Pas de manche en cours.');
     const p = this.seats[this.findSeat(uid)];
-    if (!p || !p.inMatch) throw new Error('Pas en match.');
+    if (!p || !p.inMatch) throw new Error('Tu ne joues pas ce match.');
     if (this.answers[uid]) throw new Error('Déjà répondu.');
+    const now = Date.now();
+    const a = answer || {};
+    const c = this.challenge;
 
-    if (this.mode === 'react') {
-      const goAt = this.challenge?.goAt || 0;
-      const t = Number(answer?.t);
-      if (!Number.isFinite(t)) throw new Error('Réponse invalide.');
-      if (t < goAt) throw new Error('Trop tôt !');
-      let ms = t - goAt;
-      if (ms < REACT_MIN_OK) ms = REACT_MAX_MS;
-      if (ms > REACT_MAX_MS) ms = REACT_MAX_MS;
-      this.answers[uid] = { ms, raw: t };
-    } else if (this.mode === 'timing') {
-      let pos = Number(answer?.pos);
-      if (!Number.isFinite(pos)) throw new Error('Réponse invalide.');
-      pos = Math.max(0, Math.min(1, pos));
-      const { center, width } = this.challenge;
-      const dist = Math.abs(pos - center);
-      const half = width / 2;
-      const accuracy = dist <= half ? 1 - (dist / half) * 0.15 : Math.max(0, 1 - dist / 0.5);
-      this.answers[uid] = { pos, accuracy, dist };
-    } else if (this.mode === 'sequence') {
-      if (this.challenge?.stage !== 'answer') throw new Error('Attends la fin de la séquence.');
-      const got = Array.isArray(answer?.seq) ? answer.seq.map((x) => Number(x)) : [];
-      const target = this.challenge.seq;
+    if (c.type === 'react') {
+      if (a.early || !Number.isFinite(Number(a.t)) || Number(a.t) < c.goAt) {
+        this.answers[uid] = { early: true };
+      } else {
+        // t = horloge serveur estimée par le client ; borné pour limiter la triche
+        const t = clamp(Number(a.t), now - 1200, now);
+        const ms = Math.round(t - c.goAt);
+        this.answers[uid] = ms < REACT_MIN ? { early: true } : { ms: Math.min(ms, REACT_MAX) };
+      }
+    } else if (c.type === 'timing') {
+      const t = clamp(Number(a.t), now - 1200, now);
+      if (!Number.isFinite(t) || t < c.startedAt) throw new Error('Attends le départ.');
+      const ph = ((t - c.startedAt) % c.period) / c.period;
+      const pos = ph < 0.5 ? ph * 2 : 2 - ph * 2;
+      const dist = Math.abs(pos - c.center);
+      const half = c.width / 2;
+      const accuracy = dist <= half ? 1 - (dist / half) * 0.15 : Math.max(0, 0.85 - ((dist - half) / 0.5) * 0.85);
+      this.answers[uid] = { pos, dist, accuracy };
+    } else if (c.type === 'aim') {
+      if (now < c.startsAt) throw new Error('Attends le départ.');
+      const misses = clamp(Math.floor(Number(a.misses) || 0), 0, 12);
+      const t = clamp(Number(a.t), now - 1200, now);
+      const raw = Math.round(t - c.startsAt);
+      const ms = Math.max(c.n * 180, raw) + misses * AIM_MISS_MS;
+      this.answers[uid] = { ms, misses };
+    } else if (c.type === 'math') {
+      if (now < c.startedAt) throw new Error('Attends le départ.');
+      const got = Array.isArray(a.answers) ? a.answers.map(Number) : [];
       let correct = 0;
-      for (let i = 0; i < target.length; i++) {
-        if (got[i] === target[i]) correct++;
+      for (let i = 0; i < this.secret.ans.length; i++) if (got[i] === this.secret.ans[i]) correct++;
+      this.answers[uid] = { correct, total: this.secret.ans.length, ms: Math.max(500, now - c.startedAt) };
+    } else if (c.type === 'sequence') {
+      if (c.stage !== 'answer') throw new Error('Attends la fin de la séquence.');
+      const got = Array.isArray(a.seq) ? a.seq.map(Number) : [];
+      let correct = 0;
+      for (let i = 0; i < this.secret.seq.length; i++) {
+        if (got[i] === this.secret.seq[i]) correct++;
         else break;
       }
-      const ms = Math.max(0, Date.now() - (this.challenge.startedAt || Date.now()));
-      this.answers[uid] = { correct, total: target.length, ms, got };
+      this.answers[uid] = { correct, total: this.secret.seq.length, ms: Math.max(0, now - c.startedAt) };
     } else {
-      throw new Error('Mode inconnu.');
+      throw new Error('Épreuve inconnue.');
     }
-
     this.emit();
     this.maybeCloseRound();
   }
 
   maybeCloseRound() {
+    if (this.phase !== 'playing') return;
+    if (this.challenge?.type === 'sequence' && this.challenge.stage !== 'answer') return;
     const need = this.alive();
-    if (!need.length) {
+    if (!need.length || need.every((p) => this.answers[p.uid])) {
       this.clearTimer();
-      return this.scoreRound();
-    }
-    if (need.every((p) => this.answers[p.uid])) {
-      this.clearTimer();
-      return this.scoreRound();
+      this.run(() => this.scoreRound()).catch(() => {});
     }
   }
 
   async scoreRound() {
     if (this.phase !== 'playing') return;
     this.phase = 'round_result';
-    const players = this.alive();
-    const scored = [];
-
-    for (const p of players) {
+    const scored = this.alive().map((p) => {
       const a = this.answers[p.uid];
-      let metric = 0;
-      let label = '—';
-      if (!a) {
-        metric = -1;
-        label = 'timeout';
-      } else if (this.mode === 'react') {
-        metric = 10000 - a.ms;
-        label = a.ms + ' ms';
-      } else if (this.mode === 'timing') {
-        metric = Math.round(a.accuracy * 1000);
-        label = Math.round(a.accuracy * 100) + '%';
-      } else if (this.mode === 'sequence') {
-        metric = a.correct * 10000 - a.ms;
-        label = a.correct + '/' + a.total + (a.correct === a.total ? ' · ' + a.ms + 'ms' : '');
+      let metric = -1, label = 'pas de réponse';
+      if (a) {
+        if (a.early) { metric = 0; label = 'faux départ'; }
+        else if (this.mode === 'react') { metric = 100000 - a.ms; label = a.ms + ' ms'; }
+        else if (this.mode === 'timing') { metric = Math.round(a.accuracy * 1000); label = Math.round(a.accuracy * 100) + ' %'; }
+        else if (this.mode === 'aim') { metric = 1000000 - a.ms; label = (a.ms / 1000).toFixed(2) + ' s' + (a.misses ? ' · ' + a.misses + ' raté' + (a.misses > 1 ? 's' : '') : ''); }
+        else if (this.mode === 'math') { metric = a.correct * 1000000 - a.ms; label = a.correct + '/' + a.total + ' · ' + (a.ms / 1000).toFixed(1) + ' s'; }
+        else { metric = a.correct * 100000 - a.ms; label = a.correct + '/' + a.total + (a.correct === a.total ? ' · ' + (a.ms / 1000).toFixed(1) + ' s' : ''); }
       }
-      scored.push({ uid: p.uid, name: p.name, metric, label, a });
-    }
-
-    scored.sort((a, b) => b.metric - a.metric);
+      return { uid: p.uid, name: p.name, metric, label };
+    });
+    scored.sort((x, y) => y.metric - x.metric);
     const n = scored.length;
     const rows = [];
     let place = 1;
-    for (let i = 0; i < scored.length; i++) {
-      if (i > 0 && scored[i].metric < scored[i - 1].metric) place = i + 1;
+    scored.forEach((s, i) => {
+      if (i > 0 && s.metric < scored[i - 1].metric) place = i + 1;
       const pts = Math.max(0, n - place + 1);
-      this.scores[scored[i].uid] = (this.scores[scored[i].uid] || 0) + pts;
-      rows.push({
-        uid: scored[i].uid,
-        name: scored[i].name,
-        place,
-        pts,
-        label: scored[i].label,
-        score: this.scores[scored[i].uid],
-      });
-    }
-    this.lastRound = { mode: this.mode, rows };
-    if (rows[0]) this.say('🥇 ' + rows[0].name + ' · ' + rows[0].label + ' (+' + rows[0].pts + ' pts)');
+      this.scores[s.uid] = (this.scores[s.uid] || 0) + pts;
+      rows.push({ uid: s.uid, name: s.name, place, pts, label: s.label, score: this.scores[s.uid] });
+    });
+    this.lastRound = { mode: this.mode, round: this.round, rows };
+    this.challenge = null;
+    this.secret = null;
     this.emit();
-    await sleep(RESULT_MS);
-    return this.nextRound();
+    this.setTimer(RESULT_MS, () => this.nextRound());
   }
 
   async endMatch() {
     this.phase = 'match_end';
     this.challenge = null;
+    this.mode = null;
     const players = this.seats.filter((p) => p && p.inMatch);
-    const ranked = [...players].sort(
-      (a, b) => (this.scores[b.uid] || 0) - (this.scores[a.uid] || 0) || a.uid.localeCompare(b.uid)
-    );
+    const sc = (p) => this.scores[p.uid] || 0;
+    const ranked = [...players].sort((a, b) => sc(b) - sc(a) || a.uid.localeCompare(b.uid));
     let place = 1;
-    const payload = [];
-    for (let i = 0; i < ranked.length; i++) {
-      if (i > 0 && (this.scores[ranked[i].uid] || 0) < (this.scores[ranked[i - 1].uid] || 0)) place = i + 1;
-      ranked[i].lastPlace = place;
-      payload.push({
-        uid: ranked[i].uid, name: ranked[i].name, avatar: ranked[i].avatar,
-        place, score: this.scores[ranked[i].uid] || 0,
-      });
-    }
+    const payload = ranked.map((p, i) => {
+      if (i > 0 && sc(p) < sc(ranked[i - 1])) place = i + 1;
+      p.lastPlace = place;
+      return { uid: p.uid, name: p.name, avatar: p.avatar, place, score: sc(p) };
+    });
     let changes = [];
     try { changes = this.deps.rankRecord(payload) || []; } catch (e) { console.error('[ranked] rankRecord', e?.message || e); }
     for (const c of changes) {
       const p = this.seats.find((x) => x && x.uid === c.uid);
       if (p) p.delta = c.delta;
     }
+    this.final = payload.map((r) => {
+      const c = changes.find((x) => x.uid === r.uid);
+      return { ...r, delta: c ? c.delta : null, elo: c ? c.elo : null, placement: c ? c.placement : false, placementLeft: c ? c.placementLeft : 0 };
+    });
     this.say('Match terminé — RR mis à jour');
     this.emit();
-    try {
-      if (this.deps.onMatchEnd) this.deps.onMatchEnd({ game: 'ranked', players: payload, changes });
-    } catch (e) { console.error('[ranked] onMatchEnd', e?.message || e); }
-    this.setTimer(RESULT_MS + 1500, () => {
-      for (const p of this.seats) {
-        if (!p) continue;
-        p.inMatch = false;
-        p.ready = false;
-        if (p.online === false) {
-          const i = this.seats.indexOf(p);
-          if (i >= 0) this.seats[i] = null;
-        }
-      }
-      this.challenge = null;
-      this.answers = {};
-      this.lastRound = null;
-      this.phase = 'lobby';
-      this.clearTimer();
-      this.emit();
-    });
+    try { if (this.deps.onMatchEnd) this.deps.onMatchEnd({ game: 'ranked', players: payload, changes }); }
+    catch (e) { console.error('[ranked] onMatchEnd', e?.message || e); }
+    this.setTimer(END_MS, () => this.backToLobby());
+  }
+
+  async backToLobby() {
+    for (let i = 0; i < this.seats.length; i++) {
+      const p = this.seats[i];
+      if (!p) continue;
+      if (p.online === false) { this.seats[i] = null; continue; }
+      p.inMatch = false;
+      p.ready = false;
+    }
+    this.challenge = null;
+    this.secret = null;
+    this.answers = {};
+    this.lastRound = null;
+    this.phase = 'lobby';
+    this.clearTimer();
+    this.emit();
   }
 
   setPresence(uid, online) {
@@ -406,6 +447,7 @@ class RankedArena {
     if (!p) return;
     p.online = online;
     this.emit();
+    if (!online && this.phase === 'playing') this.maybeCloseRound();
   }
   isEmpty() { return this.seats.every((p) => !p); }
 }
