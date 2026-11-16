@@ -379,8 +379,7 @@ function create(file, supabase) {
     const a = Math.max(0, Math.round(Number(amount) || 0));
     if (!a) return get(uid).elo;
     const u = get(uid);
-    if ((u.elo || 0) < a + RR_FLOOR) return null; // cannot go below floor for entry
-    const before = u.elo;
+    if ((u.elo || 0) < a + RR_FLOOR) return null;
     u.elo = Math.max(RR_FLOOR, u.elo - a);
     save([String(uid)]);
     return Math.round(u.elo);
