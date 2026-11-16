@@ -718,9 +718,341 @@ body.fs.vpk #pkInfo{font-size:12px}
 /* ---------- PLINKO ---------- */
 .plk{width:100%;max-width:580px;aspect-ratio:10/11;min-height:0;padding:0;display:block;margin:0 auto}
 .plk canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+
+
+
+
+/* ========== INTERFACE MOBILE (refonte) ========== */
+#botNav{
+  display:none;position:fixed;left:0;right:0;bottom:0;z-index:60;
+  background:rgba(8,8,8,.96);border-top:1px solid #2a2a2a;
+  padding:4px 2px calc(4px + env(safe-area-inset-bottom));
+  backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  box-shadow:0 -8px 32px rgba(0,0,0,.5)
+}
+#botNav .bn{
+  flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+  background:transparent;border:0;color:#737373;font-size:10px;font-weight:700;
+  padding:8px 2px;border-radius:12px;min-height:52px;-webkit-tap-highlight-color:transparent
+}
+#botNav .bn svg{width:22px;height:22px;stroke-width:2.2}
+#botNav .bn.on{color:#fff;background:rgba(255,255,255,.1)}
+#botNav .bn:active{transform:scale(.94)}
+.hubTabs{display:none}
+.hubTabs button{flex:1;padding:14px;border-radius:12px;font-weight:800;font-size:15px;
+  background:#111;border:1px solid #262626;color:#a3a3a3}
+.hubTabs button.on{background:#fff;color:#000;border-color:#fff}
+.cat.hide-cat{display:none!important}
+
+@media(max-width:900px){
+  /* ---- base ---- */
+  html,body{height:100%;overflow:hidden}
+  body{font-size:15px;padding:0;padding-top:env(safe-area-inset-top)}
+  body.has-botnav{padding-bottom:0}
+  #botNav{display:flex}
+  #menu{display:none!important}
+
+  /* ---- header compact ---- */
+  header{
+    padding:6px 10px;gap:6px;flex-shrink:0;
+    padding-top:max(6px, env(safe-area-inset-top));
+    background:#000;border-bottom:1px solid #1a1a1a;z-index:30
+  }
+  header .hb.ico{padding:8px;min-width:40px;min-height:40px;border-radius:12px}
+  header .hb.ico svg,header .hb.ico{font-size:0}
+  .me{padding:2px 10px 2px 2px;gap:6px}
+  .me img,.me .av{width:28px;height:28px}
+  .me b{font-size:13px}
+  #meName{display:none}
+  #bFs,#bTop{display:none!important}
+  .sp{flex:1;min-width:4px}
+
+  /* ---- vues principales : plein écran sous header, au-dessus de botNav ---- */
+  main{
+    flex:1;min-height:0;overflow:auto;-webkit-overflow-scrolling:touch;
+    padding:8px 8px 0;gap:6px;
+    padding-bottom:calc(64px + env(safe-area-inset-bottom))!important
+  }
+  main.hide{display:none!important}
+
+  /* ---- HUB : liste de jeux tactile ---- */
+  #hubView{
+    padding:12px 12px calc(72px + env(safe-area-inset-bottom));
+    gap:12px;align-items:stretch;overflow:auto
+  }
+  .hubTabs{display:flex;position:sticky;top:0;z-index:5;background:#000;padding:4px 0 10px;margin:0;gap:8px}
+  #hubView .cat{max-width:none;margin:0}
+  #hubView .cat h2{font-size:13px;text-transform:uppercase;letter-spacing:.12em;color:#737373;margin:0 0 8px}
+  #hubView .cat .catd{display:none}
+  .games{grid-template-columns:1fr 1fr;gap:10px}
+  .gcard{
+    padding:14px 12px 12px;border-radius:16px;gap:4px;
+    background:#0c0c0c;border:1px solid #222;min-height:120px;
+    justify-content:space-between;touch-action:manipulation
+  }
+  .gcard:active{border-color:#a78bfa;background:#14101f;transform:scale(.98)}
+  .gname{font-size:15px;font-weight:800;line-height:1.2}
+  .gdesc{font-size:11px;color:#737373;min-height:0;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .glive{font-size:11px;min-height:14px;color:#86efac}
+  .gplay{
+    margin-top:8px;width:100%;text-align:center;padding:11px 8px;
+    border-radius:10px;font-size:13px;font-weight:800;background:#fff;color:#000
+  }
+  .gcard:disabled .gplay{background:#262626;color:#737373}
+
+  /* ---- Rank / Classement / Admin ---- */
+  #rankView,#topView,#adminView{padding:12px 10px calc(72px + env(safe-area-inset-bottom));overflow:auto}
+  .rkwrap,.lbwrap{max-width:none;gap:12px}
+  .rkme{padding:16px;border-radius:16px}
+  .rkname{font-size:22px}
+  .lbgrid{grid-template-columns:1fr;gap:12px}
+  .lbcol{border-radius:14px}
+  .lbtitle{padding:12px 14px}
+  .lbrow{padding:10px 12px;min-height:48px}
+
+  /* ---- Tables BJ / Poker : moins de hauteur forcée ---- */
+  #table,.ftable{
+    min-height:0;flex:1;border-width:8px;
+    border-radius:20px 20px 36px 36px/20px 20px 28px 28px;
+    padding:8px 4px 48px;overflow:hidden
+  }
+  #table::after,.ftable::after{inset:5px;border-radius:14px 14px 28px 28px/14px 14px 22px 22px}
+  #table::before,.ftable::before{font-size:min(22vw,100px);opacity:.7}
+  #seats{grid-template-columns:repeat(5,minmax(0,1fr));gap:2px;padding:0 2px}
+  .seat{min-height:calc(var(--cw)*1.9);gap:3px}
+  .seat:nth-child(n){transform:none!important}
+  .plate{padding:3px 6px 3px 3px;border-radius:10px;gap:4px}
+  .plate .av{width:26px;height:26px}
+  .plate .nm{max-width:5.5ch;font-size:11px}
+  .plate .bl{font-size:10px}
+  .rule{display:none}
+  #feed{display:none}
+  #shoe{top:4px;right:2%;transform:scale(.85)}
+  #center{position:static;transform:none;margin:2px 0;width:auto}
+  #msg{font-size:12px;padding:5px 12px}
+  #cd{font-size:22px}
+  :root{--cw:clamp(28px,9.2vw,42px)}
+  .cards .card+.card{margin-left:calc(var(--cw)*-.55)}
+
+  /* ---- DOCKS collés au-dessus de la barre d'onglets ---- */
+  #dock,.dockp,#ofDock,#rDock,#pkDock{
+    position:fixed;left:0;right:0;z-index:40;
+    bottom:calc(56px + env(safe-area-inset-bottom));
+    margin:0;border-radius:18px 18px 0 0;
+    padding:10px 12px calc(10px + env(safe-area-inset-bottom,0px));
+    background:rgba(0,0,0,.94);border:1px solid #2a2a2a;border-bottom:0;
+    box-shadow:0 -12px 40px rgba(0,0,0,.55);
+    max-height:42vh;overflow-y:auto;-webkit-overflow-scrolling:touch
+  }
+  /* espace pour le dock fixe dans les vues table */
+  #bjView,#pkView,#rlView,#ofView{
+    padding-bottom:calc(56px + env(safe-area-inset-bottom))!important
+  }
+  #bjView #table,#pkView .ftable,#rlView .ftable,#ofView .ftable{
+    margin-bottom:calc(120px + env(safe-area-inset-bottom))
+  }
+
+  /* boutons d'action : grandes zones tactiles */
+  .btn{
+    min-height:48px;padding:12px 16px;border-radius:14px;font-size:15px;font-weight:800;
+    touch-action:manipulation;-webkit-user-select:none;user-select:none
+  }
+  .btn.big{min-width:0;flex:1;min-height:52px;font-size:16px;padding:14px 10px}
+  .btn.big kbd{display:none}
+  .btn.go{font-size:16px;padding:14px 20px}
+  .row{gap:8px;flex-wrap:wrap}
+  #pPlay.row,#pBet .row{display:flex;flex-wrap:nowrap}
+  #pPlay .btn{flex:1}
+  .chip{
+    width:48px;height:48px;font-size:12px;border-width:2px;
+    flex:none;touch-action:manipulation
+  }
+  #chipRow{justify-content:center;gap:8px;flex-wrap:wrap}
+  .amt{
+    flex:1;min-width:0;border-radius:14px;border-width:2px
+  }
+  .amt input{
+    width:100%;min-width:0;font-size:18px;padding:12px 8px;text-align:center
+  }
+  .amt span{padding:0 8px;font-size:12px}
+  #bHalf,#bDouble,#bMax,#bLast{min-height:44px;padding:10px 12px;font-size:13px}
+
+  /* poker dock */
+  #pkDock .btn{flex:1}
+  #pkDock .row{gap:8px}
+  .pact{display:flex;gap:8px;width:100%}
+  .pact .btn{flex:1}
+
+  /* roulette */
+  #rlView .rboard{transform-origin:top center}
+  #rDock .btn{min-height:46px}
+  .rspot{min-height:40px;font-size:12px;padding:8px 4px}
+
+  /* offline games */
+  #ofView{display:flex;flex-direction:column}
+  #ofTable{flex:1;min-height:200px;margin-bottom:calc(130px + env(safe-area-inset-bottom))}
+  #ofDock .btn{min-height:48px;flex:1}
+  #ofDock .row{gap:8px}
+
+  /* barres d'onglets tables (multi-tables) */
+  .tbar{padding:4px 0;gap:6px;overflow-x:auto;flex-shrink:0;-webkit-overflow-scrolling:touch}
+  .tbar button{min-height:40px;padding:8px 14px;border-radius:10px;font-size:13px;white-space:nowrap}
+
+  /* modales plein écran mobile */
+  .modal.on,.mod.on{align-items:flex-end}
+  .modal .box,.mod .box,.mbox{
+    width:100%;max-width:100%;border-radius:20px 20px 0 0;
+    max-height:85vh;overflow:auto;padding-bottom:calc(16px + env(safe-area-inset-bottom))
+  }
+
+  /* chat / panneaux latéraux */
+  .side,.chatbox{max-height:50vh}
+
+  /* popovers header */
+  .ppanel{right:4px;left:auto;max-width:calc(100vw - 16px);width:320px}
+}
+
+@media(min-width:901px){
+  #botNav{display:none!important}
+  .hubTabs{display:none!important}
+}
+
+
+@media(max-width:400px){
+  .games{grid-template-columns:1fr}
+  .gcard{min-height:100px}
+}
+@media(max-width:900px){
+  /* éviter double padding-bottom body + main */
+  body.has-botnav{padding-bottom:0!important}
+  /* header icons denser */
+  #bSnd,#bSet,#bBell,#bRules{flex:none}
+  /* offline dock contenu centré */
+  #ofDock{display:flex;flex-direction:column;gap:8px}
+  #ofDock .row{width:100%;justify-content:center}
+  /* poker raise slider etc */
+  #pkDock input[type=range]{width:100%;height:28px}
+  /* message centre plus lisible */
+  #msg{max-width:95%}
+}
+
+
+/* ---- Shop / Tasks / Account / Admin tabs ---- */
+.shopgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;width:100%;max-width:1000px}
+.scard{background:#0a0a0a;border:1px solid #262626;border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:8px}
+.scard h3{margin:0;font-size:17px;font-weight:800}
+.scard .price{color:var(--gold);font-weight:800;font-size:18px;font-variant-numeric:tabular-nums}
+.scard .req{font-size:12px;color:var(--mut)}
+.scard .sdesc{font-size:13px;color:#a3a3a3;min-height:36px}
+.taskrow{display:flex;align-items:center;gap:12px;background:#0a0a0a;border:1px solid #262626;border-radius:14px;padding:14px;width:100%;max-width:720px}
+.taskrow .tinfo{flex:1;min-width:0}
+.taskrow .tinfo b{display:block;font-size:15px}
+.taskrow .tinfo small{color:var(--mut);font-size:12px}
+.taskrow .tprog{font-size:12px;color:#a3a3a3;margin-top:4px}
+.taskrow .tbar{height:6px;background:#1f1f1f;border-radius:99px;overflow:hidden;margin-top:6px}
+.taskrow .tbar i{display:block;height:100%;background:linear-gradient(90deg,#a78bfa,#7c3aed);border-radius:99px}
+.adtabs{display:flex;gap:6px;flex-wrap:wrap;width:100%;max-width:1000px;margin-bottom:12px}
+.adtabs button{padding:10px 14px;border-radius:10px;font-weight:700;font-size:13px;background:#111;border:1px solid #262626;color:#a3a3a3}
+.adtabs button.on{background:#fff;color:#000;border-color:#fff}
+.adform{display:flex;flex-direction:column;gap:10px;padding:14px}
+.adform label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--mut);font-weight:700}
+.adform input,.adform select,.adform textarea{background:#000;border:1px solid #333;border-radius:10px;color:#fff;padding:10px 12px;font:inherit}
+.adlist{display:flex;flex-direction:column;gap:8px}
+.aditem{display:flex;align-items:center;gap:10px;padding:12px;background:#111;border:1px solid #262626;border-radius:12px}
+.aditem .grow{flex:1;min-width:0}
+.aditem button{padding:8px 12px;min-height:40px}
+.ocode{font-family:ui-monospace,Menlo,monospace;font-size:22px;letter-spacing:.15em;font-weight:800;color:#fde68a;background:#1a1200;border:1px dashed #fbbf24;border-radius:12px;padding:14px;text-align:center}
+.accbox{width:100%;max-width:520px;display:flex;flex-direction:column;gap:12px}
+.accstat{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.accstat div{background:#0a0a0a;border:1px solid #262626;border-radius:14px;padding:14px}
+.accstat b{display:block;font-size:20px;color:var(--gold);font-variant-numeric:tabular-nums}
+.accstat span{font-size:12px;color:var(--mut)}
+@media(max-width:900px){
+  .shopgrid{grid-template-columns:1fr 1fr;gap:10px}
+  .scard{padding:12px;border-radius:14px}
+  .scard h3{font-size:14px}
+  .taskrow{flex-wrap:wrap}
+  .taskrow .btn{width:100%}
+  .accstat{grid-template-columns:1fr 1fr}
+}
+@media(max-width:400px){.shopgrid{grid-template-columns:1fr}}
+
+
+/* ---- Ranked Arena ---- */
+#rkArenaView{display:flex;flex-direction:column;min-height:0}
+.rk-table{
+  position:relative;flex:1;min-height:360px;border-radius:24px;overflow:hidden;
+  background:
+    radial-gradient(ellipse 80% 60% at 50% 40%,#6d28d9 0%,#3b0764 45%,#1a0533 100%);
+  border:3px solid rgba(196,181,253,.35);
+  box-shadow:inset 0 0 60px rgba(0,0,0,.5),0 20px 50px rgba(109,40,217,.35);
+  display:flex;flex-direction:column;align-items:center;justify-content:space-between;
+  padding:12px 8px 20px
+}
+.rk-table::before{
+  content:"RANKED";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  font-size:min(14vw,120px);font-weight:900;letter-spacing:.2em;color:transparent;
+  -webkit-text-stroke:1.5px rgba(255,255,255,.12);pointer-events:none;z-index:0
+}
+.rk-board{display:flex;gap:6px;z-index:2;min-height:var(--ch);align-items:center;justify-content:center;margin:8px 0}
+.rk-seats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;width:100%;z-index:2;padding:0 6px}
+.rk-seat{
+  background:rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.12);border-radius:14px;
+  padding:8px;display:flex;flex-direction:column;align-items:center;gap:4px;min-height:110px;
+  transition:border-color .2s,box-shadow .2s,transform .25s
+}
+.rk-seat.on{border-color:#fbbf24;box-shadow:0 0 20px rgba(251,191,36,.35)}
+.rk-seat.win{border-color:#86efac;animation:rkPulse .8s ease}
+@keyframes rkPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+.rk-seat .nm{font-weight:700;font-size:12px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rk-seat .sc{font-size:11px;color:var(--gold);font-weight:800}
+.rk-delta{font-weight:900;font-size:14px}
+.rk-delta.up{color:#86efac}.rk-delta.dn{color:#fca5a5}
+.rk-hud{text-align:center;z-index:2;margin:4px 0}
+.rk-hud .phase{font-weight:800;font-size:15px;letter-spacing:.04em}
+.rk-hud .sub{font-size:12px;color:rgba(255,255,255,.65)}
+.rk-season{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;
+  width:100%;max-width:1000px;background:linear-gradient(135deg,#1a0533,#2e1065);
+  border:1px solid rgba(196,181,253,.3);border-radius:16px;padding:14px 16px;margin-bottom:12px
+}
+.rk-season .timer{font-variant-numeric:tabular-nums;font-weight:900;font-size:20px;color:#fde68a}
+.rk-me-card{
+  width:100%;max-width:1000px;border-radius:20px;padding:20px;margin-bottom:14px;
+  background:linear-gradient(145deg,rgba(109,40,217,.35),rgba(15,5,40,.9));
+  border:1px solid rgba(196,181,253,.35);display:grid;grid-template-columns:auto 1fr auto;gap:16px;align-items:center
+}
+.rk-badge{
+  width:72px;height:72px;border-radius:18px;display:grid;place-items:center;font-weight:900;font-size:13px;
+  color:#fff;text-shadow:0 2px 6px #000;box-shadow:0 8px 24px rgba(0,0,0,.4)
+}
+.rk-elo{font-size:28px;font-weight:900;font-variant-numeric:tabular-nums}
+.rk-tier{font-size:16px;font-weight:800}
+.rk-prog{height:8px;background:rgba(255,255,255,.1);border-radius:99px;overflow:hidden;margin-top:8px}
+.rk-prog i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#c4b5fd,#a78bfa,#7c3aed)}
+.rk-place-banner{
+  background:rgba(251,191,36,.12);border:1px dashed #fbbf24;border-radius:12px;padding:10px 14px;
+  font-size:13px;color:#fde68a;margin-top:8px
+}
+@media(max-width:900px){
+  .rk-seats{grid-template-columns:repeat(2,1fr)}
+  .rk-me-card{grid-template-columns:1fr;text-align:center;justify-items:center}
+  .rk-table{min-height:300px}
+  #rkDock{position:fixed;left:0;right:0;bottom:calc(56px + env(safe-area-inset-bottom));z-index:40;
+    background:rgba(0,0,0,.94);border-radius:16px 16px 0 0;padding:12px;border:1px solid #2a2a2a}
+}
+
 </style>
 </head>
 <body>
+<div class="modal" id="mOrder"><div class="box" style="max-width:400px;padding:20px;text-align:center">
+  <h3 style="margin:0 0 8px">Commande créée</h3>
+  <p style="color:var(--mut);font-size:13px;margin:0 0 12px">Copie ton order code et ouvre un ticket « Claim rewards » sur Discord</p>
+  <div class="ocode" id="mOrderCode">————</div>
+  <p id="mOrderName" style="margin:12px 0;font-weight:700"></p>
+  <button class="btn go" id="mOrderCopy" style="width:100%">Copier le code</button>
+  <button class="btn" id="mOrderClose" style="width:100%;margin-top:8px">Fermer</button>
+</div></div>
 <div id="gate"><div><h1>Casino</h1><p id="gatemsg">Connecte-toi avec ton compte Discord pour jouer avec ton solde du casino.</p><a class="dsc" href="/login">Se connecter avec Discord</a></div></div>
 <header>
   <div class="logo hide"><small id="subtitle"></small></div>
@@ -759,6 +1091,7 @@ body.fs.vpk #pkInfo{font-size:12px}
     </div>
   </div>
   <div class="sp"></div>
+  <button class="hb ico" id="bShop" title="Boutique" data-ic="gift"></button>
   <button class="hb ico hide" id="bTop" title="Top gains de ce jeu" data-ic="trophy"></button>
   <button class="hb ico hide" id="bRules" title="Règles" data-ic="book"></button>
   <button class="hb ico" id="bSnd" title="Son" data-ic="volOn"></button>
@@ -770,15 +1103,19 @@ body.fs.vpk #pkInfo{font-size:12px}
   </div>
   <div class="pop" id="meWrap">
     <div class="me" id="me" role="button" tabindex="0" aria-haspopup="true"><div class="av" id="meAv">?</div><div id="meName" style="font-weight:700;font-size:12px">…</div><span class="car">▾</span></div>
-    <div class="ppanel" id="mePanel"><div class="mpn"><span>Solde</span><b id="meBal">—</b></div><button class="btn" id="bDaily" data-ic="sun"> Daily</button><button class="btn hide" id="bAdmin" data-ic="sliders"> Admin</button><button class="btn" id="bGift" data-ic="gift"> Envoyer des ZTKN</button><button class="btn" id="bLogout" data-ic="power"> Déconnexion</button></div>
+    <div class="ppanel" id="mePanel"><div class="mpn"><span>Solde</span><b id="meBal">—</b></div><button class="btn" id="bAccount" data-ic="user"> Mon compte</button><button class="btn" id="bDaily" data-ic="sun"> Daily</button><button class="btn hide" id="bAdmin" data-ic="sliders"> Admin</button><button class="btn" id="bGift" data-ic="gift"> Envoyer des ZTKN</button><button class="btn" id="bLogout" data-ic="power"> Déconnexion</button></div>
   </div>
 </header>
 <div id="conn">Reconnexion…</div>
 <main id="hubView">
+  <div class="hubTabs" id="hubTabs">
+    <button type="button" class="on" data-hub="online">Online</button>
+    <button type="button" data-hub="offline">Offline</button>
+  </div>
   <section class="cat">
     <h2>Online</h2>
     <p class="catd">Tables partagées avec tous les joueurs du serveur.</p>
-    <div class="games">
+    <div class="games" id="gOnline">
       <button class="gcard" data-go="bj" id="gcBj">
         <span class="gname">Blackjack</span>
         <span class="gdesc">Table à 5 places · mise libre · blackjack payé 3:2</span>
@@ -868,15 +1205,78 @@ body.fs.vpk #pkInfo{font-size:12px}
   </div>
 </main>
 <main id="adminView" class="hide">
-  <div class="adwrap">
-    <div class="lbhead"><div><h2>Administration</h2><p>Réservé à l’administrateur du casino.</p></div></div>
-    <div class="adgrid">
-      <button class="adcard" id="adMoney"><span class="nic" id="adMoneyI"></span><b>Ajouter de l’argent</b><small>Crédite n’importe quel joueur, sans rien retirer de ton solde</small></button>
-      <button class="adcard" id="adEvents"><span class="nic" id="adEventsI"></span><b>Événements</b><small>Boosts, claim, giveaway · MP Discord + notification dans la boîte de réception</small></button>
+  <div class="lbwrap" style="align-items:center">
+    <div class="lbhead"><div><h2>Administration</h2><p>Rewards · Tasks · Économie · Événements</p></div></div>
+    <div class="adtabs" id="adTabs">
+      <button type="button" class="on" data-ad="rewards">Rewards</button>
+      <button type="button" data-ad="tasks">Tasks</button>
+      <button type="button" data-ad="orders">Commandes</button>
+      <button type="button" data-ad="money">Économie</button>
+      <button type="button" data-ad="events">Événements</button>
     </div>
-    <section class="lbcol hide" id="adEvPanel">
+    <section class="lbcol" id="adPanelRewards" style="width:100%;max-width:1000px">
+      <div class="lbtitle"><b>Créer / modifier une reward</b><small>Nitro, rôle auto, ou custom · conditions optionnelles</small></div>
+      <form class="adform" id="adRewardForm">
+        <input type="hidden" id="adRId">
+        <label>Nom<input id="adRName" required maxlength="64" placeholder="ex : Nitro 1 mois"></label>
+        <label>Description<input id="adRDesc" maxlength="200" placeholder="Court texte affiché en boutique"></label>
+        <label>Prix (ZTKN)<input id="adRPrice" inputmode="decimal" required placeholder="500"></label>
+        <label>Type
+          <select id="adRType">
+            <option value="nitro">Nitro / livraison manuelle</option>
+            <option value="role">Rôle Discord (auto)</option>
+            <option value="custom">Custom</option>
+          </select>
+        </label>
+        <label>ID du rôle Discord (si type rôle)<input id="adRRole" placeholder="123456789012345678"></label>
+        <label>Min. invitations<input id="adRMinInv" inputmode="numeric" value="0"></label>
+        <label>Min. parties jouées<input id="adRMinGames" inputmode="numeric" value="0"></label>
+        <label>Stock (vide = illimité)<input id="adRStock" inputmode="numeric" placeholder="illimité"></label>
+        <div class="row">
+          <button type="submit" class="btn go">Enregistrer</button>
+          <button type="button" class="btn" id="adRReset">Nouveau</button>
+        </div>
+      </form>
+      <div class="lbtitle"><b>Rewards actives</b></div>
+      <div class="adlist" id="adRewardList" style="padding:12px"></div>
+    </section>
+    <section class="lbcol hide" id="adPanelTasks" style="width:100%;max-width:1000px">
+      <div class="lbtitle"><b>Créer / modifier une task quotidienne</b><small>Reset chaque jour à minuit (Paris)</small></div>
+      <form class="adform" id="adTaskForm">
+        <input type="hidden" id="adTId">
+        <label>Nom<input id="adTName" required maxlength="64" placeholder="ex : Jouer 5 parties"></label>
+        <label>Description<input id="adTDesc" maxlength="200"></label>
+        <label>Récompense ZTKN<input id="adTReward" inputmode="decimal" required placeholder="15"></label>
+        <label>Type
+          <select id="adTType">
+            <option value="login">Connexion du jour</option>
+            <option value="games">Parties jouées</option>
+            <option value="invites">Invitations</option>
+            <option value="custom">Custom (manuel)</option>
+          </select>
+        </label>
+        <label>Objectif (nombre)<input id="adTTarget" inputmode="numeric" value="1"></label>
+        <div class="row">
+          <button type="submit" class="btn go">Enregistrer</button>
+          <button type="button" class="btn" id="adTReset">Nouveau</button>
+        </div>
+      </form>
+      <div class="lbtitle"><b>Tasks</b></div>
+      <div class="adlist" id="adTaskList" style="padding:12px"></div>
+    </section>
+    <section class="lbcol hide" id="adPanelOrders" style="width:100%;max-width:1000px">
+      <div class="lbtitle"><b>Dernières commandes</b><small>pending = en attente de livraison via ticket</small></div>
+      <div class="adlist" id="adOrderList" style="padding:12px"></div>
+    </section>
+    <section class="lbcol hide" id="adPanelMoney" style="width:100%;max-width:1000px">
+      <div class="lbtitle"><b>Économie</b></div>
+      <div class="adgrid" style="padding:14px">
+        <button class="adcard" id="adGive"><span class="nic"></span><b>Ajouter de l’argent</b><small>Crédit admin sans retirer de ton solde</small></button>
+      </div>
+    </section>
+    <section class="lbcol hide" id="adPanelEvents" style="width:100%;max-width:1000px">
       <div class="lbtitle"><b>Lancer un événement</b><small id="adEvDesc">Choisis un type</small></div>
-      <div class="adbody">
+      <div class="adbody" style="padding:14px">
         <div id="adTypes" class="adtypes"></div>
         <div class="adfields">
           <label id="adFAmount">Montant par gagnant<input class="gin" id="adAmount" inputmode="decimal" autocomplete="off" placeholder="ex : 50"></label>
@@ -888,8 +1288,74 @@ body.fs.vpk #pkInfo{font-size:12px}
     </section>
   </div>
 </main>
+
+<main id="shopView" class="hide">
+  <div class="lbwrap" style="align-items:center">
+    <div class="lbhead"><div><h2>Boutique</h2><p>Achète une reward avec tes ZTKN · tu reçois un <b>order code</b> à coller dans le ticket Discord</p></div></div>
+    <div class="shopgrid" id="shopGrid"><div class="lbnone">Chargement…</div></div>
+    <section class="lbcol" style="width:100%;max-width:1000px;margin-top:8px">
+      <div class="lbtitle"><b>Mes commandes</b><small>Garde ton order code précieusement</small></div>
+      <div id="shopOrders" class="adlist" style="padding:12px"><div class="lbnone">Aucune commande</div></div>
+    </section>
+  </div>
+</main>
+<main id="tasksView" class="hide">
+  <div class="lbwrap" style="align-items:center">
+    <div class="lbhead"><div><h2>Tasks du jour</h2><p id="tasksDay">Réinitialisation chaque jour à minuit (Paris)</p></div></div>
+    <div id="tasksList" style="display:flex;flex-direction:column;gap:10px;width:100%;align-items:center"><div class="lbnone">Chargement…</div></div>
+  </div>
+</main>
+<main id="accountView" class="hide">
+  <div class="lbwrap" style="align-items:center">
+    <div class="lbhead"><div><h2>Mon compte</h2><p>Solde, invitations et commandes</p></div></div>
+    <div class="accbox" id="accBox">
+      <div class="accstat">
+        <div><span>Solde</span><b id="accBal">—</b></div>
+        <div><span>Invitations</span><b id="accInv">—</b></div>
+        <div><span>Parties jouées</span><b id="accGames">—</b></div>
+        <div><span>Récompense invite</span><b id="accInvR">+10</b></div>
+      </div>
+      <section class="lbcol">
+        <div class="lbtitle"><b>Lien d’invitation</b><small>Invite des amis et gagne des ZTKN quand ils rejoignent</small></div>
+        <div style="padding:14px;display:flex;flex-direction:column;gap:8px">
+          <input class="gin" id="accInvite" readonly placeholder="Chargement du lien…" style="width:100%;background:#000;border:1px solid #333;border-radius:10px;color:#fff;padding:12px;font:inherit">
+          <button class="btn go" id="accCopyInvite">Copier le lien</button>
+        </div>
+      </section>
+      <section class="lbcol">
+        <div class="lbtitle"><b>Dernières commandes</b></div>
+        <div id="accOrders" class="adlist" style="padding:12px"><div class="lbnone">Aucune</div></div>
+      </section>
+    </div>
+  </div>
+</main>
+
+
+<main id="rkArenaView" class="hide">
+  <div class="rk-hud" id="rkHud"><div class="phase" id="rkPhase">Arène Ranked</div><div class="sub" id="rkSub">2 à 8 joueurs · pas de ZTKN · RR only</div></div>
+  <section class="rk-table" id="rkTable">
+    <div class="rk-board" id="rkBoard"></div>
+    <div class="rk-seats" id="rkSeats"></div>
+  </section>
+  <section class="dockp" id="rkDock">
+    <div class="row" id="rkActions">
+      <button class="btn go" id="rkJoin">Rejoindre l’arène</button>
+      <button class="btn hide" id="rkReady">Prêt</button>
+      <button class="btn hide" id="rkUnready">Pas prêt</button>
+      <button class="btn hide" id="rkLeave">Quitter</button>
+    </div>
+    <p style="text-align:center;font-size:12px;color:var(--mut);margin:6px 0 0" id="rkHint">Showdown : meilleure main de poker gagne la manche · 3 manches</p>
+  </section>
+</main>
+
 <main id="rankView" class="hide">
   <div class="rkwrap">
+    <div class="rk-season" id="rkSeasonBar">
+      <div><b id="rkSeasonLbl">Saison</b><div style="font-size:12px;color:var(--mut)">Soft reset chaque lundi · RR only</div></div>
+      <div class="timer" id="rkSeasonTimer">—</div>
+      <button class="btn go" id="rkPlayBtn">Jouer Ranked</button>
+    </div>
+
     <section class="rkme" id="rkMe"><div class="lbnone">…</div></section>
     <section class="lbcol">
       <div class="lbtitle"><b>Classement RR</b><small>Se joue contre les autres joueurs : poker, blackjack et roulette en ligne</small></div>
@@ -1196,7 +1662,8 @@ function connect() {
   es = new EventSource('/api/stream?t=' + encodeURIComponent(TOKEN));
   es.addEventListener('hello', (e) => { const d = JSON.parse(e.data); me = d; COIN = d.coin && d.coin !== '🪙' ? d.coin : 'ZTKN'; seatsN = d.seats || 5; $('#coin').textContent = COIN;
     $('#meName').textContent = d.name; setAvatar($('#meAv'), d.avatar, d.name); $('#conn').style.display = 'none'; BJT.clear(); P.tables.clear(); rOnHello(d); pOnHello(d); });
-  es.addEventListener('roulette', (e) => { const st = JSON.parse(e.data); offset = st.now - Date.now(); rRender(st); });
+  es.addEventListener('ranked', (e) => { try { rkRender(JSON.parse(e.data)); } catch {} });
+es.addEventListener('roulette', (e) => { const st = JSON.parse(e.data); offset = st.now - Date.now(); rRender(st); });
   es.addEventListener('poker', (e) => { const st = JSON.parse(e.data); offset = st.now - Date.now(); pUpdate(st); });
   es.addEventListener('admin', () => $('#bAdmin').classList.remove('hide'));
   es.addEventListener('bal', (e) => { W.bal = JSON.parse(e.data).bal; pHeader(); if (!O.hold && W.bal != null) $('#meBal').textContent = num(W.bal) + ' ' + COIN; });
@@ -1979,17 +2446,37 @@ function setView(v) {
   $('#topView').classList.toggle('hide', v !== 'top');
   $('#rankView').classList.toggle('hide', v !== 'rank');
   $('#adminView').classList.toggle('hide', v !== 'admin');
+  $('#shopView').classList.toggle('hide', v !== 'shop');
+  $('#tasksView').classList.toggle('hide', v !== 'tasks');
+  $('#accountView').classList.toggle('hide', v !== 'account');
+  $('#rkArenaView').classList.toggle('hide', v !== 'ranked');
   document.body.classList.toggle('vpk', v === 'poker');
   lbWatch(v === 'top');
   rkWatch(v === 'rank');
   pFitSoon();
   document.querySelectorAll('.mitem').forEach((t) => t.classList.toggle('on', t.dataset.g === v));
   menuSync(v);
-  document.title = v.startsWith('off-') ? 'Casino · Jeux offline' : v === 'roulette' ? 'Casino · Roulette' : v === 'bj' ? 'Casino · Blackjack' : v === 'poker' ? 'Casino · Poker' : v === 'top' ? 'Casino · Classement' : v === 'rank' ? 'Casino · Rank' : v === 'admin' ? 'Casino · Admin' : 'Casino · Jeux';
+  document.title = v === 'ranked' ? 'Casino · Ranked' : v === 'shop' ? 'Casino · Boutique' : v === 'tasks' ? 'Casino · Tasks' : v === 'account' ? 'Casino · Compte' : v.startsWith('off-') ? 'Casino · Jeux offline' : v === 'roulette' ? 'Casino · Roulette' : v === 'bj' ? 'Casino · Blackjack' : v === 'poker' ? 'Casino · Poker' : v === 'top' ? 'Casino · Classement' : v === 'rank' ? 'Casino · Rank' : v === 'admin' ? 'Casino · Admin' : 'Casino · Jeux';
   $('#bTop').classList.toggle('hide', v !== 'bj' && v !== 'poker');
-  $('#bRules').classList.toggle('hide', v === 'hub' || v === 'top' || v === 'rank' || v === 'admin' || v.startsWith('off-'));
+  $('#bRules').classList.toggle('hide', v === 'hub' || v === 'top' || v === 'rank' || v === 'admin' || v === 'shop' || v === 'tasks' || v === 'account' || v === 'ranked' || v.startsWith('off-'));
   try { sessionStorage.setItem('znk_v', v); } catch {}
+  try {
+    let tab = 'online';
+    if (v === 'rank') tab = 'rank';
+    else if (v === 'top') tab = 'top';
+    else if (v === 'hub') tab = document.querySelector('#hubTabs button.on')?.dataset.hub || sessionStorage.getItem('znk_hub') || 'online';
+    else if (String(v).startsWith('off-')) tab = 'offline';
+    else if (v === 'bj' || v === 'poker' || v === 'roulette') tab = 'online';
+    else if (v === 'tasks') tab = 'tasks';
+    else if (v === 'shop' || v === 'account') tab = 'online';
+    document.querySelectorAll('#botNav .bn').forEach((b) => b.classList.toggle('on', b.dataset.tab === tab));
+  } catch {}
   C.unread = 0; cRender();
+  if (v === 'shop') loadShop();
+  if (v === 'tasks') loadTasks();
+  if (v === 'account') loadAccount();
+  if (v === 'admin') loadAdminShop();
+  if (v === 'ranked') { try { rkSend('rksync'); if (RK.S) rkRender(RK.S); } catch {} }
   if (v.startsWith('off-')) ofOpen(v);
   if (v === 'poker') { pSend('psync'); if (P.S) pRender(P.S); }
   if (v === 'roulette') { rEnter(); if (W.S) rRender(W.S); else $('#meBal').textContent = num(rBal()) + ' ' + COIN; }
@@ -2069,13 +2556,13 @@ function adPick(id) {
   $('#adMinutes').value = String(t.min); $('#adMinLbl').textContent = t.minLbl || 'Durée (minutes)';
 }
 function adInit() {
-  $('#adMoneyI').innerHTML = icon('gift', 24); $('#adEventsI').innerHTML = icon('bell', 24);
   const box = $('#adTypes');
+  if (!box) return;
+  box.textContent = '';
   AD_TYPES.forEach((t) => { const b = el('button', '', t.label); b.dataset.id = t.id; b.onclick = () => adPick(t.id); box.append(b); });
   adPick('claim');
-  $('#adMoney').onclick = () => gOpen(true);
-  $('#adEvents').onclick = () => $('#adEvPanel').classList.toggle('hide');
-  $('#adLaunch').onclick = async () => {
+  const launch = $('#adLaunch');
+  if (launch) launch.onclick = async () => {
     const t = AD_TYPES.find((x) => x.id === AD.kind), b = $('#adLaunch');
     const body = { kind: t.id, minutes: Math.floor(Number($('#adMinutes').value) || 0) };
     if (t.f.includes('amount')) { body.amount = parseAmt($('#adAmount').value); if (!(body.amount > 0)) return toast('Montant invalide.'); body.winners = Math.floor(Number($('#adWinners').value) || 1); }
@@ -2114,31 +2601,54 @@ function rkLogo(r, size) {
 }
 const rkLogoEl = (r, size) => { const w = el('span', 'rkl'); w.style.display = 'inline-flex'; w.innerHTML = rkLogo(r, size); return w; };
 function rkRenderMe(d) {
-  const m = d.me, L = d.ladder, cur = L[m.idx], nxt = L[m.idx + 1] || null;
+  const m = d.me, L = d.ladder || [];
   const box = $('#rkMe'); box.replaceChildren();
+  // season bar
+  if (d.season) {
+    const lbl = $('#rkSeasonLbl'); if (lbl) lbl.textContent = d.season.label || ('Saison ' + d.season.id);
+    const tick = () => {
+      const t = $('#rkSeasonTimer'); if (!t || !d.season) return;
+      t.textContent = rkFmtLeft((d.season.end || 0) - Date.now());
+    };
+    tick(); clearInterval(window._rkSea); window._rkSea = setInterval(tick, 1000);
+  }
+  if (m.prov) {
+    box.style.setProperty('--c1', '#a78bfa'); box.style.setProperty('--c2', '#5b21b6');
+    const main = el('div', 'rkmain');
+    main.append(el('div', 'rk-tier', 'Placement'));
+    main.append(el('div', 'rk-elo', (m.placementDone || 0) + ' / ' + (d.placementN || 5)));
+    const ban = el('div', 'rk-place-banner', 'Encore ' + (m.placementLeft || 0) + ' partie(s) ranked avant ton rang officiel. 5 victoires → meilleur RR de départ.');
+    main.append(ban);
+    const stats = el('div', 'rkstats');
+    const cell = (a, b) => { const c = el('div'); c.append(el('span', '', a), el('b', '', b)); stats.append(c); };
+    cell('RR caché', '•••');
+    cell('Manches', String(m.games || 0));
+    cell('Victoires', String(m.wins || 0));
+    main.append(stats);
+    box.append(main);
+    return;
+  }
+  const cur = (m.tier) || L[m.idx] || L[0];
+  if (!cur) { box.append(el('div', 'lbnone', 'Joue une partie Ranked pour être classé.')); return; }
   box.style.setProperty('--c1', cur.c1); box.style.setProperty('--c2', cur.c2); box.style.setProperty('--c3', rkMix(cur.c2, .45));
   const lg = el('div'); lg.innerHTML = rkLogo(cur, 112);
   const main = el('div', 'rkmain');
-  main.append(el('div', 'rkkick', 'Ton rang'), el('div', 'rkname', cur.name));
-  const ea = el('div', 'rkearn'); ea.innerHTML = 'Gains cumulés : <b></b>'; ea.querySelector('b').textContent = rkFmt(m.earned) + ' ' + COIN; main.append(ea);
-  const prog = el('div', 'rkprog'), bar = el('div', 'rkbar'), fill = el('div', 'rkfill'); fill.style.width = '0%'; bar.append(fill);
-  const row = el('div', 'rkprow'), left = el('span'), right = el('span', 'nx');
-  if (nxt) {
-    left.innerHTML = '<b></b> avant <b></b>'; const bs = left.querySelectorAll('b'); bs[0].textContent = rkFmt(m.toNext) + ' ' + COIN; bs[1].textContent = nxt.name;
-    right.append(rkLogoEl(nxt, 26), el('span', '', Math.floor(m.pct * 100) + ' %'));
-  } else { left.textContent = 'Rang maximum atteint'; right.append(el('span', '', '100 %')); }
-  row.append(left, right); prog.append(bar, row);
-  box.append(lg, main, prog);
-  requestAnimationFrame(() => requestAnimationFrame(() => { fill.style.width = Math.max(m.pct * 100, 1) + '%'; }));
-  const st = el('div', 'rkstats');
-  const cell = (k, v, cls, sub) => { const c = el('div', 'rkst'); c.append(el('small', '', k)); const b = el('b', cls || '', v); if (sub) { b.append(document.createTextNode(' ')); b.append(el('i', '', sub)); } c.append(b); return c; };
-  st.append(
-    cell('Elo', m.games ? String(m.elo) : '—', 'elo', m.games && m.prov ? 'RR' : ''),
-    cell('Position', m.pos ? '#' + m.pos : '—', '', m.pos ? '/ ' + m.total : ''),
-    cell('Manches classées', String(m.games)),
-    cell('Meilleur RR', m.games ? String(m.peak) : '—')
-  );
-  box.append(st);
+  main.append(el('div', 'rk-tier', cur.name));
+  main.append(el('div', 'rk-elo', String(m.elo) + ' RR'));
+  const bar = el('div', 'rk-prog'); bar.append(Object.assign(document.createElement('i'), { style: 'width:' + Math.round((m.pct || 0) * 100) + '%' }));
+  main.append(bar);
+  if (!m.maxed && m.toNext != null) const sub = el('div'); sub.style.cssText = 'font-size:12px;color:var(--mut);margin-top:6px';
+  sub.textContent = m.maxed ? 'Rang maximum' : ('Prochain palier dans ' + Math.round(m.toNext || 0) + ' RR');
+  main.append(sub);
+  const stats = el('div', 'rkstats');
+  const cell = (a, b) => { const c = el('div'); c.append(el('span', '', a), el('b', '', b)); stats.append(c); };
+  cell('RR', String(m.elo));
+  cell('Peak', String(m.peak || m.elo));
+  cell('Manches', String(m.games || 0));
+  cell('V / D', (m.wins || 0) + ' / ' + (m.losses || 0));
+  if (m.pos) cell('Classement', '#' + m.pos);
+  main.append(stats);
+  box.append(lg, main);
 }
 function rkRenderElo(d) {
   const box = $('#rkElo'), L = d.ladder;
@@ -2153,8 +2663,8 @@ function rkRenderElo(d) {
   if (!d.elo.length) { box.replaceChildren(el('div', 'lbnone', 'Personne n’est encore classé. Joue une manche à plusieurs (poker, blackjack ou roulette) pour apparaître ici.')); return; }
   const rows = d.elo.map(mk);
   if (d.meRow) { rows.push(el('div', 'rksep', '···'), mk(d.meRow)); }
-  else if (!d.me.games) rows.push(el('div', 'lbnone', 'Tu n’es pas encore classé : joue une manche à plusieurs pour obtenir un RR.'));
-  const note = el('div', 'lbnone', 'Un « RR » indique un RR provisoire (moins de ' + d.provisional + ' manches classées).'); note.style.padding = '10px';
+  else if (!d.me.games) rows.push(el('div', 'lbnone', 'Pas encore classé : lance une partie Ranked dans l’Arène.'));
+  const note = el('div', 'lbnone', 'Placement : ' + (d.placementN || d.provisional) + ' parties ranked avant le rang officiel. Soft reset chaque lundi.'); note.style.padding = '10px';
   box.replaceChildren(...rows, note);
 }
 function rkRenderLadder(d) {
@@ -2164,7 +2674,7 @@ function rkRenderLadder(d) {
     const row = el('div', 'rkrow' + (r.id > d.me.idx ? ' locked' : '') + (r.id === d.me.idx ? ' cur' : '') + (i && sorted[i - 1].fam !== r.fam ? ' fam' : ''));
     row.append(rkLogoEl(r, 40));
     const nm = el('div', 'nm', r.name); if (r.id <= d.me.idx) { nm.style.background = `linear-gradient(90deg,${r.c1},${rkMix(r.c2, .45)})`; nm.style.webkitBackgroundClip = 'text'; nm.style.backgroundClip = 'text'; nm.style.color = 'transparent'; }
-    row.append(nm, el('div', 'mn', r.id === d.me.idx ? 'Ton rang' : r.min > 0 ? rkFmt(r.min) + ' ' + COIN : 'Départ'));
+    row.append(nm, el('div', 'mn', r.id === d.me.idx ? 'Ton rang' : r.min > 0 ? r.min + ' RR' : 'Départ'));
     box.append(row);
   });
 }
@@ -3313,8 +3823,355 @@ document.querySelectorAll('.seg[data-set]').forEach((g) => g.querySelectorAll('b
 })));
 setSync();
 
+
+
+// ========== SHOP / TASKS / ACCOUNT / ADMIN SHOP ==========
+async function loadShop() {
+  const grid = $('#shopGrid'), ord = $('#shopOrders');
+  grid.innerHTML = '<div class="lbnone">Chargement…</div>';
+  const ok = await send('shop_list');
+  const d = send.last;
+  if (!ok || !d) { grid.innerHTML = '<div class="lbnone">Boutique indisponible.</div>'; return; }
+  grid.textContent = '';
+  (d.rewards || []).forEach((r) => {
+    const c = el('div', 'scard');
+    const req = [];
+    if (r.minInvites) req.push(r.minInvites + ' invite(s)');
+    if (r.minGames) req.push(r.minGames + ' partie(s)');
+    if (r.stock != null) req.push('Stock : ' + r.stock);
+    c.innerHTML = '';
+    c.append(el('h3', '', r.name));
+    if (r.desc) c.append(el('div', 'sdesc', r.desc));
+    c.append(el('div', 'price', num(r.price) + ' ' + COIN));
+    if (req.length) c.append(el('div', 'req', req.join(' · ')));
+    const b = el('button', 'btn go', 'Acheter');
+    b.onclick = async () => {
+      if (!confirm('Acheter « ' + r.name + ' » pour ' + num(r.price) + ' ' + COIN + ' ?')) return;
+      b.disabled = true;
+      const ok2 = await send('shop_buy', { id: r.id });
+      b.disabled = false;
+      if (!ok2) return;
+      const o = send.last;
+      if (o && o.rbal != null) { W.bal = o.rbal; $('#meBal').textContent = num(o.rbal) + ' ' + COIN; }
+      $('#mOrderCode').textContent = o.code;
+      $('#mOrderName').textContent = (o.order && o.order.rewardName) || r.name;
+      $('#mOrder').classList.add('on');
+      SFX.win();
+      loadShop();
+    };
+    c.append(b);
+    grid.append(c);
+  });
+  if (!(d.rewards || []).length) grid.append(el('div', 'lbnone', 'Aucune reward pour le moment.'));
+  const okO = await send('shop_orders');
+  const od = send.last;
+  ord.textContent = '';
+  const list = (od && od.orders) || [];
+  if (!list.length) ord.append(el('div', 'lbnone', 'Aucune commande'));
+  list.forEach((o) => {
+    const row = el('div', 'aditem');
+    const g = el('div', 'grow');
+    g.append(el('b', '', o.rewardName), document.createTextNode(' · ' + o.code + ' · ' + (o.status === 'delivered' ? 'livré' : 'en attente')));
+    row.append(g);
+    const cp = el('button', 'btn', 'Copier');
+    cp.onclick = () => { navigator.clipboard?.writeText(o.code).catch(() => {}); toast('Code copié'); };
+    row.append(cp);
+    ord.append(row);
+  });
+}
+async function loadTasks() {
+  const box = $('#tasksList');
+  box.innerHTML = '<div class="lbnone">Chargement…</div>';
+  const ok = await send('tasks_list');
+  const d = send.last;
+  if (!ok || !d) { box.innerHTML = '<div class="lbnone">Tasks indisponibles.</div>'; return; }
+  $('#tasksDay').textContent = 'Jour ' + (d.day || '') + ' · reset à minuit (Paris)';
+  box.textContent = '';
+  (d.tasks || []).forEach((t) => {
+    const row = el('div', 'taskrow');
+    const info = el('div', 'tinfo');
+    info.append(el('b', '', t.name));
+    if (t.desc) info.append(el('small', '', t.desc));
+    const pct = Math.min(100, Math.round((t.progress / t.target) * 100));
+    const prog = el('div', 'tprog', t.progress + ' / ' + t.target + ' · +' + num(t.reward) + ' ' + COIN);
+    const bar = el('div', 'tbar'); bar.append(Object.assign(document.createElement('i'), { style: 'width:' + pct + '%' }));
+    info.append(prog, bar);
+    row.append(info);
+    const b = el('button', 'btn go', t.completed ? 'Réclamé' : t.claimable ? 'Réclamer' : 'En cours');
+    b.disabled = t.completed || !t.claimable;
+    b.onclick = async () => {
+      b.disabled = true;
+      const ok2 = await send('tasks_claim', { id: t.id });
+      if (ok2) {
+        const r = send.last;
+        if (r && r.rbal != null) { W.bal = r.rbal; $('#meBal').textContent = num(r.rbal) + ' ' + COIN; }
+        toast(r.msg || ('+' + r.reward));
+        SFX.win();
+        loadTasks();
+      } else b.disabled = false;
+    };
+    row.append(b);
+    box.append(row);
+  });
+  if (!(d.tasks || []).length) box.append(el('div', 'lbnone', 'Aucune task aujourd’hui.'));
+}
+async function loadAccount() {
+  const ok = await send('profile');
+  const d = send.last;
+  if (!ok || !d) return toast('Profil indisponible');
+  if (d.bal != null) { W.bal = d.bal; $('#accBal').textContent = num(d.bal) + ' ' + COIN; $('#meBal').textContent = num(d.bal) + ' ' + COIN; }
+  $('#accInv').textContent = String(d.invites || 0);
+  $('#accGames').textContent = String(d.games || 0);
+  $('#accInvR').textContent = '+' + (d.inviteReward || 10);
+  $('#accInvite').value = d.inviteUrl || 'Demande à un modo le lien d’invitation du serveur';
+  const ord = $('#accOrders');
+  ord.textContent = '';
+  (d.orders || []).forEach((o) => {
+    const row = el('div', 'aditem');
+    row.append(el('div', 'grow', o.rewardName + ' · ' + o.code + ' · ' + o.status));
+    ord.append(row);
+  });
+  if (!(d.orders || []).length) ord.append(el('div', 'lbnone', 'Aucune commande'));
+}
+$('#accCopyInvite').onclick = () => {
+  const v = $('#accInvite').value;
+  if (v) navigator.clipboard?.writeText(v).then(() => toast('Lien copié')).catch(() => toast(v));
+};
+$('#bShop').onclick = () => { try { menuClose(); } catch {} setView('shop'); };
+$('#bAccount').onclick = () => { popClose(); setView('account'); };
+$('#mOrderClose').onclick = () => $('#mOrder').classList.remove('on');
+$('#mOrderCopy').onclick = () => {
+  const c = $('#mOrderCode').textContent;
+  navigator.clipboard?.writeText(c).then(() => toast('Code copié')).catch(() => {});
+};
+
+// Admin shop tabs
+function adShow(panel) {
+  document.querySelectorAll('#adTabs button').forEach((b) => b.classList.toggle('on', b.dataset.ad === panel));
+  ['rewards', 'tasks', 'orders', 'money', 'events'].forEach((k) => {
+    const elp = $('#adPanel' + k.charAt(0).toUpperCase() + k.slice(1));
+    // ids: adPanelRewards etc
+  });
+  const map = { rewards: 'adPanelRewards', tasks: 'adPanelTasks', orders: 'adPanelOrders', money: 'adPanelMoney', events: 'adPanelEvents' };
+  Object.entries(map).forEach(([k, id]) => { const n = document.getElementById(id); if (n) n.classList.toggle('hide', k !== panel); });
+}
+document.querySelectorAll('#adTabs button').forEach((b) => (b.onclick = () => adShow(b.dataset.ad)));
+async function loadAdminShop() {
+  const ok = await send('admin_shop_list');
+  const d = send.last;
+  if (!ok || !d) return;
+  const rl = $('#adRewardList');
+  rl.textContent = '';
+  (d.rewards || []).forEach((r) => {
+    const row = el('div', 'aditem');
+    const g = el('div', 'grow');
+    g.innerHTML = '<b>' + r.name + '</b> · ' + num(r.price) + ' ' + COIN + ' · ' + r.type + (r.active ? '' : ' · OFF');
+    row.append(g);
+    const ed = el('button', 'btn', 'Édit');
+    ed.onclick = () => {
+      $('#adRId').value = r.id; $('#adRName').value = r.name; $('#adRDesc').value = r.desc || '';
+      $('#adRPrice').value = r.price; $('#adRType').value = r.type; $('#adRRole').value = r.roleId || '';
+      $('#adRMinInv').value = r.minInvites || 0; $('#adRMinGames').value = r.minGames || 0;
+      $('#adRStock').value = r.stock == null ? '' : r.stock;
+      adShow('rewards');
+    };
+    const del = el('button', 'btn', 'Suppr');
+    del.onclick = async () => {
+      if (!confirm('Supprimer ' + r.name + ' ?')) return;
+      await send('admin_reward_del', { id: r.id });
+      loadAdminShop();
+    };
+    row.append(ed, del);
+    rl.append(row);
+  });
+  if (!(d.rewards || []).length) rl.append(el('div', 'lbnone', 'Aucune reward'));
+  const tl = $('#adTaskList');
+  tl.textContent = '';
+  (d.tasks || []).forEach((t) => {
+    const row = el('div', 'aditem');
+    const g = el('div', 'grow');
+    g.innerHTML = '<b>' + t.name + '</b> · +' + num(t.reward) + ' · ' + t.type + ' ×' + t.target;
+    row.append(g);
+    const ed = el('button', 'btn', 'Édit');
+    ed.onclick = () => {
+      $('#adTId').value = t.id; $('#adTName').value = t.name; $('#adTDesc').value = t.desc || '';
+      $('#adTReward').value = t.reward; $('#adTType').value = t.type; $('#adTTarget').value = t.target;
+      adShow('tasks');
+    };
+    const del = el('button', 'btn', 'Suppr');
+    del.onclick = async () => {
+      if (!confirm('Supprimer ' + t.name + ' ?')) return;
+      await send('admin_task_del', { id: t.id });
+      loadAdminShop();
+    };
+    row.append(ed, del);
+    tl.append(row);
+  });
+  const ol = $('#adOrderList');
+  ol.textContent = '';
+  (d.orders || []).forEach((o) => {
+    const row = el('div', 'aditem');
+    row.append(el('div', 'grow', o.code + ' · ' + o.rewardName + ' · ' + o.name + ' · ' + o.status + ' · ' + num(o.price)));
+    ol.append(row);
+  });
+  if (!(d.orders || []).length) ol.append(el('div', 'lbnone', 'Aucune commande'));
+}
+$('#adRewardForm').onsubmit = async (e) => {
+  e.preventDefault();
+  const body = {
+    id: $('#adRId').value || undefined,
+    name: $('#adRName').value,
+    desc: $('#adRDesc').value,
+    price: $('#adRPrice').value,
+    type: $('#adRType').value,
+    roleId: $('#adRRole').value,
+    minInvites: $('#adRMinInv').value,
+    minGames: $('#adRMinGames').value,
+    stock: $('#adRStock').value,
+  };
+  const ok = await send('admin_reward_save', body);
+  if (ok) { toast('Reward enregistrée'); $('#adRReset').click(); loadAdminShop(); }
+};
+$('#adRReset').onclick = () => { $('#adRewardForm').reset(); $('#adRId').value = ''; };
+$('#adTaskForm').onsubmit = async (e) => {
+  e.preventDefault();
+  const body = {
+    id: $('#adTId').value || undefined,
+    name: $('#adTName').value,
+    desc: $('#adTDesc').value,
+    reward: $('#adTReward').value,
+    type: $('#adTType').value,
+    target: $('#adTTarget').value,
+  };
+  const ok = await send('admin_task_save', body);
+  if (ok) { toast('Task enregistrée'); $('#adTReset').click(); loadAdminShop(); }
+};
+$('#adTReset').onclick = () => { $('#adTaskForm').reset(); $('#adTId').value = ''; };
+// reconnect adGive if exists
+const adGiveBtn = $('#adGive');
+if (adGiveBtn) adGiveBtn.onclick = () => gOpen(true);
+
+
+
+// ========== RANKED ARENA ==========
+const RK = window.RK || { S: null, timer: null };
+window.RK = RK;
+function rkCard(c) {
+  if (!c || c.h) return '<div class="card down"><div class="inner"><div class="face front"></div><div class="face back"></div></div></div>';
+  const red = c.s === '♥' || c.s === '♦';
+  return `<div class="card"><div class="inner"><div class="face front${red ? ' red' : ''}"><div class="tl">${c.r}<i>${c.s}</i></div><div class="mid">${c.s}</div></div></div></div>`;
+}
+function rkRender(st) {
+  if (!st) return;
+  RK.S = st;
+  const phaseMap = {
+    lobby: 'Lobby — prêt ?',
+    countdown: 'Démarrage…',
+    dealing: 'Distribution…',
+    reveal: 'Abattage !',
+    round_result: 'Fin de manche',
+    match_end: 'Fin du match — RR',
+  };
+  $('#rkPhase').textContent = phaseMap[st.phase] || st.phase;
+  $('#rkSub').textContent = st.phase === 'lobby'
+    ? `${st.seats.filter(Boolean).length}/${st.maxPlayers} joueurs · ${st.minPlayers} min`
+    : `Manche ${st.round}/${st.rounds} · Match #${st.match}`;
+  const board = $('#rkBoard');
+  board.innerHTML = (st.board || []).map(rkCard).join('') || '<span style="opacity:.4;font-size:12px">Board</span>';
+  const box = $('#rkSeats');
+  box.textContent = '';
+  st.seats.forEach((p, i) => {
+    const d = el('div', 'rk-seat' + (p && p.inMatch ? ' on' : '') + (p && p.lastPlace === 1 ? ' win' : ''));
+    if (!p) {
+      d.innerHTML = '<span class="nm" style="opacity:.4">Libre</span>';
+      box.append(d);
+      return;
+    }
+    const cards = el('div', 'cards');
+    cards.innerHTML = (p.cards || []).map(rkCard).join('');
+    d.append(cards);
+    d.append(el('div', 'nm', p.name));
+    d.append(el('div', 'sc', (p.score || 0) + ' pt' + (p.hand ? ' · ' + p.hand : '')));
+    if (p.delta != null) {
+      const dg = el('div', 'rk-delta ' + (p.delta >= 0 ? 'up' : 'dn'), (p.delta >= 0 ? '+' : '') + p.delta + ' RR');
+      d.append(dg);
+    }
+    box.append(d);
+  });
+  const me = st.seats.find((p) => p && me && p.uid === me.uid) || st.seats.find((p) => p && window.me && p.uid === window.me.uid);
+  const uid = (window.me && window.me.uid) || (typeof me !== 'undefined' && me && me.uid);
+  const mine = st.seats.find((p) => p && uid && p.uid === uid);
+  $('#rkJoin').classList.toggle('hide', !!mine);
+  $('#rkReady').classList.toggle('hide', !mine || mine.ready || (st.phase !== 'lobby' && st.phase !== 'match_end'));
+  $('#rkUnready').classList.toggle('hide', !mine || !mine.ready || (st.phase !== 'lobby' && st.phase !== 'match_end'));
+  $('#rkLeave').classList.toggle('hide', !mine);
+}
+function rkSend(action, extra) {
+  return send(action, extra || {});
+}
+$('#rkJoin').onclick = async () => { await rkSend('rkjoin'); };
+$('#rkReady').onclick = async () => { await rkSend('rkready', { on: true }); };
+$('#rkUnready').onclick = async () => { await rkSend('rkunready'); };
+$('#rkLeave').onclick = async () => { await rkSend('rkleave'); };
+$('#rkPlayBtn').onclick = () => setView('ranked');
+
+// Rank panel season timer + placement
+function rkFmtLeft(ms) {
+  ms = Math.max(0, ms);
+  const s = Math.floor(ms / 1000);
+  const d = Math.floor(s / 86400);
+  const h = Math.floor((s % 86400) / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  if (d > 0) return d + 'j ' + h + 'h';
+  return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
+}
+const _rkWatch = typeof rkWatch === 'function' ? rkWatch : null;
+// patch load of rank data after fetch - enhance existing rk render if present
+
+// ========== Mobile bottom tabs + hub Online/Offline filter ==========
+(function(){
+  document.body.classList.add('has-botnav');
+  const setHubFilter = (which) => {
+    const on = which === 'online';
+    document.querySelectorAll('#hubTabs button').forEach((b) => b.classList.toggle('on', b.dataset.hub === which));
+    const gOn = document.getElementById('gOnline');
+    const gOff = document.getElementById('gOffline');
+    if (gOn) { const cat = gOn.closest('.cat'); if (cat) cat.classList.toggle('hide-cat', !on); }
+    if (gOff) { const cat = gOff.closest('.cat'); if (cat) cat.classList.toggle('hide-cat', on); }
+    try { sessionStorage.setItem('znk_hub', which); } catch {}
+    document.querySelectorAll('#botNav .bn').forEach((b) => b.classList.toggle('on', b.dataset.tab === which));
+  };
+  document.querySelectorAll('#hubTabs button').forEach((b) => {
+    b.onclick = () => setHubFilter(b.dataset.hub);
+  });
+  document.querySelectorAll('#botNav .bn').forEach((b) => {
+    b.onclick = () => {
+      const t = b.dataset.tab;
+      try { menuClose(); } catch {}
+      try { popClose(); } catch {}
+      if (t === 'rank') setView('rank');
+      else if (t === 'top') setView('top');
+      else if (t === 'online') { setView('hub'); setHubFilter('online'); }
+      else if (t === 'offline') { setView('hub'); setHubFilter('offline'); }
+      else if (t === 'tasks') setView('tasks');
+    };
+  });
+  let hub = 'online';
+  try { hub = sessionStorage.getItem('znk_hub') || 'online'; } catch {}
+  setTimeout(() => setHubFilter(hub === 'offline' ? 'offline' : 'online'), 100);
+})();
+
 connect(); tick();
 })();
 </script>
+
+<nav id="botNav" aria-label="Navigation principale">
+  <button type="button" class="bn" data-tab="rank" id="bnRank"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l2.4 7.2H22l-6 4.8 2.3 7.2L12 16.8 5.7 21.2 8 14 2 9.2h7.6z"/></svg><span>Ranked</span></button>
+  <button type="button" class="bn" data-tab="top" id="bnTop"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 21h8M12 17v4M7 4h10v4a5 5 0 01-10 0V4zM5 4h14M9 4V2h6v2"/></svg><span>Classement</span></button>
+  <button type="button" class="bn" data-tab="online" id="bnOn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg><span>Online</span></button>
+  <button type="button" class="bn" data-tab="tasks" id="bnTasks"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg><span>Tasks</span></button>
+  <button type="button" class="bn" data-tab="offline" id="bnOff"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M8 12h8M12 8v8"/></svg><span>Offline</span></button>
+</nav>
+
 </body>
 </html>
