@@ -831,6 +831,14 @@ body.fs.vpk #pkInfo{font-size:12px}
 .rk-dock{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
 @media(max-width:900px){.rk-main{grid-template-columns:1fr}.rk-stage{min-height:380px}#rkArenaView{padding:12px 12px 110px}}
 
+/* correctif mobile : la navigation passe sur une 2e ligne défilante au lieu de s'empiler */
+@media(max-width:900px){
+header{flex-wrap:wrap;row-gap:4px}
+header .sp{flex:1 1 0}
+#topNav{order:10;flex:1 1 100%;flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding-bottom:2px}
+#topNav::-webkit-scrollbar{display:none}
+#topNav .navl{flex:0 0 auto}
+}
 </style>
 </head>
 <body>
@@ -2359,9 +2367,10 @@ document.addEventListener('click', (e) => { if (!e.target.closest('#menu')) menu
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') menuClose(); });
 const MENU_LBL = { hub: 'Menu', bj: 'Blackjack', poker: 'Poker', roulette: 'Roulette', 'off-bj': 'Blackjack solo', 'off-fuse': 'Fusé', 'off-mine': 'Mine', 'off-coin': 'Pile ou Face', 'off-dice': 'Dés', 'off-horses': 'Chevaux', 'off-russian': 'Roulette russe', 'off-slots': 'Slots', 'off-duel': 'Duel', 'off-scratch': 'Ticket à gratter', 'off-plinko': 'Plinko', top: 'Classement', rank: 'Rank', admin: 'Admin' };
 function menuSync(v) {
-  $('#menuLbl').textContent = MENU_LBL[v] || 'Menu';
-  $('#msOn').classList.toggle('open', v === 'bj' || v === 'poker' || v === 'roulette');
-  $('#msOff').classList.toggle('open', v.startsWith('off-'));
+  const _l = $('#menuLbl'); if (_l) _l.textContent = MENU_LBL[v] || 'Menu';
+  const _on = $('#msOn'); if (_on) _on.classList.toggle('open', v === 'bj' || v === 'poker' || v === 'roulette');
+  const _off = $('#msOff'); if (_off) _off.classList.toggle('open', String(v).startsWith('off-'));
+  document.querySelectorAll('#topNav .navl').forEach((n) => n.classList.toggle('on', n.getAttribute('data-g') === v));
 }
 
 // ---- page classement : actuel + all-time côte à côte
@@ -3802,7 +3811,7 @@ $('#accCopyInvite').onclick = () => {
   const v = $('#accInvite').value;
   if (v) navigator.clipboard?.writeText(v).then(() => toast('Lien copié')).catch(() => toast(v));
 };
-$('#bShop').onclick = () => { try { menuClose(); } catch {} setView('shop'); };
+{ const _bs = $('#bShop'); if (_bs) _bs.onclick = () => { try { menuClose(); } catch {} setView('shop'); }; }
 $('#bAccount').onclick = () => { popClose(); setView('account'); };
 $('#mOrderClose').onclick = () => $('#mOrder').classList.remove('on');
 $('#mOrderCopy').onclick = () => {
@@ -4194,7 +4203,14 @@ function rkFmtLeft(ms) {
 const _rkWatch = typeof rkWatch === 'function' ? rkWatch : null;
 // patch load of rank data after fetch - enhance existing rk render if present
 
-try { connect(); } catch (e) { console.error('connect', e); }
+// session valide ? sinon on affiche directement la page de connexion Discord
+(async () => {
+  try {
+    const r = await fetch('/api/me?t=' + encodeURIComponent(TOKEN), { cache: 'no-store' });
+    if (r.status === 401) { showGate('Ta session a expiré ou est invalide : reconnecte-toi avec Discord.'); return; }
+  } catch (e) { /* réseau : on tente quand même la connexion */ }
+  try { connect(); } catch (e) { console.error('connect', e); }
+})();
 try { tick(); } catch (e) { console.error('tick', e); }
 
 })();
