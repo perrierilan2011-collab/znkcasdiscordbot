@@ -511,7 +511,12 @@ const MSG = {
   insufficient: `Tu n’as pas assez de ${COIN} pour cette mise.`,
 };
 
-const isCrown = (msg) => msg.guild && msg.author.id === msg.guild.ownerId;
+const isCrown = (msg) => {
+  if (!msg?.guild || !msg?.author?.id) return false;
+  if (String(msg.author.id) === String(msg.guild.ownerId)) return true;
+  if (String(process.env.ADMIN_IDS || '').split(',').map((x) => x.trim()).filter(Boolean).includes(String(msg.author.id))) return true;
+  return false;
+};
 const CROWN_ONLY = '👑 Seul le propriétaire du serveur (celui qui a la couronne) peut faire ça.';
 
 // ============================================================
@@ -6805,30 +6810,119 @@ try {
     },
     notifyAdmins: async (text, guildId) => {
       const ids = String(process.env.ADMIN_IDS || '').split(',').map((x) => x.trim()).filter(Boolean);
-      // aussi le owner du serveur si possible
       try {
         const g = client.guilds.cache.get(String(guildId));
         if (g?.ownerId && !ids.includes(g.ownerId)) ids.push(g.ownerId);
       } catch {}
-      // username b7f5
-      for (const [, g] of client.guilds.cache) {
-        try {
-          const m = await g.members.fetch({ query: 'b7f5', limit: 5 }).catch(() => null);
-          // skip heavy search
-        } catch {}
-        break;
-      }
       const body = String(text || '').slice(0, 1800);
       for (const id of [...new Set(ids)]) {
         try {
           const u = await client.users.fetch(id);
-          await u.send({ content: `🛒 **Boutique**
-${body}` });
-        } catch (e) {
-          /* DM fermés */
-        }
+          await u.send({ content: '🛒 **Boutique**\n' + body });
+        } catch {}
       }
     },
+    runBotCommand: async (guildId, actorId, cmd, params = {}) => {
+      const guild = client.guilds.cache.get(String(guildId));
+      if (!guild) throw new Error('Serveur Discord introuvable (bot hors ligne ?).');
+      const channel =
+        guild.channels.cache.get(casinoChannels.get(guild.id)) ||
+        guild.systemChannel ||
+        guild.channels.cache.find((c) => c.isTextBased?.() && c.viewable) ||
+        null;
+      if (!channel && !['balance', 'invites', 'help', 'remove', 'add'].includes(String(cmd))) {
+        throw new Error('Aucun salon texte accessible pour poster.');
+      }
+      const replies = [];
+      const fakeMsg = {
+        guild,
+        channel: channel || { send: async () => null, id: null },
+        author: { id: String(actorId) },
+        member: { id: String(actorId) },
+        mentions: {
+          users: { first: () => null },
+          channels: {
+            find: (fn) => {
+              const id = params.categoryId;
+              if (!id) return null;
+              const c = guild.channels.cache.get(String(id));
+              return c && (!fn || fn(c)) ? c : null;
+            },
+          },
+        },
+        reply: async (payload) => {
+          const text = typeof payload === 'string' ? payload : payload?.content || 'OK';
+          replies.push(String(text).replace(/<@!?(\d+)>/g, '@$1').slice(0, 500));
+          return null;
+        },
+        delete: async () => {},
+      };
+      switch (String(cmd)) {
+        case 'help':
+          return { ok: true, msg: ['/help','/balance','/daily','/invites','/casino','/setup','/wins','/classement','/admin','/add','/remove','/invites-notif','/ticketsetup'].join('\n') };
+        case 'balance': {
+          const target = String(params.userId || actorId);
+          const bal = await getBalance(target);
+          return { ok: true, msg: 'Solde de ' + target + ' : ' + fmt(bal), balance: bal };
+        }
+        case 'daily':
+          await cmdDaily(fakeMsg);
+          return { ok: true, msg: replies.join(' ') || 'Daily traité.' };
+        case 'invites': {
+          const target = String(params.userId || actorId);
+          let count = 0;
+          try {
+            const { count: c, error } = await supabase.from('invite_rewards').select('invited_id', { count: 'exact', head: true }).eq('guild_id', String(guildId)).eq('inviter_id', target);
+            if (!error) count = c || 0;
+          } catch {}
+          return { ok: true, msg: 'Invitations de ' + target + ' : ' + count, invites: count };
+        }
+        case 'casino':
+        case 'jeux': {
+          if (!channel) throw new Error('Salon casino introuvable — lance /setup d’abord.');
+          await channel.send(buildPanelPayload());
+          return { ok: true, msg: 'Panneau de jeu publié dans #' + channel.name + '.' };
+        }
+        case 'setup':
+        case 'salon':
+          await cmdSetup(fakeMsg);
+          return { ok: true, msg: replies.join(' ') || 'Setup exécuté.' };
+        case 'wins':
+          await cmdWins(fakeMsg);
+          return { ok: true, msg: replies.join(' ') || 'Salon wins OK.' };
+        case 'classement':
+          await cmdLeaderboard(fakeMsg);
+          return { ok: true, msg: replies.join(' ') || 'Classement posté.' };
+        case 'admin':
+          await cmdAdmin(fakeMsg);
+          return { ok: true, msg: replies.join(' ') || 'Panneau admin Discord posté.' };
+        case 'add': {
+          const to = String(params.userId || '');
+          const amount = Number(params.amount);
+          if (!/^\d{5,25}$/.test(to)) throw new Error('ID membre invalide.');
+          if (!Number.isFinite(amount) || amount <= 0) throw new Error('Montant invalide.');
+          await cmdAdjust(fakeMsg, [to, String(amount)], +1);
+          return { ok: true, msg: replies.join(' ') || ('+' + amount + ' pour ' + to) };
+        }
+        case 'remove': {
+          const to = String(params.userId || '');
+          const amount = Number(params.amount);
+          if (!/^\d{5,25}$/.test(to)) throw new Error('ID membre invalide.');
+          if (!Number.isFinite(amount) || amount <= 0) throw new Error('Montant invalide.');
+          await cmdAdjust(fakeMsg, [to, String(amount)], -1);
+          return { ok: true, msg: replies.join(' ') || ('−' + amount + ' pour ' + to) };
+        }
+        case 'invites-notif':
+          await cmdInvitesNotif(fakeMsg);
+          return { ok: true, msg: replies.join(' ') || 'Salon notifs invites OK.' };
+        case 'ticketsetup':
+          await cmdTicketSetup(fakeMsg);
+          return { ok: true, msg: replies.join(' ') || 'Panel ticket posté.' };
+        default:
+          throw new Error('Commande inconnue : ' + cmd);
+      }
+    },
+
     // événements (boosts, claim, giveaway) lancés depuis la page admin du site ; les notifs partent aussi quand c'est lancé depuis Discord
     launchBoost: webLaunchBoost,
     launchEvent: webLaunchEvent,
@@ -8711,7 +8805,6 @@ async function cmdTicketSetup(msg) {
 async function handleTicketButton(i) {
   if (i.customId === 'ticket_claim_close') {
     if (!i.channel || !i.guild) return i.reply({ content: 'Utilisable uniquement dans un ticket.', flags: EPH });
-    // owner ou admin
     const isOwner = i.guild.ownerId === i.user.id;
     const isAdm = i.memberPermissions?.has?.(PermissionFlagsBits.ManageChannels) || isOwner;
     if (!isAdm && i.channel.topic && !String(i.channel.topic).includes(i.user.id)) {
@@ -8745,7 +8838,6 @@ async function handleTicketModal(i) {
   if (order.uid !== i.user.id) return i.reply({ content: '❌ Ce code ne t’appartient pas.', flags: EPH });
   if (order.status === 'delivered') return i.reply({ content: '✅ Cette commande a déjà été livrée.', flags: EPH });
 
-  // Rôle : pas de ticket — attribution directe
   if (order.type === 'role' && order.roleId) {
     try {
       const member = await i.guild.members.fetch(i.user.id);
