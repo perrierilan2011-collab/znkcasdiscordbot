@@ -27,7 +27,6 @@ header{display:flex;align-items:center;gap:10px;padding:8px 14px;background:#000
 #topNav .navl.on{color:#fff;background:rgba(255,255,255,.12)}
 #bTasks svg{display:block}
 .gcard{align-items:center;text-align:center}
-.gcard .gname,.gcard .gdesc{text-align:center;width:100%}
 .gplay{align-self:center;margin-left:auto;margin-right:auto}
 
 .logo{display:none}
@@ -979,6 +978,7 @@ body.fs.vpk #pkInfo{font-size:12px}
       <button type="button" data-ad="orders">Commandes</button>
       <button type="button" data-ad="money">Économie</button>
       <button type="button" data-ad="events">Événements</button>
+      <button type="button" data-ad="bot">Commandes bot</button>
     </div>
     <section class="lbcol" id="adPanelRewards" style="width:100%;max-width:1000px">
       <div class="lbtitle"><b>Créer / modifier une reward</b><small>Nitro, rôle auto, ou custom · conditions optionnelles</small></div>
@@ -1050,6 +1050,13 @@ body.fs.vpk #pkInfo{font-size:12px}
           <label id="adFMinutes"><span id="adMinLbl">Durée (minutes)</span><input class="gin" id="adMinutes" inputmode="numeric" autocomplete="off" value="15"></label>
         </div>
         <p style="text-align:right;margin:8px 0 0"><button class="btn go" id="adLaunch">Lancer l’événement</button></p>
+      </div>
+
+    <section class="lbcol hide" id="adPanelBot" style="width:100%;max-width:1000px">
+      <div class="lbtitle"><b>Commandes bot Discord</b><small>Toutes les slash commands owner</small></div>
+      <div class="adbody" style="padding:14px;display:flex;flex-direction:column;gap:12px">
+        <div class="adlist" id="adBotCmds" style="display:flex;flex-direction:column;gap:8px"></div>
+        <div id="adBotOut" class="lbnone" style="white-space:pre-wrap;text-align:left;min-height:40px;color:#e5e5e5"></div>
       </div>
     </section>
   </div>
@@ -1317,7 +1324,7 @@ const params = new URLSearchParams(location.search);
 let TOKEN = params.get('t') || '';
 try { if (TOKEN) localStorage.setItem('znk_t', TOKEN); else TOKEN = localStorage.getItem('znk_t') || ''; } catch {}
 if (params.get('t')) history.replaceState(null, '', location.pathname);
-if (!TOKEN) { const g = $('#gate'); if (g) g.classList.add('on'); else location.replace('/login'); return; }
+if (!TOKEN) { const g = document.getElementById('gate'); if (g) g.classList.add('on'); else location.replace('/login'); return; }
 
 let me = null, S = null, offset = 0, COIN = 'ZTKN', seatsN = 5;
 const BJT = new Map(); // tid -> snapshot (blackjack)
@@ -1421,27 +1428,47 @@ async function send(action, extra = {}) {
     return d.ok;
   } catch { toast('Connexion perdue…'); return false; }
 }
-function showGate(t) { $('#gatemsg').textContent = t; $('#gate').classList.add('on'); try { localStorage.removeItem('znk_t'); } catch {} }
+function showGate(t) { const gm = document.getElementById('gatemsg'); if (gm && t) gm.textContent = t; const g = document.getElementById('gate'); if (g) g.classList.add('on'); try { localStorage.removeItem('znk_t'); } catch(e) {} }
 
 let es;
 function connect() {
+  try { if (es) es.close(); } catch (e) {}
   es = new EventSource('/api/stream?t=' + encodeURIComponent(TOKEN));
-  es.addEventListener('hello', (e) => { const d = JSON.parse(e.data); me = d; COIN = d.coin && d.coin !== '🪙' ? d.coin : 'ZTKN'; seatsN = d.seats || 5; $('#coin').textContent = COIN;
-    $('#meName').textContent = d.name; setAvatar($('#meAv'), d.avatar, d.name); $('#conn').style.display = 'none'; BJT.clear(); P.tables.clear(); rOnHello(d); pOnHello(d); });
+  es.addEventListener('hello', (e) => {
+    try {
+      const d = JSON.parse(e.data); me = d; connect._fails = 0;
+      COIN = d.coin && d.coin !== '🪙' ? d.coin : 'ZTKN'; seatsN = d.seats || 5;
+      const coinEl = document.getElementById('coin'); if (coinEl) coinEl.textContent = COIN;
+      const mn = document.getElementById('meName'); if (mn) mn.textContent = d.name;
+      const av = document.getElementById('meAv'); if (av) setAvatar(av, d.avatar, d.name);
+      const cn = document.getElementById('conn'); if (cn) cn.style.display = 'none';
+      BJT.clear(); P.tables.clear();
+      try { rOnHello(d); } catch (err) {}
+      try { pOnHello(d); } catch (err) {}
+    } catch (err) { console.error('hello', err); }
+  });
   es.addEventListener('ranked', (e) => { try { rkRender(JSON.parse(e.data)); } catch {} });
 es.addEventListener('roulette', (e) => { const st = JSON.parse(e.data); offset = st.now - Date.now(); rRender(st); });
   es.addEventListener('poker', (e) => { const st = JSON.parse(e.data); offset = st.now - Date.now(); pUpdate(st); });
   es.addEventListener('admin', () => $('#bAdmin').classList.remove('hide'));
-  es.addEventListener('bal', (e) => { try { W.bal = JSON.parse(e.data).bal; } catch(err) { return; } try { pHeader(); } catch(err) {} if (!O.hold && W.bal != null) { const mb = $('#meBal'); if (mb) mb.textContent = num(W.bal) + ' ' + COIN; } });
+  es.addEventListener('bal', (e) => { W.bal = JSON.parse(e.data).bal; pHeader(); if (!O.hold && W.bal != null) $('#meBal').textContent = num(W.bal) + ' ' + COIN; });
   es.addEventListener('inbox', (e) => nSet(JSON.parse(e.data), false));
   es.addEventListener('notif', (e) => nAdd(JSON.parse(e.data)));
-  es.addEventListener('shop', (e) => { try { const d = JSON.parse(e.data); if (W.view === 'shop' || W.view === 'admin' || W.view === 'account') { try { loadShop(); } catch(err) {} try { if (typeof loadAdminShop === 'function') loadAdminShop(); } catch(err) {} } } catch(err) {} });
   es.addEventListener('chathist', (e) => { C.msgs = JSON.parse(e.data); cRender(); });
   es.addEventListener('chat', (e) => cOnMsg(JSON.parse(e.data)));
   es.addEventListener('state', (e) => { $('#conn').style.display = 'none'; const st = JSON.parse(e.data); offset = st.now - Date.now(); bjUpdate(st); });
   es.addEventListener('tabledel', (e) => tableDel(JSON.parse(e.data)));
   es.addEventListener('emote', (e) => { const d = JSON.parse(e.data); if (d.tid && d.tid !== W.btid) return; const i = S && S.seats.findIndex((p) => p && p.uid === d.uid); if (i >= 0) { const x = el('div', 'emo', d.e); seatEls[i].root.append(x); setTimeout(() => x.remove(), 1900); } });
-  es.onerror = () => { $('#conn').style.display = 'block'; if (es.readyState === 2) setTimeout(connect, 2000); };
+  es.onerror = () => {
+    const cn = document.getElementById('conn'); if (cn) cn.style.display = 'block';
+    connect._fails = (connect._fails || 0) + 1;
+    if (connect._fails >= 4) {
+      try { es.close(); } catch (e) {}
+      showGate('Session invalide ou expirée. Reconnecte-toi via le bouton Jouer dans Discord, ou /login.');
+      return;
+    }
+    if (es.readyState === 2) setTimeout(connect, 1500);
+  };
 }
 function setAvatar(box, url, name) {
   box.textContent = ''; box.style.background = '';
@@ -2312,7 +2339,7 @@ window.__bootRoute = () => {
 };
 
 
-$('.logo').onclick = () => { ac(); setView('hub'); };
+if ($('.logo')) $('.logo').onclick = () => { ac(); setView('hub'); };
 function hubRoulette(ok) { $('#gcRoulette').disabled = !ok; const t = document.querySelector('.mitem[data-g="roulette"]'); if (t) t.disabled = !ok; }
 function updHub() {
   const plural = (n, a) => n + ' ' + a + (n > 1 ? 's' : '');
@@ -3643,7 +3670,7 @@ $('#me').onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preven
 document.querySelectorAll('.ppanel').forEach((p) => (p.onclick = (e) => e.stopPropagation()));
 document.addEventListener('click', () => popClose());
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') popClose(); });
-$('#bLogout').onclick = () => { try { localStorage.removeItem('znk_t'); } catch(e) {} try { if (es) es.close(); } catch(e) {} location.replace('/login'); };
+$('#bLogout').onclick = () => { try { localStorage.removeItem('znk_t'); } catch {} try { if (es) es.close(); } catch {} location.replace(location.pathname); };
 
 
 // réglages : victoires affichées dans le chat + notification de message
@@ -3689,7 +3716,6 @@ async function loadShop() {
       if (nameEl) {
         let t = ord.rewardName || r.name;
         if (ord.autoRole) t += ' · rôle livré automatiquement';
-        else if (ord.type === 'role' && ord.roleErr) t += ' · rôle à livrer manuellement';
         else if (ord.status === 'pending') t += ' · en attente de livraison';
         nameEl.textContent = t;
       }
@@ -3776,7 +3802,7 @@ $('#accCopyInvite').onclick = () => {
   const v = $('#accInvite').value;
   if (v) navigator.clipboard?.writeText(v).then(() => toast('Lien copié')).catch(() => toast(v));
 };
-if ($('#bShop')) $('#bShop').onclick = () => { try { menuClose(); } catch(e) {} setView('shop'); };
+$('#bShop').onclick = () => { try { menuClose(); } catch {} setView('shop'); };
 $('#bAccount').onclick = () => { popClose(); setView('account'); };
 $('#mOrderClose').onclick = () => $('#mOrder').classList.remove('on');
 $('#mOrderCopy').onclick = () => {
@@ -3785,14 +3811,51 @@ $('#mOrderCopy').onclick = () => {
 };
 
 // Admin shop tabs
+
+const AD_BOT_CMDS = [
+  { cmd: 'help', title: '/help', desc: 'Liste des commandes', fields: [] },
+  { cmd: 'balance', title: '/balance', desc: 'Solde d’un membre', fields: [{ k: 'userId', ph: 'ID membre (vide = toi)' }] },
+  { cmd: 'daily', title: '/daily', desc: 'Récompense quotidienne', fields: [] },
+  { cmd: 'invites', title: '/invites', desc: 'Stats invitations', fields: [{ k: 'userId', ph: 'ID membre' }] },
+  { cmd: 'casino', title: '/casino', desc: 'Publie le panneau de jeu', fields: [] },
+  { cmd: 'setup', title: '/setup', desc: 'Crée / rafraîchit #casino', fields: [] },
+  { cmd: 'wins', title: '/wins', desc: 'Salon des victoires', fields: [] },
+  { cmd: 'classement', title: '/classement', desc: 'Classement auto', fields: [] },
+  { cmd: 'admin', title: '/admin', desc: 'Panneau admin Discord', fields: [] },
+  { cmd: 'add', title: '/add', desc: 'Ajoute des coins', fields: [{ k: 'userId', ph: 'ID membre' }, { k: 'amount', ph: 'Montant' }] },
+  { cmd: 'remove', title: '/remove', desc: 'Retire des coins', fields: [{ k: 'userId', ph: 'ID membre' }, { k: 'amount', ph: 'Montant' }] },
+  { cmd: 'invites-notif', title: '/invites-notif', desc: 'Salon notifs invites', fields: [] },
+  { cmd: 'ticketsetup', title: '/ticketsetup', desc: 'Panel claim rewards', fields: [{ k: 'categoryId', ph: 'ID catégorie (opt)' }] },
+];
+function adBotRender() {
+  const box = $('#adBotCmds'); if (!box) return; box.textContent = '';
+  AD_BOT_CMDS.forEach((c) => {
+    const row = el('div', 'taskrow');
+    const info = el('div', 'tinfo'); info.append(el('b', null, c.title), el('small', null, c.desc)); row.append(info);
+    const fields = el('div', null); fields.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;align-items:center';
+    const inputs = {};
+    (c.fields || []).forEach((f) => { const inp = el('input', 'gin'); inp.placeholder = f.ph; inp.style.width = f.k === 'amount' ? '100px' : '160px'; inputs[f.k] = inp; fields.append(inp); });
+    const btn = el('button', 'btn go', 'Exécuter'); btn.type = 'button';
+    btn.onclick = async () => {
+      btn.disabled = true; const params = {}; Object.keys(inputs).forEach((k) => { const v = inputs[k].value.trim(); if (v) params[k] = v; });
+      const out = $('#adBotOut'); if (out) out.textContent = 'Exécution…';
+      const ok = await send('admin_bot_cmd', { cmd: c.cmd, params }); btn.disabled = false;
+      const d = send.last || {}; if (out) out.textContent = ok ? (d.msg || (d.result && d.result.msg) || 'OK') : (d.error || 'Erreur');
+      if (ok) toast(c.title + ' OK');
+    };
+    fields.append(btn); row.append(fields); box.append(row);
+  });
+}
+
 function adShow(panel) {
   document.querySelectorAll('#adTabs button').forEach((b) => b.classList.toggle('on', b.dataset.ad === panel));
   ['rewards', 'tasks', 'orders', 'money', 'events'].forEach((k) => {
     const elp = $('#adPanel' + k.charAt(0).toUpperCase() + k.slice(1));
     // ids: adPanelRewards etc
   });
-  const map = { rewards: 'adPanelRewards', tasks: 'adPanelTasks', orders: 'adPanelOrders', money: 'adPanelMoney', events: 'adPanelEvents' };
+  const map = { rewards: 'adPanelRewards', tasks: 'adPanelTasks', orders: 'adPanelOrders', money: 'adPanelMoney', events: 'adPanelEvents', bot: 'adPanelBot' };
   Object.entries(map).forEach(([k, id]) => { const n = document.getElementById(id); if (n) n.classList.toggle('hide', k !== panel); });
+  if (panel === 'bot' && typeof adBotRender === 'function') adBotRender();
 }
 document.querySelectorAll('#adTabs button').forEach((b) => (b.onclick = () => adShow(b.dataset.ad)));
 async function loadAdminShop() {
