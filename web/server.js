@@ -331,6 +331,9 @@ function init(deps) {
         }
       },
       rankRecord: (players) => rankApi.recordRanked(players, (uid) => avatarMap.get(uid)),
+      debitRR: (uid, amt) => rankApi.debitRR(uid, amt),
+      creditRR: (uid, amt) => rankApi.creditRR(uid, amt),
+      getRR: (uid) => rankApi.getRR(uid),
       onMatchEnd: (r) => roundEnd(guildId, r),
     });
     entry.roulette = new RouletteRoom(guildId, {
@@ -712,6 +715,14 @@ function init(deps) {
         }
         case 'rkact': {
           await entry.arena.run(() => entry.arena.act(user.uid, d.answer || d));
+          break;
+        }
+        case 'rkhit': {
+          await entry.arena.run(() => entry.arena.act(user.uid, 'hit'));
+          break;
+        }
+        case 'rkstand': {
+          await entry.arena.run(() => entry.arena.act(user.uid, 'stand'));
           break;
         }
 
