@@ -5,8 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#000000">
 <title>Casino · Jeux en ligne</title>
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&display=swap" rel="stylesheet">
 <style>
 :root{
   --bg:#000; --violet:#262626; --violet2:#525252; --gold:#fbbf24; --green:#22c55e; --red:#ef4444;
@@ -724,221 +722,6 @@ body.fs.vpk #pkInfo{font-size:12px}
 
 
 
-/* ========== INTERFACE MOBILE (refonte) ========== */
-#botNav{
-  display:none;position:fixed;left:0;right:0;bottom:0;z-index:60;
-  background:rgba(8,8,8,.96);border-top:1px solid #2a2a2a;
-  padding:4px 2px calc(4px + env(safe-area-inset-bottom));
-  backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
-  box-shadow:0 -8px 32px rgba(0,0,0,.5)
-}
-#botNav .bn{
-  flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
-  background:transparent;border:0;color:#737373;font-size:10px;font-weight:700;
-  padding:8px 2px;border-radius:12px;min-height:52px;-webkit-tap-highlight-color:transparent
-}
-#botNav .bn svg{width:22px;height:22px;stroke-width:2.2}
-#botNav .bn.on{color:#fff;background:rgba(255,255,255,.1)}
-#botNav .bn:active{transform:scale(.94)}
-.hubTabs{display:none}
-.hubTabs button{flex:1;padding:14px;border-radius:12px;font-weight:800;font-size:15px;
-  background:#111;border:1px solid #262626;color:#a3a3a3}
-.hubTabs button.on{background:#fff;color:#000;border-color:#fff}
-.cat.hide-cat{display:none!important}
-
-@media(max-width:900px){
-  /* ---- base ---- */
-  html,body{height:100%;overflow:hidden}
-  body{font-size:15px;padding:0;padding-top:env(safe-area-inset-top)}
-  body.has-botnav{padding-bottom:0}
-  #botNav{display:flex}
-  #menu{display:none!important}
-
-  /* ---- header compact ---- */
-  header{
-    padding:6px 10px;gap:6px;flex-shrink:0;
-    padding-top:max(6px, env(safe-area-inset-top));
-    background:#000;border-bottom:1px solid #1a1a1a;z-index:30
-  }
-  header .hb.ico{padding:8px;min-width:40px;min-height:40px;border-radius:12px}
-  header .hb.ico svg,header .hb.ico{font-size:0}
-  .me{padding:2px 10px 2px 2px;gap:6px}
-  .me img,.me .av{width:28px;height:28px}
-  .me b{font-size:13px}
-  #meName{display:none}
-  #bFs,#bTop{display:none!important}
-  .sp{flex:1;min-width:4px}
-
-  /* ---- vues principales : plein écran sous header, au-dessus de botNav ---- */
-  main{
-    flex:1;min-height:0;overflow:auto;-webkit-overflow-scrolling:touch;
-    padding:8px 8px 0;gap:6px;
-    padding-bottom:calc(64px + env(safe-area-inset-bottom))!important
-  }
-  main.hide{display:none!important}
-
-  /* ---- HUB : liste de jeux tactile ---- */
-  #hubView{
-    padding:12px 12px calc(72px + env(safe-area-inset-bottom));
-    gap:12px;align-items:stretch;overflow:auto
-  }
-  .hubTabs{display:flex;position:sticky;top:0;z-index:5;background:#000;padding:4px 0 10px;margin:0;gap:8px}
-  #hubView .cat{max-width:none;margin:0}
-  #hubView .cat h2{font-size:13px;text-transform:uppercase;letter-spacing:.12em;color:#737373;margin:0 0 8px}
-  #hubView .cat .catd{display:none}
-  .games{grid-template-columns:1fr 1fr;gap:10px}
-  .gcard{
-    padding:14px 12px 12px;border-radius:16px;gap:4px;
-    background:#0c0c0c;border:1px solid #222;min-height:120px;
-    justify-content:space-between;touch-action:manipulation
-  }
-  .gcard:active{border-color:#a78bfa;background:#14101f;transform:scale(.98)}
-  .gname{font-size:15px;font-weight:800;line-height:1.2}
-  .gdesc{font-size:11px;color:#737373;min-height:0;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-  .glive{font-size:11px;min-height:14px;color:#86efac}
-  .gplay{
-    margin-top:8px;width:100%;text-align:center;padding:11px 8px;
-    border-radius:10px;font-size:13px;font-weight:800;background:#fff;color:#000
-  }
-  .gcard:disabled .gplay{background:#262626;color:#737373}
-
-  /* ---- Rank / Classement / Admin ---- */
-  #rankView,#topView,#adminView{padding:12px 10px calc(72px + env(safe-area-inset-bottom));overflow:auto}
-  .rkwrap,.lbwrap{max-width:none;gap:12px}
-  .rkme{padding:16px;border-radius:16px}
-  .rkname{font-size:22px}
-  .lbgrid{grid-template-columns:1fr;gap:12px}
-  .lbcol{border-radius:14px}
-  .lbtitle{padding:12px 14px}
-  .lbrow{padding:10px 12px;min-height:48px}
-
-  /* ---- Tables BJ / Poker : moins de hauteur forcée ---- */
-  #table,.ftable{
-    min-height:0;flex:1;border-width:8px;
-    border-radius:20px 20px 36px 36px/20px 20px 28px 28px;
-    padding:8px 4px 48px;overflow:hidden
-  }
-  #table::after,.ftable::after{inset:5px;border-radius:14px 14px 28px 28px/14px 14px 22px 22px}
-  #table::before,.ftable::before{font-size:min(22vw,100px);opacity:.7}
-  #seats{grid-template-columns:repeat(5,minmax(0,1fr));gap:2px;padding:0 2px}
-  .seat{min-height:calc(var(--cw)*1.9);gap:3px}
-  .seat:nth-child(n){transform:none!important}
-  .plate{padding:3px 6px 3px 3px;border-radius:10px;gap:4px}
-  .plate .av{width:26px;height:26px}
-  .plate .nm{max-width:5.5ch;font-size:11px}
-  .plate .bl{font-size:10px}
-  .rule{display:none}
-  #feed{display:none}
-  #shoe{top:4px;right:2%;transform:scale(.85)}
-  #center{position:static;transform:none;margin:2px 0;width:auto}
-  #msg{font-size:12px;padding:5px 12px}
-  #cd{font-size:22px}
-  :root{--cw:clamp(28px,9.2vw,42px)}
-  .cards .card+.card{margin-left:calc(var(--cw)*-.55)}
-
-  /* ---- DOCKS collés au-dessus de la barre d'onglets ---- */
-  #dock,.dockp,#ofDock,#rDock,#pkDock{
-    position:fixed;left:0;right:0;z-index:40;
-    bottom:calc(56px + env(safe-area-inset-bottom));
-    margin:0;border-radius:18px 18px 0 0;
-    padding:10px 12px calc(10px + env(safe-area-inset-bottom,0px));
-    background:rgba(0,0,0,.94);border:1px solid #2a2a2a;border-bottom:0;
-    box-shadow:0 -12px 40px rgba(0,0,0,.55);
-    max-height:42vh;overflow-y:auto;-webkit-overflow-scrolling:touch
-  }
-  /* espace pour le dock fixe dans les vues table */
-  #bjView,#pkView,#rlView,#ofView{
-    padding-bottom:calc(56px + env(safe-area-inset-bottom))!important
-  }
-  #bjView #table,#pkView .ftable,#rlView .ftable,#ofView .ftable{
-    margin-bottom:calc(120px + env(safe-area-inset-bottom))
-  }
-
-  /* boutons d'action : grandes zones tactiles */
-  .btn{
-    min-height:48px;padding:12px 16px;border-radius:14px;font-size:15px;font-weight:800;
-    touch-action:manipulation;-webkit-user-select:none;user-select:none
-  }
-  .btn.big{min-width:0;flex:1;min-height:52px;font-size:16px;padding:14px 10px}
-  .btn.big kbd{display:none}
-  .btn.go{font-size:16px;padding:14px 20px}
-  .row{gap:8px;flex-wrap:wrap}
-  #pPlay.row,#pBet .row{display:flex;flex-wrap:nowrap}
-  #pPlay .btn{flex:1}
-  .chip{
-    width:48px;height:48px;font-size:12px;border-width:2px;
-    flex:none;touch-action:manipulation
-  }
-  #chipRow{justify-content:center;gap:8px;flex-wrap:wrap}
-  .amt{
-    flex:1;min-width:0;border-radius:14px;border-width:2px
-  }
-  .amt input{
-    width:100%;min-width:0;font-size:18px;padding:12px 8px;text-align:center
-  }
-  .amt span{padding:0 8px;font-size:12px}
-  #bHalf,#bDouble,#bMax,#bLast{min-height:44px;padding:10px 12px;font-size:13px}
-
-  /* poker dock */
-  #pkDock .btn{flex:1}
-  #pkDock .row{gap:8px}
-  .pact{display:flex;gap:8px;width:100%}
-  .pact .btn{flex:1}
-
-  /* roulette */
-  #rlView .rboard{transform-origin:top center}
-  #rDock .btn{min-height:46px}
-  .rspot{min-height:40px;font-size:12px;padding:8px 4px}
-
-  /* offline games */
-  #ofView{display:flex;flex-direction:column}
-  #ofTable{flex:1;min-height:200px;margin-bottom:calc(130px + env(safe-area-inset-bottom))}
-  #ofDock .btn{min-height:48px;flex:1}
-  #ofDock .row{gap:8px}
-
-  /* barres d'onglets tables (multi-tables) */
-  .tbar{padding:4px 0;gap:6px;overflow-x:auto;flex-shrink:0;-webkit-overflow-scrolling:touch}
-  .tbar button{min-height:40px;padding:8px 14px;border-radius:10px;font-size:13px;white-space:nowrap}
-
-  /* modales plein écran mobile */
-  .modal.on,.mod.on{align-items:flex-end}
-  .modal .box,.mod .box,.mbox{
-    width:100%;max-width:100%;border-radius:20px 20px 0 0;
-    max-height:85vh;overflow:auto;padding-bottom:calc(16px + env(safe-area-inset-bottom))
-  }
-
-  /* chat / panneaux latéraux */
-  .side,.chatbox{max-height:50vh}
-
-  /* popovers header */
-  .ppanel{right:4px;left:auto;max-width:calc(100vw - 16px);width:320px}
-}
-
-@media(min-width:901px){
-  #botNav{display:none!important}
-  .hubTabs{display:none!important}
-}
-
-
-@media(max-width:400px){
-  .games{grid-template-columns:1fr}
-  .gcard{min-height:100px}
-}
-@media(max-width:900px){
-  /* éviter double padding-bottom body + main */
-  body.has-botnav{padding-bottom:0!important}
-  /* header icons denser */
-  #bSnd,#bSet,#bBell,#bRules{flex:none}
-  /* offline dock contenu centré */
-  #ofDock{display:flex;flex-direction:column;gap:8px}
-  #ofDock .row{width:100%;justify-content:center}
-  /* poker raise slider etc */
-  #pkDock input[type=range]{width:100%;height:28px}
-  /* message centre plus lisible */
-  #msg{max-width:95%}
-}
-
-
 /* ---- Shop / Tasks / Account / Admin tabs ---- */
 .shopgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;width:100%;max-width:1000px}
 .scard{background:#0a0a0a;border:1px solid #262626;border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:8px}
@@ -980,143 +763,6 @@ body.fs.vpk #pkInfo{font-size:12px}
 @media(max-width:400px){.shopgrid{grid-template-columns:1fr}}
 
 
-/* ---- Ranked Arena ---- */
-#rkArenaView{display:flex;flex-direction:column;min-height:0}
-.rk-table{
-  position:relative;flex:1;min-height:360px;border-radius:24px;overflow:hidden;
-  background:
-    radial-gradient(ellipse 80% 60% at 50% 40%,#6d28d9 0%,#3b0764 45%,#1a0533 100%);
-  border:3px solid rgba(196,181,253,.35);
-  box-shadow:inset 0 0 60px rgba(0,0,0,.5),0 20px 50px rgba(109,40,217,.35);
-  display:flex;flex-direction:column;align-items:center;justify-content:space-between;
-  padding:12px 8px 20px
-}
-.rk-table::before{
-  content:"RANKED";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
-  font-size:min(14vw,120px);font-weight:900;letter-spacing:.2em;color:transparent;
-  -webkit-text-stroke:1.5px rgba(255,255,255,.12);pointer-events:none;z-index:0
-}
-.rk-board{display:flex;gap:6px;z-index:2;min-height:var(--ch);align-items:center;justify-content:center;margin:8px 0}
-.rk-seats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;width:100%;z-index:2;padding:0 6px}
-.rk-seat{
-  background:rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.12);border-radius:14px;
-  padding:8px;display:flex;flex-direction:column;align-items:center;gap:4px;min-height:110px;
-  transition:border-color .2s,box-shadow .2s,transform .25s
-}
-.rk-seat.on{border-color:#fbbf24;box-shadow:0 0 20px rgba(251,191,36,.35)}
-.rk-seat.win{border-color:#86efac;animation:rkPulse .8s ease}
-@keyframes rkPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
-.rk-seat .nm{font-weight:700;font-size:12px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.rk-seat .sc{font-size:11px;color:var(--gold);font-weight:800}
-.rk-delta{font-weight:900;font-size:14px}
-.rk-delta.up{color:#86efac}.rk-delta.dn{color:#fca5a5}
-.rk-hud{text-align:center;z-index:2;margin:4px 0}
-.rk-hud .phase{font-weight:800;font-size:15px;letter-spacing:.04em}
-.rk-hud .sub{font-size:12px;color:rgba(255,255,255,.65)}
-.rk-season{
-  display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;
-  width:100%;max-width:1000px;background:linear-gradient(135deg,#1a0533,#2e1065);
-  border:1px solid rgba(196,181,253,.3);border-radius:16px;padding:14px 16px;margin-bottom:12px
-}
-.rk-season .timer{font-variant-numeric:tabular-nums;font-weight:900;font-size:20px;color:#fde68a}
-.rk-me-card{
-  width:100%;max-width:1000px;border-radius:20px;padding:20px;margin-bottom:14px;
-  background:linear-gradient(145deg,rgba(109,40,217,.35),rgba(15,5,40,.9));
-  border:1px solid rgba(196,181,253,.35);display:grid;grid-template-columns:auto 1fr auto;gap:16px;align-items:center
-}
-.rk-badge{
-  width:72px;height:72px;border-radius:18px;display:grid;place-items:center;font-weight:900;font-size:13px;
-  color:#fff;text-shadow:0 2px 6px #000;box-shadow:0 8px 24px rgba(0,0,0,.4)
-}
-.rk-elo{font-size:28px;font-weight:900;font-variant-numeric:tabular-nums}
-.rk-tier{font-size:16px;font-weight:800}
-.rk-prog{height:8px;background:rgba(255,255,255,.1);border-radius:99px;overflow:hidden;margin-top:8px}
-.rk-prog i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#c4b5fd,#a78bfa,#7c3aed)}
-.rk-place-banner{
-  background:rgba(251,191,36,.12);border:1px dashed #fbbf24;border-radius:12px;padding:10px 14px;
-  font-size:13px;color:#fde68a;margin-top:8px
-}
-@media(max-width:900px){
-  .rk-seats{grid-template-columns:repeat(2,1fr)}
-  .rk-me-card{grid-template-columns:1fr;text-align:center;justify-items:center}
-  .rk-table{min-height:300px}
-  #rkDock{position:fixed;left:0;right:0;bottom:calc(56px + env(safe-area-inset-bottom));z-index:40;
-    background:rgba(0,0,0,.94);border-radius:16px 16px 0 0;padding:12px;border:1px solid #2a2a2a}
-}
-
-
-/* ---- Layout centré + nav PC / mobile ---- */
-header{
-  max-width:1100px;margin:0 auto;width:100%;
-  display:flex;align-items:center;gap:8px;flex-wrap:wrap;
-  padding:10px 16px;box-sizing:border-box;
-}
-main, #hubView, #shopView, #tasksView, #accountView, #rankView, #rkArenaView, #topView, #adminView, #bjView, #pkView, #rlView, #ofView{
-  width:100%;max-width:1000px;margin-left:auto;margin-right:auto;box-sizing:border-box;
-}
-#hubView{padding:12px 16px 100px}
-.hub-hero{
-  display:flex;flex-direction:column;align-items:center;text-align:center;gap:12px;
-  margin:8px 0 24px;padding:20px 16px;border-radius:20px;
-  background:linear-gradient(145deg,rgba(109,40,217,.35),rgba(15,5,40,.85));
-  border:1px solid rgba(196,181,253,.35);
-}
-.hub-hero h1{margin:0;font-size:clamp(22px,5vw,32px);font-weight:900;letter-spacing:.02em}
-.hub-hero p{margin:0;color:var(--mut);font-size:14px;max-width:420px}
-.hub-hero .btn.rk-cta{
-  font-size:16px;font-weight:800;padding:14px 28px;border-radius:14px;
-  background:linear-gradient(135deg,#a78bfa,#7c3aed);color:#fff;border:none;
-  box-shadow:0 8px 28px rgba(124,58,237,.45);
-}
-.hub-hero .btn.rk-cta:hover{filter:brightness(1.08)}
-.hub-section{margin:0 0 28px}
-.hub-section h2{text-align:center;margin:0 0 6px;font-size:18px}
-.hub-section .catd{text-align:center;margin:0 0 14px}
-.games{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;justify-content:center}
-.gcard{text-align:left}
-
-/* Nav desktop : boutons alignés */
-#deskNav{
-  display:none;flex:1;align-items:center;justify-content:center;gap:6px;flex-wrap:wrap;min-width:0;
-}
-#deskNav button{
-  background:transparent;border:1px solid transparent;color:#d4d4d4;font-weight:700;
-  padding:8px 12px;border-radius:10px;font-size:13px;cursor:pointer;white-space:nowrap;
-}
-#deskNav button:hover{background:#171717;color:#fff}
-#deskNav button.on{background:#fff;color:#000;border-color:#fff}
-#deskNav button.rk{color:#c4b5fd;border-color:rgba(167,139,250,.35)}
-#deskNav button.rk.on{background:linear-gradient(135deg,#7c3aed,#5b21b6);color:#fff;border-color:transparent}
-#deskNav button.shop{color:#fde68a}
-#deskNav button.task{color:#86efac}
-
-/* Menu déroulant : mobile only */
-@media(min-width:901px){
-  #menu{display:none!important}
-  #deskNav{display:flex}
-  #botNav{display:none!important}
-}
-@media(max-width:900px){
-  #deskNav{display:none!important}
-  #menu{display:block}
-  header{padding:8px 10px}
-  #hubView{padding-bottom:120px}
-}
-
-/* Bouton Tasks header (planche) */
-#bTasks{
-  display:inline-flex;align-items:center;gap:6px;font-weight:700;font-size:12px;
-  padding:7px 12px!important;width:auto!important;
-}
-#bTasks .task-ico{
-  width:16px;height:16px;border:1.5px solid currentColor;border-radius:3px;position:relative;flex-shrink:0;
-}
-#bTasks .task-ico::before,#bTasks .task-ico::after{
-  content:"";position:absolute;left:3px;right:3px;height:1.5px;background:currentColor;border-radius:1px;
-}
-#bTasks .task-ico::before{top:5px}
-#bTasks .task-ico::after{top:9px}
-
 /* Tasks board style */
 #tasksView .task-board{
   max-width:560px;margin:0 auto;background:#0a0a0a;border:1px solid #262626;border-radius:16px;padding:16px;
@@ -1127,130 +773,55 @@ main, #hubView, #shopView, #tasksView, #accountView, #rankView, #rkArenaView, #t
 
 
 
-/* Ranked skill playfield */
-.rk-play{
-  width:100%;max-width:520px;margin:12px auto;z-index:3;text-align:center;
-  min-height:160px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;
-}
-.rk-go{
-  width:min(90vw,280px);height:min(90vw,280px);border-radius:50%;border:4px solid rgba(255,255,255,.15);
-  display:grid;place-items:center;font-size:42px;font-weight:900;letter-spacing:.08em;
-  background:rgba(0,0,0,.45);transition:background .08s,border-color .08s,transform .08s;user-select:none;cursor:pointer;
-}
-.rk-go.wait{border-color:#fbbf24;color:#fde68a}
-.rk-go.ready{background:#16a34a;border-color:#86efac;color:#fff;box-shadow:0 0 40px rgba(22,163,74,.5);transform:scale(1.04)}
-.rk-go.done{opacity:.7;cursor:default}
-.rk-bar-wrap{width:100%;max-width:420px;height:28px;background:rgba(0,0,0,.5);border-radius:99px;position:relative;overflow:hidden;border:1px solid rgba(255,255,255,.15)}
-.rk-bar-zone{position:absolute;top:0;bottom:0;background:rgba(134,239,172,.45);border-left:2px solid #86efac;border-right:2px solid #86efac}
-.rk-bar-cursor{position:absolute;top:0;bottom:0;width:4px;background:#fff;border-radius:2px;box-shadow:0 0 10px #fff;transform:translateX(-50%)}
-.rk-seq-row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
-.rk-seq-btn{
-  width:64px;height:64px;border-radius:16px;border:2px solid rgba(255,255,255,.2);
-  font-size:22px;font-weight:900;cursor:pointer;background:rgba(0,0,0,.4);color:#fff;
-}
-.rk-seq-btn.on{background:#7c3aed;border-color:#c4b5fd;transform:scale(1.06)}
-.rk-seq-btn:disabled{opacity:.5;cursor:default}
-.rk-hint{font-size:13px;color:rgba(255,255,255,.7);max-width:360px}
-.rk-result-list{width:100%;max-width:420px;text-align:left;font-size:13px}
-.rk-result-list div{display:flex;justify-content:space-between;padding:6px 10px;border-bottom:1px solid rgba(255,255,255,.08)}
 
-
-/* ================= REFONTE UI ZNK — noir conservé, thèmes de jeux intacts ================= */
-:root{--panel:#0b0b0c;--line:#1e1e22;--line2:#2c2c32;--ink:#f4f4f2;--mut:#8b8b94;--ice:#5ee0ff;--ok:#34d399;--bad:#ff5d5d;--r:16px;
-  --disp:"Bricolage Grotesque","Segoe UI",system-ui,sans-serif}
-body{letter-spacing:-.005em}
-h1,h2,h3,.gname,#deskNav button,#brand{font-family:var(--disp)}
-/* en-tête : marque + onglets principaux uniquement */
-header{gap:18px;padding:0 18px;height:58px;background:#000;border-bottom:1px solid var(--line)}
-#menu{display:none!important}
-#brand{background:none;font-weight:800;font-size:22px;letter-spacing:-.04em;color:#fff;padding:0;display:flex;align-items:center;gap:8px}
-#brand i{width:10px;height:10px;border-radius:50%;background:var(--ice);box-shadow:0 0 14px var(--ice);display:block}
-#deskNav{flex:0 1 auto;justify-content:flex-start;gap:2px;height:100%}
-@media(min-width:901px){#deskNav{display:flex}}
-#deskNav button{height:100%;border:0;border-radius:0;background:none;color:var(--mut);font-size:14px;font-weight:600;padding:0 13px;position:relative}
-#deskNav button:hover{background:none;color:#fff}
-#deskNav button.on{background:none;color:#fff}
-#deskNav button.on::after{content:"";position:absolute;left:13px;right:13px;bottom:-1px;height:2px;background:#fff}
-#deskNav button.rk,#deskNav button.shop,#deskNav button.task{color:var(--mut);border:0}
-#deskNav button.rk.on,#deskNav button.shop.on,#deskNav button.task.on{background:none;color:#fff}
-#deskNav button.rk::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--ice);margin-right:7px;vertical-align:2px}
-.hb{background:none;border:1px solid var(--line);border-radius:10px}
-.hb:hover:not(:disabled){background:#141416;border-color:var(--line2)}
-.me{background:#0e0e10;border-color:var(--line)}
-/* panneaux */
-.lbcol,.accstat div,.task-board,.rkme,.gcard{background:var(--panel);border-color:var(--line);border-radius:var(--r)}
-.lbhead h2{font-family:var(--disp);font-size:30px;letter-spacing:-.03em}
-.btn{background:#17171a;border-color:var(--line2)}
-.btn:hover:not(:disabled){background:#222226;transform:none}
-.btn.go{background:#fff;color:#000;border-color:#fff;font-weight:800}
-.btn.go:hover:not(:disabled){background:#e8e8e8}
-/* accueil */
-#hubView{align-items:stretch;max-width:1120px;margin:0 auto;width:100%;gap:0;padding:28px 20px 110px}
-.hub-hero{flex-direction:row;justify-content:space-between;align-items:center;text-align:left;gap:24px;margin:0 0 36px;padding:30px 32px;border-radius:22px;
-  background:radial-gradient(90% 140% at 100% 0%,rgba(94,224,255,.16),transparent 60%),#07090a;border:1px solid #17313a;flex-wrap:wrap}
-.hub-hero h1{font-size:clamp(28px,4.2vw,44px);letter-spacing:-.04em;line-height:1.05;margin:0 0 8px}
-.hub-hero p{max-width:460px;font-size:15px;margin:0}
-.hub-hero .btn.rk-cta{background:var(--ice);color:#001a21;box-shadow:none;border-radius:999px;padding:14px 26px;font-size:15px}
-.hub-section{margin:0 0 34px}
-.hub-section h2{text-align:left;font-size:26px;letter-spacing:-.03em;margin:0 0 2px}
-.hub-section .catd{text-align:left;margin:0 0 16px}
-.games{grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
-.gcard{--t:#fff;position:relative;padding:20px 20px 18px 24px;gap:8px;overflow:hidden;min-height:150px;transition:transform .15s,border-color .15s}
-.gcard::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--t)}
-.gcard::after{content:"";position:absolute;right:-30px;top:-30px;width:120px;height:120px;border-radius:50%;background:var(--t);opacity:.09;transition:opacity .2s}
-.gcard:hover:not(:disabled){background:var(--panel);border-color:var(--t);transform:translateY(-2px)}
-.gcard:hover:not(:disabled)::after{opacity:.2}
-.gname{font-size:21px;letter-spacing:-.03em}
-.gplay{margin-top:auto;background:none;color:var(--t);padding:0;font-size:13px}
-.gcard[data-go=bj]{--t:#22b573}.gcard[data-go=poker]{--t:#2dd4bf}.gcard[data-go=roulette]{--t:#ef4444}
-.gcard[data-go=off-bj]{--t:#22b573}.gcard[data-go=off-fuse]{--t:#fb923c}.gcard[data-go=off-mine]{--t:#fbbf24}
-.gcard[data-go=off-coin]{--t:#facc15}.gcard[data-go=off-dice]{--t:#e5e5e5}.gcard[data-go=off-horses]{--t:#c08457}
-.gcard[data-go=off-russian]{--t:#dc2626}.gcard[data-go=off-slots]{--t:#a78bfa}.gcard[data-go=off-duel]{--t:#f87171}
-.gcard[data-go=off-plinko]{--t:#38bdf8}.gcard[data-go=off-scratch]{--t:#f59e0b}
+/* nouvelles pages : même mise en page que « Classement » */
+#shopView,#tasksView,#accountView,#rankView,#adminView{align-items:center;padding:24px 16px 64px;overflow:auto}
+@media(max-width:600px){#shopView,#tasksView,#accountView,#rankView,#adminView{padding:16px 8px 64px}}
 /* ================= ARÈNE RANKED ================= */
-#rkArenaView{--a:var(--ice);width:100%;max-width:1120px;margin:0 auto;padding:18px 18px 110px;gap:14px}
+#rkArenaView{--a:#5ee0ff;width:100%;max-width:1000px;margin:0 auto;padding:14px 12px 40px;gap:14px;overflow:auto}
 .rk-top{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
-.rk-top h2{margin:0;font-family:var(--disp);font-size:30px;letter-spacing:-.04em;flex:1}
+.rk-top h2{margin:0;font-family:inherit;font-size:30px;letter-spacing:-.04em;flex:1}
 .rk-pips{display:flex;gap:6px;flex-wrap:wrap}
-.rk-pip{padding:7px 12px;border-radius:999px;border:1px solid var(--line2);font-size:12px;font-weight:700;color:var(--mut);background:#0b0b0c}
+.rk-pip{padding:7px 12px;border-radius:999px;border:1px solid #2c2c32;font-size:12px;font-weight:700;color:#8a8a8a;background:#0b0b0c}
 .rk-pip.done{color:#000;background:#fff;border-color:#fff}
 .rk-pip.cur{color:#001a21;background:var(--a);border-color:var(--a)}
 .rk-main{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:14px;align-items:start}
-.rk-stage{position:relative;min-height:440px;border-radius:22px;border:1px solid var(--line2);background:#050607;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:22px;overflow:hidden;user-select:none;-webkit-user-select:none;touch-action:manipulation}
-.rk-big{font-family:var(--disp);font-size:clamp(34px,7vw,64px);font-weight:800;letter-spacing:-.05em;line-height:1;text-align:center}
-.rk-sm{color:var(--mut);font-size:14px;text-align:center;max-width:440px;line-height:1.5}
-.rk-count{font-family:var(--disp);font-size:20px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--a)}
-.rk-react{width:min(100%,460px);aspect-ratio:1.5;border-radius:26px;border:0;font-family:var(--disp);font-size:clamp(28px,6vw,48px);font-weight:800;background:#3a1212;color:#ffb4b4;transition:none}
+.rk-stage{position:relative;min-height:440px;border-radius:22px;border:1px solid #2c2c32;background:#050607;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:22px;overflow:hidden;user-select:none;-webkit-user-select:none;touch-action:manipulation}
+.rk-big{font-family:inherit;font-size:clamp(34px,7vw,64px);font-weight:800;letter-spacing:-.05em;line-height:1;text-align:center}
+.rk-sm{color:#8a8a8a;font-size:14px;text-align:center;max-width:440px;line-height:1.5}
+.rk-count{font-family:inherit;font-size:20px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--a)}
+.rk-react{width:min(100%,460px);aspect-ratio:1.5;border-radius:26px;border:0;font-family:inherit;font-size:clamp(28px,6vw,48px);font-weight:800;background:#3a1212;color:#ffb4b4;transition:none}
 .rk-react.go{background:#16c47a;color:#00210f}
 .rk-react.bad{background:#2a2a2e;color:#ff8d8d}.rk-react.done{background:#1b2b3a;color:#bfe8ff}
 .rk-react:disabled{opacity:1;filter:none}
-.rk-aim{position:relative;width:100%;max-width:640px;aspect-ratio:16/10;border-radius:18px;background:#0b0e10;border:1px solid var(--line2);cursor:crosshair;overflow:hidden}
+.rk-aim{position:relative;width:100%;max-width:640px;aspect-ratio:16/10;border-radius:18px;background:#0b0e10;border:1px solid #2c2c32;cursor:crosshair;overflow:hidden}
 .rk-tg{position:absolute;border-radius:50%;transform:translate(-50%,-50%);background:radial-gradient(circle,#fff 0 18%,#ff4d4d 19% 45%,#fff 46% 62%,#ff4d4d 63%);box-shadow:0 0 18px rgba(255,77,77,.5)}
-.rk-bar{position:relative;width:100%;max-width:620px;height:56px;border-radius:14px;background:#0e1113;border:1px solid var(--line2);overflow:hidden}
-.rk-zone{position:absolute;top:0;bottom:0;background:rgba(52,211,153,.3);border-inline:2px solid var(--ok)}
+.rk-bar{position:relative;width:100%;max-width:620px;height:56px;border-radius:14px;background:#0e1113;border:1px solid #2c2c32;overflow:hidden}
+.rk-zone{position:absolute;top:0;bottom:0;background:rgba(52,211,153,.3);border-inline:2px solid #34d399}
 .rk-cur{position:absolute;top:-2px;bottom:-2px;width:5px;margin-left:-2px;background:#fff;border-radius:3px;box-shadow:0 0 14px #fff}
 .rk-pads{display:grid;grid-template-columns:repeat(2,minmax(0,150px));gap:12px}
 .rk-pad{aspect-ratio:1;border-radius:20px;border:0;background:color-mix(in srgb,var(--c) 22%,#0b0b0c);transition:none}
 .rk-pad.on{background:var(--c);box-shadow:0 0 36px var(--c)}
 .rk-pad:disabled{opacity:1;cursor:default}
 .rk-dots{display:flex;gap:8px}.rk-dots i{width:12px;height:12px;border-radius:50%;background:#2a2a2e}.rk-dots i.f{background:#fff}
-.rk-q{font-family:var(--disp);font-size:clamp(34px,8vw,60px);font-weight:800;letter-spacing:-.04em;font-variant-numeric:tabular-nums}
-.rk-in{width:min(100%,260px);text-align:center;font:800 32px var(--disp);padding:12px;border-radius:14px;background:#0e1113;border:1px solid var(--line2);color:#fff;outline:none}
+.rk-q{font-family:inherit;font-size:clamp(34px,8vw,60px);font-weight:800;letter-spacing:-.04em;font-variant-numeric:tabular-nums}
+.rk-in{width:min(100%,260px);text-align:center;font:800 32px inherit;padding:12px;border-radius:14px;background:#0e1113;border:1px solid #2c2c32;color:#fff;outline:none}
 .rk-in:focus{border-color:var(--a)}
 .rk-res{width:100%;max-width:520px;display:flex;flex-direction:column;gap:6px}
-.rk-row{display:grid;grid-template-columns:34px 1fr auto auto;gap:10px;align-items:center;padding:10px 14px;border-radius:12px;background:#0d0d0f;border:1px solid var(--line);font-size:14px}
-.rk-row.me{border-color:var(--a)}.rk-row b{font-family:var(--disp);font-size:18px}
-.rk-row .pt{color:var(--a);font-weight:800}.rk-row .up{color:var(--ok);font-weight:800}.rk-row .dn{color:var(--bad);font-weight:800}
-.rk-side{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:8px;display:flex;flex-direction:column;gap:4px}
-.rk-side h3{margin:8px 10px 6px;font-size:13px;color:var(--mut);font-weight:600}
+.rk-row{display:grid;grid-template-columns:34px 1fr auto auto;gap:10px;align-items:center;padding:10px 14px;border-radius:12px;background:#0d0d0f;border:1px solid #1e1e22;font-size:14px}
+.rk-row.me{border-color:var(--a)}.rk-row b{font-family:inherit;font-size:18px}
+.rk-row .pt{color:var(--a);font-weight:800}.rk-row .up{color:#34d399;font-weight:800}.rk-row .dn{color:#ff5d5d;font-weight:800}
+.rk-side{background:#0a0a0a;border:1px solid #1e1e22;border-radius:14px;padding:8px;display:flex;flex-direction:column;gap:4px}
+.rk-side h3{margin:8px 10px 6px;font-size:13px;color:#8a8a8a;font-weight:600}
 .rk-pl{display:grid;grid-template-columns:30px 1fr auto;gap:10px;align-items:center;padding:9px 10px;border-radius:10px}
 .rk-pl.me{background:#101417}.rk-pl .av2{width:30px;height:30px;border-radius:50%;background:#222;display:grid;place-items:center;font-weight:800;font-size:13px;overflow:hidden}
 .rk-pl .av2 img{width:100%;height:100%;object-fit:cover}
-.rk-pl .nm{font-weight:700;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.rk-pl small{display:block;color:var(--mut);font-size:11px;font-weight:500}
-.rk-pl .sc{font-family:var(--disp);font-size:20px;font-weight:800;font-variant-numeric:tabular-nums}
+.rk-pl .nm{font-weight:700;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.rk-pl small{display:block;color:#8a8a8a;font-size:11px;font-weight:500}
+.rk-pl .sc{font-family:inherit;font-size:20px;font-weight:800;font-variant-numeric:tabular-nums}
 .rk-pl.off{opacity:.4}.rk-pl.empty{opacity:.25}
 .rk-dock{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
-@media(max-width:900px){.rk-main{grid-template-columns:1fr}.rk-stage{min-height:380px}#rkArenaView{padding:12px 12px 110px}.hub-hero{padding:22px}header{height:auto;padding:6px 10px}}
+@media(max-width:900px){.rk-main{grid-template-columns:1fr}.rk-stage{min-height:380px}#rkArenaView{padding:12px 12px 110px}}
+
 </style>
 </head>
 <body>
@@ -1264,12 +835,11 @@ header{gap:18px;padding:0 18px;height:58px;background:#000;border-bottom:1px sol
 </div></div>
 <div id="gate"><div><h1>Casino</h1><p id="gatemsg">Connecte-toi avec ton compte Discord pour jouer avec ton solde du casino.</p><a class="dsc" href="/login">Se connecter avec Discord</a></div></div>
 <header>
-  <button id="brand" type="button" aria-label="Accueil"><i></i>ZNK</button>
+  <div class="logo hide"><small id="subtitle"></small></div>
   <div id="menu">
     <button class="hb" id="menuBtn" aria-haspopup="true" aria-expanded="false"><span class="mburger"></span><span id="menuLbl">Menu</span><span class="car">▾</span></button>
     <div id="menuPanel" role="menu">
       <button class="mitem" data-g="hub">Accueil</button>
-      <button class="mitem rk" data-g="ranked">⚔️ Ranked</button>
       <div class="msep"></div>
       <div class="msec" id="msOn">
         <button class="mhead" type="button">Online <i>▾</i></button>
@@ -1296,51 +866,35 @@ header{gap:18px;padding:0 18px;height:58px;background:#000;border-bottom:1px sol
         </div>
       </div>
       <div class="msep"></div>
-      <button class="mitem" data-g="rank">Rank</button>
       <button class="mitem" data-g="top">Classement</button>
+      <button class="mitem" data-g="ranked">Ranked</button>
+      <button class="mitem" data-g="rank">Rangs</button>
       <button class="mitem" data-g="shop">Boutique</button>
       <button class="mitem" data-g="tasks">Tasks</button>
-      <button class="mitem" data-g="account">Mon compte</button>
     </div>
   </div>
-  
-  <nav id="deskNav" aria-label="Navigation">
-    <button type="button" data-tab="online">Online</button>
-    <button type="button" data-tab="offline">Offline</button>
-    <button type="button" class="rk" data-g="ranked">Ranked</button>
-    <button type="button" data-g="rank">Rangs</button>
-    <button type="button" data-g="top">Classement</button>
-    <button type="button" class="shop" data-g="shop">Boutique</button>
-    <button type="button" class="task" data-g="tasks">Tasks</button>
-  </nav>
   <div class="sp"></div>
-  <button class="hb" id="bTasks" title="Tasks du jour"><span class="task-ico" aria-hidden="true"></span><span>Tasks</span></button>
-  <button class="hb ico" id="bShop" title="Boutique" data-ic="gift"></button>
-  <button class="hb ico hide" id="bTop" title="Top gains de ce jeu" data-ic="trophy"></button>
-  <button class="hb ico hide" id="bRules" title="Règles" data-ic="book"></button>
-  <button class="hb ico" id="bSnd" title="Son" data-ic="volOn"></button>
-  <button class="hb ico" id="bFs" title="Plein écran" data-ic="full"></button>
-  <button class="hb ico" id="bSet" title="Paramètres" data-ic="sliders"></button>
+  <button class="hb hide" id="bTasks" aria-hidden="true"></button><button class="hb hide" id="bShop" aria-hidden="true"></button>
+  <button class="hb ico hide" id="bTop" title="Top gains de ce jeu">🏆</button>
+  <button class="hb ico hide" id="bRules" title="Règles">📖</button>
+  <button class="hb ico" id="bSnd" title="Son">🔊</button>
+  <button class="hb ico" id="bFs" title="Plein écran">⛶</button>
+  <button class="hb ico" id="bSet" title="Paramètres">⚙</button>
   <div class="pop" id="bellWrap">
-    <button class="hb ico" id="bBell" title="Notifications" aria-haspopup="true" data-ic="bell"><span id="bBadge"></span></button>
+    <button class="hb ico" id="bBell" title="Notifications" aria-haspopup="true">🔔<span id="bBadge"></span></button>
     <div class="ppanel" id="nPanel"><h3>Notifications</h3><div id="nList"></div></div>
   </div>
   <div class="pop" id="meWrap">
     <div class="me" id="me" role="button" tabindex="0" aria-haspopup="true"><div class="av" id="meAv">?</div><div id="meName" style="font-weight:700;font-size:12px">…</div><span class="car">▾</span></div>
-    <div class="ppanel" id="mePanel"><div class="mpn"><span>Solde</span><b id="meBal">—</b></div><button class="btn" id="bAccount" data-ic="user"> Mon compte</button><button class="btn" id="bDaily" data-ic="sun"> Daily</button><button class="btn hide" id="bAdmin" data-ic="sliders"> Admin</button><button class="btn" id="bGift" data-ic="gift"> Envoyer des ZTKN</button><button class="btn" id="bLogout" data-ic="power"> Déconnexion</button></div>
+    <div class="ppanel" id="mePanel"><div class="mpn"><span>Solde</span><b id="meBal">—</b></div><button class="btn" id="bAccount">Mon compte</button><button class="btn" id="bDaily">Daily</button><button class="btn hide" id="bAdmin">Admin</button><button class="btn" id="bGift">Envoyer des ZTKN</button><button class="btn" id="bLogout"> Déconnexion</button></div>
   </div>
 </header>
 <div id="conn">Reconnexion…</div>
 <main id="hubView">
-  <div class="hub-hero">
-    <div><h1>Ranked : ici, seul le skill compte.</h1>
-    <p>5 épreuves — réflexes, visée, mémoire, précision, calcul. Aucune mise, aucun hasard : tu gagnes du RR uniquement grâce à tes performances.</p></div>
-    <button type="button" class="btn rk-cta" id="hubRankedBtn" data-g="ranked">Entrer dans l’arène</button>
-  </div>
-  <section class="hub-section cat">
+  <section class="cat">
     <h2>Online</h2>
-    <p class="catd">Tables partagées avec les joueurs du serveur.</p>
-    <div class="games" id="gOnline">
+    <p class="catd">Tables partagées avec tous les joueurs du serveur.</p>
+    <div class="games">
       <button class="gcard" data-go="bj" id="gcBj">
         <span class="gname">Blackjack</span>
         <span class="gdesc">Table à 5 places · mise libre · blackjack payé 3:2</span>
@@ -1356,11 +910,16 @@ header{gap:18px;padding:0 18px;height:58px;background:#000;border-bottom:1px sol
         <span class="gdesc">Roulette européenne · rouge, noir, pair, impair, numéros pleins</span>
         <span class="glive" id="gRlLive"></span><span class="gplay">Jouer</span>
       </button>
+      <button class="gcard" data-go="ranked" id="gcRanked">
+        <span class="gname">Ranked</span>
+        <span class="gdesc">Arène 100 % skill : réflexe, visée, mémoire, précision, calcul · RR, sans mise</span>
+        <span class="glive"></span><span class="gplay">Jouer</span>
+      </button>
     </div>
   </section>
-  <section class="hub-section cat">
+  <section class="cat">
     <h2>Offline</h2>
-    <p class="catd">Solo sur le site (et aussi en MP Discord).</p>
+    <p class="catd">Jouables directement en MP Discord, et aussi sur le site.</p>
     <div class="games" id="gOffline">
       <button class="gcard" data-go="off-bj" id="gcOffBj">
         <span class="gname">Blackjack</span>
@@ -1397,7 +956,7 @@ header{gap:18px;padding:0 18px;height:58px;background:#000;border-bottom:1px sol
         <span class="gdesc">Survis au barillet, plus de balles = plus de gain</span>
         <span class="glive"></span><span class="gplay">Jouer</span>
       </button>
-      <button class="gcard" data-go="off-slots">
+          <button class="gcard" data-go="off-slots">
         <span class="gname">Slots</span>
         <span class="gdesc">Aligne trois Z violets : jackpot x400</span>
         <span class="glive"></span><span class="gplay">Jouer</span>
@@ -2155,7 +1714,7 @@ $('#bTop').onclick = async () => {
     box.textContent = ''; box.append(t);
   } catch { box.textContent = 'Classement indisponible.'; }
 };
-const sndBtn = $('#bSnd'); const refreshSnd = () => { sndBtn.innerHTML = icon(sndOn ? 'volOn' : 'volOff', 19); sndBtn.title = sndOn ? 'Son' : 'Muet'; }; refreshSnd();
+const sndBtn = $('#bSnd'); const refreshSnd = () => { sndBtn.textContent = sndOn ? '🔊' : '🔇'; sndBtn.title = sndOn ? 'Son' : 'Muet'; }; refreshSnd();
 sndBtn.onclick = () => { sndOn = !sndOn; try { localStorage.setItem('znk_snd', sndOn ? '1' : '0'); } catch {} refreshSnd(); if (sndOn) SFX.chip(); };
 document.addEventListener('pointerdown', () => ac(), { once: true });
 // retour sur l'onglet : resynchronise le solde
@@ -2401,7 +1960,7 @@ function tableDel(d) {
 }
 
 // ---- plein écran (API native, sinon plein écran « simulé » sur iPhone)
-function fsUpd() { setTimeout(pFitSoon, 0); const on = !!document.fullscreenElement || !!document.webkitFullscreenElement || document.body.classList.contains('pfs'); document.body.classList.toggle('fs', on); $('#bFs').innerHTML = icon(on ? 'fullOff' : 'full', 19); $('#bFs').title = on ? 'Quitter le plein écran' : 'Plein écran'; }
+function fsUpd() { setTimeout(pFitSoon, 0); const on = !!document.fullscreenElement || !!document.webkitFullscreenElement || document.body.classList.contains('pfs'); document.body.classList.toggle('fs', on); $('#bFs').textContent = '⛶'; $('#bFs').title = on ? 'Quitter le plein écran' : 'Plein écran'; }
 $('#bFs').onclick = async () => {
   const d = document.documentElement, b = document.body;
   try {
@@ -2661,14 +2220,7 @@ function routeSet(v, replace) {
   if (replace) history.replaceState(null, '', path);
   else history.pushState(null, '', path);
 }
-function deskSync(v) {
-  let hub = 'online'; try { hub = sessionStorage.getItem('znk_hub') || 'online'; } catch {}
-  const inOn = v === 'bj' || v === 'poker' || v === 'roulette' || (v === 'hub' && hub === 'online');
-  const inOff = String(v).startsWith('off-') || (v === 'hub' && hub === 'offline');
-  document.querySelectorAll('#deskNav [data-tab]').forEach((b) => b.classList.toggle('on', b.dataset.tab === 'online' ? inOn : inOff));
-}
 function navHighlight(v) {
-  deskSync(v);
   document.querySelectorAll('#deskNav [data-g], #menuPanel .mitem[data-g]').forEach((b) => {
     const g = b.getAttribute('data-g');
     let on = g === v;
@@ -4581,55 +4133,11 @@ function rkFmtLeft(ms) {
 const _rkWatch = typeof rkWatch === 'function' ? rkWatch : null;
 // patch load of rank data after fetch - enhance existing rk render if present
 
-// ========== Mobile bottom tabs + hub Online/Offline filter ==========
-(function(){
-  document.body.classList.add('has-botnav');
-  const setHubFilter = (which) => {
-    const on = which === 'online';
-    document.querySelectorAll('#hubTabs button').forEach((b) => b.classList.toggle('on', b.dataset.hub === which));
-    const gOn = document.getElementById('gOnline');
-    const gOff = document.getElementById('gOffline');
-    if (gOn) { const cat = gOn.closest('.cat'); if (cat) cat.classList.toggle('hide-cat', !on); }
-    if (gOff) { const cat = gOff.closest('.cat'); if (cat) cat.classList.toggle('hide-cat', on); }
-    try { sessionStorage.setItem('znk_hub', which); } catch {}
-    document.querySelectorAll('#botNav .bn').forEach((b) => b.classList.toggle('on', b.dataset.tab === which));
-  };
-  document.querySelectorAll('#hubTabs button').forEach((b) => {
-    b.onclick = () => setHubFilter(b.dataset.hub);
-  });
-  document.querySelectorAll('#botNav .bn').forEach((b) => {
-    b.onclick = () => {
-      const t = b.dataset.tab;
-      try { menuClose(); } catch {}
-      try { popClose(); } catch {}
-      if (t === 'rank') setView('rank');
-      else if (t === 'top') setView('top');
-      else if (t === 'online') { setView('hub'); setHubFilter('online'); }
-      else if (t === 'offline') { setView('hub'); setHubFilter('offline'); }
-      else if (t === 'tasks') setView('tasks');
-    };
-  });
-  let hub = 'online';
-  try { hub = sessionStorage.getItem('znk_hub') || 'online'; } catch {}
-  setTimeout(() => setHubFilter(hub === 'offline' ? 'offline' : 'online'), 100);
-})();
-
-document.querySelectorAll('#deskNav [data-tab]').forEach((b) => {
-  b.onclick = () => { ac(); const t = document.getElementById(b.dataset.tab === 'online' ? 'bnOn' : 'bnOff'); if (t) t.click(); deskSync(W.view); };
-});
-$('#brand').onclick = () => { ac(); const t = document.getElementById('bnOn'); if (t) t.click(); deskSync(W.view); };
-setTimeout(() => deskSync(W.view), 250);
 connect(); tick();
 })();
 </script>
 
-<nav id="botNav" aria-label="Navigation principale">
-  <button type="button" class="bn" data-tab="rank" id="bnRank"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l2.4 7.2H22l-6 4.8 2.3 7.2L12 16.8 5.7 21.2 8 14 2 9.2h7.6z"/></svg><span>Ranked</span></button>
-  <button type="button" class="bn" data-tab="top" id="bnTop"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 21h8M12 17v4M7 4h10v4a5 5 0 01-10 0V4zM5 4h14M9 4V2h6v2"/></svg><span>Classement</span></button>
-  <button type="button" class="bn" data-tab="online" id="bnOn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg><span>Online</span></button>
-  <button type="button" class="bn" data-tab="tasks" id="bnTasks"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg><span>Tasks</span></button>
-  <button type="button" class="bn" data-tab="offline" id="bnOff"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M8 12h8M12 8v8"/></svg><span>Offline</span></button>
-</nav>
+
 
 </body>
 </html>
