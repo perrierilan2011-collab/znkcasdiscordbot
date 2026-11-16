@@ -374,35 +374,10 @@ function create(file, supabase) {
     return LADDER[rankIndex(u.elo)];
   };
 
-
-  function debitRR(uid, amount) {
-    const a = Math.max(0, Math.round(Number(amount) || 0));
-    if (!a) return get(uid).elo;
-    const u = get(uid);
-    if ((u.elo || 0) < a + RR_FLOOR) return null;
-    u.elo = Math.max(RR_FLOOR, u.elo - a);
-    save([String(uid)]);
-    return Math.round(u.elo);
-  }
-  function creditRR(uid, amount) {
-    const a = Math.max(0, Math.round(Number(amount) || 0));
-    const u = get(uid);
-    u.elo = Math.max(RR_FLOOR, (u.elo || RR_START) + a);
-    if (u.elo > (u.peak || 0)) u.peak = u.elo;
-    save([String(uid)]);
-    return Math.round(u.elo);
-  }
-  function getRR(uid) {
-    return Math.round((users[uid] && users[uid].elo) || RR_START);
-  }
-
   return {
     info,
     record,
     recordRanked,
-    debitRR,
-    creditRR,
-    getRR,
     view,
     touch: (uid, name, avatar) => {
       if (users[uid]) {

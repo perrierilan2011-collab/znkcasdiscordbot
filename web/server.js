@@ -331,9 +331,6 @@ function init(deps) {
         }
       },
       rankRecord: (players) => rankApi.recordRanked(players, (uid) => avatarMap.get(uid)),
-      debitRR: (uid, amt) => rankApi.debitRR(uid, amt),
-      creditRR: (uid, amt) => rankApi.creditRR(uid, amt),
-      getRR: (uid) => rankApi.getRR(uid),
       onMatchEnd: (r) => roundEnd(guildId, r),
     });
     entry.roulette = new RouletteRoom(guildId, {
@@ -717,14 +714,6 @@ function init(deps) {
           await entry.arena.run(() => entry.arena.act(user.uid, d.answer || d));
           break;
         }
-        case 'rkhit': {
-          await entry.arena.run(() => entry.arena.act(user.uid, 'hit'));
-          break;
-        }
-        case 'rkstand': {
-          await entry.arena.run(() => entry.arena.act(user.uid, 'stand'));
-          break;
-        }
 
         // ---- boutique / tasks / profil
         case 'shop_list': {
@@ -732,9 +721,56 @@ function init(deps) {
           return json(res, 200, { ok: true, rewards: shopApi.listRewards(false) });
         }
         case 'shop_buy': {
-          const out = await shopApi.buy(user.uid, String(d.id || ''), user.guildId, user.name);
-          walBal = out.balance;
-          return json(res, 200, { ok: true, code: out.code, order: { code: out.code, rewardName: out.order.rewardName, type: out.order.type, price: out.order.price }, rbal: walBal });
+          const order = await shopApi.buy(user.uid, String(d.id || ''), user.guildId, user.name);
+          let autoRole = false;
+          let roleErr = '';
+          if (order.type === 'role' && order.roleId && deps.grantRole) {
+            try {
+              await deps.grantRole(user.guildId, user.uid, order.roleId);
+              try { shopApi.markDelivered(order.code); } catch {}
+              order.status = 'delivered';
+              autoRole = true;
+            } catch (e) {
+              roleErr = String(e?.message || e).slice(0, 120);
+              console.error('[web] grantRole', e?.message || e);
+            }
+          }
+          walBal = await deps.getBalance(user.uid);
+          // solde live pour l'acheteur
+          for (const c of entry.clients) {
+            if (c.uid !== user.uid) continue;
+            try { c.write(`event: bal\ndata: ${JSON.stringify({ bal: walBal })}\n\n`); } catch {}
+          }
+          // notif admin (inbox + event SSE)
+          const adminText = `${user.name} a acheté « ${order.rewardName} » (${order.price}) · code ${order.code}` + (autoRole ? ' · rôle livré' : order.type === 'role' ? ' · rôle à livrer' : ' · en attente');
+          const adminNotif = { id: crypto.randomBytes(6).toString('hex'), t: Date.now(), type: 'shop', title: 'Achat boutique', text: adminText, code: order.code, buyer: user.name, uid: user.uid };
+          try {
+            const adminIds = String(process.env.ADMIN_IDS || '').split(',').map((x) => x.trim()).filter(Boolean);
+            for (const aid of adminIds) {
+              pushNotif(aid, adminNotif);
+              for (const c of entry.clients) {
+                if (c.uid !== aid) continue;
+                try { c.write(`event: notif\ndata: ${JSON.stringify(adminNotif)}\n\n`); } catch {}
+              }
+            }
+            // aussi les clients déjà flagués admin sur ce serveur
+            for (const c of entry.clients) {
+              if (!c._isAdmin || adminIds.includes(c.uid)) continue;
+              pushNotif(c.uid, adminNotif);
+              try { c.write(`event: notif\ndata: ${JSON.stringify(adminNotif)}\n\n`); } catch {}
+            }
+          } catch (e) { console.error('[web] shop admin notif', e?.message || e); }
+          try {
+            if (deps.notifyAdmins) await deps.notifyAdmins(adminText, user.guildId);
+          } catch (e) { console.error('[web] notifyAdmins', e?.message || e); }
+          // refresh listes commandes côté admin connecté
+          entry.broadcast(`event: shop\ndata: ${JSON.stringify({ kind: 'order', order: { code: order.code, rewardName: order.rewardName, type: order.type, price: order.price, status: order.status, name: user.name, uid: user.uid } })}\n\n`);
+          return json(res, 200, {
+            ok: true,
+            code: order.code,
+            order: { code: order.code, rewardName: order.rewardName, type: order.type, price: order.price, status: order.status, autoRole, roleErr },
+            rbal: walBal,
+          });
         }
         case 'shop_orders': {
           return json(res, 200, { ok: true, orders: shopApi.listOrders({ uid: user.uid, limit: 30 }) });
@@ -817,7 +853,7 @@ function init(deps) {
     });
     res.write(`retry: 2000\nevent: hello\ndata: ${JSON.stringify({ uid: user.uid, name: user.name, avatar: user.avatar, seats: SEATS, coin: deps.coin || '🪙', roulette: ROULETTE_INFO, poker: POKER_INFO })}\n\n`);
     res.uid = user.uid; // sert au snapshot personnalisé du poker
-    Promise.resolve(deps.isAdmin ? deps.isAdmin(user.uid) : false).then((a) => { if (a) try { res.write(`event: admin\ndata: {"admin":true}\n\n`); } catch { /* fermée */ } }).catch(() => {});
+    Promise.resolve(deps.isAdmin ? deps.isAdmin(user.uid) : false).then((a) => { if (a) { res._isAdmin = true; try { res.write(`event: admin\ndata: {"admin":true}\n\n`); } catch { /* fermée */ } } }).catch(() => {});
     if (user.avatar) avatarMap.set(user.uid, user.avatar);
     entry.seen.set(user.uid, { uid: user.uid, name: user.name, avatar: user.avatar });
     if (entry.seen.size > 300) entry.seen.delete(entry.seen.keys().next().value);

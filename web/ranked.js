@@ -1,46 +1,80 @@
 'use strict';
 /*
- * web/ranked.js — Ranked Blackjack ZNK : multi 2–6 joueurs, entrée fixe 10 RR.
- * Interface calquée sur le blackjack online. Pot = n×10 RR, réparti par classement.
+ * web/ranked.js — Arène Ranked ZNK : 100 % SKILL, zéro hasard dans le résultat.
+ *
+ * 5 épreuves (ordre mélangé à chaque match, toutes différentes) :
+ *   react    Réflexe   — clique dès que l'écran passe au vert
+ *   aim      Visée     — 6 cibles qui rétrécissent, le plus rapide et le plus précis gagne
+ *   sequence Mémoire   — rejoue une séquence de 5 signaux
+ *   timing   Précision — stoppe un curseur qui fait des allers-retours dans une zone étroite
+ *   math     Calcul    — 3 opérations mentales
+ *
+ * Le hasard ne sert qu'à générer l'épreuve (identique pour tous les joueurs d'un même match).
+ * Le classement d'une manche dépend uniquement de la performance.
+ * Chaque manche donne (n - place + 1) points ; le total des 5 manches fixe la place → RR.
+ *
+ * Correctifs par rapport à l'ancienne version :
+ *  - les clients se calent sur l'horloge serveur (le GO n'était jamais synchronisé → "Trop tôt" à tort)
+ *  - plus aucun sleep() dans la file d'actions (le serveur ne se bloquait plus pendant 4,5 s)
+ *  - le deadline est remis à zéro quand un timer se déclenche (le compte à rebours ne repartait pas)
+ *  - la phase "match_end" ne cassait plus le lobby
  */
 const { randomInt } = require('crypto');
 
-const SEATS = 6;
+const SEATS = 8;
 const MIN_PLAYERS = 2;
-const ENTRY_RR = 10;
-const DECKS = 6;
-const TURN_MS = 25_000;
-const RESULT_MS = 8_000;
-const DEAL_STEP_MS = 420;
-const DEALER_STEP_MS = 800;
-const START_MS = 4_000;
+const ROUNDS = 5;
+const START_MS = 4000;
+const INTRO_MS = 2600;
+const RESULT_MS = 4200;
+const END_MS = 10000;
 
-const SUITS = ['♠', '♥', '♦', '♣'];
-const RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const floor2 = (n) => Math.floor(n * 100 + 1e-9) / 100;
+const REACT_MAX = 1500;
+const REACT_MIN = 100; // en dessous = anticipation
+const TIMING_PERIOD = 1500;
+const TIMING_LEAD = 1200;
+const TIMING_WINDOW = 6000;
+const AIM_N = 6;
+const AIM_LEAD = 1800;
+const AIM_WINDOW = 16000;
+const AIM_MISS_MS = 500;
+const SEQ_LEN = 5;
+const SEQ_SHOW = 550;
+const SEQ_GAP = 240;
+const SEQ_ANSWER = 10000;
+const MATH_N = 3;
+const MATH_LEAD = 1500;
+const MATH_WINDOW = 25000;
 
-function cardPts(r) {
-  if (r === 'A') return 11;
-  if (r === 'K' || r === 'Q' || r === 'J' || r === '10') return 10;
-  return Number(r);
-}
-function handInfo(cards) {
-  let total = 0, aces = 0;
-  for (const c of cards) { total += cardPts(c.r); if (c.r === 'A') aces++; }
-  while (total > 21 && aces > 0) { total -= 10; aces--; }
-  return { total, soft: aces > 0 };
-}
-const isNatural = (cards) => cards.length === 2 && handInfo(cards).total === 21;
+const GAMES = ['react', 'aim', 'sequence', 'timing', 'math'];
+
 function shuffle(a) {
-  for (let i = a.length - 1; i > 0; i--) { const j = randomInt(i + 1); [a[i], a[j]] = [a[j], a[i]]; }
-  return a;
+  const r = [...a];
+  for (let i = r.length - 1; i > 0; i--) {
+    const j = randomInt(i + 1);
+    [r[i], r[j]] = [r[j], r[i]];
+  }
+  return r;
 }
-function shareWeights(n) {
-  const w = [];
-  for (let i = 0; i < n; i++) w.push(n - i);
-  const sum = w.reduce((a, b) => a + b, 0);
-  return w.map((x) => x / sum);
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+function makeMath() {
+  const qs = [];
+  const ans = [];
+  for (let i = 0; i < MATH_N; i++) {
+    const k = i % 3;
+    if (k === 0) {
+      const a = 12 + randomInt(8), b = 3 + randomInt(7);
+      qs.push(a + ' × ' + b); ans.push(a * b);
+    } else if (k === 1) {
+      const a = 40 + randomInt(60), b = 20 + randomInt(60), c = 10 + randomInt(30);
+      qs.push(a + ' + ' + b + ' − ' + c); ans.push(a + b - c);
+    } else {
+      const a = 6 + randomInt(8), b = 4 + randomInt(6), c = 10 + randomInt(40);
+      qs.push(a + ' × ' + b + ' + ' + c); ans.push(a * b + c);
+    }
+  }
+  return { qs, ans };
 }
 
 class RankedArena {
@@ -48,253 +82,374 @@ class RankedArena {
     this.guildId = guildId;
     this.deps = deps;
     this.seats = Array(SEATS).fill(null);
-    this.phase = 'lobby';
+    this.phase = 'lobby'; // lobby | intro | playing | round_result | match_end
     this.deadline = 0;
-    this.turn = null;
-    this.dealer = { cards: [], hole: false };
-    this.shoe = [];
-    this.cardId = 0;
     this.round = 0;
+    this.match = 0;
+    this.plan = [];
+    this.mode = null;
+    this.challenge = null;
+    this.secret = null;
+    this.answers = {};
+    this.scores = {};
+    this.lastRound = null;
+    this.final = null;
     this.feed = [];
     this.timer = null;
     this.q = Promise.resolve();
-    this.pot = 0;
-    this._finalRows = null;
-    this.fresh();
   }
-  run(fn) { const p = this.q.catch(() => {}).then(fn); this.q = p.catch(() => {}); return p; }
-  say(t) { this.feed.push({ t: Date.now(), text: t }); if (this.feed.length > 10) this.feed.shift(); }
-  emit() { try { this.deps.onChange(this); } catch (e) { console.error('[ranked] emit', e?.message || e); } }
+
+  /* ---------- infra ---------- */
+  run(fn) {
+    const p = this.q.catch(() => {}).then(fn);
+    this.q = p.catch(() => {});
+    return p;
+  }
+  say(t) {
+    this.feed.push({ t: Date.now(), text: t });
+    if (this.feed.length > 10) this.feed.shift();
+  }
+  emit() {
+    try { this.deps.onChange(this); } catch (e) { console.error('[ranked] emit', e?.message || e); }
+  }
   setTimer(ms, fn) {
     clearTimeout(this.timer);
     this.deadline = Date.now() + ms;
-    this.timer = setTimeout(() => { this.timer = null; this.deadline = 0; this.run(fn).catch((e) => console.error('[ranked] timer', e)); }, ms);
+    this.timer = setTimeout(() => {
+      this.timer = null;
+      this.deadline = 0;
+      this.run(fn).catch((e) => console.error('[ranked] timer', e));
+    }, ms);
   }
-  clearTimer() { clearTimeout(this.timer); this.timer = null; this.deadline = 0; }
+  clearTimer() {
+    clearTimeout(this.timer);
+    this.timer = null;
+    this.deadline = 0;
+  }
   findSeat(uid) { return this.seats.findIndex((p) => p && p.uid === uid); }
-  fresh() {
-    const s = [];
-    for (let d = 0; d < DECKS; d++) for (const su of SUITS) for (const r of RANKS) s.push({ r, s: su });
-    this.shoe = shuffle(s);
-  }
-  draw() {
-    if (this.shoe.length < 40) this.fresh();
-    const c = this.shoe.pop();
-    return { id: ++this.cardId, r: c.r, s: c.s };
-  }
+  alive() { return this.seats.filter((p) => p && p.inMatch && p.online !== false); }
+  lobbyCount() { return this.seats.filter(Boolean).length; }
+  inLobby() { return this.phase === 'lobby'; }
 
   snapshot(uid) {
-    const dInfo = handInfo(this.dealer.cards.filter((_, i) => !(this.dealer.hole && i === 1)));
+    const mine = this.answers[uid] || null;
     return {
-      now: Date.now(), mode: 'ranked', skill: false, game: 'blackjack',
-      entry: ENTRY_RR, minPlayers: MIN_PLAYERS, maxPlayers: SEATS,
-      phase: this.phase, deadline: this.deadline, round: this.round, turn: this.turn, pot: this.pot,
-      shoeLeft: this.shoe.length,
-      dealer: {
-        cards: this.dealer.cards.map((c, i) => (this.dealer.hole && i === 1 ? { id: c.id, h: 1 } : { id: c.id, r: c.r, s: c.s })),
-        total: this.dealer.cards.length ? dInfo.total : 0, soft: dInfo.soft,
-        bj: !this.dealer.hole && this.dealer.cards.length === 2 && handInfo(this.dealer.cards).total === 21,
-      },
-      seats: this.seats.map((p) => p ? {
-        uid: p.uid, name: p.name, avatar: p.avatar, online: p.online !== false,
-        ready: !!p.ready, inMatch: !!p.inMatch, rr: p.rr, bet: p.bet || 0,
-        hands: (p.hands || []).map((h) => {
-          const i = handInfo(h.cards);
-          return { cards: h.cards.map((c) => ({ id: c.id, r: c.r, s: c.s })), bet: h.bet, total: i.total, soft: i.soft && i.total < 21, state: h.state, result: h.result || null, net: h.net ?? null };
-        }),
-        place: p.place || null, delta: p.delta ?? null, won: p.won || 0, score: p.rr || 0,
-      } : null),
+      now: Date.now(),
+      mode: 'ranked',
+      skill: true,
+      phase: this.phase,
+      deadline: this.deadline,
+      round: this.round,
+      rounds: ROUNDS,
+      match: this.match,
+      plan: this.plan,
+      gameMode: this.mode,
+      challenge: this.challenge,
+      answered: !!mine,
+      lastRound: this.lastRound,
+      final: this.final,
+      seats: this.seats.map((p) =>
+        p
+          ? {
+              uid: p.uid, name: p.name, avatar: p.avatar,
+              online: p.online !== false, inMatch: !!p.inMatch, ready: !!p.ready,
+              score: this.scores[p.uid] || 0,
+              answered: !!this.answers[p.uid],
+              lastPlace: p.lastPlace || null,
+              delta: p.delta ?? null,
+            }
+          : null
+      ),
       feed: this.feed,
-      rounds: 1, match: this.round, plan: ['blackjack'], gameMode: 'blackjack',
-      challenge: null, answered: false, lastRound: null,
-      final: this.phase === 'result' ? this._finalRows : null,
+      minPlayers: MIN_PLAYERS,
+      maxPlayers: SEATS,
     };
   }
 
+  /* ---------- lobby ---------- */
   async join(user) {
-    if (this.findSeat(user.uid) >= 0) throw new Error('Tu es déjà à la table.');
-    if (this.phase !== 'lobby' && this.phase !== 'betting') throw new Error('Main en cours — attends la fin.');
+    if (this.findSeat(user.uid) >= 0) throw new Error('Tu es déjà dans l’arène.');
+    if (!this.inLobby()) throw new Error('Match en cours — rejoins à la fin.');
     const idx = this.seats.findIndex((s) => !s);
-    if (idx < 0) throw new Error('Table pleine (6 max).');
-    let rr = ENTRY_RR;
-    try { if (this.deps.getRR) rr = await this.deps.getRR(user.uid); } catch {}
-    if (rr < ENTRY_RR) throw new Error(`Il te faut ${ENTRY_RR} RR (tu en as ${Math.floor(rr)}).`);
-    this.seats[idx] = { uid: user.uid, name: user.name, avatar: user.avatar, online: true, ready: false, inMatch: false, rr, bet: 0, hands: [], place: null, delta: null, won: 0 };
-    this.say(user.name + ' rejoint la table ranked');
-    this.checkStart(); this.emit();
+    if (idx < 0) throw new Error('Arène pleine (8 max).');
+    this.seats[idx] = {
+      uid: user.uid, name: user.name, avatar: user.avatar,
+      online: true, ready: false, inMatch: false, lastPlace: null, delta: null,
+    };
+    this.say(user.name + ' rejoint l’arène');
+    this.checkStart();
   }
 
   async leave(uid) {
     const idx = this.findSeat(uid);
     if (idx < 0) return;
     const p = this.seats[idx];
-    if (p.inMatch && this.phase !== 'lobby' && this.phase !== 'result') {
-      p.online = false; this.say(p.name + ' a abandonné');
-      if (this.turn && this.turn.seat === idx) await this.act(uid, 'stand', true);
-      this.emit(); return;
+    if (p.inMatch && !this.inLobby()) {
+      p.online = false; // il reste classé en dernier s'il abandonne
+      this.say(p.name + ' a abandonné');
+      this.emit();
+      if (this.phase === 'playing') this.maybeCloseRound();
+      return;
     }
-    if (p.bet > 0 && (this.phase === 'lobby' || this.phase === 'betting')) {
-      try { if (this.deps.creditRR) await this.deps.creditRR(p.uid, p.bet); } catch (e) { console.error('[ranked] refund', e?.message || e); }
-      this.pot = floor2(this.pot - p.bet); p.bet = 0;
-    }
-    this.seats[idx] = null; this.say(p.name + ' quitte la table'); this.checkStart(); this.emit();
+    this.seats[idx] = null;
+    this.say(p.name + ' quitte l’arène');
+    this.checkStart();
   }
 
   async ready(uid, on = true) {
-    if (this.phase !== 'lobby' && this.phase !== 'betting') throw new Error('Main en cours.');
+    if (!this.inLobby()) throw new Error('Match en cours.');
     const p = this.seats[this.findSeat(uid)];
-    if (!p) throw new Error('Rejoins d’abord la table.');
-    if (on && !p.bet) {
-      let ok = null;
-      try { if (this.deps.debitRR) ok = await this.deps.debitRR(p.uid, ENTRY_RR); } catch (e) { throw new Error(e?.message || 'Impossible de débiter les RR.'); }
-      if (ok === null) throw new Error(`Solde RR insuffisant (besoin ${ENTRY_RR}).`);
-      p.rr = typeof ok === 'number' ? ok : p.rr - ENTRY_RR;
-      p.bet = ENTRY_RR; this.pot = floor2(this.pot + ENTRY_RR);
-      this.say(`${p.name} mise ${ENTRY_RR} RR`);
-    }
-    if (!on && p.bet > 0) {
-      try { if (this.deps.creditRR) p.rr = await this.deps.creditRR(p.uid, p.bet); } catch {}
-      this.pot = floor2(this.pot - p.bet); p.bet = 0;
-    }
-    p.ready = !!on && p.bet > 0;
-    this.checkStart(); this.emit();
+    if (!p) throw new Error('Rejoins l’arène d’abord.');
+    p.ready = !!on;
+    this.checkStart();
   }
 
   checkStart() {
-    if (this.phase !== 'lobby' && this.phase !== 'betting') return;
-    this.phase = 'lobby';
-    const seated = this.seats.filter(Boolean);
-    const ready = seated.filter((p) => p.ready && p.bet > 0);
-    if (ready.length >= MIN_PLAYERS && ready.length === seated.length) {
-      if (!this.deadline) this.setTimer(START_MS, () => this.startHand());
-    } else this.clearTimer();
+    if (this.inLobby()) {
+      const ready = this.seats.filter((p) => p && p.ready).length;
+      if (ready >= MIN_PLAYERS && ready === this.lobbyCount()) {
+        if (!this.deadline) this.setTimer(START_MS, () => this.startMatch());
+      } else {
+        this.clearTimer();
+      }
+    }
     this.emit();
   }
 
-  async startHand() {
-    const players = this.seats.map((p, i) => ({ p, i })).filter((x) => x.p && x.p.ready && x.p.bet > 0);
-    if (players.length < MIN_PLAYERS) { this.clearTimer(); this.phase = 'lobby'; this.emit(); return; }
-    this.clearTimer(); this.phase = 'dealing'; this.round++; this.turn = null;
-    this.dealer = { cards: [], hole: true }; this._finalRows = null;
-    for (const { p } of players) {
-      p.inMatch = true; p.hands = [{ cards: [], bet: p.bet, state: 'play', result: null, net: null }];
-      p.place = null; p.delta = null; p.won = 0;
+  /* ---------- match ---------- */
+  async startMatch() {
+    const players = this.seats.filter((p) => p && p.ready);
+    if (!this.inLobby() || players.length < MIN_PLAYERS) return this.checkStart();
+    this.match++;
+    this.round = 0;
+    this.scores = {};
+    this.lastRound = null;
+    this.final = null;
+    this.plan = shuffle(GAMES).slice(0, ROUNDS);
+    for (const p of this.seats) {
+      if (!p) continue;
+      p.inMatch = !!p.ready;
+      p.lastPlace = null;
+      p.delta = null;
+      if (p.inMatch) this.scores[p.uid] = 0;
     }
-    for (const p of this.seats) if (p && !p.inMatch) p.ready = false;
-    this.say(`Main #${this.round} · pot ${this.pot} RR · ${players.length} joueurs`);
-    this.emit(); await sleep(400);
-    for (let pass = 0; pass < 2; pass++) {
-      for (const { p } of players) { p.hands[0].cards.push(this.draw()); this.emit(); await sleep(DEAL_STEP_MS); }
-      this.dealer.cards.push(this.draw()); this.emit(); await sleep(DEAL_STEP_MS);
-    }
-    for (const { p } of players) if (isNatural(p.hands[0].cards)) p.hands[0].state = 'bj';
-    const up = this.dealer.cards[0];
-    if (cardPts(up.r) >= 10 && handInfo(this.dealer.cards).total === 21) {
-      this.say('Blackjack du croupier'); this.emit(); await sleep(700); return this.dealerPlay(true);
-    }
-    this.phase = 'playing'; this.emit(); await sleep(250); return this.nextTurn();
+    this.say('Match #' + this.match + ' — ' + players.length + ' joueurs');
+    return this.nextRound();
   }
 
-  nextTurn() {
-    for (let i = 0; i < SEATS; i++) {
-      const p = this.seats[i]; if (!p || !p.inMatch) continue;
-      for (let k = 0; k < p.hands.length; k++) {
-        if (p.hands[k].state === 'play') {
-          this.turn = { seat: i, hand: k };
-          this.setTimer(p.online === false ? 2500 : TURN_MS, () => this.act(p.uid, 'stand', true));
-          this.emit(); return;
-        }
+  async nextRound() {
+    this.round++;
+    if (this.round > ROUNDS) return this.endMatch();
+    this.mode = this.plan[this.round - 1];
+    this.answers = {};
+    this.challenge = null;
+    this.secret = null;
+    this.lastRound = null;
+    this.phase = 'intro';
+    this.emit();
+    this.setTimer(INTRO_MS, () => this.beginRound());
+  }
+
+  async beginRound() {
+    if (this.phase !== 'intro') return;
+    const now = Date.now();
+    this.phase = 'playing';
+    let ms = 0;
+
+    if (this.mode === 'react') {
+      const goAt = now + 1400 + randomInt(2600);
+      this.challenge = { type: 'react', goAt, maxMs: REACT_MAX };
+      ms = goAt - now + REACT_MAX + 400;
+    } else if (this.mode === 'aim') {
+      const targets = [];
+      for (let i = 0; i < AIM_N; i++) targets.push({ x: 0.1 + randomInt(81) / 100, y: 0.12 + randomInt(77) / 100 });
+      this.challenge = { type: 'aim', targets, startsAt: now + AIM_LEAD, n: AIM_N };
+      ms = AIM_LEAD + AIM_WINDOW + 400;
+    } else if (this.mode === 'timing') {
+      const center = 0.2 + randomInt(61) / 100;
+      this.challenge = { type: 'timing', center, width: 0.1, period: TIMING_PERIOD, startedAt: now + TIMING_LEAD, window: TIMING_WINDOW };
+      ms = TIMING_LEAD + TIMING_WINDOW + 400;
+    } else if (this.mode === 'math') {
+      const { qs, ans } = makeMath();
+      this.secret = { ans };
+      this.challenge = { type: 'math', qs, startedAt: now + MATH_LEAD, window: MATH_WINDOW };
+      ms = MATH_LEAD + MATH_WINDOW + 400;
+    } else {
+      const seq = [];
+      for (let i = 0; i < SEQ_LEN; i++) seq.push(randomInt(4));
+      const showStart = now + 700;
+      this.secret = { seq };
+      this.challenge = { type: 'sequence', stage: 'show', seq, showStart, show: SEQ_SHOW, gap: SEQ_GAP, len: SEQ_LEN };
+      ms = 700 + SEQ_LEN * (SEQ_SHOW + SEQ_GAP) + 300;
+      this.setTimer(ms, () => this.sequenceAnswerPhase());
+      this.emit();
+      return;
+    }
+    this.emit();
+    this.setTimer(ms, () => this.scoreRound());
+  }
+
+  async sequenceAnswerPhase() {
+    if (this.mode !== 'sequence' || this.phase !== 'playing') return;
+    this.challenge = { type: 'sequence', stage: 'answer', len: SEQ_LEN, startedAt: Date.now(), inputMs: SEQ_ANSWER };
+    this.emit();
+    this.setTimer(SEQ_ANSWER + 300, () => this.scoreRound());
+  }
+
+  async act(uid, answer) {
+    if (this.phase !== 'playing' || !this.challenge) throw new Error('Pas de manche en cours.');
+    const p = this.seats[this.findSeat(uid)];
+    if (!p || !p.inMatch) throw new Error('Tu ne joues pas ce match.');
+    if (this.answers[uid]) throw new Error('Déjà répondu.');
+    const now = Date.now();
+    const a = answer || {};
+    const c = this.challenge;
+
+    if (c.type === 'react') {
+      if (a.early || !Number.isFinite(Number(a.t)) || Number(a.t) < c.goAt) {
+        this.answers[uid] = { early: true };
+      } else {
+        // t = horloge serveur estimée par le client ; borné pour limiter la triche
+        const t = clamp(Number(a.t), now - 1200, now);
+        const ms = Math.round(t - c.goAt);
+        this.answers[uid] = ms < REACT_MIN ? { early: true } : { ms: Math.min(ms, REACT_MAX) };
       }
+    } else if (c.type === 'timing') {
+      const t = clamp(Number(a.t), now - 1200, now);
+      if (!Number.isFinite(t) || t < c.startedAt) throw new Error('Attends le départ.');
+      const ph = ((t - c.startedAt) % c.period) / c.period;
+      const pos = ph < 0.5 ? ph * 2 : 2 - ph * 2;
+      const dist = Math.abs(pos - c.center);
+      const half = c.width / 2;
+      const accuracy = dist <= half ? 1 - (dist / half) * 0.15 : Math.max(0, 0.85 - ((dist - half) / 0.5) * 0.85);
+      this.answers[uid] = { pos, dist, accuracy };
+    } else if (c.type === 'aim') {
+      if (now < c.startsAt) throw new Error('Attends le départ.');
+      const misses = clamp(Math.floor(Number(a.misses) || 0), 0, 12);
+      const t = clamp(Number(a.t), now - 1200, now);
+      const raw = Math.round(t - c.startsAt);
+      const ms = Math.max(c.n * 180, raw) + misses * AIM_MISS_MS;
+      this.answers[uid] = { ms, misses };
+    } else if (c.type === 'math') {
+      if (now < c.startedAt) throw new Error('Attends le départ.');
+      const got = Array.isArray(a.answers) ? a.answers.map(Number) : [];
+      let correct = 0;
+      for (let i = 0; i < this.secret.ans.length; i++) if (got[i] === this.secret.ans[i]) correct++;
+      this.answers[uid] = { correct, total: this.secret.ans.length, ms: Math.max(500, now - c.startedAt) };
+    } else if (c.type === 'sequence') {
+      if (c.stage !== 'answer') throw new Error('Attends la fin de la séquence.');
+      const got = Array.isArray(a.seq) ? a.seq.map(Number) : [];
+      let correct = 0;
+      for (let i = 0; i < this.secret.seq.length; i++) {
+        if (got[i] === this.secret.seq[i]) correct++;
+        else break;
+      }
+      this.answers[uid] = { correct, total: this.secret.seq.length, ms: Math.max(0, now - c.startedAt) };
+    } else {
+      throw new Error('Épreuve inconnue.');
     }
-    this.turn = null; this.clearTimer(); return this.dealerPlay(false);
+    this.emit();
+    this.maybeCloseRound();
   }
 
-  async act(uid, action, auto = false) {
-    if (this.phase !== 'playing' || !this.turn) throw new Error('Ce n’est pas ton tour.');
-    const p = this.seats[this.turn.seat];
-    if (!p || p.uid !== uid) throw new Error('Ce n’est pas ton tour.');
-    const h = p.hands[this.turn.hand];
-    if (!h || h.state !== 'play') throw new Error('Main terminée.');
-    if (!auto) this.clearTimer();
-    if (action === 'stand') { h.state = 'stand'; this.emit(); await sleep(200); return this.nextTurn(); }
-    if (action === 'hit') {
-      h.cards.push(this.draw());
-      const t = handInfo(h.cards).total;
-      if (t > 21) h.state = 'bust'; else if (t === 21) h.state = '21';
-      this.emit(); await sleep(DEAL_STEP_MS); return this.nextTurn();
+  maybeCloseRound() {
+    if (this.phase !== 'playing') return;
+    if (this.challenge?.type === 'sequence' && this.challenge.stage !== 'answer') return;
+    const need = this.alive();
+    if (!need.length || need.every((p) => this.answers[p.uid])) {
+      this.clearTimer();
+      this.run(() => this.scoreRound()).catch(() => {});
     }
-    throw new Error('Action inconnue (hit / stand uniquement).');
   }
 
-  async dealerPlay(natural) {
-    this.phase = 'dealer'; this.turn = null; this.clearTimer(); this.emit(); await sleep(400);
-    this.dealer.hole = false; this.emit(); await sleep(DEALER_STEP_MS);
-    if (!natural) {
-      const live = this.seats.some((p) => p && p.inMatch && p.hands.some((h) => h.state === 'stand' || h.state === '21' || h.state === 'bj'));
-      if (live) while (handInfo(this.dealer.cards).total < 17) { this.dealer.cards.push(this.draw()); this.emit(); await sleep(DEALER_STEP_MS); }
-    }
-    return this.settle();
-  }
-
-  handScore(h, dTotal, dBJ) {
-    const t = handInfo(h.cards).total;
-    if (h.state === 'bust' || t > 21) return -1000 + t;
-    const bj = h.state === 'bj' || isNatural(h.cards);
-    if (dBJ) return bj ? 500 : 100 + t;
-    if (bj) return 900;
-    if (dTotal > 21) return 700 + t;
-    if (t > dTotal) return 600 + t;
-    if (t === dTotal) return 400 + t;
-    return 200 + t;
-  }
-
-  async settle() {
-    const dInfo = handInfo(this.dealer.cards);
-    const dBJ = this.dealer.cards.length === 2 && dInfo.total === 21;
-    const participants = this.seats.filter((p) => p && p.inMatch && p.bet > 0);
-    const ranked = participants.map((p) => {
-      let best = -9999;
-      for (const h of p.hands) { const s = this.handScore(h, dInfo.total, dBJ); if (s > best) best = s; }
-      return { p, score: best };
+  async scoreRound() {
+    if (this.phase !== 'playing') return;
+    this.phase = 'round_result';
+    const scored = this.alive().map((p) => {
+      const a = this.answers[p.uid];
+      let metric = -1, label = 'pas de réponse';
+      if (a) {
+        if (a.early) { metric = 0; label = 'faux départ'; }
+        else if (this.mode === 'react') { metric = 100000 - a.ms; label = a.ms + ' ms'; }
+        else if (this.mode === 'timing') { metric = Math.round(a.accuracy * 1000); label = Math.round(a.accuracy * 100) + ' %'; }
+        else if (this.mode === 'aim') { metric = 1000000 - a.ms; label = (a.ms / 1000).toFixed(2) + ' s' + (a.misses ? ' · ' + a.misses + ' raté' + (a.misses > 1 ? 's' : '') : ''); }
+        else if (this.mode === 'math') { metric = a.correct * 1000000 - a.ms; label = a.correct + '/' + a.total + ' · ' + (a.ms / 1000).toFixed(1) + ' s'; }
+        else { metric = a.correct * 100000 - a.ms; label = a.correct + '/' + a.total + (a.correct === a.total ? ' · ' + (a.ms / 1000).toFixed(1) + ' s' : ''); }
+      }
+      return { uid: p.uid, name: p.name, metric, label };
     });
-    ranked.sort((a, b) => b.score - a.score || a.p.uid.localeCompare(b.p.uid));
-    const n = ranked.length;
-    const weights = shareWeights(n);
-    const pot = this.pot;
-    let place = 1;
+    scored.sort((x, y) => y.metric - x.metric);
+    const n = scored.length;
     const rows = [];
-    for (let i = 0; i < n; i++) {
-      if (i > 0 && ranked[i].score < ranked[i - 1].score) place = i + 1;
-      const share = floor2(pot * weights[i]);
-      const p = ranked[i].p;
-      p.place = place; p.won = share; p.delta = floor2(share - p.bet);
-      for (const h of p.hands) { h.net = p.delta; h.result = p.delta > 0 ? 'win' : p.delta < 0 ? 'lose' : 'push'; }
-      try { if (share > 0 && this.deps.creditRR) p.rr = await this.deps.creditRR(p.uid, share); } catch (e) { console.error('[ranked] creditRR', p.uid, share, e?.message || e); }
-      rows.push({ uid: p.uid, name: p.name, avatar: p.avatar, place, score: share, bet: p.bet, net: p.delta });
-      this.say(`${p.name} #${place} · ${p.delta >= 0 ? '+' : ''}${p.delta} RR`);
+    let place = 1;
+    scored.forEach((s, i) => {
+      if (i > 0 && s.metric < scored[i - 1].metric) place = i + 1;
+      const pts = Math.max(0, n - place + 1);
+      this.scores[s.uid] = (this.scores[s.uid] || 0) + pts;
+      rows.push({ uid: s.uid, name: s.name, place, pts, label: s.label, score: this.scores[s.uid] });
+    });
+    this.lastRound = { mode: this.mode, round: this.round, rows };
+    this.challenge = null;
+    this.secret = null;
+    this.emit();
+    this.setTimer(RESULT_MS, () => this.nextRound());
+  }
+
+  async endMatch() {
+    this.phase = 'match_end';
+    this.challenge = null;
+    this.mode = null;
+    const players = this.seats.filter((p) => p && p.inMatch);
+    const sc = (p) => this.scores[p.uid] || 0;
+    const ranked = [...players].sort((a, b) => sc(b) - sc(a) || a.uid.localeCompare(b.uid));
+    let place = 1;
+    const payload = ranked.map((p, i) => {
+      if (i > 0 && sc(p) < sc(ranked[i - 1])) place = i + 1;
+      p.lastPlace = place;
+      return { uid: p.uid, name: p.name, avatar: p.avatar, place, score: sc(p) };
+    });
+    let changes = [];
+    try { changes = this.deps.rankRecord(payload) || []; } catch (e) { console.error('[ranked] rankRecord', e?.message || e); }
+    for (const c of changes) {
+      const p = this.seats.find((x) => x && x.uid === c.uid);
+      if (p) p.delta = c.delta;
     }
-    try {
-      if (this.deps.rankRecord) this.deps.rankRecord(rows.map((r) => ({ uid: r.uid, name: r.name, place: r.place, avatar: r.avatar })));
-    } catch (e) { console.error('[ranked] rankRecord', e?.message || e); }
-    this._finalRows = rows; this.phase = 'result'; this.pot = 0; this.emit();
-    try { if (this.deps.onMatchEnd) this.deps.onMatchEnd({ game: 'ranked', players: rows }); } catch (e) { console.error('[ranked] onMatchEnd', e?.message || e); }
-    this.setTimer(RESULT_MS, () => this.backToLobby());
+    this.final = payload.map((r) => {
+      const c = changes.find((x) => x.uid === r.uid);
+      return { ...r, delta: c ? c.delta : null, elo: c ? c.elo : null, placement: c ? c.placement : false, placementLeft: c ? c.placementLeft : 0 };
+    });
+    this.say('Match terminé — RR mis à jour');
+    this.emit();
+    try { if (this.deps.onMatchEnd) this.deps.onMatchEnd({ game: 'ranked', players: payload, changes }); }
+    catch (e) { console.error('[ranked] onMatchEnd', e?.message || e); }
+    this.setTimer(END_MS, () => this.backToLobby());
   }
 
   async backToLobby() {
-    for (let i = 0; i < SEATS; i++) {
-      const p = this.seats[i]; if (!p) continue;
+    for (let i = 0; i < this.seats.length; i++) {
+      const p = this.seats[i];
+      if (!p) continue;
       if (p.online === false) { this.seats[i] = null; continue; }
-      p.inMatch = false; p.ready = false; p.bet = 0; p.hands = []; p.place = null;
+      p.inMatch = false;
+      p.ready = false;
     }
-    this.dealer = { cards: [], hole: false }; this.turn = null; this.phase = 'lobby'; this.clearTimer(); this.emit();
+    this.challenge = null;
+    this.secret = null;
+    this.answers = {};
+    this.lastRound = null;
+    this.phase = 'lobby';
+    this.clearTimer();
+    this.emit();
   }
 
   setPresence(uid, online) {
     const p = this.seats.find((x) => x && x.uid === uid);
-    if (!p) return; p.online = online; this.emit();
+    if (!p) return;
+    p.online = online;
+    this.emit();
+    if (!online && this.phase === 'playing') this.maybeCloseRound();
   }
   isEmpty() { return this.seats.every((p) => !p); }
 }
 
-module.exports = { RankedArena, SEATS, MIN_PLAYERS, ENTRY_RR, ROUNDS: 1 };
+module.exports = { RankedArena, SEATS, MIN_PLAYERS, ROUNDS };
