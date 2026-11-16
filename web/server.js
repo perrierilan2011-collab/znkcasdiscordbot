@@ -722,49 +722,32 @@ function init(deps) {
         }
         case 'shop_buy': {
           const order = await shopApi.buy(user.uid, String(d.id || ''), user.guildId, user.name);
-          let autoRole = false;
-          let roleErr = '';
+          let autoRole = false, roleErr = '';
           if (order.type === 'role' && order.roleId && deps.grantRole) {
             try {
               await deps.grantRole(user.guildId, user.uid, order.roleId);
               try { shopApi.markDelivered(order.code); } catch {}
               order.status = 'delivered';
               autoRole = true;
-            } catch (e) {
-              roleErr = String(e?.message || e).slice(0, 120);
-              console.error('[web] grantRole', e?.message || e);
-            }
+            } catch (e) { roleErr = String(e?.message || e).slice(0, 120); }
           }
           walBal = await deps.getBalance(user.uid);
-          // solde live pour l'acheteur
           for (const c of entry.clients) {
             if (c.uid !== user.uid) continue;
             try { c.write(`event: bal\ndata: ${JSON.stringify({ bal: walBal })}\n\n`); } catch {}
           }
-          // notif admin (inbox + event SSE)
-          const adminText = `${user.name} a acheté « ${order.rewardName} » (${order.price}) · code ${order.code}` + (autoRole ? ' · rôle livré' : order.type === 'role' ? ' · rôle à livrer' : ' · en attente');
-          const adminNotif = { id: crypto.randomBytes(6).toString('hex'), t: Date.now(), type: 'shop', title: 'Achat boutique', text: adminText, code: order.code, buyer: user.name, uid: user.uid };
           try {
+            const adminText = `${user.name} a acheté « ${order.rewardName} » (${order.price}) · code ${order.code}` + (autoRole ? ' · rôle livré' : '');
             const adminIds = String(process.env.ADMIN_IDS || '').split(',').map((x) => x.trim()).filter(Boolean);
+            const adminNotif = { id: crypto.randomBytes(6).toString('hex'), t: Date.now(), type: 'shop', title: 'Achat boutique', text: adminText };
             for (const aid of adminIds) {
               pushNotif(aid, adminNotif);
               for (const c of entry.clients) {
-                if (c.uid !== aid) continue;
-                try { c.write(`event: notif\ndata: ${JSON.stringify(adminNotif)}\n\n`); } catch {}
+                if (c.uid === aid) try { c.write(`event: notif\ndata: ${JSON.stringify(adminNotif)}\n\n`); } catch {}
               }
             }
-            // aussi les clients déjà flagués admin sur ce serveur
-            for (const c of entry.clients) {
-              if (!c._isAdmin || adminIds.includes(c.uid)) continue;
-              pushNotif(c.uid, adminNotif);
-              try { c.write(`event: notif\ndata: ${JSON.stringify(adminNotif)}\n\n`); } catch {}
-            }
-          } catch (e) { console.error('[web] shop admin notif', e?.message || e); }
-          try {
-            if (deps.notifyAdmins) await deps.notifyAdmins(adminText, user.guildId);
-          } catch (e) { console.error('[web] notifyAdmins', e?.message || e); }
-          // refresh listes commandes côté admin connecté
-          entry.broadcast(`event: shop\ndata: ${JSON.stringify({ kind: 'order', order: { code: order.code, rewardName: order.rewardName, type: order.type, price: order.price, status: order.status, name: user.name, uid: user.uid } })}\n\n`);
+            if (deps.notifyAdmins) await deps.notifyAdmins(adminText, user.guildId).catch(() => {});
+          } catch {}
           return json(res, 200, {
             ok: true,
             code: order.code,
@@ -827,6 +810,12 @@ function init(deps) {
           return json(res, 200, { ok: true, tasks: shopApi.listTasks(true) });
         }
 
+        case 'admin_bot_cmd': {
+          if (!deps.isAdmin || !(await deps.isAdmin(user.uid))) throw new Error('Action réservée à l’administrateur.');
+          if (!deps.runBotCommand) throw new Error('Commandes bot indisponibles (redémarre le bot).');
+          const result = await deps.runBotCommand(user.guildId, user.uid, String(d.cmd || ''), (d.params && typeof d.params === 'object') ? d.params : {});
+          return json(res, 200, { ok: true, result: result || { ok: true }, msg: (result && result.msg) || 'OK' });
+        }
         default:
           return json(res, 400, { ok: false, error: 'Action inconnue.' });
       }
@@ -853,7 +842,7 @@ function init(deps) {
     });
     res.write(`retry: 2000\nevent: hello\ndata: ${JSON.stringify({ uid: user.uid, name: user.name, avatar: user.avatar, seats: SEATS, coin: deps.coin || '🪙', roulette: ROULETTE_INFO, poker: POKER_INFO })}\n\n`);
     res.uid = user.uid; // sert au snapshot personnalisé du poker
-    Promise.resolve(deps.isAdmin ? deps.isAdmin(user.uid) : false).then((a) => { if (a) { res._isAdmin = true; try { res.write(`event: admin\ndata: {"admin":true}\n\n`); } catch { /* fermée */ } } }).catch(() => {});
+    Promise.resolve(deps.isAdmin ? deps.isAdmin(user.uid) : false).then((a) => { if (a) try { res.write(`event: admin\ndata: {"admin":true}\n\n`); } catch { /* fermée */ } }).catch(() => {});
     if (user.avatar) avatarMap.set(user.uid, user.avatar);
     entry.seen.set(user.uid, { uid: user.uid, name: user.name, avatar: user.avatar });
     if (entry.seen.size > 300) entry.seen.delete(entry.seen.keys().next().value);
@@ -868,10 +857,8 @@ function init(deps) {
       res.write(`event: poker\ndata: ${JSON.stringify({ ...r.snapshot(user.uid), tid: t })}\n\n`);
     }
     deps.getBalance(user.uid).then((b) => { try { res.write(`event: bal\ndata: ${JSON.stringify({ bal: b })}\n\n`); } catch { /* fermée */ } }).catch(() => {});
-    entry.roulette.setPresence(user.uid, true);
-    res.write(`event: roulette\ndata: ${JSON.stringify(entry.roulette.snapshot())}\n\n`);
-    entry.arena.setPresence(user.uid, true);
-    res.write(`event: ranked\ndata: ${JSON.stringify(entry.arena.snapshot(user.uid))}\n\n`);
+    try { entry.roulette.setPresence(user.uid, true); res.write(`event: roulette\ndata: ${JSON.stringify(entry.roulette.snapshot())}\n\n`); } catch (e) { console.error('[stream] roulette', e?.message || e); }
+    try { entry.arena.setPresence(user.uid, true); res.write(`event: ranked\ndata: ${JSON.stringify(entry.arena.snapshot(user.uid))}\n\n`); } catch (e) { console.error('[stream] ranked', e?.message || e); }
     res.write(`event: chathist\ndata: ${JSON.stringify(Object.fromEntries(entry.chat))}\n\n`);
     res.write(`event: inbox\ndata: ${JSON.stringify([...(inbox[user.uid] || []), ...eventsOf(user.guildId)].sort((a, b) => b.t - a.t).slice(0, 30))}\n\n`);
     const hb = setInterval(() => {
