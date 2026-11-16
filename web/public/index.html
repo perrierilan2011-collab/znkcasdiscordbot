@@ -26,9 +26,6 @@ header{display:flex;align-items:center;gap:10px;padding:8px 14px;background:#000
 #topNav .navl:hover{color:#fff;background:rgba(255,255,255,.06)}
 #topNav .navl.on{color:#fff;background:rgba(255,255,255,.12)}
 #bTasks svg{display:block}
-@media(max-width:900px){#topNav .navl{padding:6px 7px;font-size:12px}}
-@media(max-width:640px){#topNav{max-width:52vw;overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch}}
-/* cartes hub : bouton Jouer centré */
 .gcard{align-items:center;text-align:center}
 .gcard .gname,.gcard .gdesc{text-align:center;width:100%}
 .gplay{align-self:center;margin-left:auto;margin-right:auto}
@@ -61,13 +58,13 @@ main{flex:1;display:flex;flex-direction:column;min-height:0;padding:10px 10px 0;
   border-radius:30px 30px 50% 50%/30px 30px 22% 22%;
   /* vrai tapis violet : spot de lumière + grain de feutre, rebord capitonné violet autour */
   background:
-    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .06 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>") padding-box,
-    radial-gradient(ellipse 75% 65% at 50% 36%,#2a2a2a 0%,#141414 40%,#0a0a0a 70%,#000 100%) padding-box,
-    linear-gradient(180deg,#3a3a3a 0%,#1a1a1a 30%,#0a0a0a 70%,#000 100%) border-box;
-  box-shadow:inset 0 0 70px rgba(0,0,0,.85),inset 0 0 0 1px rgba(255,255,255,.06),0 0 0 1px rgba(255,255,255,.08),0 26px 60px rgba(0,0,0,.65);
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .09 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>") padding-box,
+    radial-gradient(ellipse 75% 65% at 50% 36%,#8b46f5 0%,#6226c9 34%,#3f1396 66%,#240a5e 100%) padding-box,
+    linear-gradient(180deg,#c4b5fd 0%,#7c3aed 9%,#4c1d95 30%,#2a0d63 62%,#14052f 100%) border-box;
+  box-shadow:inset 0 0 70px rgba(10,2,40,.7),inset 0 0 0 1px rgba(255,255,255,.08),0 0 0 1px rgba(196,181,253,.4),0 26px 60px rgba(0,0,0,.65),0 0 70px rgba(139,92,246,.38);
   display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:14px 8px 62px;overflow:hidden}
 /* liseré doré imprimé sur le tapis */
-#table::after,.ftable::after{content:"";position:absolute;inset:9px;border:1px solid rgba(255,255,255,.12);border-radius:22px 22px 50% 50%/22px 22px 21% 21%;box-shadow:none;pointer-events:none;z-index:0}
+#table::after,.ftable::after{content:"";position:absolute;inset:9px;border:2px solid rgba(251,191,36,.4);border-radius:22px 22px 50% 50%/22px 22px 21% 21%;box-shadow:0 0 0 5px rgba(0,0,0,0),inset 0 0 22px rgba(251,191,36,.1);pointer-events:none;z-index:0}
 /* ZNK transparent (lettres de verre : contour + reflet qui glisse), centré sur la table, sous les cartes et les joueurs */
 #table::before,.ftable::before{content:"ZNK";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:0;
   font-size:min(15vw,165px);font-weight:900;line-height:1;letter-spacing:.16em;padding-left:.16em;white-space:nowrap;
@@ -855,7 +852,6 @@ body.fs.vpk #pkInfo{font-size:12px}
     <button type="button" class="navl" data-g="top">Classement</button>
     <button type="button" class="navl" data-g="shop">Boutique</button>
     <button type="button" class="navl" data-g="tasks">Tasks</button>
-    <button type="button" class="navl" data-g="off-bj">Solo</button>
   </nav>
   <div class="sp"></div>
   <button class="hb ico hide" id="bTop" title="Top">&#9651;</button>
@@ -898,7 +894,7 @@ body.fs.vpk #pkInfo{font-size:12px}
       </button>
       <button class="gcard" data-go="ranked" id="gcRanked">
         <span class="gname">Ranked</span>
-        <span class="gdesc">Blackjack competitif · 10 RR · 2 a 6 joueurs · le classement repartit le pot</span>
+        <span class="gdesc">Arène 100 % skill : réflexe, visée, mémoire, précision, calcul · RR, sans mise</span>
         <span class="glive"></span><span class="gplay">Jouer</span>
       </button>
     </div>
@@ -1105,32 +1101,16 @@ body.fs.vpk #pkInfo{font-size:12px}
 
 
 <main id="rkArenaView" class="hide">
-  <div class="rk-top" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:8px 12px 0">
-    <h2 style="margin:0">Ranked Blackjack</h2>
-    <span id="rkPotLbl" style="color:#a3a3a3;font-size:13px">Entree 10 RR · 2 a 6 joueurs</span>
+  <div class="rk-top"><h2>Ranked</h2><div class="rk-pips" id="rkPips"></div></div>
+  <div class="rk-main">
+    <section class="rk-stage" id="rkStage"></section>
+    <aside class="rk-side"><h3 id="rkSideT">Joueurs</h3><div id="rkSeats"></div></aside>
   </div>
-  <section id="rkTable" class="ftable" style="min-height:420px;margin:8px">
-    <div id="rkDealer" style="display:flex;flex-direction:column;align-items:center;gap:6px;margin-top:8px;position:relative;z-index:1">
-      <div class="dname">CROUPIER</div>
-      <div class="cards" id="rkDCards"></div>
-      <span class="pill" id="rkDTot" style="display:none"></span>
-    </div>
-    <div style="position:absolute;left:50%;top:48%;transform:translate(-50%,-50%);z-index:3;text-align:center;pointer-events:none">
-      <div id="rkMsg" style="display:inline-block;background:rgba(0,0,0,.72);border:1px solid rgba(255,255,255,.12);padding:7px 18px;border-radius:999px;font-weight:700"></div>
-      <div id="rkCd" style="margin-top:6px;font-size:28px;font-weight:900;color:#fff"></div>
-    </div>
-    <div id="rkSeatsBox" style="width:100%;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px;align-items:end;padding:0 4px 8px;position:relative;z-index:1"></div>
-  </section>
-  <div class="dockp" id="rkDock">
-    <div class="row" id="rkActs">
-      <button class="btn go" id="rkJoin">Rejoindre</button>
-      <button class="btn go hide" id="rkReady">Pret (10 RR)</button>
-      <button class="btn hide" id="rkUnready">Annuler</button>
-      <button class="btn hit hide" id="rkHit">Tirer</button>
-      <button class="btn std hide" id="rkStand">Rester</button>
-      <button class="btn hide" id="rkLeave">Quitter</button>
-    </div>
-    <div class="note" id="rkNote">Minimum 2 joueurs · mise obligatoire 10 RR · le pot est reparti selon le classement des mains</div>
+  <div class="rk-dock">
+    <button class="btn go" id="rkJoin">Rejoindre l’arène</button>
+    <button class="btn go hide" id="rkReady">Je suis prêt</button>
+    <button class="btn hide" id="rkUnready">Pas prêt</button>
+    <button class="btn hide" id="rkLeave">Quitter</button>
   </div>
 </main>
 
@@ -1144,7 +1124,7 @@ body.fs.vpk #pkInfo{font-size:12px}
 
     <section class="rkme" id="rkMe"><div class="lbnone">…</div></section>
     <section class="lbcol">
-      <div class="lbtitle"><b>Classement RR</b><small>Se gagne en Ranked Blackjack (10 RR, 2 a 6 joueurs)</small></div>
+      <div class="lbtitle"><b>Classement RR</b><small>Se gagne uniquement en Ranked : 5 épreuves de skill</small></div>
       <div id="rkElo"><div class="lbnone">…</div></div>
     </section>
     <section class="lbcol">
@@ -1337,15 +1317,7 @@ const params = new URLSearchParams(location.search);
 let TOKEN = params.get('t') || '';
 try { if (TOKEN) localStorage.setItem('znk_t', TOKEN); else TOKEN = localStorage.getItem('znk_t') || ''; } catch {}
 if (params.get('t')) history.replaceState(null, '', location.pathname);
-if (!TOKEN) {
-  const g = $('#gate');
-  if (g) g.classList.add('on');
-  else {
-    // fallback si gate absent : redirige vers OAuth
-    location.replace('/login');
-  }
-  return;
-}
+if (!TOKEN) { const g = $('#gate'); if (g) g.classList.add('on'); else location.replace('/login'); return; }
 
 let me = null, S = null, offset = 0, COIN = 'ZTKN', seatsN = 5;
 const BJT = new Map(); // tid -> snapshot (blackjack)
@@ -1454,15 +1426,16 @@ function showGate(t) { $('#gatemsg').textContent = t; $('#gate').classList.add('
 let es;
 function connect() {
   es = new EventSource('/api/stream?t=' + encodeURIComponent(TOKEN));
-  es.addEventListener('hello', (e) => { const d = JSON.parse(e.data); me = d; COIN = d.coin && d.coin !== '🪙' ? d.coin : 'ZTKN'; seatsN = d.seats || 5; const coinEl = $('#coin'); if (coinEl) coinEl.textContent = COIN;
-    if ($('#meName')) $('#meName').textContent = d.name; if ($('#meAv')) setAvatar($('#meAv'), d.avatar, d.name); if ($('#conn')) $('#conn').style.display = 'none'; BJT.clear(); P.tables.clear(); try { rOnHello(d); } catch(e){} try { pOnHello(d); } catch(e){} });
-  es.addEventListener('ranked', (e) => { try { (window.rkRender || rkRender)(JSON.parse(e.data)); } catch (err) { console.error('ranked', err); } });
+  es.addEventListener('hello', (e) => { const d = JSON.parse(e.data); me = d; COIN = d.coin && d.coin !== '🪙' ? d.coin : 'ZTKN'; seatsN = d.seats || 5; $('#coin').textContent = COIN;
+    $('#meName').textContent = d.name; setAvatar($('#meAv'), d.avatar, d.name); $('#conn').style.display = 'none'; BJT.clear(); P.tables.clear(); rOnHello(d); pOnHello(d); });
+  es.addEventListener('ranked', (e) => { try { rkRender(JSON.parse(e.data)); } catch {} });
 es.addEventListener('roulette', (e) => { const st = JSON.parse(e.data); offset = st.now - Date.now(); rRender(st); });
   es.addEventListener('poker', (e) => { const st = JSON.parse(e.data); offset = st.now - Date.now(); pUpdate(st); });
   es.addEventListener('admin', () => $('#bAdmin').classList.remove('hide'));
-  es.addEventListener('bal', (e) => { W.bal = JSON.parse(e.data).bal; pHeader(); if (!O.hold && W.bal != null) $('#meBal').textContent = num(W.bal) + ' ' + COIN; });
+  es.addEventListener('bal', (e) => { try { W.bal = JSON.parse(e.data).bal; } catch(err) { return; } try { pHeader(); } catch(err) {} if (!O.hold && W.bal != null) { const mb = $('#meBal'); if (mb) mb.textContent = num(W.bal) + ' ' + COIN; } });
   es.addEventListener('inbox', (e) => nSet(JSON.parse(e.data), false));
   es.addEventListener('notif', (e) => nAdd(JSON.parse(e.data)));
+  es.addEventListener('shop', (e) => { try { const d = JSON.parse(e.data); if (W.view === 'shop' || W.view === 'admin' || W.view === 'account') { try { loadShop(); } catch(err) {} try { if (typeof loadAdminShop === 'function') loadAdminShop(); } catch(err) {} } } catch(err) {} });
   es.addEventListener('chathist', (e) => { C.msgs = JSON.parse(e.data); cRender(); });
   es.addEventListener('chat', (e) => cOnMsg(JSON.parse(e.data)));
   es.addEventListener('state', (e) => { $('#conn').style.display = 'none'; const st = JSON.parse(e.data); offset = st.now - Date.now(); bjUpdate(st); });
@@ -1724,7 +1697,7 @@ $('#bTop').onclick = async () => {
     box.textContent = ''; box.append(t);
   } catch { box.textContent = 'Classement indisponible.'; }
 };
-const sndBtn = $('#bSnd'); const refreshSnd = () => { if (!sndBtn) return; sndBtn.textContent = sndOn ? '\u266b' : '\u2715'; sndBtn.title = sndOn ? 'Son' : 'Muet'; }; refreshSnd();
+const sndBtn = $('#bSnd'); const refreshSnd = () => { sndBtn.textContent = sndOn ? '🔊' : '🔇'; sndBtn.title = sndOn ? 'Son' : 'Muet'; }; refreshSnd();
 sndBtn.onclick = () => { sndOn = !sndOn; try { localStorage.setItem('znk_snd', sndOn ? '1' : '0'); } catch {} refreshSnd(); if (sndOn) SFX.chip(); };
 document.addEventListener('pointerdown', () => ac(), { once: true });
 // retour sur l'onglet : resynchronise le solde
@@ -2231,14 +2204,16 @@ function routeSet(v, replace) {
   else history.pushState(null, '', path);
 }
 function navHighlight(v) {
-  document.querySelectorAll('#topNav [data-g], #deskNav [data-g], #menuPanel .mitem[data-g]').forEach((b) => {
+  document.querySelectorAll('#deskNav [data-g], #menuPanel .mitem[data-g]').forEach((b) => {
     const g = b.getAttribute('data-g');
-    b.classList.toggle('on', g === v || (String(v).startsWith('off-') && g === 'off-bj'));
+    let on = g === v;
+    if (g === 'hub' && v === 'hub') on = true;
+    b.classList.toggle('on', on);
   });
   const lbl = $('#menuLbl');
   if (lbl) {
     const map = { hub:'Accueil', ranked:'Ranked', rank:'Rank', top:'Classement', shop:'Boutique', tasks:'Tasks', account:'Compte', bj:'Blackjack', poker:'Poker', roulette:'Roulette' };
-    lbl.textContent = map[v] || (String(v).startsWith('off-') ? 'Solo' : 'Menu');
+    lbl.textContent = map[v] || (v.startsWith('off-') ? 'Offline' : 'Menu');
   }
 }
 
@@ -2306,16 +2281,14 @@ function setView(v) {
   else { const m = v === 'poker' ? null : mySeat(); $('#meBal').textContent = m ? num(m.bal) + ' ' + COIN : v === 'bj' ? 'Spectateur' : (W.bal != null ? num(W.bal) + ' ' + COIN : 'Casino'); }
 }
 document.querySelectorAll('.gcard').forEach((c) => (c.onclick = () => { ac(); setView(c.dataset.go); }));
-
-// desk nav + header tasks/shop + hub ranked
-
-// top nav (liste horizontale)
 document.querySelectorAll('#topNav [data-g]').forEach((b) => {
   b.onclick = () => { try { ac(); } catch(e) {} setView(b.getAttribute('data-g')); };
 });
 const _bTasksBtn = $('#bTasks');
 if (_bTasksBtn) _bTasksBtn.onclick = () => { try { ac(); } catch(e) {} setView('tasks'); };
 
+
+// desk nav + header tasks/shop + hub ranked
 document.querySelectorAll('#deskNav [data-g]').forEach((b) => {
   b.onclick = () => { ac(); setView(b.getAttribute('data-g')); };
 });
@@ -2339,7 +2312,7 @@ window.__bootRoute = () => {
 };
 
 
-if ($('.logo')) $('.logo').onclick = () => { ac(); setView('hub'); };
+$('.logo').onclick = () => { ac(); setView('hub'); };
 function hubRoulette(ok) { $('#gcRoulette').disabled = !ok; const t = document.querySelector('.mitem[data-g="roulette"]'); if (t) t.disabled = !ok; }
 function updHub() {
   const plural = (n, a) => n + ' ' + a + (n > 1 ? 's' : '');
@@ -2353,15 +2326,15 @@ function updHub() {
 
 // ---- menu déroulant
 function menuClose() { try { const m = $('#menu'); if (m) m.classList.remove('open'); const b = $('#menuBtn'); if (b) b.setAttribute('aria-expanded', 'false'); } catch(e) {} }
-if ($('#menuBtn') && $('#menu')) { $('#menuBtn').onclick = (e) => { e.stopPropagation(); const o = $('#menu').classList.toggle('open'); $('#menuBtn').setAttribute('aria-expanded', String(o)); }; }
+if ($('#menuBtn') && $('#menu')) $('#menuBtn').onclick = (e) => { e.stopPropagation(); const o = $('#menu').classList.toggle('open'); $('#menuBtn').setAttribute('aria-expanded', String(o)); };
 document.querySelectorAll('#menuPanel .mhead').forEach((b) => (b.onclick = (e) => { e.stopPropagation(); b.parentElement.classList.toggle('open'); }));
-document.addEventListener('click', (e) => { if (!e.target.closest('#menu') && !e.target.closest('#topNav')) menuClose(); });
+document.addEventListener('click', (e) => { if (!e.target.closest('#menu')) menuClose(); });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') menuClose(); });
 const MENU_LBL = { hub: 'Menu', bj: 'Blackjack', poker: 'Poker', roulette: 'Roulette', 'off-bj': 'Blackjack solo', 'off-fuse': 'Fusé', 'off-mine': 'Mine', 'off-coin': 'Pile ou Face', 'off-dice': 'Dés', 'off-horses': 'Chevaux', 'off-russian': 'Roulette russe', 'off-slots': 'Slots', 'off-duel': 'Duel', 'off-scratch': 'Ticket à gratter', 'off-plinko': 'Plinko', top: 'Classement', rank: 'Rank', admin: 'Admin' };
 function menuSync(v) {
-  const _ml = $('#menuLbl'); if (_ml) _ml.textContent = (typeof MENU_LBL !== 'undefined' && MENU_LBL[v]) || 'Menu';
-  const _on = $('#msOn'); if (_on) _on.classList.toggle('open', v === 'bj' || v === 'poker' || v === 'roulette');
-  const _off = $('#msOff'); if (_off) _off.classList.toggle('open', String(v).startsWith('off-'));
+  $('#menuLbl').textContent = MENU_LBL[v] || 'Menu';
+  $('#msOn').classList.toggle('open', v === 'bj' || v === 'poker' || v === 'roulette');
+  $('#msOff').classList.toggle('open', v.startsWith('off-'));
 }
 
 // ---- page classement : actuel + all-time côte à côte
@@ -3566,7 +3539,7 @@ async function gSearch() {
 function gOpen(admin) { menuClose(); G.admin = admin === true; $('#gTitle').textContent = G.admin ? 'Ajouter de l’argent (admin)' : 'Envoyer des ZTKN'; $('#gSend').textContent = G.admin ? 'Ajouter' : 'Envoyer'; G.to = null; $('#gQ').value = ''; $('#gAmt').value = ''; $('#mGift').classList.add('on'); gSel(); gSearch(); setTimeout(() => $('#gQ').focus(), 50); }
 $('#bGift').onclick = () => { popClose(); gOpen(); };
 $('#bAdmin').onclick = () => { popClose(); setView('admin'); };
-if ($('#bDaily')) if ($('#bDaily')) $('#bDaily').onclick = async () => {
+if ($('#bDaily')) $('#bDaily').onclick = async () => {
   const b = $('#bDaily'); if (b.disabled) return; b.disabled = true;
   try {
     const ok = await send('daily'), d = send.last;
@@ -3708,12 +3681,21 @@ async function loadShop() {
       const ok2 = await send('shop_buy', { id: r.id });
       b.disabled = false;
       if (!ok2) return;
-      const o = send.last;
-      if (o && o.rbal != null) { W.bal = o.rbal; $('#meBal').textContent = num(o.rbal) + ' ' + COIN; }
-      $('#mOrderCode').textContent = o.code;
-      $('#mOrderName').textContent = (o.order && o.order.rewardName) || r.name;
-      $('#mOrder').classList.add('on');
-      SFX.win();
+      const o = send.last || {};
+      const ord = o.order || {};
+      if (o.rbal != null) { W.bal = o.rbal; const mb = $('#meBal'); if (mb) mb.textContent = num(o.rbal) + ' ' + COIN; }
+      const codeEl = $('#mOrderCode'); if (codeEl) codeEl.textContent = o.code || ord.code || '—';
+      const nameEl = $('#mOrderName');
+      if (nameEl) {
+        let t = ord.rewardName || r.name;
+        if (ord.autoRole) t += ' · rôle livré automatiquement';
+        else if (ord.type === 'role' && ord.roleErr) t += ' · rôle à livrer manuellement';
+        else if (ord.status === 'pending') t += ' · en attente de livraison';
+        nameEl.textContent = t;
+      }
+      const mo = $('#mOrder'); if (mo) mo.classList.add('on');
+      try { SFX.win(); } catch(e) {}
+      try { loadShop(); } catch(e) {}
       loadShop();
     };
     c.append(b);
@@ -3930,11 +3912,10 @@ const rkMine = (st) => { const u = me && me.uid; return u ? st.seats.find((p) =>
 
 function rkRender(st) {
   if (!st) return;
-  if (st.game === 'blackjack' || st.skill === false) { if (window.rkRender && window.rkRender !== rkRender) return window.rkRender(st); }
   RK.offs.push(st.now - Date.now()); if (RK.offs.length > 12) RK.offs.shift();
-  RK.off = Math.max(...RK.offs);
+  RK.off = Math.max(...RK.offs); // l'échantillon au plus faible délai réseau
   RK.S = st;
-  try { rkPips(st); rkSeats(st); rkDock(st); } catch (e) { console.error(e); }
+  rkPips(st); rkSeats(st); rkDock(st);
   const k = st.phase === 'lobby'
     ? 'lobby|' + st.deadline + '|' + st.seats.map((p) => (p ? (p.ready ? 2 : 1) : 0)).join('')
     : [st.phase, st.match, st.round, (st.challenge && st.challenge.stage) || ''].join('|');
@@ -3949,7 +3930,7 @@ document.addEventListener('keydown', (e) => {
 });
 
 function rkPips(st) {
-  const box = $('#rkPips'); if (!box) return; box.textContent = '';
+  const box = $('#rkPips'); box.textContent = '';
   for (let i = 0; i < st.rounds; i++) {
     const g = st.plan && st.plan[i];
     const done = st.phase !== 'lobby' && st.phase !== 'match_end' ? (i + 1 < st.round || (i + 1 === st.round && st.phase === 'round_result')) : st.phase === 'match_end';
@@ -3958,9 +3939,9 @@ function rkPips(st) {
   }
 }
 function rkSeats(st) {
-  const box = $('#rkSeats'); if (!box) return; box.textContent = '';
+  const box = $('#rkSeats'); box.textContent = '';
   const inM = st.phase !== 'lobby';
-  const _rst = $('#rkSideT'); if (_rst) _rst.textContent = inM ? 'Score du match' : 'Joueurs ' + st.seats.filter(Boolean).length + '/' + st.maxPlayers;
+  $('#rkSideT').textContent = inM ? 'Score du match' : 'Joueurs ' + st.seats.filter(Boolean).length + '/' + st.maxPlayers;
   const list = st.seats.map((p, i) => ({ p, i }));
   if (inM) list.sort((a, b) => ((b.p && b.p.score) || -1) - ((a.p && a.p.score) || -1));
   list.forEach(({ p }) => {
@@ -3975,17 +3956,16 @@ function rkSeats(st) {
 }
 function rkDock(st) {
   const mine = rkMine(st), lob = st.phase === 'lobby';
-  const t = (id, v) => { const n = document.getElementById(id); if (n) n.classList.toggle('hide', v); };
-  t('rkJoin', !!mine || !lob);
-  t('rkReady', !mine || (mine && mine.ready) || !lob);
-  t('rkUnready', !mine || !(mine && mine.ready) || !lob);
-  t('rkLeave', !mine);
-  const lv = document.getElementById('rkLeave'); if (lv) lv.textContent = mine && mine.inMatch && !lob ? 'Abandonner' : 'Quitter';
+  $('#rkJoin').classList.toggle('hide', !!mine || !lob);
+  $('#rkReady').classList.toggle('hide', !mine || mine.ready || !lob);
+  $('#rkUnready').classList.toggle('hide', !mine || !mine.ready || !lob);
+  $('#rkLeave').classList.toggle('hide', !mine);
+  $('#rkLeave').textContent = mine && mine.inMatch && !lob ? 'Abandonner' : 'Quitter';
 }
 
 function rkStage(st) {
   RK.loop++; RK.onKey = null;
-  const old = $('#rkStage'); if (!old) return; const S = old.cloneNode(false); old.replaceWith(S); RK.stage = S;
+  const old = $('#rkStage'); const S = old.cloneNode(false); old.replaceWith(S); RK.stage = S;
   const mine = rkMine(st);
   const play = !!(mine && mine.inMatch && mine.online !== false && !st.answered);
   const big = (t) => S.append(el('div', 'rk-big', t));
@@ -4151,140 +4131,7 @@ function rkFmtLeft(ms) {
 const _rkWatch = typeof rkWatch === 'function' ? rkWatch : null;
 // patch load of rank data after fetch - enhance existing rk render if present
 
-
-// --- Ranked Blackjack client override ---
-(function () {
-  if (!window.RK) window.RK = {};
-  const rkNow = () => Date.now() + (RK.off || 0);
-  function rkCardEl(c) {
-    if (!c || c.h) {
-      const d = el('div', 'card down');
-      d.innerHTML = '<div class="inner"><div class="face front"></div><div class="face back"></div></div>';
-      return d;
-    }
-    const red = c.s === '♥' || c.s === '♦';
-    const d = el('div', 'card');
-    d.innerHTML = '<div class="inner"><div class="face front' + (red ? ' red' : '') + '"><span class="tl">' + c.r + '<i>' + c.s + '</i></span><span class="mid">' + c.s + '</span></div><div class="face back"></div></div>';
-    return d;
-  }
-  const rkMine = (st) => {
-    const u = me && me.uid;
-    return u ? (st.seats || []).find((p) => p && p.uid === u) || null : null;
-  };
-  window.rkRender = function rkRender(st) {
-    if (!st) return;
-    RK.offs = RK.offs || [];
-    RK.offs.push(st.now - Date.now());
-    if (RK.offs.length > 12) RK.offs.shift();
-    RK.off = Math.max.apply(null, RK.offs);
-    RK.S = st;
-    const potEl = document.getElementById('rkPotLbl');
-    if (potEl) potEl.textContent = 'Pot ' + (st.pot || 0) + ' RR · entree ' + (st.entry || 10) + ' RR · ' + (st.seats || []).filter(Boolean).length + '/' + (st.maxPlayers || 6);
-
-    const dc = document.getElementById('rkDCards');
-    if (dc) {
-      dc.textContent = '';
-      ((st.dealer && st.dealer.cards) || []).forEach((c) => dc.appendChild(rkCardEl(c)));
-    }
-    const dt = document.getElementById('rkDTot');
-    if (dt) {
-      if (st.dealer && st.dealer.cards && st.dealer.cards.length && st.phase !== 'lobby') {
-        dt.style.display = '';
-        dt.textContent = st.dealer.bj ? 'BJ' : String(st.dealer.total || '');
-        dt.className = 'pill' + (st.dealer.bj ? ' bj' : '');
-      } else dt.style.display = 'none';
-    }
-    const msg = document.getElementById('rkMsg');
-    if (msg) {
-      const n = (st.seats || []).filter(Boolean).length;
-      const r = (st.seats || []).filter((p) => p && p.ready).length;
-      if (st.phase === 'result') msg.textContent = 'Fin de main — pot reparti';
-      else if (st.phase === 'lobby' || st.phase === 'betting') msg.textContent = n < (st.minPlayers || 2) ? 'Minimum ' + (st.minPlayers || 2) + ' joueurs' : r + '/' + n + ' prets';
-      else if (st.phase === 'dealing') msg.textContent = 'Distribution…';
-      else if (st.phase === 'playing') msg.textContent = 'A vous de jouer';
-      else if (st.phase === 'dealer') msg.textContent = 'Croupier…';
-      else msg.textContent = st.phase || '';
-    }
-    const cd = document.getElementById('rkCd');
-    if (cd) cd.textContent = st.deadline ? Math.max(0, Math.ceil((st.deadline - rkNow()) / 1000)) + ' s' : '';
-
-    const box = document.getElementById('rkSeatsBox');
-    if (box) {
-      box.textContent = '';
-      const mine = rkMine(st);
-      for (let i = 0; i < (st.maxPlayers || 6); i++) {
-        const p = st.seats[i];
-        const seat = el('div', 'seat' + (p && me && p.uid === me.uid ? ' mine' : '') + (st.turn && st.turn.seat === i ? ' turn' : ''));
-        if (!p) { seat.appendChild(el('div', 'empty', 'Libre')); box.appendChild(seat); continue; }
-        const hands = el('div', 'hands');
-        (p.hands || []).forEach((h) => {
-          const hand = el('div', 'hand' + (st.turn && st.turn.seat === i ? ' act' : ''));
-          const cards = el('div', 'cards');
-          (h.cards || []).forEach((c) => cards.appendChild(rkCardEl(c)));
-          hand.appendChild(cards);
-          if (h.total) {
-            hand.appendChild(el('span', 'pill' + (h.state === 'bust' ? ' bust' : h.state === 'bj' ? ' bj' : h.total === 21 ? ' t21' : ''), h.state === 'bj' ? 'BJ' : String(h.total)));
-          }
-          if (h.result) hand.appendChild(el('div', 'res ' + h.result, h.result === 'win' ? '+' + (h.net || '') : h.result === 'lose' ? String(h.net || '') : '='));
-          hands.appendChild(hand);
-        });
-        seat.appendChild(hands);
-        if (p.bet) {
-          const spot = el('div', 'betspot');
-          spot.appendChild(el('span', 'betamt', p.bet + ' RR'));
-          seat.appendChild(spot);
-        }
-        const plate = el('div', 'plate');
-        const av = el('div', 'av');
-        if (typeof setAvatar === 'function') setAvatar(av, p.avatar, p.name);
-        else av.textContent = (p.name || '?')[0];
-        plate.appendChild(av);
-        plate.appendChild(el('div', 'nm', p.name + (p.ready ? ' · pret' : '') + (p.place ? ' · #' + p.place : '')));
-        plate.appendChild(el('div', 'bl', (p.rr != null ? p.rr : '—') + ' RR'));
-        seat.appendChild(plate);
-        box.appendChild(seat);
-      }
-    }
-
-    const mine = rkMine(st);
-    const lob = st.phase === 'lobby' || st.phase === 'betting';
-    const myTurn = !!(mine && st.turn && st.seats[st.turn.seat] && st.seats[st.turn.seat].uid === (me && me.uid) && st.phase === 'playing');
-    const j = document.getElementById('rkJoin');
-    const rd = document.getElementById('rkReady');
-    const ur = document.getElementById('rkUnready');
-    const lv = document.getElementById('rkLeave');
-    const ht = document.getElementById('rkHit');
-    const sd = document.getElementById('rkStand');
-    if (j) j.classList.toggle('hide', !!mine || !lob);
-    if (rd) rd.classList.toggle('hide', !mine || !!(mine && mine.ready) || !lob);
-    if (ur) ur.classList.toggle('hide', !mine || !(mine && mine.ready) || !lob);
-    if (lv) lv.classList.toggle('hide', !mine);
-    if (ht) ht.classList.toggle('hide', !myTurn);
-    if (sd) sd.classList.toggle('hide', !myTurn);
-    const note = document.getElementById('rkNote');
-    if (note) {
-      if (st.phase === 'result' && st.final) note.textContent = st.final.map((r) => r.name + ' #' + r.place + ' (' + (r.net >= 0 ? '+' : '') + r.net + ' RR)').join(' · ');
-      else note.textContent = 'Minimum 2 joueurs · mise obligatoire 10 RR · le pot est reparti selon le classement des mains';
-    }
-  };
-  // bind actions (idempotent)
-  const bind = (id, fn) => { const n = document.getElementById(id); if (n) n.onclick = fn; };
-  const rkSend = (action, extra) => send(action, extra || {});
-  bind('rkJoin', () => rkSend('rkjoin'));
-  bind('rkReady', () => rkSend('rkready', { on: true }));
-  bind('rkUnready', () => rkSend('rkunready'));
-  bind('rkLeave', () => rkSend('rkleave'));
-  bind('rkHit', () => rkSend('rkhit'));
-  bind('rkStand', () => rkSend('rkstand'));
-  if (!RK._bjIv) {
-    RK._bjIv = setInterval(() => {
-      const e = document.getElementById('rkCd');
-      if (e && RK.S && RK.S.deadline) e.textContent = Math.max(0, Math.ceil((RK.S.deadline - rkNow()) / 1000)) + ' s';
-    }, 250);
-  }
-})();
-
-try { connect(); } catch (e) { console.error('connect', e); const c = document.getElementById('conn'); if (c) { c.style.display = ''; c.textContent = 'Erreur connexion — recharge la page'; } }
+try { connect(); } catch (e) { console.error('connect', e); }
 try { tick(); } catch (e) { console.error('tick', e); }
 
 })();
