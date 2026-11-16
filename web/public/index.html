@@ -983,10 +983,11 @@ header .sp{flex:1 1 0}
     <div class="adtabs" id="adTabs">
       <button type="button" class="on" data-ad="rewards">Rewards</button>
       <button type="button" data-ad="tasks">Tasks</button>
-      <button type="button" data-ad="orders">Commandes</button>
-      <button type="button" data-ad="money">Économie</button>
-      <button type="button" data-ad="events">Événements</button>
-      <button type="button" data-ad="bot">Commandes bot</button>
+      <button type="button" data-ad="orders">Orders</button>
+      <button type="button" data-ad="money">Economy</button>
+      <button type="button" data-ad="ranks">Ranks RR</button>
+      <button type="button" data-ad="events">Events</button>
+      <button type="button" data-ad="bot">Bot cmds</button>
     </div>
     <section class="lbcol" id="adPanelRewards" style="width:100%;max-width:1000px">
       <div class="lbtitle"><b>Créer / modifier une reward</b><small>Nitro, rôle auto, ou custom · conditions optionnelles</small></div>
@@ -1043,9 +1044,38 @@ header .sp{flex:1 1 0}
       <div class="adlist" id="adOrderList" style="padding:12px"></div>
     </section>
     <section class="lbcol hide" id="adPanelMoney" style="width:100%;max-width:1000px">
-      <div class="lbtitle"><b>Économie</b></div>
-      <div class="adgrid" style="padding:14px">
-        <button class="adcard" id="adGive"><span class="nic"></span><b>Ajouter de l’argent</b><small>Crédit admin sans retirer de ton solde</small></button>
+      <div class="lbtitle"><b>Economy</b><small>Same actions as Discord admin panel (no channel tools)</small></div>
+      <div class="adbody" style="padding:14px;display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+          <input class="gin" id="adEcoUid" placeholder="Discord user ID" style="width:200px">
+          <input class="gin" id="adEcoAmt" placeholder="Amount" inputmode="decimal" style="width:120px">
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px">
+          <button type="button" class="btn go" data-eco="add">+ Add</button>
+          <button type="button" class="btn" data-eco="remove" style="background:#7f1d1d">− Remove</button>
+          <button type="button" class="btn" data-eco="set">🎯 Set</button>
+          <button type="button" class="btn" data-eco="view">👀 View</button>
+          <button type="button" class="btn" data-eco="player_stats">📊 Player stats</button>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px">
+          <button type="button" class="btn go" data-eco="gift_all">🎁 Gift all</button>
+          <button type="button" class="btn" data-eco="reset_balances" style="background:#7f1d1d">💥 Reset balances</button>
+          <button type="button" class="btn" data-eco="reset_alltime" style="background:#7f1d1d">👑 Reset all-time</button>
+          <button type="button" class="btn" data-eco="reset_stats" style="background:#7f1d1d">📈 Reset stats</button>
+        </div>
+        <div id="adEcoOut" class="lbnone" style="white-space:pre-wrap;text-align:left;min-height:40px;color:#e5e5e5"></div>
+        <button class="adcard" id="adGive" style="display:none"></button>
+      </div>
+    </section>
+    <section class="lbcol hide" id="adPanelRanks" style="width:100%;max-width:1000px">
+      <div class="lbtitle"><b>Rank ladder (RR)</b><small>Visible to everyone · edit thresholds · saved in Supabase</small></div>
+      <div class="adbody" style="padding:14px;display:flex;flex-direction:column;gap:10px">
+        <div id="adLadderList" style="display:flex;flex-direction:column;gap:6px"></div>
+        <div class="row">
+          <button type="button" class="btn go" id="adLadderSave">Save ladder</button>
+          <button type="button" class="btn" id="adLadderReload">Reload</button>
+        </div>
+        <div id="adLadderOut" class="lbnone"></div>
       </div>
     </section>
     <section class="lbcol hide" id="adPanelEvents" style="width:100%;max-width:1000px">
@@ -3862,11 +3892,87 @@ function adShow(panel) {
     const elp = $('#adPanel' + k.charAt(0).toUpperCase() + k.slice(1));
     // ids: adPanelRewards etc
   });
-  const map = { rewards: 'adPanelRewards', tasks: 'adPanelTasks', orders: 'adPanelOrders', money: 'adPanelMoney', events: 'adPanelEvents', bot: 'adPanelBot' };
+  const map = { rewards: 'adPanelRewards', tasks: 'adPanelTasks', orders: 'adPanelOrders', money: 'adPanelMoney', ranks: 'adPanelRanks', events: 'adPanelEvents', bot: 'adPanelBot' };
   Object.entries(map).forEach(([k, id]) => { const n = document.getElementById(id); if (n) n.classList.toggle('hide', k !== panel); });
   if (panel === 'bot' && typeof adBotRender === 'function') adBotRender();
+  if (panel === 'ranks' && typeof adLadderLoad === 'function') adLadderLoad();
 }
+
 document.querySelectorAll('#adTabs button').forEach((b) => (b.onclick = () => adShow(b.dataset.ad)));
+
+// ---- Admin economy buttons
+document.querySelectorAll('[data-eco]').forEach((btn) => {
+  btn.addEventListener('click', async () => {
+    const op = btn.dataset.eco;
+    const userId = ($('#adEcoUid') && $('#adEcoUid').value.trim()) || '';
+    const amount = ($('#adEcoAmt') && $('#adEcoAmt').value.trim()) || '';
+    const out = $('#adEcoOut');
+    if (out) out.textContent = 'Working…';
+    const body = { op };
+    if (userId) body.userId = userId;
+    if (amount !== '') body.amount = amount;
+    if (['reset_balances', 'reset_alltime', 'reset_stats', 'gift_all'].includes(op)) {
+      if (!confirm('Confirm ' + op + '?')) { if (out) out.textContent = 'Cancelled'; return; }
+    }
+    const ok = await send('admin_eco', body);
+    const d = send.last || {};
+    if (out) out.textContent = ok ? (d.msg || 'OK') : (d.error || 'Error');
+  });
+});
+
+async function adLadderLoad() {
+  const box = $('#adLadderList'); if (!box) return;
+  box.textContent = 'Loading…';
+  const ok = await send('admin_ladder_get');
+  const d = send.last || {};
+  const ladder = (ok && d.ladder) || [];
+  box.textContent = '';
+  if (!ladder.length) { box.append(el('div', 'lbnone', 'No ladder')); return; }
+  ladder.forEach((t, i) => {
+    const row = el('div', 'aditem');
+    row.style.cssText = 'display:flex;flex-wrap:wrap;gap:8px;align-items:center';
+    const name = el('input', 'gin'); name.value = t.name || ''; name.style.width = '140px'; name.dataset.k = 'name';
+    const min = el('input', 'gin'); min.type = 'number'; min.value = t.min; min.style.width = '90px'; min.dataset.k = 'min';
+    const c1 = el('input', 'gin'); c1.value = t.c1 || ''; c1.style.width = '90px'; c1.dataset.k = 'c1';
+    row.append(el('span', null, '#' + i), name, el('span', null, 'RR ≥'), min, el('span', null, 'c1'), c1);
+    row._tier = t;
+    row._name = name; row._min = min; row._c1 = c1;
+    box.append(row);
+  });
+}
+async function adLadderSave() {
+  const box = $('#adLadderList'); if (!box) return;
+  const tiers = [];
+  [...box.children].forEach((row, i) => {
+    if (!row._tier) return;
+    tiers.push({
+      id: i,
+      fam: row._tier.fam,
+      fi: row._tier.fi,
+      div: row._tier.div,
+      name: row._name.value.trim() || row._tier.name,
+      min: Number(row._min.value) || 0,
+      c1: row._c1.value.trim() || row._tier.c1,
+      c2: row._tier.c2,
+      sym: row._tier.sym,
+      pips: row._tier.pips,
+    });
+  });
+  const out = $('#adLadderOut'); if (out) out.textContent = 'Saving…';
+  const ok = await send('admin_ladder_set', { ladder: tiers });
+  const d = send.last || {};
+  if (out) out.textContent = ok ? (d.msg || 'Saved') : (d.error || 'Error');
+  if (ok) adLadderLoad();
+}
+const _adShow = typeof adShow === 'function' ? adShow : null;
+// hook ranks panel load
+(function(){
+  const prev = window.adShow;
+})();
+if ($('#adLadderSave')) $('#adLadderSave').onclick = () => adLadderSave();
+if ($('#adLadderReload')) $('#adLadderReload').onclick = () => adLadderLoad();
+
+
 async function loadAdminShop() {
   const ok = await send('admin_shop_list');
   const d = send.last;
