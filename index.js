@@ -4957,109 +4957,54 @@ async function playInstant(i, key, bet, choice) {
 //  PANNEAU DE JEU (boutons) + POP-UPS
 // ============================================================
 function buildHelpEmbed() {
-  const p = PREFIX;
   return new EmbedBuilder()
     .setColor(COLORS.violet)
     .setAuthor({ name: 'ZNK CASINO' })
-    .setTitle('✨ Guide des commandes')
+    .setTitle('✨ Guide des commandes (slash)')
     .setDescription(
-      'Utilise **`/help`** ou **`' +
-        p +
-        'help`** pour revoir ce message.\n' +
-        'La plupart des jeux se lancent aussi via le **panneau** (boutons).'
+      '**Toutes les commandes sont en `/`** et **réservées au propriétaire** du serveur (couronne).'
     )
     .addFields(
       {
-        name: '🎮 Jouer',
-        value:
-          '• Panneau : **Start** → casino privé → **Jouer** → choix du jeu + mise\n' +
-          '• Site web : lien dans le panneau (online, offline, ranked, shop)\n' +
-          '• `' +
-          p +
-          'casino` ou `' +
-          p +
-          'jeux` — republie le panneau de jeu',
+        name: '📖 Aide',
+        value: '`/help` · `/aide` — ce guide',
         inline: false,
       },
       {
-        name: '💰 Joueur',
+        name: '💰 Comptes',
         value:
-          '• `' +
-          p +
-          'balance` / `' +
-          p +
-          'bal` / `' +
-          p +
-          'solde` — ton solde\n' +
-          '• `' +
-          p +
-          'daily` — récompense quotidienne (**' +
-          DAILY_AMOUNT +
-          '** ' +
-          COIN +
-          ', minuit Paris)\n' +
-          '• `' +
-          p +
-          'invites` — tes invitations (**+' +
-          INVITE_REWARD +
-          '** ' +
-          COIN +
-          ' / ami)\n' +
-          '• **`/help`** ou `' +
-          p +
-          'help` / `' +
-          p +
-          'aide` — ce guide',
+          '`/balance` `[membre]` · `/solde` — solde\n' +
+          '`/daily` — récompense quotidienne\n' +
+          '`/invites` `[membre]` — invitations\n' +
+          '`/add` `membre` `montant` — ajouter des coins\n' +
+          '`/remove` `membre` `montant` — retirer des coins',
         inline: false,
       },
       {
-        name: '🎁 Boutique & tickets',
+        name: '🎮 Casino',
         value:
-          '• Achète une reward sur le **site** → tu reçois un **order code**\n' +
-          '• Discord : bouton **Ouvrir un ticket** du panel claim → colle le code\n' +
-          '• Owner : `' +
-          p +
-          'ticketsetup` [catégorie] — poste le panel tickets',
+          '`/casino` · `/jeux` — publier le panneau de jeu\n' +
+          '`/setup` · `/salon` — configurer les salons\n' +
+          '`/wins` — salon des victoires\n' +
+          '`/classement` — message classement auto\n' +
+          '`/admin` — panneau admin\n' +
+          '`/invites-notif` — salon notifs d’invites',
         inline: false,
       },
       {
-        name: '🏆 Ranked (site)',
+        name: '🎁 Boutique / tickets',
         value:
-          'Arène **sans ZTKN** : tu joues pour du **RR**, placements (5 parties), saison 1 semaine avec soft reset le lundi.',
+          '`/ticketsetup` `[catégorie]` — panel claim rewards (order codes du site)',
         inline: false,
       },
       {
-        name: '👑 Owner uniquement',
+        name: '🌐 Site',
         value:
-          '• `' +
-          p +
-          'setup` / `' +
-          p +
-          'salon` — configure les salons du casino\n' +
-          '• `' +
-          p +
-          'admin` — panneau admin Discord\n' +
-          '• `' +
-          p +
-          'wins` — salon des victoires\n' +
-          '• `' +
-          p +
-          'classement` — message classement auto\n' +
-          '• `' +
-          p +
-          'add @membre <montant>` / `' +
-          p +
-          'remove @membre <montant>`\n' +
-          '• `' +
-          p +
-          'invites-notif` — salon notifs d’invites\n' +
-          '• `' +
-          p +
-          'ticketsetup` — panel claim rewards',
+          'Jeux online / offline / **ranked** (RR) / shop / tasks — via le lien Discord du site.',
         inline: false,
       }
     )
-    .setFooter({ text: 'ZNK Casino · /help' })
+    .setFooter({ text: 'ZNK Casino · commandes owner uniquement' })
     .setTimestamp();
 }
 
@@ -6703,7 +6648,7 @@ async function cmdAdjust(msg, args, sign) {
   const name = sign > 0 ? 'add' : 'remove';
   const targetId = parseUserId(args[0]);
   const amount = parseAmount(args[1]);
-  if (!targetId || !amount) return msg.reply(`Usage : \`${PREFIX}${name} @membre <montant>\``);
+  if (!targetId || !amount) return msg.reply('Usage : /' + name + ' membre:@… montant:…');
   if (amount > MAX_ADMIN_AMOUNT) return msg.reply(`Montant trop grand (max ${num(MAX_ADMIN_AMOUNT)}).`);
 
   const balance = Number(await rpc('admin_adjust', { p_user_id: targetId, p_amount: sign * amount }));
@@ -8374,69 +8319,24 @@ async function updateLeaderboards() {
 // ============================================================
 //  MESSAGES (commandes écrites)
 // ============================================================
-const PLAYER_CMDS = new Set(['invites', 'invitations', 'balance', 'bal', 'solde', 'daily', 'aide', 'help', 'casino', 'jeux']);
-const OWNER_CMDS = new Set([
-  'add', 'ajouter', 'remove', 'retirer', 'classement', 'setup', 'salon',
-  'wins', 'win', 'admin', 'invites-notif', 'invitesnotif', 'notifinvites',
-]);
-
+// ============================================================
+//  MESSAGES — les commandes sont en SLASH uniquement
+// ============================================================
 client.on(Events.MessageCreate, async (msg) => {
   if (msg.author.bot || !msg.guild) return;
-
-  const [cmdRaw] = msg.content.startsWith(PREFIX) ? msg.content.slice(PREFIX.length).trim().split(/\s+/) : [''];
-  const cmd = (cmdRaw || '').toLowerCase();
-  const args = msg.content.startsWith(PREFIX) ? msg.content.slice(PREFIX.length).trim().split(/\s+/).slice(1) : [];
-  const isPlayerCmd = PLAYER_CMDS.has(cmd);
-  const isOwnerCmd = OWNER_CMDS.has(cmd);
-
-  if (!isPlayerCmd && !isOwnerCmd) return;
-  if (!isCrown(msg)) return msg.reply(CROWN_ONLY).catch(() => {});
-
-  try {
-    switch (cmd) {
-      case 'balance':
-      case 'bal':
-      case 'solde':
-        return await cmdBalance(msg, args);
-      case 'daily':
-        return await cmdDaily(msg);
-      case 'invites':
-      case 'invitations':
-        return await cmdInvites(msg, args);
-      case 'aide':
-      case 'help':
-        return await msg.reply({ embeds: [buildHelpEmbed()] });
-      case 'casino':
-      case 'jeux':
-        return await msg.channel.send(buildPanelPayload());
-      case 'add':
-      case 'ajouter':
-        return await cmdAdjust(msg, args, +1);
-      case 'remove':
-      case 'retirer':
-        return await cmdAdjust(msg, args, -1);
-      case 'classement':
-        return await cmdLeaderboard(msg);
-      case 'setup':
-      case 'salon':
-        return await cmdSetup(msg);
-      case 'wins':
-      case 'win':
-        return await cmdWins(msg);
-      case 'invites-notif':
-      case 'invitesnotif':
-      case 'notifinvites':
-        return await cmdInvitesNotif(msg);
-      case 'admin':
-        return await cmdAdmin(msg);
-      default:
-        return;
-    }
-  } catch (e) {
-    console.error(`[${cmd}]`, e);
-    const hint = isCrown(msg) ? `\n${explainError(e)}` : '';
-    msg.reply(`⚠️ Une erreur est survenue, réessaie dans un instant.${hint}`).catch(() => {});
+  if (!msg.content.startsWith(PREFIX)) return;
+  const cmd = msg.content.slice(PREFIX.length).trim().split(/\s+/)[0]?.toLowerCase() || '';
+  if (!cmd) return;
+  // Plus de préfixe ! — orienter vers /
+  if (msg.author.id !== msg.guild.ownerId) {
+    return msg.reply(CROWN_ONLY).catch(() => {});
   }
+  return msg
+    .reply({
+      content:
+        `Les commandes **\`!\`** sont désactivées.\nUtilise les **slash commands** : tape **\`/\`** puis choisis (ex. \`/help\`, \`/setup\`, \`/admin\`).`,
+    })
+    .catch(() => {});
 });
 
 // ============================================================
@@ -8445,10 +8345,7 @@ client.on(Events.MessageCreate, async (msg) => {
 client.on(Events.InteractionCreate, async (i) => {
   try {
     if (i.isChatInputCommand()) {
-      if (i.commandName === 'help' || i.commandName === 'aide') {
-        return i.reply({ embeds: [buildHelpEmbed()], flags: EPH });
-      }
-      return i.reply({ content: 'Commande inconnue. Utilise `/help`.', flags: EPH }).catch(() => {});
+      return handleSlashCommand(i);
     }
     if (!i.customId) return;
     if (
@@ -8775,7 +8672,7 @@ async function cmdTicketSetup(msg) {
   const payload = { embeds: [buildTicketPanelEmbed()], components: [ticketPanelRow()] };
   const sent = await msg.channel.send(payload);
   shop.setTicketCfg(msg.guild.id, { panelChannelId: sent.id, categoryId: category?.id || shop.getTicketCfg(msg.guild.id)?.categoryId || null });
-  return msg.reply({ content: `Panel ticket posté.${category ? ' Catégorie : ' + category.name : ' (optionnel : mentionne une catégorie `!ticketsetup #catégorie`)'}` }).catch(() => {});
+  return msg.reply({ content: 'Panel ticket posté.' + (category ? ' Catégorie : ' + category.name : ' (optionnel : /ticketsetup + catégorie)') }).catch(() => {});
 }
 
 async function handleTicketButton(i) {
@@ -8856,15 +8753,163 @@ async function handleTicketModal(i) {
 }
 
 
+
+/** Contexte type "message" pour réutiliser les cmd* existantes depuis un slash */
+function slashCtx(i) {
+  return {
+    author: i.user,
+    member: i.member,
+    guild: i.guild,
+    channel: i.channel,
+    mentions: {
+      users: {
+        first: () => i.options.getUser('membre') || null,
+      },
+      channels: {
+        find: (fn) => {
+          const c = i.options.getChannel('categorie');
+          if (c && typeof fn === 'function' && fn(c)) return c;
+          return null;
+        },
+      },
+    },
+    reply: async (payload) => {
+      const data = typeof payload === 'string' ? { content: payload } : { ...payload };
+      // réponses de commandes owner = éphémères sauf si déjà flags
+      if (data.flags == null) data.flags = EPH;
+      if (!i.replied && !i.deferred) return i.reply(data);
+      return i.followUp(data);
+    },
+    delete: async () => {},
+  };
+}
+
+function requireOwner(i) {
+  if (!i.guild) {
+    return i.reply({ content: 'Utilisable uniquement sur un serveur.', flags: EPH }).then(() => false);
+  }
+  if (i.user.id !== i.guild.ownerId) {
+    return i.reply({ content: CROWN_ONLY, flags: EPH }).then(() => false);
+  }
+  return Promise.resolve(true);
+}
+
+async function handleSlashCommand(i) {
+  try {
+    if (!(await requireOwner(i))) return;
+
+    const name = i.commandName;
+    const msg = slashCtx(i);
+    const member = i.options.getUser('membre');
+    const amountOpt = i.options.getNumber('montant');
+
+    switch (name) {
+      case 'help':
+      case 'aide':
+        return i.reply({ embeds: [buildHelpEmbed()], flags: EPH });
+      case 'balance':
+      case 'solde': {
+        const targetId = member?.id || i.user.id;
+        const bal = await getBalance(targetId);
+        if (targetId === i.user.id) return i.reply({ content: `💰 Ton solde : **${fmt(bal)}**`, flags: EPH });
+        return i.reply({ content: `💰 Solde de <@${targetId}> : **${fmt(bal)}**`, flags: EPH });
+      }
+      case 'daily':
+        return cmdDaily(msg);
+      case 'invites': {
+        const targetId = member?.id || i.user.id;
+        return i.reply({ ...(await buildInvitesPayload(i.guild, targetId)), flags: EPH });
+      }
+      case 'casino':
+      case 'jeux': {
+        await i.channel.send(buildPanelPayload());
+        return i.reply({ content: '✅ Panneau de jeu publié.', flags: EPH });
+      }
+      case 'setup':
+      case 'salon':
+        return cmdSetup(msg);
+      case 'wins':
+        return cmdWins(msg);
+      case 'classement':
+        return cmdLeaderboard(msg);
+      case 'admin':
+        return cmdAdmin(msg);
+      case 'add': {
+        if (!member || amountOpt == null) {
+          return i.reply({ content: 'Usage : `/add membre:@… montant:…`', flags: EPH });
+        }
+        return cmdAdjust(msg, [member.id, String(amountOpt)], +1);
+      }
+      case 'remove': {
+        if (!member || amountOpt == null) {
+          return i.reply({ content: 'Usage : `/remove membre:@… montant:…`', flags: EPH });
+        }
+        return cmdAdjust(msg, [member.id, String(amountOpt)], -1);
+      }
+      case 'invites-notif':
+        return cmdInvitesNotif(msg);
+      case 'ticketsetup': {
+        // adapter catégorie depuis option
+        const cat = i.options.getChannel('categorie');
+        const fake = slashCtx(i);
+        fake.mentions.channels.find = (fn) => (cat && fn(cat) ? cat : null);
+        return cmdTicketSetup(fake);
+      }
+      default:
+        return i.reply({ content: 'Commande inconnue. Utilise `/help`.', flags: EPH });
+    }
+  } catch (e) {
+    console.error(`[slash:${i.commandName}]`, e);
+    const text = `⚠️ Erreur : ${explainError(e)}`;
+    if (i.replied || i.deferred) return i.followUp({ content: text, flags: EPH }).catch(() => {});
+    return i.reply({ content: text, flags: EPH }).catch(() => {});
+  }
+}
+
 async function registerSlashCommands() {
   try {
     const commands = [
-      new SlashCommandBuilder().setName('help').setDescription('Affiche le guide des commandes du casino ZNK').toJSON(),
-      new SlashCommandBuilder().setName('aide').setDescription('Affiche le guide des commandes du casino ZNK').toJSON(),
-    ];
+      new SlashCommandBuilder().setName('help').setDescription('Guide des commandes du casino ZNK (owner)'),
+      new SlashCommandBuilder().setName('aide').setDescription('Guide des commandes du casino ZNK (owner)'),
+      new SlashCommandBuilder()
+        .setName('balance')
+        .setDescription('Affiche un solde (owner)')
+        .addUserOption((o) => o.setName('membre').setDescription('Membre (défaut : toi)')),
+      new SlashCommandBuilder().setName('solde').setDescription('Alias de /balance').addUserOption((o) => o.setName('membre').setDescription('Membre')),
+      new SlashCommandBuilder().setName('daily').setDescription('Récompense quotidienne (owner)'),
+      new SlashCommandBuilder()
+        .setName('invites')
+        .setDescription('Statistiques d’invitations (owner)')
+        .addUserOption((o) => o.setName('membre').setDescription('Membre (défaut : toi)')),
+      new SlashCommandBuilder().setName('casino').setDescription('Publie le panneau de jeu (owner)'),
+      new SlashCommandBuilder().setName('jeux').setDescription('Alias de /casino'),
+      new SlashCommandBuilder().setName('setup').setDescription('Configure les salons du casino (owner)'),
+      new SlashCommandBuilder().setName('salon').setDescription('Alias de /setup'),
+      new SlashCommandBuilder().setName('wins').setDescription('Crée le salon des victoires (owner)'),
+      new SlashCommandBuilder().setName('classement').setDescription('Poste le classement auto (owner)'),
+      new SlashCommandBuilder().setName('admin').setDescription('Ouvre / crée le panneau admin (owner)'),
+      new SlashCommandBuilder()
+        .setName('add')
+        .setDescription('Ajoute des coins à un membre (owner)')
+        .addUserOption((o) => o.setName('membre').setDescription('Membre').setRequired(true))
+        .addNumberOption((o) => o.setName('montant').setDescription('Montant').setRequired(true).setMinValue(0.01)),
+      new SlashCommandBuilder()
+        .setName('remove')
+        .setDescription('Retire des coins à un membre (owner)')
+        .addUserOption((o) => o.setName('membre').setDescription('Membre').setRequired(true))
+        .addNumberOption((o) => o.setName('montant').setDescription('Montant').setRequired(true).setMinValue(0.01)),
+      new SlashCommandBuilder().setName('invites-notif').setDescription('Crée le salon notifs d’invites (owner)'),
+      new SlashCommandBuilder()
+        .setName('ticketsetup')
+        .setDescription('Poste le panel claim rewards / tickets (owner)')
+        .addChannelOption((o) =>
+          o.setName('categorie').setDescription('Catégorie où créer les tickets').addChannelTypes(ChannelType.GuildCategory)
+        ),
+    ].map((c) => c.toJSON());
+
     const rest = new REST({ version: '10' }).setToken(DISCORD_TOKEN);
     const appId = client.user.id;
-    await rest.put(Routes.applicationCommands(appId), { body: commands });
+    // Guild commands = dispo immédiatement + réservées en pratique au serveur
     for (const [gid] of client.guilds.cache) {
       try {
         await rest.put(Routes.applicationGuildCommands(appId, gid), { body: commands });
@@ -8872,7 +8917,9 @@ async function registerSlashCommands() {
         console.warn('[slash] guild', gid, e?.message || e);
       }
     }
-    console.log('[slash] /help et /aide enregistrées');
+    // Global aussi (propagation plus lente)
+    await rest.put(Routes.applicationCommands(appId), { body: commands });
+    console.log('[slash] commandes / enregistrées (' + commands.length + ')');
   } catch (e) {
     console.error('[slash] enregistrement impossible :', e?.message || e);
   }
