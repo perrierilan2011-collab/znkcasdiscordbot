@@ -150,6 +150,7 @@ function init(deps) {
         return (v && v.me && v.me.games) || 0;
       } catch { return 0; }
       }),
+    supabase: deps.supabase || null,
   });
 
 

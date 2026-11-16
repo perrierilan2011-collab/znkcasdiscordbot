@@ -1,7 +1,7 @@
 'use strict';
 /*
- * web/shop.js — boutique (rewards), commandes (order codes), tasks quotidiennes.
- * Stockage JSON local (+ optionnel sync). Le serveur web et le bot Discord partagent ce module.
+ * web/shop.js — boutique, order codes, tasks quotidiennes.
+ * JSON local + sync Supabase (tables shop_*) si deps.supabase fourni.
  */
 const fs = require('fs');
 const path = require('path');
@@ -27,16 +27,19 @@ function save(file, data) {
 }
 
 function dayKeyParis(d = new Date()) {
-  // YYYY-MM-DD en Europe/Paris
   try {
-    return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Europe/Paris',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(d);
   } catch {
     return d.toISOString().slice(0, 10);
   }
 }
 
 function makeCode() {
-  // 8 caractères lisibles, sans 0/O/1/I
   const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let s = '';
   const bytes = crypto.randomBytes(8);
@@ -46,14 +49,15 @@ function makeCode() {
 
 /**
  * @param {string} dataDir
- * @param {{ getBalance, debit, credit, getInviteCount?: (uid, guildId)=>Promise<number>, getGamesPlayed?: (uid)=>Promise<number> }} deps
+ * @param {{ getBalance, debit, credit, getInviteCount?, getGamesPlayed?, supabase? }} deps
  */
 function create(dataDir, deps = {}) {
+  const sb = deps.supabase || null;
   const REWARDS_FILE = path.join(dataDir, 'shop_rewards.json');
   const ORDERS_FILE = path.join(dataDir, 'shop_orders.json');
   const TASKS_FILE = path.join(dataDir, 'shop_tasks.json');
   const PROGRESS_FILE = path.join(dataDir, 'shop_task_progress.json');
-  const TICKETS_FILE = path.join(dataDir, 'shop_ticket_cfg.json'); // guildId -> { categoryId, panelChannelId }
+  const TICKETS_FILE = path.join(dataDir, 'shop_ticket_cfg.json');
 
   let rewards = load(REWARDS_FILE, []);
   let orders = load(ORDERS_FILE, {});
@@ -61,13 +65,200 @@ function create(dataDir, deps = {}) {
   let progress = load(PROGRESS_FILE, {});
   let ticketCfg = load(TICKETS_FILE, {});
 
-  const persistRewards = () => save(REWARDS_FILE, rewards);
-  const persistOrders = () => save(ORDERS_FILE, orders);
-  const persistTasks = () => save(TASKS_FILE, tasks);
-  const persistProgress = () => save(PROGRESS_FILE, progress);
-  const persistTickets = () => save(TICKETS_FILE, ticketCfg);
+  const persistRewards = () => {
+    save(REWARDS_FILE, rewards);
+    if (sb) syncRewardsUp().catch((e) => console.error('[shop] sb rewards', e?.message || e));
+  };
+  const persistOrders = () => {
+    save(ORDERS_FILE, orders);
+  };
+  const persistTasks = () => {
+    save(TASKS_FILE, tasks);
+    if (sb) syncTasksUp().catch((e) => console.error('[shop] sb tasks', e?.message || e));
+  };
+  const persistProgress = () => {
+    save(PROGRESS_FILE, progress);
+  };
+  const persistTickets = () => {
+    save(TICKETS_FILE, ticketCfg);
+    if (sb) syncTicketsUp().catch((e) => console.error('[shop] sb tickets', e?.message || e));
+  };
 
-  // ---- seed defaults si vide ----
+  async function syncRewardsUp() {
+    if (!sb || !rewards.length) return;
+    const rows = rewards.map((r) => ({
+      id: r.id,
+      name: r.name,
+      description: r.desc || '',
+      price: r.price,
+      type: r.type || 'custom',
+      role_id: r.roleId || '',
+      min_invites: Number(r.minInvites) || 0,
+      min_games: Number(r.minGames) || 0,
+      active: r.active !== false,
+      stock: r.stock == null ? null : Number(r.stock),
+      updated_at: new Date().toISOString(),
+    }));
+    const { error } = await sb.from('shop_rewards').upsert(rows, { onConflict: 'id' });
+    if (error) throw error;
+  }
+
+  async function syncTasksUp() {
+    if (!sb || !tasks.length) return;
+    const rows = tasks.map((t) => ({
+      id: t.id,
+      name: t.name,
+      description: t.desc || '',
+      reward: t.reward,
+      type: t.type || 'games',
+      target: t.target || 1,
+      active: t.active !== false,
+      updated_at: new Date().toISOString(),
+    }));
+    const { error } = await sb.from('shop_tasks').upsert(rows, { onConflict: 'id' });
+    if (error) throw error;
+  }
+
+  async function syncTicketsUp() {
+    if (!sb) return;
+    const rows = Object.entries(ticketCfg).map(([guild_id, c]) => ({
+      guild_id,
+      category_id: c.categoryId || null,
+      panel_channel_id: c.panelChannelId || null,
+      updated_at: new Date().toISOString(),
+    }));
+    if (!rows.length) return;
+    const { error } = await sb.from('shop_ticket_cfg').upsert(rows, { onConflict: 'guild_id' });
+    if (error) throw error;
+  }
+
+  async function upsertOrderDb(order) {
+    if (!sb || !order) return;
+    const { error } = await sb.from('shop_orders').upsert(
+      {
+        code: order.code,
+        user_id: order.uid,
+        user_name: order.name || '',
+        guild_id: order.guildId || '',
+        reward_id: order.rewardId,
+        reward_name: order.rewardName || '',
+        type: order.type || 'custom',
+        role_id: order.roleId || '',
+        price: order.price,
+        status: order.status || 'pending',
+        created_at: order.createdAt || new Date().toISOString(),
+        delivered_at: order.deliveredAt || null,
+      },
+      { onConflict: 'code' }
+    );
+    if (error) console.error('[shop] sb order', error.message || error);
+  }
+
+  async function upsertProgressDb(uid, u) {
+    if (!sb || !u) return;
+    const { error } = await sb.from('shop_task_progress').upsert(
+      {
+        user_id: String(uid),
+        day: u.day,
+        done: u.done || [],
+        prog: u.prog || {},
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'user_id,day' }
+    );
+    if (error) console.error('[shop] sb progress', error.message || error);
+  }
+
+  async function loadFromSupabase() {
+    if (!sb) return;
+    try {
+      const { data: rw, error: e1 } = await sb.from('shop_rewards').select('*');
+      if (e1) throw e1;
+      if (rw && rw.length) {
+        rewards = rw.map((r) => ({
+          id: r.id,
+          name: r.name,
+          desc: r.description || '',
+          price: Number(r.price) || 0,
+          type: r.type || 'custom',
+          roleId: r.role_id || '',
+          minInvites: Number(r.min_invites) || 0,
+          minGames: Number(r.min_games) || 0,
+          active: r.active !== false,
+          stock: r.stock == null ? null : Number(r.stock),
+        }));
+        save(REWARDS_FILE, rewards);
+      }
+
+      const { data: tk, error: e2 } = await sb.from('shop_tasks').select('*');
+      if (e2) throw e2;
+      if (tk && tk.length) {
+        tasks = tk.map((t) => ({
+          id: t.id,
+          name: t.name,
+          desc: t.description || '',
+          reward: Number(t.reward) || 0,
+          type: t.type || 'games',
+          target: Number(t.target) || 1,
+          active: t.active !== false,
+        }));
+        save(TASKS_FILE, tasks);
+      }
+
+      const { data: od, error: e3 } = await sb.from('shop_orders').select('*').order('created_at', { ascending: false }).limit(2000);
+      if (e3) throw e3;
+      if (od && od.length) {
+        const map = {};
+        for (const o of od) {
+          map[o.code] = {
+            code: o.code,
+            uid: o.user_id,
+            name: o.user_name || '',
+            guildId: o.guild_id || '',
+            rewardId: o.reward_id,
+            rewardName: o.reward_name || '',
+            type: o.type || 'custom',
+            roleId: o.role_id || '',
+            price: Number(o.price) || 0,
+            status: o.status || 'pending',
+            createdAt: o.created_at,
+            deliveredAt: o.delivered_at || null,
+          };
+        }
+        orders = { ...orders, ...map };
+        save(ORDERS_FILE, orders);
+      }
+
+      const day = dayKeyParis();
+      const { data: pr, error: e4 } = await sb.from('shop_task_progress').select('*').eq('day', day);
+      if (!e4 && pr) {
+        for (const row of pr) {
+          progress[row.user_id] = {
+            day: row.day,
+            done: row.done || [],
+            prog: row.prog || {},
+          };
+        }
+        save(PROGRESS_FILE, progress);
+      }
+
+      const { data: cfg, error: e5 } = await sb.from('shop_ticket_cfg').select('*');
+      if (!e5 && cfg) {
+        for (const c of cfg) {
+          ticketCfg[c.guild_id] = {
+            categoryId: c.category_id || null,
+            panelChannelId: c.panel_channel_id || null,
+          };
+        }
+        save(TICKETS_FILE, ticketCfg);
+      }
+
+      console.log('[shop] chargé depuis Supabase');
+    } catch (e) {
+      console.error('[shop] load supabase', e?.message || e);
+    }
+  }
+
   if (!tasks.length) {
     tasks = [
       { id: 'daily_login', name: 'Connexion du jour', desc: 'Ouvre le casino aujourd’hui', reward: 5, type: 'login', target: 1, active: true },
@@ -77,6 +268,12 @@ function create(dataDir, deps = {}) {
     persistTasks();
   }
 
+  if (sb) loadFromSupabase().then(() => {
+    // push seeds if DB empty
+    syncRewardsUp().catch(() => {});
+    syncTasksUp().catch(() => {});
+  });
+
   function listRewards(admin = false) {
     return rewards
       .filter((r) => admin || r.active !== false)
@@ -85,7 +282,7 @@ function create(dataDir, deps = {}) {
         name: r.name,
         desc: r.desc || '',
         price: r.price,
-        type: r.type || 'custom', // nitro | role | custom
+        type: r.type || 'custom',
         roleId: r.roleId || '',
         minInvites: Number(r.minInvites) || 0,
         minGames: Number(r.minGames) || 0,
@@ -128,28 +325,27 @@ function create(dataDir, deps = {}) {
     rewards = rewards.filter((r) => r.id !== id);
     if (rewards.length === before) throw new Error('Reward introuvable.');
     persistRewards();
+    if (sb) sb.from('shop_rewards').delete().eq('id', id).then(({ error }) => {
+      if (error) console.error('[shop] del reward', error.message);
+    });
     return true;
   }
 
   async function buy(uid, rewardId, guildId, name) {
     const r = rewards.find((x) => x.id === rewardId && x.active !== false);
-    if (!r) throw new Error('Reward introuvable ou désactivée.');
+    if (!r) throw new Error('Reward introuvable.');
     if (r.stock != null && r.stock <= 0) throw new Error('Rupture de stock.');
-    const minInv = Number(r.minInvites) || 0;
-    const minGames = Number(r.minGames) || 0;
-    if (minInv > 0 && deps.getInviteCount) {
-      const inv = await deps.getInviteCount(uid, guildId);
-      if (inv < minInv) throw new Error(`Il te faut au moins ${minInv} invitation(s) (tu en as ${inv}).`);
+    const invites = deps.getInviteCount ? await deps.getInviteCount(uid, guildId) : 0;
+    const games = deps.getGamesPlayed ? await deps.getGamesPlayed(uid) : 0;
+    if ((r.minInvites || 0) > 0 && invites < r.minInvites) {
+      throw new Error(`Il te faut ${r.minInvites} invitation(s) (tu en as ${invites}).`);
     }
-    if (minGames > 0 && deps.getGamesPlayed) {
-      const g = await deps.getGamesPlayed(uid);
-      if (g < minGames) throw new Error(`Il te faut au moins ${minGames} partie(s) jouée(s) (tu en as ${g}).`);
+    if ((r.minGames || 0) > 0 && games < r.minGames) {
+      throw new Error(`Il te faut ${r.minGames} partie(s) jouée(s) (tu en as ${games}).`);
     }
-    const price = floor2(r.price);
-    if (price > 0) {
-      const nb = await deps.debit(uid, price);
-      if (nb === null) throw new Error('Solde insuffisant.');
-    }
+    const bal = await deps.getBalance(uid);
+    if (bal < r.price) throw new Error(`Solde insuffisant (${bal} < ${r.price}).`);
+    await deps.debit(uid, r.price);
     if (r.stock != null) {
       r.stock = Math.max(0, r.stock - 1);
       persistRewards();
@@ -161,47 +357,45 @@ function create(dataDir, deps = {}) {
     const order = {
       code,
       uid: String(uid),
-      name: String(name || 'Joueur').slice(0, 32),
+      name: name || '',
+      guildId: guildId ? String(guildId) : '',
       rewardId: r.id,
       rewardName: r.name,
       type: r.type || 'custom',
       roleId: r.roleId || '',
-      price,
-      status: 'pending', // pending | delivered
-      createdAt: Date.now(),
-      deliveredAt: 0,
+      price: r.price,
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+      deliveredAt: null,
     };
     orders[code] = order;
     persistOrders();
-    return { code, order, balance: price > 0 ? await deps.getBalance(uid).catch(() => null) : null };
+    upsertOrderDb(order);
+    return order;
   }
 
   function getOrder(code) {
-    const c = String(code || '')
-      .trim()
-      .toUpperCase();
+    const c = String(code || '').trim().toUpperCase();
     return orders[c] || null;
   }
 
-  function listOrders(filter = {}) {
+  function listOrders({ uid, limit = 50 } = {}) {
     let list = Object.values(orders);
-    if (filter.uid) list = list.filter((o) => o.uid === String(filter.uid));
-    if (filter.status) list = list.filter((o) => o.status === filter.status);
-    return list.sort((a, b) => b.createdAt - a.createdAt).slice(0, filter.limit || 100);
+    if (uid) list = list.filter((o) => o.uid === String(uid));
+    list.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+    return list.slice(0, limit);
   }
 
-  function markDelivered(code, meta = {}) {
+  function markDelivered(code) {
     const o = getOrder(code);
-    if (!o) throw new Error('Order code invalide.');
+    if (!o) throw new Error('Order introuvable.');
     o.status = 'delivered';
-    o.deliveredAt = Date.now();
-    if (meta.by) o.deliveredBy = String(meta.by);
-    if (meta.channelId) o.channelId = String(meta.channelId);
+    o.deliveredAt = new Date().toISOString();
     persistOrders();
+    upsertOrderDb(o);
     return o;
   }
 
-  // ---- tasks ----
   function listTasks(admin = false) {
     return tasks
       .filter((t) => admin || t.active !== false)
@@ -209,9 +403,9 @@ function create(dataDir, deps = {}) {
         id: t.id,
         name: t.name,
         desc: t.desc || '',
-        reward: floor2(t.reward),
-        type: t.type || 'custom', // login | games | invites | custom
-        target: Math.max(1, Math.floor(Number(t.target) || 1)),
+        reward: t.reward,
+        type: t.type || 'games',
+        target: t.target || 1,
         active: t.active !== false,
       }));
   }
@@ -222,14 +416,15 @@ function create(dataDir, deps = {}) {
     if (!name) throw new Error('Nom de task requis.');
     const reward = floor2(Number(body.reward));
     if (!(reward >= 0)) throw new Error('Récompense invalide.');
-    const type = ['login', 'games', 'invites', 'custom'].includes(body.type) ? body.type : 'custom';
+    const type = ['login', 'games', 'invites', 'custom'].includes(body.type) ? body.type : 'games';
+    const target = Math.max(1, Math.floor(Number(body.target) || 1));
     const entry = {
       id,
       name,
       desc: String(body.desc || '').trim().slice(0, 200),
       reward,
       type,
-      target: Math.max(1, Math.floor(Number(body.target) || 1)),
+      target,
       active: body.active === false || body.active === 'false' ? false : true,
     };
     const i = tasks.findIndex((t) => t.id === id);
@@ -244,6 +439,9 @@ function create(dataDir, deps = {}) {
     tasks = tasks.filter((t) => t.id !== id);
     if (tasks.length === before) throw new Error('Task introuvable.');
     persistTasks();
+    if (sb) sb.from('shop_tasks').delete().eq('id', id).then(({ error }) => {
+      if (error) console.error('[shop] del task', error.message);
+    });
     return true;
   }
 
@@ -266,6 +464,7 @@ function create(dataDir, deps = {}) {
       u.prog[t.id] = Math.min(t.target, (u.prog[t.id] || 0) + amount);
     }
     persistProgress();
+    upsertProgressDb(uid, u);
   }
 
   function markLogin(uid) {
@@ -291,22 +490,17 @@ function create(dataDir, deps = {}) {
     const u = userDay(String(uid));
     if (u.done.includes(t.id)) throw new Error('Déjà réclamée aujourd’hui.');
     const cur = u.prog[t.id] || 0;
-    // login auto-complete
-    if (t.type === 'login' && cur < t.target) {
-      u.prog[t.id] = t.target;
-    }
+    if (t.type === 'login' && cur < t.target) u.prog[t.id] = t.target;
     const have = u.prog[t.id] || 0;
     if (have < t.target) throw new Error(`Progression insuffisante (${have}/${t.target}).`);
     u.done.push(t.id);
     persistProgress();
+    upsertProgressDb(uid, u);
     let bal = null;
-    if (t.reward > 0) {
-      bal = await deps.credit(uid, t.reward);
-    }
+    if (t.reward > 0) bal = await deps.credit(uid, t.reward);
     return { reward: t.reward, balance: bal, task: t.name };
   }
 
-  // ---- ticket config per guild ----
   function setTicketCfg(guildId, cfg) {
     ticketCfg[String(guildId)] = { ...(ticketCfg[String(guildId)] || {}), ...cfg };
     persistTickets();
