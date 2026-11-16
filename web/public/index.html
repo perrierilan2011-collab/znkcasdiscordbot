@@ -1337,7 +1337,15 @@ const params = new URLSearchParams(location.search);
 let TOKEN = params.get('t') || '';
 try { if (TOKEN) localStorage.setItem('znk_t', TOKEN); else TOKEN = localStorage.getItem('znk_t') || ''; } catch {}
 if (params.get('t')) history.replaceState(null, '', location.pathname);
-if (!TOKEN) { $('#gate').classList.add('on'); return; }
+if (!TOKEN) {
+  const g = $('#gate');
+  if (g) g.classList.add('on');
+  else {
+    // fallback si gate absent : redirige vers OAuth
+    location.replace('/login');
+  }
+  return;
+}
 
 let me = null, S = null, offset = 0, COIN = 'ZTKN', seatsN = 5;
 const BJT = new Map(); // tid -> snapshot (blackjack)
@@ -1446,8 +1454,8 @@ function showGate(t) { $('#gatemsg').textContent = t; $('#gate').classList.add('
 let es;
 function connect() {
   es = new EventSource('/api/stream?t=' + encodeURIComponent(TOKEN));
-  es.addEventListener('hello', (e) => { const d = JSON.parse(e.data); me = d; COIN = d.coin && d.coin !== '🪙' ? d.coin : 'ZTKN'; seatsN = d.seats || 5; $('#coin').textContent = COIN;
-    $('#meName').textContent = d.name; setAvatar($('#meAv'), d.avatar, d.name); $('#conn').style.display = 'none'; BJT.clear(); P.tables.clear(); rOnHello(d); pOnHello(d); });
+  es.addEventListener('hello', (e) => { const d = JSON.parse(e.data); me = d; COIN = d.coin && d.coin !== '🪙' ? d.coin : 'ZTKN'; seatsN = d.seats || 5; const coinEl = $('#coin'); if (coinEl) coinEl.textContent = COIN;
+    if ($('#meName')) $('#meName').textContent = d.name; if ($('#meAv')) setAvatar($('#meAv'), d.avatar, d.name); if ($('#conn')) $('#conn').style.display = 'none'; BJT.clear(); P.tables.clear(); try { rOnHello(d); } catch(e){} try { pOnHello(d); } catch(e){} });
   es.addEventListener('ranked', (e) => { try { (window.rkRender || rkRender)(JSON.parse(e.data)); } catch (err) { console.error('ranked', err); } });
 es.addEventListener('roulette', (e) => { const st = JSON.parse(e.data); offset = st.now - Date.now(); rRender(st); });
   es.addEventListener('poker', (e) => { const st = JSON.parse(e.data); offset = st.now - Date.now(); pUpdate(st); });
@@ -2331,7 +2339,7 @@ window.__bootRoute = () => {
 };
 
 
-$('.logo').onclick = () => { ac(); setView('hub'); };
+if ($('.logo')) $('.logo').onclick = () => { ac(); setView('hub'); };
 function hubRoulette(ok) { $('#gcRoulette').disabled = !ok; const t = document.querySelector('.mitem[data-g="roulette"]'); if (t) t.disabled = !ok; }
 function updHub() {
   const plural = (n, a) => n + ' ' + a + (n > 1 ? 's' : '');
@@ -2344,16 +2352,16 @@ function updHub() {
 }
 
 // ---- menu déroulant
-function menuClose() { const m = $('#menu'); if (m) m.classList.remove('open'); const b = $('#menuBtn'); if (b) b.setAttribute('aria-expanded', 'false'); }
-if ($('#menuBtn') && $('#menu')) $('#menuBtn').onclick = (e) => { e.stopPropagation(); const o = $('#menu').classList.toggle('open'); $('#menuBtn').setAttribute('aria-expanded', String(o)); };
+function menuClose() { try { const m = $('#menu'); if (m) m.classList.remove('open'); const b = $('#menuBtn'); if (b) b.setAttribute('aria-expanded', 'false'); } catch(e) {} }
+if ($('#menuBtn') && $('#menu')) { $('#menuBtn').onclick = (e) => { e.stopPropagation(); const o = $('#menu').classList.toggle('open'); $('#menuBtn').setAttribute('aria-expanded', String(o)); }; }
 document.querySelectorAll('#menuPanel .mhead').forEach((b) => (b.onclick = (e) => { e.stopPropagation(); b.parentElement.classList.toggle('open'); }));
-document.addEventListener('click', (e) => { if (!e.target.closest('#menu')) menuClose(); });
+document.addEventListener('click', (e) => { if (!e.target.closest('#menu') && !e.target.closest('#topNav')) menuClose(); });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') menuClose(); });
 const MENU_LBL = { hub: 'Menu', bj: 'Blackjack', poker: 'Poker', roulette: 'Roulette', 'off-bj': 'Blackjack solo', 'off-fuse': 'Fusé', 'off-mine': 'Mine', 'off-coin': 'Pile ou Face', 'off-dice': 'Dés', 'off-horses': 'Chevaux', 'off-russian': 'Roulette russe', 'off-slots': 'Slots', 'off-duel': 'Duel', 'off-scratch': 'Ticket à gratter', 'off-plinko': 'Plinko', top: 'Classement', rank: 'Rank', admin: 'Admin' };
 function menuSync(v) {
-  $('#menuLbl').textContent = MENU_LBL[v] || 'Menu';
-  $('#msOn').classList.toggle('open', v === 'bj' || v === 'poker' || v === 'roulette');
-  $('#msOff').classList.toggle('open', v.startsWith('off-'));
+  const _ml = $('#menuLbl'); if (_ml) _ml.textContent = (typeof MENU_LBL !== 'undefined' && MENU_LBL[v]) || 'Menu';
+  const _on = $('#msOn'); if (_on) _on.classList.toggle('open', v === 'bj' || v === 'poker' || v === 'roulette');
+  const _off = $('#msOff'); if (_off) _off.classList.toggle('open', String(v).startsWith('off-'));
 }
 
 // ---- page classement : actuel + all-time côte à côte
@@ -3558,7 +3566,7 @@ async function gSearch() {
 function gOpen(admin) { menuClose(); G.admin = admin === true; $('#gTitle').textContent = G.admin ? 'Ajouter de l’argent (admin)' : 'Envoyer des ZTKN'; $('#gSend').textContent = G.admin ? 'Ajouter' : 'Envoyer'; G.to = null; $('#gQ').value = ''; $('#gAmt').value = ''; $('#mGift').classList.add('on'); gSel(); gSearch(); setTimeout(() => $('#gQ').focus(), 50); }
 $('#bGift').onclick = () => { popClose(); gOpen(); };
 $('#bAdmin').onclick = () => { popClose(); setView('admin'); };
-if ($('#bDaily')) $('#bDaily').onclick = async () => {
+if ($('#bDaily')) if ($('#bDaily')) $('#bDaily').onclick = async () => {
   const b = $('#bDaily'); if (b.disabled) return; b.disabled = true;
   try {
     const ok = await send('daily'), d = send.last;
@@ -3662,7 +3670,7 @@ $('#me').onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preven
 document.querySelectorAll('.ppanel').forEach((p) => (p.onclick = (e) => e.stopPropagation()));
 document.addEventListener('click', () => popClose());
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') popClose(); });
-$('#bLogout').onclick = () => { try { localStorage.removeItem('znk_t'); } catch {} try { if (es) es.close(); } catch {} location.replace(location.pathname); };
+$('#bLogout').onclick = () => { try { localStorage.removeItem('znk_t'); } catch(e) {} try { if (es) es.close(); } catch(e) {} location.replace('/login'); };
 
 
 // réglages : victoires affichées dans le chat + notification de message
@@ -3786,7 +3794,7 @@ $('#accCopyInvite').onclick = () => {
   const v = $('#accInvite').value;
   if (v) navigator.clipboard?.writeText(v).then(() => toast('Lien copié')).catch(() => toast(v));
 };
-$('#bShop').onclick = () => { try { menuClose(); } catch {} setView('shop'); };
+if ($('#bShop')) $('#bShop').onclick = () => { try { menuClose(); } catch(e) {} setView('shop'); };
 $('#bAccount').onclick = () => { popClose(); setView('account'); };
 $('#mOrderClose').onclick = () => $('#mOrder').classList.remove('on');
 $('#mOrderCopy').onclick = () => {
@@ -3952,7 +3960,7 @@ function rkPips(st) {
 function rkSeats(st) {
   const box = $('#rkSeats'); if (!box) return; box.textContent = '';
   const inM = st.phase !== 'lobby';
-  $('#rkSideT').textContent = inM ? 'Score du match' : 'Joueurs ' + st.seats.filter(Boolean).length + '/' + st.maxPlayers;
+  const _rst = $('#rkSideT'); if (_rst) _rst.textContent = inM ? 'Score du match' : 'Joueurs ' + st.seats.filter(Boolean).length + '/' + st.maxPlayers;
   const list = st.seats.map((p, i) => ({ p, i }));
   if (inM) list.sort((a, b) => ((b.p && b.p.score) || -1) - ((a.p && a.p.score) || -1));
   list.forEach(({ p }) => {
@@ -3967,16 +3975,17 @@ function rkSeats(st) {
 }
 function rkDock(st) {
   const mine = rkMine(st), lob = st.phase === 'lobby';
-  $('#rkJoin').classList.toggle('hide', !!mine || !lob);
-  $('#rkReady').classList.toggle('hide', !mine || mine.ready || !lob);
-  $('#rkUnready').classList.toggle('hide', !mine || !mine.ready || !lob);
-  $('#rkLeave').classList.toggle('hide', !mine);
-  $('#rkLeave').textContent = mine && mine.inMatch && !lob ? 'Abandonner' : 'Quitter';
+  const t = (id, v) => { const n = document.getElementById(id); if (n) n.classList.toggle('hide', v); };
+  t('rkJoin', !!mine || !lob);
+  t('rkReady', !mine || (mine && mine.ready) || !lob);
+  t('rkUnready', !mine || !(mine && mine.ready) || !lob);
+  t('rkLeave', !mine);
+  const lv = document.getElementById('rkLeave'); if (lv) lv.textContent = mine && mine.inMatch && !lob ? 'Abandonner' : 'Quitter';
 }
 
 function rkStage(st) {
   RK.loop++; RK.onKey = null;
-  const old = $('#rkStage'); const S = old.cloneNode(false); old.replaceWith(S); RK.stage = S;
+  const old = $('#rkStage'); if (!old) return; const S = old.cloneNode(false); old.replaceWith(S); RK.stage = S;
   const mine = rkMine(st);
   const play = !!(mine && mine.inMatch && mine.online !== false && !st.answered);
   const big = (t) => S.append(el('div', 'rk-big', t));
@@ -4275,7 +4284,9 @@ const _rkWatch = typeof rkWatch === 'function' ? rkWatch : null;
   }
 })();
 
-connect(); tick();
+try { connect(); } catch (e) { console.error('connect', e); const c = document.getElementById('conn'); if (c) { c.style.display = ''; c.textContent = 'Erreur connexion — recharge la page'; } }
+try { tick(); } catch (e) { console.error('tick', e); }
+
 })();
 </script>
 
