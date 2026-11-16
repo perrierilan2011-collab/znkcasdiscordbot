@@ -42,18 +42,19 @@ const localImg = (file) => {
 };
 // Bannière de fond (image sans texte) au-dessus d'un panneau : images/panel_*.png (ignorée si le fichier n'existe pas)
 // CARD_GIF=off : retour aux images fixes PNG (aucune animation)
-const CARD_GIF = !/^(off|0|false|non|no)$/i.test(String(process.env.CARD_GIF || '').trim());
+const CARD_GIF = false; // disabled — no GIF/image cards
+// Image/GIF system disabled except for the ONLINE panel banner (panel_online.png)
 function withBanner(payload, file) {
   try {
-    const gifFile = String(file).replace(/\.png$/i, '.gif');
-    if (CARD_GIF && localImg(gifFile)) file = gifFile; // version animée de la bannière
-    const p = localImg(file);
+    // Only keep the ONLINE panel image — no GIFs, no other banners
+    if (String(file) !== 'panel_online.png') return payload;
+    const p = localImg('panel_online.png');
     const e = payload.embeds?.[0];
     if (!p || !e) return payload;
-    e.setImage(`attachment://${file}`);
-    payload.files = [...(payload.files || []), new AttachmentBuilder(p, { name: file })];
+    e.setImage('attachment://panel_online.png');
+    payload.files = [...(payload.files || []), new AttachmentBuilder(p, { name: 'panel_online.png' })];
   } catch {
-    /* bannière facultative */
+    /* optional */
   }
   return payload;
 }
@@ -173,48 +174,9 @@ function drawPanelBanner(info, bg) {
   return { cv, complete: complete && !info.hasCode && !!info.title && info.lines.length > 0 };
 }
 function panelBanner(embed) {
-  const bg = getBannerBg();
-  if (!bg) return null; // pas d'image de fond : aucune bannière (jamais un fond vide)
-  const info = bannerInfo(embed);
-  const key = `${info.title}\n${info.lines.join('\n')}\n${info.hasCode}`;
-  let entry = bannerCache.get(key);
-  if (!entry) {
-    const { cv, complete } = drawPanelBanner(info, bg);
-    entry = { png: cv.toBuffer('image/png'), gif: null, complete };
-    if (bannerCache.size >= 80) bannerCache.delete(bannerCache.keys().next().value);
-    bannerCache.set(key, entry);
-    if (CARD_GIF && !bannerPending.has(key)) {
-      bannerPending.add(key);
-      fxAnim
-        .animateCard(canvasLib, cv, BANNER_FILE, IMG_DIR, { src: localImg(BANNER_FILE) })
-        .then((buf) => {
-          if (buf) entry.gif = buf;
-        })
-        .catch((e) => console.error('[fx] bannière :', e?.message || e))
-        .finally(() => bannerPending.delete(key));
-    }
-  }
-  const buf = CARD_GIF && entry.gif ? entry.gif : entry.png;
-  const name = `panel-${Date.now().toString(36)}${randomInt(100, 999)}.${imgExt(buf)}`;
-  return { name, buf, complete: entry.complete };
+  return null;
 }
 function animPanel(payload) {
-  try {
-    const e = payload.embeds?.[0];
-    if (!e || e.data?.image || payload.files?.length) return payload;
-    const b = panelBanner(e);
-    if (!b) return payload;
-    e.setImage(`attachment://${b.name}`);
-    if (b.complete) {
-      // tout le texte est sur l'image : on ne le répète pas dans l'embed
-      delete e.data.title;
-      delete e.data.description;
-    }
-    payload.files = [new AttachmentBuilder(b.buf, { name: b.name })];
-    payload.attachments = [];
-  } catch {
-    /* bannière facultative */
-  }
   return payload;
 }
 // Prépare les GIF des panneaux principaux au démarrage (le 1er clic sur « Jouer » est alors déjà animé)
@@ -7050,7 +7012,7 @@ function buildPokerPanelPayload() {
     .setDescription('Clique sur **Play Online** : le site s’ouvre et tu choisis ton jeu (ton solde du casino est utilisé).')
     .setFooter({ text: 'Admin → Salon online pour créer ce salon' });
   const row = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('online_play').setLabel('Play Online').setEmoji('🎮').setStyle(ButtonStyle.Success)
+    new ButtonBuilder().setCustomId('online_play').setLabel('Play Online').setEmoji('🎮').setStyle(ButtonStyle.Primary)
   );
   return withBanner({ embeds: [embed], components: [row] }, 'panel_online.png');
 }
@@ -7882,11 +7844,8 @@ async function editWithCard(i, payload) {
     return i.editReply(payload);
   }
 }
+// Image cards disabled — keep embed text only
 function putCard(payload, card, embed) {
-  const e = embed || payload.embeds?.[0];
-  if (!card || !e) return payload;
-  e.setImage(`attachment://${card.name}`);
-  payload.files = [...(payload.files || []), card.file];
   return payload;
 }
 const userName = (u) => cleanTxt(u?.globalName || u?.username) || 'Joueur';
@@ -8748,45 +8707,33 @@ function gameBgForEmbed(e) {
 //  TEXTE -> IMAGE : plus aucun texte "normal", tout est converti en image (voir textcard.js)
 //  Désactiver temporairement : variable Railway TEXT_CARDS=off
 // ============================================================
-if (String(process.env.TEXT_CARDS || 'on').toLowerCase() !== 'off') {
-  try {
-    require('./textcard').install({
-      client,
-      discord: require('discord.js'),
-      canvasLib,
-      FONT: STATS_FONT,
-      localImg,
-      getBg: getBgByUrl,
-      loadRemoteImage,
-      getAvatar: getAvatarCached,
-      gameBg: gameBgForEmbed,
-    });
-  } catch (e) {
-    console.error('[textcard] non chargé (textcard.js manquant ?) :', e?.message || e);
-  }
-}
+// TEXT CARDS / image message system DISABLED — plain Discord embeds only
+// (ONLINE panel banner is still attached via withBanner for panel_online.png only)
+
 
 
 
 // ============================================================
-//  TICKETS CLAIM REWARDS (order codes boutique)
+// ============================================================
+//  TICKETS CLAIM REWARDS (shop order codes)
 // ============================================================
 function buildTicketPanelEmbed() {
   return new EmbedBuilder()
     .setColor(COLORS.violet)
     .setTitle('🎁 Claim rewards')
     .setDescription(
-      'Tu as acheté une reward sur le **site** et reçu un **order code** ?\n\n' +
-        '1. Clique sur **Ouvrir un ticket**\n' +
-        '2. Entre ton order code\n' +
-        '3. Le salon est renommé selon ta reward (Nitro, Rôle…)\n' +
-        '4. Un staff te livre, ou le rôle est donné **automatiquement**'
+      'Bought a reward on the **website** and received an **order code**?\n\n' +
+        '1. Click **Open a ticket**\n' +
+        '2. Enter your order code\n' +
+        '3. The channel is renamed after your reward (Nitro, Role…)\n' +
+        '4. Staff delivers it, or the role is given **automatically**\n\n' +
+        'Server owner can mark the reward as **delivered** inside the ticket.'
     )
-    .setFooter({ text: 'Un order code = une commande boutique' });
+    .setFooter({ text: 'One order code = one shop order' });
 }
 function ticketPanelRow() {
   return new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('ticket_claim_open').setLabel('Ouvrir un ticket').setEmoji('🎫').setStyle(ButtonStyle.Primary)
+    new ButtonBuilder().setCustomId('ticket_claim_open').setLabel('Open a ticket').setEmoji('🎫').setStyle(ButtonStyle.Primary)
   );
 }
 
@@ -8794,34 +8741,73 @@ async function cmdTicketSetup(msg) {
   if (!isCrown(msg)) return msg.reply(CROWN_ONLY).catch(() => {});
   const category = msg.mentions.channels.find((c) => c.type === ChannelType.GuildCategory) || null;
   const shop = webApp.shop;
-  if (!shop) return msg.reply('Boutique web indisponible (module shop).');
+  if (!shop) return msg.reply('Web shop unavailable (shop module).');
   if (category) shop.setTicketCfg(msg.guild.id, { categoryId: category.id });
   const payload = { embeds: [buildTicketPanelEmbed()], components: [ticketPanelRow()] };
   const sent = await msg.channel.send(payload);
   shop.setTicketCfg(msg.guild.id, { panelChannelId: sent.id, categoryId: category?.id || shop.getTicketCfg(msg.guild.id)?.categoryId || null });
-  return msg.reply({ content: 'Panel ticket posté.' + (category ? ' Catégorie : ' + category.name : ' (optionnel : /ticketsetup + catégorie)') }).catch(() => {});
+  return msg.reply({ content: 'Ticket panel posted.' + (category ? ' Category: ' + category.name : ' (optional: /ticketsetup + category)') }).catch(() => {});
 }
 
 async function handleTicketButton(i) {
+  // Close ticket
   if (i.customId === 'ticket_claim_close') {
-    if (!i.channel || !i.guild) return i.reply({ content: 'Utilisable uniquement dans un ticket.', flags: EPH });
+    if (!i.channel || !i.guild) return i.reply({ content: 'Only usable inside a ticket.', flags: EPH });
     const isOwner = i.guild.ownerId === i.user.id;
     const isAdm = i.memberPermissions?.has?.(PermissionFlagsBits.ManageChannels) || isOwner;
     if (!isAdm && i.channel.topic && !String(i.channel.topic).includes(i.user.id)) {
-      return i.reply({ content: 'Seul le staff (ou le créateur) peut fermer ce ticket.', flags: EPH });
+      return i.reply({ content: 'Only staff (or the ticket creator) can close this ticket.', flags: EPH });
     }
-    await i.reply({ content: 'Ticket fermé dans 3 secondes…' }).catch(() => {});
-    setTimeout(() => i.channel.delete('Ticket claim fermé').catch(() => {}), 3000);
+    await i.reply({ content: 'Ticket closes in 3 seconds…' }).catch(() => {});
+    setTimeout(() => i.channel.delete('Ticket claim closed').catch(() => {}), 3000);
     return true;
   }
+
+  // Owner / staff: mark reward as delivered
+  if (i.customId.startsWith('ticket_claim_deliver|')) {
+    if (!i.guild || !i.channel) return i.reply({ content: 'Only usable inside a ticket.', flags: EPH });
+    const isOwner = i.guild.ownerId === i.user.id;
+    const isAdm = i.memberPermissions?.has?.(PermissionFlagsBits.ManageChannels) || isOwner;
+    if (!isAdm) return i.reply({ content: 'Only the server owner or staff can mark a reward as delivered.', flags: EPH });
+    const code = i.customId.split('|')[1];
+    const shop = webApp.shop;
+    if (!shop) return i.reply({ content: 'Shop unavailable.', flags: EPH });
+    const order = shop.getOrder(code);
+    if (!order) return i.reply({ content: '❌ Order code not found.', flags: EPH });
+    if (order.status === 'delivered') return i.reply({ content: '✅ Already marked as delivered.', flags: EPH });
+    try {
+      shop.markDelivered(code);
+    } catch (e) {
+      return i.reply({ content: '❌ Could not update order: ' + (e?.message || e), flags: EPH });
+    }
+    // Disable buttons on the message
+    try {
+      const disabled = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('ticket_claim_deliver_done').setLabel('Reward delivered').setEmoji('✅').setStyle(ButtonStyle.Success).setDisabled(true),
+        new ButtonBuilder().setCustomId('ticket_claim_close').setLabel('Close ticket').setStyle(ButtonStyle.Danger)
+      );
+      await i.update({
+        content: i.message.content || undefined,
+        embeds: i.message.embeds,
+        components: [disabled],
+      });
+    } catch {
+      await i.reply({ content: `✅ Order \`${code}\` marked as **delivered**. The code no longer works.`, flags: EPH }).catch(() => {});
+    }
+    try {
+      await i.channel.send(`✅ **Reward delivered** by <@${i.user.id}>\nOrder code \`${code}\` (\`${order.rewardName}\`) is now closed and can no longer be used.`);
+    } catch {}
+    return true;
+  }
+
   if (i.customId !== 'ticket_claim_open') return false;
-  if (!i.guild) return i.reply({ content: 'Utilisable uniquement sur un serveur.', flags: EPH });
+  if (!i.guild) return i.reply({ content: 'Only usable in a server.', flags: EPH });
   const modal = new ModalBuilder()
     .setCustomId('modal_ticket_code')
-    .setTitle('Order code boutique')
+    .setTitle('Shop order code')
     .addComponents(
       new ActionRowBuilder().addComponents(
-        new TextInputBuilder().setCustomId('code').setLabel('Ton order code').setStyle(TextInputStyle.Short).setRequired(true).setMinLength(6).setMaxLength(16).setPlaceholder('ex : AB12CD34')
+        new TextInputBuilder().setCustomId('code').setLabel('Your order code').setStyle(TextInputStyle.Short).setRequired(true).setMinLength(6).setMaxLength(16).setPlaceholder('e.g. AB12CD34')
       )
     );
   await i.showModal(modal);
@@ -8832,21 +8818,38 @@ async function handleTicketModal(i) {
   if (i.customId !== 'modal_ticket_code') return false;
   const code = String(i.fields.getTextInputValue('code') || '').trim().toUpperCase();
   const shop = webApp.shop;
-  if (!shop) return i.reply({ content: 'Boutique indisponible.', flags: EPH });
-  const order = shop.getOrder(code);
-  if (!order) return i.reply({ content: '❌ Order code invalide.', flags: EPH });
-  if (order.uid !== i.user.id) return i.reply({ content: '❌ Ce code ne t’appartient pas.', flags: EPH });
-  if (order.status === 'delivered') return i.reply({ content: '✅ Cette commande a déjà été livrée.', flags: EPH });
+  if (!shop) return i.reply({ content: 'Shop unavailable.', flags: EPH });
 
+  // STRICT validation FIRST — never create a ticket on invalid/foreign/delivered codes
+  const order = shop.getOrder(code);
+  if (!order) {
+    return i.reply({ content: '❌ Invalid order code. No ticket created.', flags: EPH });
+  }
+  if (String(order.uid) !== String(i.user.id)) {
+    return i.reply({ content: '❌ This code does not belong to you. No ticket created.', flags: EPH });
+  }
+  if (order.status === 'delivered') {
+    return i.reply({ content: '✅ This order was already delivered. The code no longer works.', flags: EPH });
+  }
+
+  // Auto-role delivery
   if (order.type === 'role' && order.roleId) {
     try {
       const member = await i.guild.members.fetch(i.user.id);
       await member.roles.add(order.roleId, `Shop order ${order.code}`);
       shop.markDelivered(order.code);
-      return i.reply({ content: `✅ Rôle **${order.rewardName}** attribué. Pas de ticket nécessaire.`, flags: EPH });
+      try {
+        await i.user.send({
+          content:
+            `✅ **Role delivered**\n` +
+            `The role **${order.rewardName}** has been added to your account.\n` +
+            `Order code: \`${order.code}\``,
+        });
+      } catch {}
+      return i.reply({ content: `✅ Role **${order.rewardName}** granted. No ticket needed.`, flags: EPH });
     } catch (e) {
       console.error('[ticket] role', e?.message || e);
-      return i.reply({ content: '⚠️ Impossible d’attribuer le rôle automatiquement (hiérarchie / permissions bot).', flags: EPH });
+      // fall through to create ticket if role grant failed
     }
   }
 
@@ -8876,22 +8879,33 @@ async function handleTicketModal(i) {
     });
   } catch (e) {
     console.error('[ticket]', e);
-    return i.reply({ content: 'Impossible de créer le salon (permissions bot : Gérer les salons).', flags: EPH });
+    return i.reply({ content: 'Could not create the channel (bot needs Manage Channels).', flags: EPH });
   }
 
   const embed = new EmbedBuilder()
     .setColor(COLORS.violet)
     .setTitle(String(order.rewardName || 'Reward'))
     .setDescription(
-      `**Joueur :** <@${i.user.id}>\n**Order code :** \`${order.code}\`\n**Type :** ${order.type}\n**Prix payé :** ${order.price} ${COIN_PLAIN}` +
-        (order.type === 'nitro' ? '\n\nStaff : livrez le Nitro puis fermez le ticket.' : '\n\nStaff : livrez la reward puis fermez le ticket.')
+      `**Player:** <@${i.user.id}>\n**Order code:** \`${order.code}\`\n**Type:** ${order.type}\n**Price paid:** ${order.price} ${COIN_PLAIN}\n**Ticket:** ${ch}\n\n` +
+        (order.type === 'nitro'
+          ? 'Staff: deliver the Nitro, then click **Mark delivered**.'
+          : 'Staff: deliver the reward, then click **Mark delivered**.')
     )
     .setTimestamp();
-  const closeRow = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('ticket_claim_close').setLabel('Fermer le ticket').setStyle(ButtonStyle.Danger)
+  const row = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId('ticket_claim_deliver|' + order.code)
+      .setLabel('Mark delivered')
+      .setEmoji('✅')
+      .setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId('ticket_claim_close').setLabel('Close ticket').setStyle(ButtonStyle.Danger)
   );
-  await ch.send({ content: `<@${i.user.id}>`, embeds: [embed], components: [closeRow] });
-  await i.reply({ content: `Ticket créé : ${ch}`, flags: EPH });
+  await ch.send({
+    content: `<@${i.user.id}> Ticket opened for order \`${order.code}\` — ${ch}`,
+    embeds: [embed],
+    components: [row],
+  });
+  await i.reply({ content: `✅ Ticket opened: ${ch}`, flags: EPH });
   return true;
 }
 

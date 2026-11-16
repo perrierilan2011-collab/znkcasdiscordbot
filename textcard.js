@@ -1,3 +1,6 @@
+/* DISABLED — textcard image system off */
+module.exports = { install() { console.log('[textcard] disabled'); } };
+/*
 'use strict';
 /*
  * textcard.js — ZNK Casino
@@ -1126,3 +1129,5 @@ function fmtTime(ts, f) {
 }
 
 module.exports = { install, drawTextCard, parseBlocks, parseInline };
+
+*/
