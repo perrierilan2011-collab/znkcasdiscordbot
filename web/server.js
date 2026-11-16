@@ -3,7 +3,7 @@
  * web/server.js — serveur web du casino ZNK (jeux « online » EXTERNES, hors Discord) : blackjack + poker + roulette multijoueur.
  * Sans dépendance : module http de Node + Server-Sent Events (temps réel) + POST pour les actions.
  *
- * Adresse publique : variable PUBLIC_URL (défaut : https://znkcasdiscordbot-production.up.railway.app)
+ * Adresse publique : variable PUBLIC_URL (défaut : https://znk.up.railway.app)
  * Port : variable PORT (fournie automatiquement par Railway)
  * Le joueur arrive par un lien PERSONNEL généré par le bot (bouton Discord) : le lien contient un jeton signé
  * (identité Discord + serveur), valable 12 h. Aucun mot de passe, aucune appli OAuth à configurer.
@@ -19,14 +19,16 @@ const { PokerRoom, INFO: POKER_INFO } = require('./poker');
 const { RouletteRoom, INFO: ROULETTE_INFO } = require('./roulette');
 const { create: createOffline } = require('./offline');
 const { create: createRank } = require('./rank');
+const { create: createShop } = require('./shop');
+const { RankedArena } = require('./ranked');
 
-const PUBLIC_URL = String(process.env.PUBLIC_URL || 'https://znkcasdiscordbot-production.up.railway.app').replace(/\/+$/, '');
+const PUBLIC_URL = String(process.env.PUBLIC_URL || 'https://znk.up.railway.app').replace(/\/+$/, '');
 const TOKEN_TTL_MS = 12 * 3600 * 1000;
 // chat en direct : un salon par jeu (par serveur Discord), historique gardé en mémoire
-const CHAT_ROOMS = new Set(['hub', 'bj', 'poker', 'roulette', 'off-bj', 'off-fuse', 'off-mine', 'off-coin', 'off-dice', 'off-horses', 'off-russian', 'off-slots', 'off-duel', 'off-scratch', 'off-plinko']);
+const CHAT_ROOMS = new Set(['hub', 'bj', 'poker', 'roulette', 'ranked', 'off-bj', 'off-fuse', 'off-mine', 'off-coin', 'off-dice', 'off-horses', 'off-russian', 'off-slots', 'off-duel', 'off-scratch', 'off-plinko']);
 const CHAT_KEEP = 60;
 // salon de chat de chaque jeu : les victoires y sont annoncées automatiquement (+ dans l'accueil)
-const GAME_ROOM = { blackjack: 'bj', poker: 'poker', roulette: 'roulette', 'bj-solo': 'off-bj', fuse: 'off-fuse', mines: 'off-mine', coin: 'off-coin', dice: 'off-dice', horses: 'off-horses', russian: 'off-russian', slots: 'off-slots', duel: 'off-duel', scratch: 'off-scratch', plinko: 'off-plinko' };
+const GAME_ROOM = { blackjack: 'bj', poker: 'poker', roulette: 'roulette', ranked: 'ranked', 'bj-solo': 'off-bj', fuse: 'off-fuse', mines: 'off-mine', coin: 'off-coin', dice: 'off-dice', horses: 'off-horses', russian: 'off-russian', slots: 'off-slots', duel: 'off-duel', scratch: 'off-scratch', plinko: 'off-plinko' };
 const EMOTES = new Set(['🔥', '👏', '😈', '🍀', '😱', '😂', '💸', '🎉']);
 const DATA_DIR = path.join(__dirname, '..', 'data');
 
@@ -137,10 +139,24 @@ function init(deps) {
   }
   const avatarMap = new Map(); // uid -> avatar (affiché dans les classements)
   const rankApi = createRank(path.join(DATA_DIR, 'rank.json'), deps.supabase);
+  const shopApi = createShop(DATA_DIR, {
+    getBalance: deps.getBalance,
+    debit: deps.debit,
+    credit: deps.credit,
+    getInviteCount: deps.getInviteCount || (async () => 0),
+    getGamesPlayed: deps.getGamesPlayed || (async (uid) => {
+      try {
+        const v = rankApi.view(String(uid), 1);
+        return (v && v.me && v.me.games) || 0;
+      } catch { return 0; }
+      }),
+  });
+
 
   // ---------- fin de manche : rang / ELO + récap Discord + annonce des gagnants dans le chat du site ----------
   function roundEnd(guildId, r) {
     try { rankApi.record(r, (uid) => avatarMap.get(uid)); } catch (e) { console.error('[web] rang/elo', e?.message || e); }
+    try { for (const p of (r && r.players) || []) if (p && p.uid) shopApi.bumpProgress(p.uid, 'games', 1); } catch (e) { console.error('[web] shop tasks', e?.message || e); }
     try {
       const room = GAME_ROOM[r && r.game];
       if (room) {
@@ -305,6 +321,17 @@ function init(deps) {
       }
     };
     entry.broadcast = broadcast;
+    entry.arena = new RankedArena(guildId, {
+      onChange: (room) => {
+        for (const res of entry.clients) {
+          try {
+            res.write(`event: ranked\ndata: ${JSON.stringify(room.snapshot(res.uid))}\n\n`);
+          } catch { /* fermée */ }
+        }
+      },
+      rankRecord: (players) => rankApi.recordRanked(players, (uid) => avatarMap.get(uid)),
+      onMatchEnd: (r) => roundEnd(guildId, r),
+    });
     entry.roulette = new RouletteRoom(guildId, {
       getBalance: deps.getBalance,
       debit: deps.debit,
@@ -660,6 +687,94 @@ function init(deps) {
           }
           break;
         }
+
+
+        // ---- ranked arena
+        case 'rkjoin': {
+          await entry.arena.run(() => entry.arena.join(user));
+          break;
+        }
+        case 'rkleave': {
+          await entry.arena.run(() => entry.arena.leave(user.uid));
+          break;
+        }
+        case 'rkready': {
+          await entry.arena.run(() => entry.arena.ready(user.uid, d.on !== false));
+          break;
+        }
+        case 'rkunready': {
+          await entry.arena.run(() => entry.arena.ready(user.uid, false));
+          break;
+        }
+        case 'rksync': {
+          break;
+        }
+
+        // ---- boutique / tasks / profil
+        case 'shop_list': {
+          shopApi.markLogin(user.uid);
+          return json(res, 200, { ok: true, rewards: shopApi.listRewards(false) });
+        }
+        case 'shop_buy': {
+          const out = await shopApi.buy(user.uid, String(d.id || ''), user.guildId, user.name);
+          walBal = out.balance;
+          return json(res, 200, { ok: true, code: out.code, order: { code: out.code, rewardName: out.order.rewardName, type: out.order.type, price: out.order.price }, rbal: walBal });
+        }
+        case 'shop_orders': {
+          return json(res, 200, { ok: true, orders: shopApi.listOrders({ uid: user.uid, limit: 30 }) });
+        }
+        case 'tasks_list': {
+          shopApi.markLogin(user.uid);
+          return json(res, 200, { ok: true, day: shopApi.dayKeyParis(), tasks: shopApi.tasksForUser(user.uid) });
+        }
+        case 'tasks_claim': {
+          const out = await shopApi.claimTask(user.uid, String(d.id || ''));
+          walBal = out.balance;
+          return json(res, 200, { ok: true, reward: out.reward, msg: `+${out.reward} · ${out.task}`, rbal: walBal, tasks: shopApi.tasksForUser(user.uid) });
+        }
+        case 'profile': {
+          shopApi.markLogin(user.uid);
+          const inv = deps.getInviteCount ? await deps.getInviteCount(user.uid, user.guildId).catch(() => 0) : 0;
+          const games = deps.getGamesPlayed ? await deps.getGamesPlayed(user.uid).catch(() => 0) : 0;
+          let rankGames = 0;
+          try { rankGames = rankApi.view(user.uid, 1).me.games || 0; } catch {}
+          const bal = await deps.getBalance(user.uid);
+          const inviteUrl = deps.inviteUrl ? await deps.inviteUrl(user.guildId).catch(() => '') : '';
+          return json(res, 200, {
+            ok: true,
+            bal,
+            invites: inv,
+            games: Math.max(games, rankGames),
+            inviteUrl: inviteUrl || '',
+            inviteReward: Number(process.env.INVITE_REWARD) || 10,
+            orders: shopApi.listOrders({ uid: user.uid, limit: 10 }),
+          });
+        }
+        case 'admin_shop_list': {
+          if (!deps.isAdmin || !(await deps.isAdmin(user.uid))) throw new Error('Action réservée à l’administrateur.');
+          return json(res, 200, { ok: true, rewards: shopApi.listRewards(true), tasks: shopApi.listTasks(true), orders: shopApi.listOrders({ limit: 50 }) });
+        }
+        case 'admin_reward_save': {
+          if (!deps.isAdmin || !(await deps.isAdmin(user.uid))) throw new Error('Action réservée à l’administrateur.');
+          const entry = shopApi.adminUpsertReward(d);
+          return json(res, 200, { ok: true, reward: entry, rewards: shopApi.listRewards(true) });
+        }
+        case 'admin_reward_del': {
+          if (!deps.isAdmin || !(await deps.isAdmin(user.uid))) throw new Error('Action réservée à l’administrateur.');
+          shopApi.adminDeleteReward(String(d.id || ''));
+          return json(res, 200, { ok: true, rewards: shopApi.listRewards(true) });
+        }
+        case 'admin_task_save': {
+          if (!deps.isAdmin || !(await deps.isAdmin(user.uid))) throw new Error('Action réservée à l’administrateur.');
+          const entry = shopApi.adminUpsertTask(d);
+          return json(res, 200, { ok: true, task: entry, tasks: shopApi.listTasks(true) });
+        }
+        case 'admin_task_del': {
+          if (!deps.isAdmin || !(await deps.isAdmin(user.uid))) throw new Error('Action réservée à l’administrateur.');
+          shopApi.adminDeleteTask(String(d.id || ''));
+          return json(res, 200, { ok: true, tasks: shopApi.listTasks(true) });
+        }
+
         default:
           return json(res, 400, { ok: false, error: 'Action inconnue.' });
       }
@@ -703,6 +818,8 @@ function init(deps) {
     deps.getBalance(user.uid).then((b) => { try { res.write(`event: bal\ndata: ${JSON.stringify({ bal: b })}\n\n`); } catch { /* fermée */ } }).catch(() => {});
     entry.roulette.setPresence(user.uid, true);
     res.write(`event: roulette\ndata: ${JSON.stringify(entry.roulette.snapshot())}\n\n`);
+    entry.arena.setPresence(user.uid, true);
+    res.write(`event: ranked\ndata: ${JSON.stringify(entry.arena.snapshot(user.uid))}\n\n`);
     res.write(`event: chathist\ndata: ${JSON.stringify(Object.fromEntries(entry.chat))}\n\n`);
     res.write(`event: inbox\ndata: ${JSON.stringify([...(inbox[user.uid] || []), ...eventsOf(user.guildId)].sort((a, b) => b.t - a.t).slice(0, 30))}\n\n`);
     const hb = setInterval(() => {
@@ -723,6 +840,7 @@ function init(deps) {
             for (const r of entry.bjs.values()) r.setPresence(user.uid, false);
             for (const r of entry.pokers.values()) r.setPresence(user.uid, false);
             entry.roulette.setPresence(user.uid, false);
+            try { entry.arena.setPresence(user.uid, false); } catch {}
           }
         }, 8000); // tolérance : rechargement de page / coupure réseau brève
       } else entry.conns.set(user.uid, n);
@@ -775,7 +893,7 @@ function init(deps) {
   server.listen(port, '0.0.0.0', () => console.log(`[web] blackjack + poker + roulette en ligne → ${PUBLIC_URL} (port ${port})`));
   server.on('error', (e) => console.error('[web] serveur :', e?.message || e));
 
-  return { makeLink, pushEvent, enabled: true, rooms, server, publicUrl: PUBLIC_URL, oauth: oauthOn };
+  return { makeLink, pushEvent, enabled: true, rooms, server, publicUrl: PUBLIC_URL, oauth: oauthOn, shop: shopApi };
 }
 
 module.exports = { init };
