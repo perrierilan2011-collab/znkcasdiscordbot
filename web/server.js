@@ -819,13 +819,91 @@ function init(deps) {
         }
 
         case 'admin_bot_cmd': {
-          if (!deps.isAdmin || !(await deps.isAdmin(user.uid))) throw new Error('Action réservée à l’administrateur.');
-          if (!deps.runBotCommand) throw new Error('Commandes bot indisponibles (redémarre le bot).');
+          if (!deps.isAdmin || !(await deps.isAdmin(user.uid))) throw new Error('Admin only.');
+          if (!deps.runBotCommand) throw new Error('Bot commands unavailable (restart bot).');
           const result = await deps.runBotCommand(user.guildId, user.uid, String(d.cmd || ''), (d.params && typeof d.params === 'object') ? d.params : {});
           return json(res, 200, { ok: true, result: result || { ok: true }, msg: (result && result.msg) || 'OK' });
         }
+
+        // Economy admin (Discord panel actions — no channel creation)
+        case 'admin_eco': {
+          if (!deps.isAdmin || !(await deps.isAdmin(user.uid))) throw new Error('Admin only.');
+          const action = String(d.op || '');
+          const target = String(d.userId || '').trim();
+          const amount = Number(d.amount);
+          if (action === 'add') {
+            if (!/^\d{5,25}$/.test(target) || !(amount > 0)) throw new Error('Invalid userId or amount.');
+            const nb = await deps.credit(target, amount);
+            return json(res, 200, { ok: true, msg: `+${amount} → ${target}`, bal: nb });
+          }
+          if (action === 'remove') {
+            if (!/^\d{5,25}$/.test(target) || !(amount > 0)) throw new Error('Invalid userId or amount.');
+            const nb = await deps.debit(target, amount);
+            if (nb === null) throw new Error('Insufficient balance.');
+            return json(res, 200, { ok: true, msg: `−${amount} → ${target}`, bal: nb });
+          }
+          if (action === 'set') {
+            if (!/^\d{5,25}$/.test(target) || !(amount >= 0)) throw new Error('Invalid userId or amount.');
+            const cur = await deps.getBalance(target);
+            const diff = amount - cur;
+            if (diff > 0) await deps.credit(target, diff);
+            else if (diff < 0) {
+              const nb = await deps.debit(target, -diff);
+              if (nb === null) throw new Error('Could not set balance.');
+            }
+            return json(res, 200, { ok: true, msg: `Balance set to ${amount} for ${target}`, bal: amount });
+          }
+          if (action === 'view') {
+            const uid = /^\d{5,25}$/.test(target) ? target : user.uid;
+            const bal = await deps.getBalance(uid);
+            let rr = null;
+            try { rr = rankApi.getRR ? rankApi.getRR(uid) : (rankApi.view(uid, 1).me || {}).elo; } catch {}
+            return json(res, 200, { ok: true, msg: `Balance ${uid}: ${bal}` + (rr != null ? ` · RR ${rr}` : ''), bal, rr });
+          }
+          if (action === 'gift_all') {
+            if (!(amount > 0)) throw new Error('Invalid amount.');
+            if (!deps.giftAll) throw new Error('giftAll not wired on bot.');
+            const n = await deps.giftAll(user.guildId, amount, user.uid);
+            return json(res, 200, { ok: true, msg: `Gifted ${amount} to ${n} players` });
+          }
+          if (action === 'reset_balances') {
+            if (!deps.resetBalances) throw new Error('resetBalances not wired on bot.');
+            const n = await deps.resetBalances(user.guildId, user.uid);
+            return json(res, 200, { ok: true, msg: `Reset ${n} balances` });
+          }
+          if (action === 'reset_alltime') {
+            if (!deps.resetAlltime) throw new Error('resetAlltime not wired on bot.');
+            await deps.resetAlltime(user.guildId);
+            return json(res, 200, { ok: true, msg: 'All-time peaks reset' });
+          }
+          if (action === 'reset_stats') {
+            if (!deps.resetStats) throw new Error('resetStats not wired on bot.');
+            await deps.resetStats(user.guildId);
+            return json(res, 200, { ok: true, msg: 'Game stats reset' });
+          }
+          if (action === 'player_stats') {
+            const uid = /^\d{5,25}$/.test(target) ? target : user.uid;
+            const bal = await deps.getBalance(uid);
+            const rv = rankApi.view(uid, 1);
+            return json(res, 200, { ok: true, msg: `Player ${uid}`, bal, rank: rv.me, ladder: rv.ladder });
+          }
+          throw new Error('Unknown economy action: ' + action);
+        }
+
+        case 'admin_ladder_get': {
+          if (!deps.isAdmin || !(await deps.isAdmin(user.uid))) throw new Error('Admin only.');
+          const ladder = rankApi.getLadder ? rankApi.getLadder() : (rankApi.view(user.uid, 1).ladder || []);
+          return json(res, 200, { ok: true, ladder });
+        }
+        case 'admin_ladder_set': {
+          if (!deps.isAdmin || !(await deps.isAdmin(user.uid))) throw new Error('Admin only.');
+          if (!rankApi.adminSetLadder) throw new Error('Ladder edit not available.');
+          const ladder = rankApi.adminSetLadder(d.ladder || d.tiers || []);
+          return json(res, 200, { ok: true, ladder, msg: 'Ladder saved to Supabase' });
+        }
+
         default:
-          return json(res, 400, { ok: false, error: 'Action inconnue.' });
+          return json(res, 400, { ok: false, error: 'Unknown action.' });
       }
       entry.syncTables();
       return json(res, 200, { ok: true, tid: created, daily, msg: evMsg, rbal: walBal ?? roulette.players.get(user.uid)?.bal });

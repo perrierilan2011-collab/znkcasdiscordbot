@@ -11,44 +11,50 @@ const fs = require('fs');
 const path = require('path');
 
 const ROMAN = ['III', 'II', 'I'];
-const RR_START = 1000;
-const RR_FLOOR = 100;
-const PLACEMENT_N = 5;
-const SOFT_KEEP = 0.85; // fraction de (elo - floor) conservée au reset
+let RR_START = 1000;
+let RR_FLOOR = 100;
+let PLACEMENT_N = 5;
+let SOFT_KEEP = 0.85;
 const K_ARENA = 28;
 
-// Paliers = seuils de RR
-const FAMILIES = [
+// Default families (English names) — used until Supabase ladder is loaded
+const DEFAULT_FAMILIES = [
   { fam: 'Bronze', c1: '#e0a06a', c2: '#8a4b14', sym: 'chev', mins: [100, 400, 700] },
-  { fam: 'Argent', c1: '#f3f4f6', c2: '#8b94a3', sym: 'chev', mins: [1000, 1200, 1400] },
-  { fam: 'Or', c1: '#fde68a', c2: '#d97706', sym: 'star', mins: [1600, 1800, 2000] },
-  { fam: 'Platine', c1: '#a5f3fc', c2: '#3b82a6', sym: 'star', mins: [2200, 2400, 2600] },
-  { fam: 'Diamant', c1: '#c4b5fd', c2: '#6d28d9', sym: 'gem', mins: [2800, 3000, 3200] },
-  { fam: 'Maître', c1: '#fcd34d', c2: '#b45309', sym: 'crown', mins: [3400] },
-  { fam: 'Grand Maître', c1: '#f9a8d4', c2: '#be185d', sym: 'crown', mins: [3800] },
+  { fam: 'Silver', c1: '#f3f4f6', c2: '#8b94a3', sym: 'chev', mins: [1000, 1200, 1400] },
+  { fam: 'Gold', c1: '#fde68a', c2: '#d97706', sym: 'star', mins: [1600, 1800, 2000] },
+  { fam: 'Platinum', c1: '#a5f3fc', c2: '#3b82a6', sym: 'star', mins: [2200, 2400, 2600] },
+  { fam: 'Diamond', c1: '#c4b5fd', c2: '#6d28d9', sym: 'gem', mins: [2800, 3000, 3200] },
+  { fam: 'Master', c1: '#fcd34d', c2: '#b45309', sym: 'crown', mins: [3400] },
+  { fam: 'Grand Master', c1: '#f9a8d4', c2: '#be185d', sym: 'crown', mins: [3800] },
   { fam: 'Champion', c1: '#67e8f9', c2: '#0e7490', sym: 'crown', mins: [4200] },
-  { fam: 'Légende', c1: '#fb923c', c2: '#b91c1c', sym: 'wings', mins: [4600] },
-  { fam: 'Immortel ZNK', c1: '#fff7ad', c2: '#f59e0b', sym: 'wings', mins: [5000] },
+  { fam: 'Legend', c1: '#fb923c', c2: '#b91c1c', sym: 'wings', mins: [4600] },
+  { fam: 'Immortal ZNK', c1: '#fff7ad', c2: '#f59e0b', sym: 'wings', mins: [5000] },
 ];
 
-const LADDER = [];
-FAMILIES.forEach((f, fi) => {
-  f.mins.forEach((min, k) => {
-    const div = f.mins.length === 3 ? ROMAN[k] : '';
-    LADDER.push({
-      id: LADDER.length,
-      fam: f.fam,
-      fi,
-      div,
-      name: div ? `${f.fam} ${div}` : f.fam,
-      min,
-      c1: f.c1,
-      c2: f.c2,
-      sym: f.sym,
-      pips: f.mins.length === 3 ? k + 1 : 0,
+function buildLadderFromFamilies(families) {
+  const out = [];
+  families.forEach((f, fi) => {
+    f.mins.forEach((min, k) => {
+      const div = f.mins.length === 3 ? ROMAN[k] : '';
+      out.push({
+        id: out.length,
+        fam: f.fam,
+        fi,
+        div,
+        name: div ? `${f.fam} ${div}` : f.fam,
+        min: Number(min) || 0,
+        c1: f.c1,
+        c2: f.c2,
+        sym: f.sym,
+        pips: f.mins.length === 3 ? k + 1 : 0,
+      });
     });
   });
-});
+  return out;
+}
+
+/** Mutable ladder — always visible to every player (even during placement) */
+let LADDER = buildLadderFromFamilies(DEFAULT_FAMILIES);
 
 function rankIndex(rr) {
   let i = 0;
@@ -59,7 +65,7 @@ function rankIndex(rr) {
 function progress(rr) {
   const e = Math.max(0, Number(rr) || 0);
   const i = rankIndex(e);
-  const cur = LADDER[i];
+  const cur = LADDER[i] || LADDER[0];
   const next = LADDER[i + 1] || null;
   const pct = next ? Math.max(0, Math.min(1, (e - cur.min) / (next.min - cur.min))) : 1;
   return { idx: i, pct, toNext: next ? Math.max(0, next.min - e) : 0, maxed: !next, tier: cur };
@@ -150,9 +156,80 @@ function create(file, supabase) {
     }
   }
 
+  async function loadLadderFromDb() {
+    if (!supabase) return;
+    try {
+      const { data, error } = await supabase.from('site_rank_ladder').select('*').order('id', { ascending: true });
+      if (error) throw error;
+      if (data && data.length) {
+        LADDER = data.map((r) => ({
+          id: r.id,
+          fam: r.fam,
+          fi: r.fi || 0,
+          div: r.div || '',
+          name: r.name,
+          min: Number(r.min_rr) || 0,
+          c1: r.c1 || '#a78bfa',
+          c2: r.c2 || '#5b21b6',
+          sym: r.sym || 'chev',
+          pips: r.pips || 0,
+        }));
+        console.log('[rank] ladder loaded from Supabase (' + LADDER.length + ' tiers)');
+      }
+    } catch (e) {
+      console.error('[rank] ladder load', e?.message || e);
+    }
+  }
+
+  async function saveLadderToDb() {
+    if (!supabase || !LADDER.length) return;
+    try {
+      const rows = LADDER.map((t) => ({
+        id: t.id,
+        fam: t.fam,
+        fi: t.fi || 0,
+        div: t.div || '',
+        name: t.name,
+        min_rr: t.min,
+        c1: t.c1,
+        c2: t.c2,
+        sym: t.sym,
+        pips: t.pips || 0,
+        updated_at: new Date().toISOString(),
+      }));
+      const { error } = await supabase.from('site_rank_ladder').upsert(rows, { onConflict: 'id' });
+      if (error) throw error;
+    } catch (e) {
+      console.error('[rank] ladder save', e?.message || e);
+    }
+  }
+
+  /** Admin: update RR thresholds (array of { id, min } or full tiers) */
+  function adminSetLadder(tiers) {
+    if (!Array.isArray(tiers) || !tiers.length) throw new Error('Invalid ladder.');
+    const next = tiers.map((t, i) => ({
+      id: t.id != null ? Number(t.id) : i,
+      fam: String(t.fam || t.name || 'Tier').slice(0, 32),
+      fi: Number(t.fi) || 0,
+      div: String(t.div || ''),
+      name: String(t.name || t.fam || 'Tier').slice(0, 48),
+      min: Math.max(0, Math.floor(Number(t.min) || 0)),
+      c1: String(t.c1 || '#a78bfa'),
+      c2: String(t.c2 || '#5b21b6'),
+      sym: String(t.sym || 'chev'),
+      pips: Number(t.pips) || 0,
+    }));
+    next.sort((a, b) => a.min - b.min || a.id - b.id);
+    next.forEach((t, i) => (t.id = i));
+    LADDER = next;
+    saveLadderToDb();
+    return LADDER.map((t) => ({ ...t }));
+  }
+
   if (supabase)
     (async () => {
       try {
+        await loadLadderFromDb();
         for (let from = 0; ; from += 1000) {
           const { data, error } = await supabase.from('player_rank').select('*').range(from, from + 999);
           if (error) throw error;
@@ -160,7 +237,7 @@ function create(file, supabase) {
             const loc = users[r.user_id];
             if (loc && (loc.eg || 0) > r.games) continue;
             users[r.user_id] = {
-              n: r.name || 'Joueur',
+              n: r.name || 'Player',
               a: r.avatar || '',
               earned: Number(r.earned) || 0,
               elo: Number(r.elo) || RR_START,
@@ -175,9 +252,9 @@ function create(file, supabase) {
         }
         Object.keys(users).forEach((id) => dirty.add(id));
         await flushDb();
-        console.log('[rank] RR chargés depuis Supabase');
+        console.log('[rank] RR loaded from Supabase');
       } catch (e) {
-        console.error('[rank] chargement supabase', e?.message || e);
+        console.error('[rank] supabase load', e?.message || e);
       }
     })();
 
@@ -306,6 +383,7 @@ function create(file, supabase) {
     const row = ([id, u], i) => {
       const placing = (u.place || 0) < PLACEMENT_N;
       const pr = progress(u.elo);
+      // Always expose tier + ladder RR — even during placement
       return {
         pos: i + 1,
         uid: id,
@@ -316,8 +394,8 @@ function create(file, supabase) {
         wins: u.w || 0,
         prov: placing,
         placementLeft: placing ? PLACEMENT_N - (u.place || 0) : 0,
-        rank: placing ? null : pr.idx,
-        tier: placing ? null : pr.tier,
+        rank: pr.idx,
+        tier: pr.tier,
       };
     };
     const meU = users[uid];
@@ -370,9 +448,26 @@ function create(file, supabase) {
 
   const info = (uid) => {
     const u = users[uid];
-    if (!u || (u.place || 0) < PLACEMENT_N) return { id: -1, name: 'Placement', fam: 'Placement', c1: '#a78bfa', c2: '#5b21b6', sym: 'chev', pips: 0, fi: 0 };
-    return LADDER[rankIndex(u.elo)];
+    if (!u || (u.place || 0) < PLACEMENT_N) {
+      return { id: -1, name: 'Placement', fam: 'Placement', c1: '#a78bfa', c2: '#5b21b6', sym: 'chev', pips: 0, fi: 0 };
+    }
+    return LADDER[rankIndex(u.elo)] || LADDER[0];
   };
+
+  /** Adjust RR directly (admin / ranked BJ) */
+  function adjustRR(uid, delta, name) {
+    const u = get(String(uid), name);
+    const before = u.elo;
+    u.elo = Math.max(RR_FLOOR, Math.round((u.elo + Number(delta)) * 100) / 100);
+    if (u.elo > (u.peak || 0)) u.peak = u.elo;
+    save([String(uid)]);
+    return { before: Math.round(before), elo: Math.round(u.elo), delta: Math.round(u.elo - before) };
+  }
+
+  function getRR(uid) {
+    const u = users[String(uid)];
+    return u ? Math.round(u.elo) : RR_START;
+  }
 
   return {
     info,
@@ -386,10 +481,30 @@ function create(file, supabase) {
       }
     },
     ensureSeason,
-    LADDER,
+    adminSetLadder,
+    getLadder: () => LADDER.map((t) => ({ ...t })),
+    adjustRR,
+    getRR,
+    get LADDER() {
+      return LADDER;
+    },
     RR_START,
     PLACEMENT_N,
   };
 }
 
-module.exports = { create, LADDER, progress, rankIndex, RR_START, PLACEMENT_N, SOFT_KEEP };
+module.exports = {
+  create,
+  progress,
+  rankIndex,
+  get LADDER() {
+    return LADDER;
+  },
+  get RR_START() {
+    return RR_START;
+  },
+  get PLACEMENT_N() {
+    return PLACEMENT_N;
+  },
+  SOFT_KEEP,
+};
