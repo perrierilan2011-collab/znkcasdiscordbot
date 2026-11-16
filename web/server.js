@@ -709,6 +709,10 @@ function init(deps) {
         case 'rksync': {
           break;
         }
+        case 'rkact': {
+          await entry.arena.run(() => entry.arena.act(user.uid, d.answer || d));
+          break;
+        }
 
         // ---- boutique / tasks / profil
         case 'shop_list': {
