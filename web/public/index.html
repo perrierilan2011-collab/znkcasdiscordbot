@@ -7,7 +7,7 @@
 <title>Casino · Jeux en ligne</title>
 <style>
 :root{
-  --bg:#000; --violet:#262626; --violet2:#525252; --gold:#e5e5e5; --green:#a3a3a3; --red:#a3a3a3;
+  --bg:#000; --violet:#262626; --violet2:#525252; --gold:#fbbf24; --green:#22c55e; --red:#ef4444;
   --felt1:#0f7a4d; --felt2:#064e32; --ink:#f2f2f2; --mut:#8a8a8a;
   --cw:clamp(34px,4.6vw,66px); --ch:calc(var(--cw)*1.42);
 }
@@ -20,14 +20,18 @@ button{font:inherit;color:inherit;cursor:pointer;border:0}
 button:disabled{opacity:.38;cursor:not-allowed;filter:grayscale(.4)}
 /* ---------- en-tête ---------- */
 header{display:flex;align-items:center;gap:10px;padding:8px 14px;background:#000;border-bottom:1px solid #1f1f1f;position:relative;z-index:18}
-/* ---------- top nav (liste horizontale, plus de menu deroulant) ---------- */
+
 #topNav{display:flex;align-items:center;gap:2px;flex-wrap:wrap;min-width:0}
-#topNav .navl{background:transparent;border:0;color:#a3a3a3;font-weight:700;font-size:13px;padding:6px 10px;border-radius:8px;white-space:nowrap}
+#topNav .navl{background:transparent;border:0;color:#a3a3a3;font-weight:700;font-size:13px;padding:6px 10px;border-radius:8px;white-space:nowrap;cursor:pointer}
 #topNav .navl:hover{color:#fff;background:rgba(255,255,255,.06)}
 #topNav .navl.on{color:#fff;background:rgba(255,255,255,.12)}
 #bTasks svg{display:block}
 @media(max-width:900px){#topNav .navl{padding:6px 7px;font-size:12px}}
-@media(max-width:640px){#topNav{max-width:55vw;overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch}#topNav .navl{font-size:11px}}
+@media(max-width:640px){#topNav{max-width:52vw;overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch}}
+/* cartes hub : bouton Jouer centré */
+.gcard{align-items:center;text-align:center}
+.gcard .gname,.gcard .gdesc{text-align:center;width:100%}
+.gplay{align-self:center;margin-left:auto;margin-right:auto}
 
 .logo{display:none}
 .sp{flex:1}
@@ -60,7 +64,7 @@ main{flex:1;display:flex;flex-direction:column;min-height:0;padding:10px 10px 0;
     url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .06 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>") padding-box,
     radial-gradient(ellipse 75% 65% at 50% 36%,#2a2a2a 0%,#141414 40%,#0a0a0a 70%,#000 100%) padding-box,
     linear-gradient(180deg,#3a3a3a 0%,#1a1a1a 30%,#0a0a0a 70%,#000 100%) border-box;
-  box-shadow:inset 0 0 70px rgba(0,0,0,.8),inset 0 0 0 1px rgba(255,255,255,.06),0 0 0 1px rgba(255,255,255,.08),0 26px 60px rgba(0,0,0,.65);
+  box-shadow:inset 0 0 70px rgba(0,0,0,.85),inset 0 0 0 1px rgba(255,255,255,.06),0 0 0 1px rgba(255,255,255,.08),0 26px 60px rgba(0,0,0,.65);
   display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:14px 8px 62px;overflow:hidden}
 /* liseré doré imprimé sur le tapis */
 #table::after,.ftable::after{content:"";position:absolute;inset:9px;border:1px solid rgba(255,255,255,.12);border-radius:22px 22px 50% 50%/22px 22px 21% 21%;box-shadow:none;pointer-events:none;z-index:0}
@@ -846,20 +850,18 @@ body.fs.vpk #pkInfo{font-size:12px}
 <header>
   <nav id="topNav" aria-label="Navigation">
     <button type="button" class="navl" data-g="hub">Accueil</button>
-    <button type="button" class="navl" data-g="bj">Blackjack</button>
-    <button type="button" class="navl" data-g="poker">Poker</button>
-    <button type="button" class="navl" data-g="roulette">Roulette</button>
     <button type="button" class="navl" data-g="ranked">Ranked</button>
     <button type="button" class="navl" data-g="rank">Rangs</button>
     <button type="button" class="navl" data-g="top">Classement</button>
     <button type="button" class="navl" data-g="shop">Boutique</button>
+    <button type="button" class="navl" data-g="tasks">Tasks</button>
     <button type="button" class="navl" data-g="off-bj">Solo</button>
   </nav>
   <div class="sp"></div>
   <button class="hb ico hide" id="bTop" title="Top">&#9651;</button>
   <button class="hb ico hide" id="bRules" title="Regles">&#63;</button>
-  <button class="hb ico" id="bTasks" title="Tasks" style="display:inline-flex" aria-label="Tasks">
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="3" width="14" height="18" rx="1.5"/><path d="M8 3v3h6V3"/><path d="M8 11h6M8 15h4"/></svg>
+  <button class="hb ico" id="bTasks" title="Tasks" aria-label="Tasks" style="display:inline-flex;align-items:center;justify-content:center">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="3" width="14" height="18" rx="1.5"/><path d="M8 3v3h6V3"/><path d="M8 11h6M8 15h4"/></svg>
   </button>
   <button class="hb ico" id="bSnd" title="Son">&#9835;</button>
   <button class="hb ico" id="bFs" title="Plein ecran">&#9635;</button>
@@ -1103,18 +1105,21 @@ body.fs.vpk #pkInfo{font-size:12px}
 
 
 <main id="rkArenaView" class="hide">
-  <div class="rk-top"><h2>Ranked Blackjack</h2><span id="rkPotLbl" style="color:#a3a3a3;font-size:13px">Entree 10 RR · 2 a 6 joueurs</span></div>
-  <section id="rkTable" class="ftable" style="min-height:420px;margin:0 8px">
+  <div class="rk-top" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:8px 12px 0">
+    <h2 style="margin:0">Ranked Blackjack</h2>
+    <span id="rkPotLbl" style="color:#a3a3a3;font-size:13px">Entree 10 RR · 2 a 6 joueurs</span>
+  </div>
+  <section id="rkTable" class="ftable" style="min-height:420px;margin:8px">
     <div id="rkDealer" style="display:flex;flex-direction:column;align-items:center;gap:6px;margin-top:8px;position:relative;z-index:1">
       <div class="dname">CROUPIER</div>
       <div class="cards" id="rkDCards"></div>
       <span class="pill" id="rkDTot" style="display:none"></span>
     </div>
-    <div id="center" style="position:absolute;left:50%;top:48%;transform:translate(-50%,-50%);z-index:3;text-align:center;pointer-events:none">
+    <div style="position:absolute;left:50%;top:48%;transform:translate(-50%,-50%);z-index:3;text-align:center;pointer-events:none">
       <div id="rkMsg" style="display:inline-block;background:rgba(0,0,0,.72);border:1px solid rgba(255,255,255,.12);padding:7px 18px;border-radius:999px;font-weight:700"></div>
       <div id="rkCd" style="margin-top:6px;font-size:28px;font-weight:900;color:#fff"></div>
     </div>
-    <div id="rkSeats" style="width:100%;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px;align-items:end;padding:0 4px 8px;position:relative;z-index:1"></div>
+    <div id="rkSeatsBox" style="width:100%;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px;align-items:end;padding:0 4px 8px;position:relative;z-index:1"></div>
   </section>
   <div class="dockp" id="rkDock">
     <div class="row" id="rkActs">
@@ -1443,7 +1448,7 @@ function connect() {
   es = new EventSource('/api/stream?t=' + encodeURIComponent(TOKEN));
   es.addEventListener('hello', (e) => { const d = JSON.parse(e.data); me = d; COIN = d.coin && d.coin !== '🪙' ? d.coin : 'ZTKN'; seatsN = d.seats || 5; $('#coin').textContent = COIN;
     $('#meName').textContent = d.name; setAvatar($('#meAv'), d.avatar, d.name); $('#conn').style.display = 'none'; BJT.clear(); P.tables.clear(); rOnHello(d); pOnHello(d); });
-  es.addEventListener('ranked', (e) => { try { rkRender(JSON.parse(e.data)); } catch {} });
+  es.addEventListener('ranked', (e) => { try { (window.rkRender || rkRender)(JSON.parse(e.data)); } catch (err) { console.error('ranked', err); } });
 es.addEventListener('roulette', (e) => { const st = JSON.parse(e.data); offset = st.now - Date.now(); rRender(st); });
   es.addEventListener('poker', (e) => { const st = JSON.parse(e.data); offset = st.now - Date.now(); pUpdate(st); });
   es.addEventListener('admin', () => $('#bAdmin').classList.remove('hide'));
@@ -1711,7 +1716,7 @@ $('#bTop').onclick = async () => {
     box.textContent = ''; box.append(t);
   } catch { box.textContent = 'Classement indisponible.'; }
 };
-const sndBtn = $('#bSnd'); const refreshSnd = () => { sndBtn.textContent = sndOn ? '\u266b' : '\u2715'; sndBtn.title = sndOn ? 'Son' : 'Muet'; }; refreshSnd();
+const sndBtn = $('#bSnd'); const refreshSnd = () => { if (!sndBtn) return; sndBtn.textContent = sndOn ? '\u266b' : '\u2715'; sndBtn.title = sndOn ? 'Son' : 'Muet'; }; refreshSnd();
 sndBtn.onclick = () => { sndOn = !sndOn; try { localStorage.setItem('znk_snd', sndOn ? '1' : '0'); } catch {} refreshSnd(); if (sndOn) SFX.chip(); };
 document.addEventListener('pointerdown', () => ac(), { once: true });
 // retour sur l'onglet : resynchronise le solde
@@ -2218,15 +2223,14 @@ function routeSet(v, replace) {
   else history.pushState(null, '', path);
 }
 function navHighlight(v) {
-  document.querySelectorAll('#topNav [data-g], #deskNav [data-g]').forEach((b) => {
+  document.querySelectorAll('#topNav [data-g], #deskNav [data-g], #menuPanel .mitem[data-g]').forEach((b) => {
     const g = b.getAttribute('data-g');
-    b.classList.toggle('on', g === v || (v.startsWith('off-') && g === 'off-bj' && v !== 'hub'));
+    b.classList.toggle('on', g === v || (String(v).startsWith('off-') && g === 'off-bj'));
   });
-});
-  const lbl = null;
-  if (false) {
+  const lbl = $('#menuLbl');
+  if (lbl) {
     const map = { hub:'Accueil', ranked:'Ranked', rank:'Rank', top:'Classement', shop:'Boutique', tasks:'Tasks', account:'Compte', bj:'Blackjack', poker:'Poker', roulette:'Roulette' };
-    lbl.textContent = map[v] || (v.startsWith('off-') ? 'Offline' : 'Menu');
+    lbl.textContent = map[v] || (String(v).startsWith('off-') ? 'Solo' : 'Menu');
   }
 }
 
@@ -2296,11 +2300,15 @@ function setView(v) {
 document.querySelectorAll('.gcard').forEach((c) => (c.onclick = () => { ac(); setView(c.dataset.go); }));
 
 // desk nav + header tasks/shop + hub ranked
-document.querySelectorAll('#topNav [data-g]').forEach((b) => {
-  b.onclick = () => { ac(); setView(b.getAttribute('data-g')); };
-});
-document.querySelectorAll('#deskNav [data-g]').forEach((b) => {
 
+// top nav (liste horizontale)
+document.querySelectorAll('#topNav [data-g]').forEach((b) => {
+  b.onclick = () => { try { ac(); } catch(e) {} setView(b.getAttribute('data-g')); };
+});
+const _bTasksBtn = $('#bTasks');
+if (_bTasksBtn) _bTasksBtn.onclick = () => { try { ac(); } catch(e) {} setView('tasks'); };
+
+document.querySelectorAll('#deskNav [data-g]').forEach((b) => {
   b.onclick = () => { ac(); setView(b.getAttribute('data-g')); };
 });
 const _bTasks = $('#bTasks');
@@ -2336,7 +2344,9 @@ function updHub() {
 }
 
 // ---- menu déroulant
-function menuClose() {}
+function menuClose() { const m = $('#menu'); if (m) m.classList.remove('open'); const b = $('#menuBtn'); if (b) b.setAttribute('aria-expanded', 'false'); }
+if ($('#menuBtn') && $('#menu')) $('#menuBtn').onclick = (e) => { e.stopPropagation(); const o = $('#menu').classList.toggle('open'); $('#menuBtn').setAttribute('aria-expanded', String(o)); };
+document.querySelectorAll('#menuPanel .mhead').forEach((b) => (b.onclick = (e) => { e.stopPropagation(); b.parentElement.classList.toggle('open'); }));
 document.addEventListener('click', (e) => { if (!e.target.closest('#menu')) menuClose(); });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') menuClose(); });
 const MENU_LBL = { hub: 'Menu', bj: 'Blackjack', poker: 'Poker', roulette: 'Roulette', 'off-bj': 'Blackjack solo', 'off-fuse': 'Fusé', 'off-mine': 'Mine', 'off-coin': 'Pile ou Face', 'off-dice': 'Dés', 'off-horses': 'Chevaux', 'off-russian': 'Roulette russe', 'off-slots': 'Slots', 'off-duel': 'Duel', 'off-scratch': 'Ticket à gratter', 'off-plinko': 'Plinko', top: 'Classement', rank: 'Rank', admin: 'Admin' };
@@ -3548,8 +3558,7 @@ async function gSearch() {
 function gOpen(admin) { menuClose(); G.admin = admin === true; $('#gTitle').textContent = G.admin ? 'Ajouter de l’argent (admin)' : 'Envoyer des ZTKN'; $('#gSend').textContent = G.admin ? 'Ajouter' : 'Envoyer'; G.to = null; $('#gQ').value = ''; $('#gAmt').value = ''; $('#mGift').classList.add('on'); gSel(); gSearch(); setTimeout(() => $('#gQ').focus(), 50); }
 $('#bGift').onclick = () => { popClose(); gOpen(); };
 $('#bAdmin').onclick = () => { popClose(); setView('admin'); };
-// daily removed
-// $('#bDaily').onclick = async () => {
+if ($('#bDaily')) $('#bDaily').onclick = async () => {
   const b = $('#bDaily'); if (b.disabled) return; b.disabled = true;
   try {
     const ok = await send('daily'), d = send.last;
@@ -3893,126 +3902,230 @@ if (adGiveBtn) adGiveBtn.onclick = () => gOpen(true);
 
 
 
-// ========== RANKED BLACKJACK ==========
+// ========== RANKED ARENA v2 (100 % skill) ==========
 if (!window.RK) window.RK = {};
-Object.assign(RK, { S: null, off: 0, offs: [], key: '' });
-const rkNow = () => Date.now() + RK.off;
+Object.assign(RK, { S: null, off: 0, offs: [], key: '', loop: 0, stage: null, onKey: null });
+const RK_NAMES = { react: 'Réflexe', aim: 'Visée', sequence: 'Mémoire', timing: 'Précision', math: 'Calcul' };
+const RK_RULES = {
+  react: 'Attends que l’écran passe au vert, puis clique. Trop tôt = faux départ.',
+  aim: 'Clique les 6 cibles le plus vite possible. Un clic à côté coûte 0,5 s.',
+  sequence: 'Mémorise les 5 signaux, puis rejoue-les dans l’ordre.',
+  timing: 'Stoppe le curseur dans la zone verte. Plus tu es près du centre, mieux c’est.',
+  math: '3 calculs mentaux : la justesse d’abord, la vitesse ensuite.',
+};
+const SEQC = ['#ff5d5d', '#4da3ff', '#ffd84d', '#34d399'];
+const rkNow = () => Date.now() + RK.off; // horloge serveur estimée
 function rkSend(action, extra) { return send(action, extra || {}); }
+function rkModeLabel(m) { return RK_NAMES[m] || (m || ''); }
+function rkLoop(fn) { const tok = RK.loop; const step = () => { if (tok !== RK.loop) return; fn(); requestAnimationFrame(step); }; requestAnimationFrame(step); }
 const rkMine = (st) => { const u = me && me.uid; return u ? st.seats.find((p) => p && p.uid === u) || null : null; };
-
-function rkCardEl(c) {
-  if (!c || c.h) {
-    const d = el('div', 'card down'); d.innerHTML = '<div class="inner"><div class="face front"></div><div class="face back"></div></div>'; return d;
-  }
-  const red = c.s === '♥' || c.s === '♦';
-  const d = el('div', 'card');
-  d.innerHTML = '<div class="inner"><div class="face front' + (red ? ' red' : '') + '"><span class="tl">' + c.r + '<i>' + c.s + '</i></span><span class="mid">' + c.s + '</span></div><div class="face back"></div></div>';
-  return d;
-}
 
 function rkRender(st) {
   if (!st) return;
+  if (st.game === 'blackjack' || st.skill === false) { if (window.rkRender && window.rkRender !== rkRender) return window.rkRender(st); }
   RK.offs.push(st.now - Date.now()); if (RK.offs.length > 12) RK.offs.shift();
   RK.off = Math.max(...RK.offs);
   RK.S = st;
-  const pot = st.pot || 0;
-  const potEl = $('#rkPotLbl');
-  if (potEl) potEl.textContent = 'Pot ' + pot + ' RR · entree ' + (st.entry || 10) + ' RR · ' + (st.seats.filter(Boolean).length) + '/' + (st.maxPlayers || 6);
-
-  // dealer
-  const dc = $('#rkDCards'); if (dc) { dc.textContent = ''; (st.dealer && st.dealer.cards || []).forEach((c) => dc.append(rkCardEl(c))); }
-  const dt = $('#rkDTot');
-  if (dt) {
-    if (st.dealer && st.dealer.cards && st.dealer.cards.length && st.phase !== 'lobby') {
-      dt.style.display = ''; dt.textContent = st.dealer.bj ? 'BJ' : (st.dealer.total || '');
-      dt.className = 'pill' + (st.dealer.bj ? ' bj' : '');
-    } else dt.style.display = 'none';
-  }
-
-  // message
-  const msg = $('#rkMsg');
-  const phaseMap = { lobby: 'En attente de joueurs', dealing: 'Distribution…', playing: 'A vous de jouer', dealer: 'Croupier…', result: 'Resultat' };
-  if (msg) {
-    if (st.phase === 'result' && st.final) msg.textContent = 'Fin de main — pot reparti';
-    else if (st.phase === 'lobby') {
-      const n = st.seats.filter(Boolean).length, r = st.seats.filter((p) => p && p.ready).length;
-      msg.textContent = n < (st.minPlayers || 2) ? 'Minimum ' + (st.minPlayers || 2) + ' joueurs' : r + '/' + n + ' prets';
-    } else msg.textContent = phaseMap[st.phase] || st.phase;
-  }
-  const cd = $('#rkCd');
-  if (cd) cd.textContent = st.deadline ? Math.max(0, Math.ceil((st.deadline - rkNow()) / 1000)) + ' s' : '';
-
-  // seats
-  const box = $('#rkSeats'); if (!box) return;
-  box.textContent = '';
-  const mine = rkMine(st);
-  for (let i = 0; i < (st.maxPlayers || 6); i++) {
-    const p = st.seats[i];
-    const seat = el('div', 'seat' + (p && me && p.uid === me.uid ? ' mine' : '') + (st.turn && st.turn.seat === i ? ' turn' : ''));
-    if (!p) {
-      seat.append(el('div', 'empty', 'Libre'));
-      box.append(seat); continue;
-    }
-    const hands = el('div', 'hands');
-    (p.hands || []).forEach((h) => {
-      const hand = el('div', 'hand' + (st.turn && st.turn.seat === i ? ' act' : ''));
-      const cards = el('div', 'cards');
-      (h.cards || []).forEach((c) => cards.append(rkCardEl(c)));
-      hand.append(cards);
-      if (h.total) {
-        const pill = el('span', 'pill' + (h.state === 'bust' ? ' bust' : h.state === 'bj' ? ' bj' : h.total === 21 ? ' t21' : ''), h.state === 'bj' ? 'BJ' : String(h.total));
-        hand.append(pill);
-      }
-      if (h.result) {
-        const res = el('div', 'res ' + h.result, h.result === 'win' ? '+' + (h.net || '') : h.result === 'lose' ? String(h.net || '') : '=');
-        hand.append(res);
-      }
-      hands.append(hand);
-    });
-    seat.append(hands);
-    if (p.bet) {
-      const spot = el('div', 'betspot');
-      spot.append(el('span', 'betamt', p.bet + ' RR'));
-      seat.append(spot);
-    }
-    const plate = el('div', 'plate');
-    const av = el('div', 'av'); setAvatar(av, p.avatar, p.name);
-    const nm = el('div', 'nm', p.name + (p.ready ? ' · pret' : '') + (p.place ? ' · #' + p.place : ''));
-    const bl = el('div', 'bl', (p.rr != null ? p.rr : '—') + ' RR');
-    plate.append(av, nm, bl);
-    if (p.online === false) { const d = el('span', 'dot off'); plate.append(d); }
-    seat.append(plate);
-    box.append(seat);
-  }
-
-  // dock
-  const lob = st.phase === 'lobby' || st.phase === 'betting';
-  const myTurn = !!(mine && st.turn && st.seats[st.turn.seat] && st.seats[st.turn.seat].uid === me.uid && st.phase === 'playing');
-  $('#rkJoin').classList.toggle('hide', !!mine || !lob);
-  $('#rkReady').classList.toggle('hide', !mine || (mine.ready) || !lob);
-  $('#rkUnready').classList.toggle('hide', !mine || !mine.ready || !lob);
-  $('#rkLeave').classList.toggle('hide', !mine);
-  $('#rkHit').classList.toggle('hide', !myTurn);
-  $('#rkStand').classList.toggle('hide', !myTurn);
-  const note = $('#rkNote');
-  if (note) {
-    if (st.phase === 'result' && st.final) note.textContent = st.final.map((r) => r.name + ' #' + r.place + ' (' + (r.net >= 0 ? '+' : '') + r.net + ' RR)').join(' · ');
-    else note.textContent = 'Minimum 2 joueurs · mise obligatoire 10 RR · le pot est reparti selon le classement des mains';
-  }
+  try { rkPips(st); rkSeats(st); rkDock(st); } catch (e) { console.error(e); }
+  const k = st.phase === 'lobby'
+    ? 'lobby|' + st.deadline + '|' + st.seats.map((p) => (p ? (p.ready ? 2 : 1) : 0)).join('')
+    : [st.phase, st.match, st.round, (st.challenge && st.challenge.stage) || ''].join('|');
+  if (k !== RK.key) { RK.key = k; rkStage(st); }
 }
 if (!RK.iv) RK.iv = setInterval(() => {
   const e = document.getElementById('rkCd');
   if (e && RK.S && RK.S.deadline) e.textContent = Math.max(0, Math.ceil((RK.S.deadline - rkNow()) / 1000)) + ' s';
 }, 250);
+document.addEventListener('keydown', (e) => {
+  if (e.code === 'Space' && W.view === 'ranked' && RK.onKey && !/INPUT|TEXTAREA/.test(e.target.tagName)) { e.preventDefault(); RK.onKey(); }
+});
+
+function rkPips(st) {
+  const box = $('#rkPips'); if (!box) return; box.textContent = '';
+  for (let i = 0; i < st.rounds; i++) {
+    const g = st.plan && st.plan[i];
+    const done = st.phase !== 'lobby' && st.phase !== 'match_end' ? (i + 1 < st.round || (i + 1 === st.round && st.phase === 'round_result')) : st.phase === 'match_end';
+    const cur = !done && (st.phase === 'intro' || st.phase === 'playing') && i + 1 === st.round;
+    box.append(el('span', 'rk-pip' + (done ? ' done' : cur ? ' cur' : ''), g ? rkModeLabel(g) : 'Manche ' + (i + 1)));
+  }
+}
+function rkSeats(st) {
+  const box = $('#rkSeats'); if (!box) return; box.textContent = '';
+  const inM = st.phase !== 'lobby';
+  $('#rkSideT').textContent = inM ? 'Score du match' : 'Joueurs ' + st.seats.filter(Boolean).length + '/' + st.maxPlayers;
+  const list = st.seats.map((p, i) => ({ p, i }));
+  if (inM) list.sort((a, b) => ((b.p && b.p.score) || -1) - ((a.p && a.p.score) || -1));
+  list.forEach(({ p }) => {
+    const d = el('div', 'rk-pl' + (p && me && p.uid === me.uid ? ' me' : '') + (!p ? ' empty' : p.online === false ? ' off' : ''));
+    if (!p) { d.append(el('div', 'av2', '·'), el('div', 'nm', 'Place libre'), el('span')); box.append(d); return; }
+    const av = el('div', 'av2'); setAvatar(av, p.avatar, p.name);
+    const nm = el('div'); nm.append(el('div', 'nm', p.name));
+    nm.append(el('small', null, p.online === false ? 'a abandonné' : inM ? (p.inMatch ? (st.phase === 'playing' ? (p.answered ? 'a répondu' : 'joue…') : '') : 'spectateur') : p.ready ? 'prêt' : 'en attente'));
+    const right = el('div', 'sc', inM ? String(p.score) : p.ready ? '✓' : '');
+    d.append(av, nm, right); box.append(d);
+  });
+}
+function rkDock(st) {
+  const mine = rkMine(st), lob = st.phase === 'lobby';
+  $('#rkJoin').classList.toggle('hide', !!mine || !lob);
+  $('#rkReady').classList.toggle('hide', !mine || mine.ready || !lob);
+  $('#rkUnready').classList.toggle('hide', !mine || !mine.ready || !lob);
+  $('#rkLeave').classList.toggle('hide', !mine);
+  $('#rkLeave').textContent = mine && mine.inMatch && !lob ? 'Abandonner' : 'Quitter';
+}
+
+function rkStage(st) {
+  RK.loop++; RK.onKey = null;
+  const old = $('#rkStage'); const S = old.cloneNode(false); old.replaceWith(S); RK.stage = S;
+  const mine = rkMine(st);
+  const play = !!(mine && mine.inMatch && mine.online !== false && !st.answered);
+  const big = (t) => S.append(el('div', 'rk-big', t));
+  const sm = (t) => S.append(el('p', 'rk-sm', t));
+  const cd = (pre) => { const c = el('div', 'rk-count', pre + '…'); c.id = 'rkCd'; S.append(c); };
+
+  if (st.phase === 'lobby') {
+    const n = st.seats.filter(Boolean).length, r = st.seats.filter((p) => p && p.ready).length;
+    big(st.deadline ? 'Départ imminent' : 'L’arène vous attend');
+    sm(st.deadline ? 'Tout le monde est prêt.' : !mine ? 'Rejoins l’arène, puis appuie sur « Je suis prêt ».' : n < st.minPlayers ? 'Il faut au moins ' + st.minPlayers + ' joueurs. Invite un ami.' : r + '/' + n + ' prêts — le match démarre quand tout le monde l’est.');
+    if (st.deadline) cd('Début dans');
+    sm('5 épreuves : réflexe, visée, mémoire, précision, calcul. Même défi pour tous, aucun hasard dans le résultat. Tu gagnes du RR, pas de ZTKN.');
+    return;
+  }
+  if (st.phase === 'intro') {
+    big(rkModeLabel(st.gameMode)); sm(RK_RULES[st.gameMode] || ''); cd('Manche ' + st.round + '/' + st.rounds + ' — départ dans');
+    return;
+  }
+  if (st.phase === 'round_result' || st.phase === 'match_end') {
+    const fin = st.phase === 'match_end';
+    const rows = fin ? (st.final || []) : (st.lastRound && st.lastRound.rows) || [];
+    big(fin ? 'Match terminé' : 'Manche ' + st.round + ' · ' + rkModeLabel(st.lastRound && st.lastRound.mode));
+    const box = el('div', 'rk-res');
+    rows.forEach((r) => {
+      const row = el('div', 'rk-row' + (me && r.uid === me.uid ? ' me' : ''));
+      row.append(el('b', null, '#' + r.place), el('span', null, r.name));
+      row.append(el('span', fin ? '' : 'pt', fin ? r.score + ' pts' : r.label));
+      row.append(el('span', fin ? (r.delta >= 0 ? 'up' : 'dn') : 'pt', fin ? (r.delta == null ? '' : (r.delta >= 0 ? '+' : '') + r.delta + ' RR') : '+' + r.pts));
+      box.append(row);
+    });
+    S.append(box);
+    if (fin) { const m = (st.final || []).find((r) => me && r.uid === me.uid); sm(m && m.placement ? 'Placement : encore ' + m.placementLeft + ' partie(s) avant ton rang officiel.' : 'Retour au lobby dans quelques secondes.'); }
+    return;
+  }
+  const c = st.challenge; if (!c) { sm('…'); return; }
+  if (!play) { const t = el('div', 'rk-count', mine ? 'Réponse envoyée' : 'Tu regardes ce match'); S.append(t); }
+  if (c.type === 'react') rkReact(st, c, S, play);
+  else if (c.type === 'aim') rkAim(st, c, S, play);
+  else if (c.type === 'sequence') rkSeq(st, c, S, play);
+  else if (c.type === 'timing') rkTiming(st, c, S, play);
+  else if (c.type === 'math') rkMath(st, c, S, play);
+}
+
+function rkReact(st, c, S, play) {
+  const b = el('button', 'rk-react', 'Attends…'); b.type = 'button'; b.disabled = !play;
+  S.append(b, el('p', 'rk-sm', 'Clic, toucher ou Espace dès que c’est vert.'));
+  let state = play ? 'wait' : 'done';
+  const hit = (e) => {
+    if (e) e.preventDefault();
+    if (state !== 'wait' && state !== 'go') return;
+    const t = rkNow();
+    if (t < c.goAt) { state = 'bad'; b.className = 'rk-react bad'; b.textContent = 'Trop tôt !'; rkSend('rkact', { answer: { early: true } }); return; }
+    state = 'done'; b.className = 'rk-react done'; b.textContent = Math.round(t - c.goAt) + ' ms'; rkSend('rkact', { answer: { t } });
+  };
+  b.addEventListener('pointerdown', hit); RK.onKey = hit;
+  rkLoop(() => { if (state === 'wait' && rkNow() >= c.goAt) { state = 'go'; b.className = 'rk-react go'; b.textContent = 'CLIQUE !'; } });
+}
+function rkAim(st, c, S, play) {
+  const info = el('div', 'rk-count'); const field = el('div', 'rk-aim'); S.append(info, field);
+  let i = 0, misses = 0, done = !play, cur = null;
+  const place = () => {
+    if (cur) cur.remove(); cur = null; if (i >= c.n) return;
+    const t = c.targets[i], d = Math.round(68 - i * 5);
+    cur = el('div', 'rk-tg'); cur.style.cssText = 'left:' + t.x * 100 + '%;top:' + t.y * 100 + '%;width:' + d + 'px;height:' + d + 'px'; field.append(cur);
+  };
+  field.addEventListener('pointerdown', (e) => {
+    e.preventDefault(); if (done || rkNow() < c.startsAt || !cur) return;
+    const r = cur.getBoundingClientRect(), rad = r.width / 2 + 4;
+    if (Math.hypot(e.clientX - (r.left + r.width / 2), e.clientY - (r.top + r.height / 2)) <= rad) {
+      i++;
+      if (i >= c.n) { done = true; cur.remove(); cur = null; info.textContent = 'Terminé'; rkSend('rkact', { answer: { t: rkNow(), misses } }); } else place();
+    } else misses++;
+  });
+  rkLoop(() => {
+    if (done) return;
+    const left = c.startsAt - rkNow();
+    if (left > 0) info.textContent = 'Prépare-toi… ' + Math.ceil(left / 1000);
+    else { info.textContent = 'Cible ' + (i + 1) + '/' + c.n + (misses ? ' · ' + misses + ' raté' + (misses > 1 ? 's' : '') : ''); if (!cur) place(); }
+  });
+}
+function rkSeq(st, c, S, play) {
+  const msg = el('p', 'rk-sm'), grid = el('div', 'rk-pads'), dots = el('div', 'rk-dots');
+  const pads = SEQC.map((col) => { const b = el('button', 'rk-pad'); b.type = 'button'; b.style.setProperty('--c', col); b.disabled = true; grid.append(b); return b; });
+  S.append(msg, grid, dots);
+  if (c.stage === 'show') {
+    msg.textContent = 'Regarde bien…';
+    rkLoop(() => {
+      const t = rkNow() - c.showStart; let on = -1;
+      if (t >= 0) { const k = Math.floor(t / (c.show + c.gap)); if (k < c.len && t - k * (c.show + c.gap) < c.show) on = c.seq[k]; }
+      pads.forEach((p, i) => p.classList.toggle('on', i === on));
+    });
+    return;
+  }
+  msg.textContent = play ? 'À toi : rejoue la séquence.' : '';
+  for (let i = 0; i < c.len; i++) dots.append(el('i'));
+  const got = []; let done = !play;
+  pads.forEach((p, i) => {
+    p.disabled = done;
+    p.addEventListener('pointerdown', (e) => {
+      e.preventDefault(); if (done) return;
+      got.push(i); p.classList.add('on'); setTimeout(() => p.classList.remove('on'), 140);
+      dots.children[got.length - 1].classList.add('f');
+      if (got.length >= c.len) { done = true; pads.forEach((x) => (x.disabled = true)); rkSend('rkact', { answer: { seq: got } }); }
+    });
+  });
+}
+function rkTiming(st, c, S, play) {
+  const info = el('div', 'rk-count'), bar = el('div', 'rk-bar'), zone = el('div', 'rk-zone'), cur = el('div', 'rk-cur');
+  zone.style.left = (c.center - c.width / 2) * 100 + '%'; zone.style.width = c.width * 100 + '%'; bar.append(zone, cur);
+  S.append(info, bar, el('p', 'rk-sm', 'Clic, toucher ou Espace pour stopper le curseur.'));
+  let stopped = !play, frozen = null;
+  const posAt = (t) => { const ph = ((((t - c.startedAt) % c.period) + c.period) % c.period) / c.period; return ph < 0.5 ? ph * 2 : 2 - ph * 2; };
+  const stop = (e) => {
+    if (e) e.preventDefault(); if (stopped) return;
+    const t = rkNow(); if (t < c.startedAt) return;
+    stopped = true; frozen = posAt(t); cur.style.left = frozen * 100 + '%'; info.textContent = 'Envoyé'; rkSend('rkact', { answer: { t } });
+  };
+  S.addEventListener('pointerdown', stop); RK.onKey = stop;
+  rkLoop(() => {
+    if (frozen != null) return;
+    const t = rkNow();
+    if (t < c.startedAt) { info.textContent = 'Prépare-toi…'; cur.style.left = '0%'; return; }
+    if (!stopped) info.textContent = 'Maintenant !';
+    cur.style.left = posAt(t) * 100 + '%';
+  });
+}
+function rkMath(st, c, S, play) {
+  const info = el('div', 'rk-count'), q = el('div', 'rk-q'), inp = el('input', 'rk-in');
+  inp.type = 'text'; inp.inputMode = 'numeric'; inp.autocomplete = 'off'; inp.disabled = true; S.append(info, q, inp);
+  let i = 0, done = !play; const ans = [];
+  const show = () => { q.textContent = c.qs[i] + ' = ?'; inp.value = ''; };
+  inp.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' || done) return;
+    const v = inp.value.trim().replace(',', '.'); if (v === '') return;
+    ans.push(Number(v)); i++;
+    if (i >= c.qs.length) { done = true; inp.disabled = true; q.textContent = 'Envoyé'; rkSend('rkact', { answer: { answers: ans } }); } else show();
+  });
+  rkLoop(() => {
+    if (done) return;
+    const left = c.startedAt - rkNow();
+    if (left > 0) { info.textContent = 'Prépare-toi… ' + Math.ceil(left / 1000); q.textContent = '…'; }
+    else { if (inp.disabled) { inp.disabled = false; show(); inp.focus(); } info.textContent = 'Calcul ' + (i + 1) + '/' + c.qs.length + ' · Entrée pour valider'; }
+  });
+}
 
 $('#rkJoin').onclick = () => rkSend('rkjoin');
 $('#rkReady').onclick = () => rkSend('rkready', { on: true });
 $('#rkUnready').onclick = () => rkSend('rkunready');
 $('#rkLeave').onclick = () => rkSend('rkleave');
-$('#rkHit').onclick = () => rkSend('rkhit');
-$('#rkStand').onclick = () => rkSend('rkstand');
-if ($('#rkPlayBtn')) $('#rkPlayBtn').onclick = () => setView('ranked');
-
 if ($('#rkPlayBtn')) $('#rkPlayBtn').onclick = () => setView('ranked');
 
 
@@ -4028,6 +4141,139 @@ function rkFmtLeft(ms) {
 }
 const _rkWatch = typeof rkWatch === 'function' ? rkWatch : null;
 // patch load of rank data after fetch - enhance existing rk render if present
+
+
+// --- Ranked Blackjack client override ---
+(function () {
+  if (!window.RK) window.RK = {};
+  const rkNow = () => Date.now() + (RK.off || 0);
+  function rkCardEl(c) {
+    if (!c || c.h) {
+      const d = el('div', 'card down');
+      d.innerHTML = '<div class="inner"><div class="face front"></div><div class="face back"></div></div>';
+      return d;
+    }
+    const red = c.s === '♥' || c.s === '♦';
+    const d = el('div', 'card');
+    d.innerHTML = '<div class="inner"><div class="face front' + (red ? ' red' : '') + '"><span class="tl">' + c.r + '<i>' + c.s + '</i></span><span class="mid">' + c.s + '</span></div><div class="face back"></div></div>';
+    return d;
+  }
+  const rkMine = (st) => {
+    const u = me && me.uid;
+    return u ? (st.seats || []).find((p) => p && p.uid === u) || null : null;
+  };
+  window.rkRender = function rkRender(st) {
+    if (!st) return;
+    RK.offs = RK.offs || [];
+    RK.offs.push(st.now - Date.now());
+    if (RK.offs.length > 12) RK.offs.shift();
+    RK.off = Math.max.apply(null, RK.offs);
+    RK.S = st;
+    const potEl = document.getElementById('rkPotLbl');
+    if (potEl) potEl.textContent = 'Pot ' + (st.pot || 0) + ' RR · entree ' + (st.entry || 10) + ' RR · ' + (st.seats || []).filter(Boolean).length + '/' + (st.maxPlayers || 6);
+
+    const dc = document.getElementById('rkDCards');
+    if (dc) {
+      dc.textContent = '';
+      ((st.dealer && st.dealer.cards) || []).forEach((c) => dc.appendChild(rkCardEl(c)));
+    }
+    const dt = document.getElementById('rkDTot');
+    if (dt) {
+      if (st.dealer && st.dealer.cards && st.dealer.cards.length && st.phase !== 'lobby') {
+        dt.style.display = '';
+        dt.textContent = st.dealer.bj ? 'BJ' : String(st.dealer.total || '');
+        dt.className = 'pill' + (st.dealer.bj ? ' bj' : '');
+      } else dt.style.display = 'none';
+    }
+    const msg = document.getElementById('rkMsg');
+    if (msg) {
+      const n = (st.seats || []).filter(Boolean).length;
+      const r = (st.seats || []).filter((p) => p && p.ready).length;
+      if (st.phase === 'result') msg.textContent = 'Fin de main — pot reparti';
+      else if (st.phase === 'lobby' || st.phase === 'betting') msg.textContent = n < (st.minPlayers || 2) ? 'Minimum ' + (st.minPlayers || 2) + ' joueurs' : r + '/' + n + ' prets';
+      else if (st.phase === 'dealing') msg.textContent = 'Distribution…';
+      else if (st.phase === 'playing') msg.textContent = 'A vous de jouer';
+      else if (st.phase === 'dealer') msg.textContent = 'Croupier…';
+      else msg.textContent = st.phase || '';
+    }
+    const cd = document.getElementById('rkCd');
+    if (cd) cd.textContent = st.deadline ? Math.max(0, Math.ceil((st.deadline - rkNow()) / 1000)) + ' s' : '';
+
+    const box = document.getElementById('rkSeatsBox');
+    if (box) {
+      box.textContent = '';
+      const mine = rkMine(st);
+      for (let i = 0; i < (st.maxPlayers || 6); i++) {
+        const p = st.seats[i];
+        const seat = el('div', 'seat' + (p && me && p.uid === me.uid ? ' mine' : '') + (st.turn && st.turn.seat === i ? ' turn' : ''));
+        if (!p) { seat.appendChild(el('div', 'empty', 'Libre')); box.appendChild(seat); continue; }
+        const hands = el('div', 'hands');
+        (p.hands || []).forEach((h) => {
+          const hand = el('div', 'hand' + (st.turn && st.turn.seat === i ? ' act' : ''));
+          const cards = el('div', 'cards');
+          (h.cards || []).forEach((c) => cards.appendChild(rkCardEl(c)));
+          hand.appendChild(cards);
+          if (h.total) {
+            hand.appendChild(el('span', 'pill' + (h.state === 'bust' ? ' bust' : h.state === 'bj' ? ' bj' : h.total === 21 ? ' t21' : ''), h.state === 'bj' ? 'BJ' : String(h.total)));
+          }
+          if (h.result) hand.appendChild(el('div', 'res ' + h.result, h.result === 'win' ? '+' + (h.net || '') : h.result === 'lose' ? String(h.net || '') : '='));
+          hands.appendChild(hand);
+        });
+        seat.appendChild(hands);
+        if (p.bet) {
+          const spot = el('div', 'betspot');
+          spot.appendChild(el('span', 'betamt', p.bet + ' RR'));
+          seat.appendChild(spot);
+        }
+        const plate = el('div', 'plate');
+        const av = el('div', 'av');
+        if (typeof setAvatar === 'function') setAvatar(av, p.avatar, p.name);
+        else av.textContent = (p.name || '?')[0];
+        plate.appendChild(av);
+        plate.appendChild(el('div', 'nm', p.name + (p.ready ? ' · pret' : '') + (p.place ? ' · #' + p.place : '')));
+        plate.appendChild(el('div', 'bl', (p.rr != null ? p.rr : '—') + ' RR'));
+        seat.appendChild(plate);
+        box.appendChild(seat);
+      }
+    }
+
+    const mine = rkMine(st);
+    const lob = st.phase === 'lobby' || st.phase === 'betting';
+    const myTurn = !!(mine && st.turn && st.seats[st.turn.seat] && st.seats[st.turn.seat].uid === (me && me.uid) && st.phase === 'playing');
+    const j = document.getElementById('rkJoin');
+    const rd = document.getElementById('rkReady');
+    const ur = document.getElementById('rkUnready');
+    const lv = document.getElementById('rkLeave');
+    const ht = document.getElementById('rkHit');
+    const sd = document.getElementById('rkStand');
+    if (j) j.classList.toggle('hide', !!mine || !lob);
+    if (rd) rd.classList.toggle('hide', !mine || !!(mine && mine.ready) || !lob);
+    if (ur) ur.classList.toggle('hide', !mine || !(mine && mine.ready) || !lob);
+    if (lv) lv.classList.toggle('hide', !mine);
+    if (ht) ht.classList.toggle('hide', !myTurn);
+    if (sd) sd.classList.toggle('hide', !myTurn);
+    const note = document.getElementById('rkNote');
+    if (note) {
+      if (st.phase === 'result' && st.final) note.textContent = st.final.map((r) => r.name + ' #' + r.place + ' (' + (r.net >= 0 ? '+' : '') + r.net + ' RR)').join(' · ');
+      else note.textContent = 'Minimum 2 joueurs · mise obligatoire 10 RR · le pot est reparti selon le classement des mains';
+    }
+  };
+  // bind actions (idempotent)
+  const bind = (id, fn) => { const n = document.getElementById(id); if (n) n.onclick = fn; };
+  const rkSend = (action, extra) => send(action, extra || {});
+  bind('rkJoin', () => rkSend('rkjoin'));
+  bind('rkReady', () => rkSend('rkready', { on: true }));
+  bind('rkUnready', () => rkSend('rkunready'));
+  bind('rkLeave', () => rkSend('rkleave'));
+  bind('rkHit', () => rkSend('rkhit'));
+  bind('rkStand', () => rkSend('rkstand'));
+  if (!RK._bjIv) {
+    RK._bjIv = setInterval(() => {
+      const e = document.getElementById('rkCd');
+      if (e && RK.S && RK.S.deadline) e.textContent = Math.max(0, Math.ceil((RK.S.deadline - rkNow()) / 1000)) + ' s';
+    }, 250);
+  }
+})();
 
 connect(); tick();
 })();
