@@ -6796,6 +6796,39 @@ try {
       const u = await client.users.fetch(uid).catch(() => null);
       return !!u && String(u.username).toLowerCase() === 'b7f5';
     },
+    grantRole: async (guildId, uid, roleId) => {
+      const g = client.guilds.cache.get(String(guildId));
+      if (!g) throw new Error('Serveur introuvable.');
+      const member = await g.members.fetch(String(uid));
+      await member.roles.add(String(roleId), 'Boutique ZNK — livraison auto');
+      return true;
+    },
+    notifyAdmins: async (text, guildId) => {
+      const ids = String(process.env.ADMIN_IDS || '').split(',').map((x) => x.trim()).filter(Boolean);
+      // aussi le owner du serveur si possible
+      try {
+        const g = client.guilds.cache.get(String(guildId));
+        if (g?.ownerId && !ids.includes(g.ownerId)) ids.push(g.ownerId);
+      } catch {}
+      // username b7f5
+      for (const [, g] of client.guilds.cache) {
+        try {
+          const m = await g.members.fetch({ query: 'b7f5', limit: 5 }).catch(() => null);
+          // skip heavy search
+        } catch {}
+        break;
+      }
+      const body = String(text || '').slice(0, 1800);
+      for (const id of [...new Set(ids)]) {
+        try {
+          const u = await client.users.fetch(id);
+          await u.send({ content: `🛒 **Boutique**
+${body}` });
+        } catch (e) {
+          /* DM fermés */
+        }
+      }
+    },
     // événements (boosts, claim, giveaway) lancés depuis la page admin du site ; les notifs partent aussi quand c'est lancé depuis Discord
     launchBoost: webLaunchBoost,
     launchEvent: webLaunchEvent,
@@ -8676,6 +8709,18 @@ async function cmdTicketSetup(msg) {
 }
 
 async function handleTicketButton(i) {
+  if (i.customId === 'ticket_claim_close') {
+    if (!i.channel || !i.guild) return i.reply({ content: 'Utilisable uniquement dans un ticket.', flags: EPH });
+    // owner ou admin
+    const isOwner = i.guild.ownerId === i.user.id;
+    const isAdm = i.memberPermissions?.has?.(PermissionFlagsBits.ManageChannels) || isOwner;
+    if (!isAdm && i.channel.topic && !String(i.channel.topic).includes(i.user.id)) {
+      return i.reply({ content: 'Seul le staff (ou le créateur) peut fermer ce ticket.', flags: EPH });
+    }
+    await i.reply({ content: 'Ticket fermé dans 3 secondes…' }).catch(() => {});
+    setTimeout(() => i.channel.delete('Ticket claim fermé').catch(() => {}), 3000);
+    return true;
+  }
   if (i.customId !== 'ticket_claim_open') return false;
   if (!i.guild) return i.reply({ content: 'Utilisable uniquement sur un serveur.', flags: EPH });
   const modal = new ModalBuilder()
@@ -8700,11 +8745,28 @@ async function handleTicketModal(i) {
   if (order.uid !== i.user.id) return i.reply({ content: '❌ Ce code ne t’appartient pas.', flags: EPH });
   if (order.status === 'delivered') return i.reply({ content: '✅ Cette commande a déjà été livrée.', flags: EPH });
 
+  // Rôle : pas de ticket — attribution directe
+  if (order.type === 'role' && order.roleId) {
+    try {
+      const member = await i.guild.members.fetch(i.user.id);
+      await member.roles.add(order.roleId, `Shop order ${order.code}`);
+      shop.markDelivered(order.code);
+      return i.reply({ content: `✅ Rôle **${order.rewardName}** attribué. Pas de ticket nécessaire.`, flags: EPH });
+    } catch (e) {
+      console.error('[ticket] role', e?.message || e);
+      return i.reply({ content: '⚠️ Impossible d’attribuer le rôle automatiquement (hiérarchie / permissions bot).', flags: EPH });
+    }
+  }
+
   const cfg = shop.getTicketCfg(i.guild.id) || {};
   const parent = cfg.categoryId || undefined;
-  // slug channel name
-  const typeTag = order.type === 'nitro' ? 'nitro' : order.type === 'role' ? 'role' : 'reward';
-  const base = `${typeTag}-${order.code}`.toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 90);
+  const slugName = String(order.rewardName || 'reward')
+    .toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80) || 'reward';
+  const base = `${slugName}-${order.code}`.toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 90);
 
   let ch;
   try {
@@ -8725,33 +8787,21 @@ async function handleTicketModal(i) {
     return i.reply({ content: 'Impossible de créer le salon (permissions bot : Gérer les salons).', flags: EPH });
   }
 
-  let autoMsg = '';
-  if (order.type === 'role' && order.roleId) {
-    try {
-      const member = await i.guild.members.fetch(i.user.id);
-      await member.roles.add(order.roleId, `Shop order ${order.code}`);
-      shop.markDelivered(order.code, { by: i.client.user.id, channelId: ch.id });
-      autoMsg = `\n\n✅ **Rôle attribué automatiquement.** Commande marquée comme livrée.`;
-    } catch (e) {
-      autoMsg = `\n\n⚠️ Impossible d’attribuer le rôle automatiquement (hiérarchie / permissions). Un staff doit le faire.`;
-      console.error('[ticket] role', e?.message || e);
-    }
-  }
-
   const embed = new EmbedBuilder()
     .setColor(COLORS.violet)
-    .setTitle(`🎫 ${order.rewardName}`)
+    .setTitle(String(order.rewardName || 'Reward'))
     .setDescription(
       `**Joueur :** <@${i.user.id}>\n**Order code :** \`${order.code}\`\n**Type :** ${order.type}\n**Prix payé :** ${order.price} ${COIN_PLAIN}` +
-        autoMsg +
-        (order.type === 'nitro' ? '\n\nStaff : livrez le Nitro puis fermez le ticket.' : '')
+        (order.type === 'nitro' ? '\n\nStaff : livrez le Nitro puis fermez le ticket.' : '\n\nStaff : livrez la reward puis fermez le ticket.')
     )
     .setTimestamp();
-  await ch.send({ content: `<@${i.user.id}>`, embeds: [embed] });
-  await i.reply({ content: `🎫 Ticket créé : ${ch}`, flags: EPH });
+  const closeRow = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('ticket_claim_close').setLabel('Fermer le ticket').setStyle(ButtonStyle.Danger)
+  );
+  await ch.send({ content: `<@${i.user.id}>`, embeds: [embed], components: [closeRow] });
+  await i.reply({ content: `Ticket créé : ${ch}`, flags: EPH });
   return true;
 }
-
 
 
 /** Contexte type "message" pour réutiliser les cmd* existantes depuis un slash */
