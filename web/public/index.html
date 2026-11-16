@@ -7,7 +7,7 @@
 <title>Casino · Jeux en ligne</title>
 <style>
 :root{
-  --bg:#000; --violet:#262626; --violet2:#525252; --gold:#fbbf24; --green:#22c55e; --red:#ef4444;
+  --bg:#000; --violet:#262626; --violet2:#525252; --gold:#e5e5e5; --green:#a3a3a3; --red:#a3a3a3;
   --felt1:#0f7a4d; --felt2:#064e32; --ink:#f2f2f2; --mut:#8a8a8a;
   --cw:clamp(34px,4.6vw,66px); --ch:calc(var(--cw)*1.42);
 }
@@ -20,6 +20,15 @@ button{font:inherit;color:inherit;cursor:pointer;border:0}
 button:disabled{opacity:.38;cursor:not-allowed;filter:grayscale(.4)}
 /* ---------- en-tête ---------- */
 header{display:flex;align-items:center;gap:10px;padding:8px 14px;background:#000;border-bottom:1px solid #1f1f1f;position:relative;z-index:18}
+/* ---------- top nav (liste horizontale, plus de menu deroulant) ---------- */
+#topNav{display:flex;align-items:center;gap:2px;flex-wrap:wrap;min-width:0}
+#topNav .navl{background:transparent;border:0;color:#a3a3a3;font-weight:700;font-size:13px;padding:6px 10px;border-radius:8px;white-space:nowrap}
+#topNav .navl:hover{color:#fff;background:rgba(255,255,255,.06)}
+#topNav .navl.on{color:#fff;background:rgba(255,255,255,.12)}
+#bTasks svg{display:block}
+@media(max-width:900px){#topNav .navl{padding:6px 7px;font-size:12px}}
+@media(max-width:640px){#topNav{max-width:55vw;overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch}#topNav .navl{font-size:11px}}
+
 .logo{display:none}
 .sp{flex:1}
 .me{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.12);border-radius:999px;padding:3px 12px 3px 3px}
@@ -48,13 +57,13 @@ main{flex:1;display:flex;flex-direction:column;min-height:0;padding:10px 10px 0;
   border-radius:30px 30px 50% 50%/30px 30px 22% 22%;
   /* vrai tapis violet : spot de lumière + grain de feutre, rebord capitonné violet autour */
   background:
-    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .09 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>") padding-box,
-    radial-gradient(ellipse 75% 65% at 50% 36%,#8b46f5 0%,#6226c9 34%,#3f1396 66%,#240a5e 100%) padding-box,
-    linear-gradient(180deg,#c4b5fd 0%,#7c3aed 9%,#4c1d95 30%,#2a0d63 62%,#14052f 100%) border-box;
-  box-shadow:inset 0 0 70px rgba(10,2,40,.7),inset 0 0 0 1px rgba(255,255,255,.08),0 0 0 1px rgba(196,181,253,.4),0 26px 60px rgba(0,0,0,.65),0 0 70px rgba(139,92,246,.38);
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .06 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>") padding-box,
+    radial-gradient(ellipse 75% 65% at 50% 36%,#2a2a2a 0%,#141414 40%,#0a0a0a 70%,#000 100%) padding-box,
+    linear-gradient(180deg,#3a3a3a 0%,#1a1a1a 30%,#0a0a0a 70%,#000 100%) border-box;
+  box-shadow:inset 0 0 70px rgba(0,0,0,.8),inset 0 0 0 1px rgba(255,255,255,.06),0 0 0 1px rgba(255,255,255,.08),0 26px 60px rgba(0,0,0,.65);
   display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:14px 8px 62px;overflow:hidden}
 /* liseré doré imprimé sur le tapis */
-#table::after,.ftable::after{content:"";position:absolute;inset:9px;border:2px solid rgba(251,191,36,.4);border-radius:22px 22px 50% 50%/22px 22px 21% 21%;box-shadow:0 0 0 5px rgba(0,0,0,0),inset 0 0 22px rgba(251,191,36,.1);pointer-events:none;z-index:0}
+#table::after,.ftable::after{content:"";position:absolute;inset:9px;border:1px solid rgba(255,255,255,.12);border-radius:22px 22px 50% 50%/22px 22px 21% 21%;box-shadow:none;pointer-events:none;z-index:0}
 /* ZNK transparent (lettres de verre : contour + reflet qui glisse), centré sur la table, sous les cartes et les joueurs */
 #table::before,.ftable::before{content:"ZNK";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:0;
   font-size:min(15vw,165px);font-weight:900;line-height:1;letter-spacing:.16em;padding-left:.16em;white-space:nowrap;
@@ -835,58 +844,33 @@ body.fs.vpk #pkInfo{font-size:12px}
 </div></div>
 <div id="gate"><div><h1>Casino</h1><p id="gatemsg">Connecte-toi avec ton compte Discord pour jouer avec ton solde du casino.</p><a class="dsc" href="/login">Se connecter avec Discord</a></div></div>
 <header>
-  <div class="logo hide"><small id="subtitle"></small></div>
-  <div id="menu">
-    <button class="hb" id="menuBtn" aria-haspopup="true" aria-expanded="false"><span class="mburger"></span><span id="menuLbl">Menu</span><span class="car">▾</span></button>
-    <div id="menuPanel" role="menu">
-      <button class="mitem" data-g="hub">Accueil</button>
-      <div class="msep"></div>
-      <div class="msec" id="msOn">
-        <button class="mhead" type="button">Online <i>▾</i></button>
-        <div class="msub">
-          <button class="mitem" data-g="bj">Blackjack</button>
-          <button class="mitem" data-g="poker">Poker</button>
-          <button class="mitem" data-g="roulette">Roulette</button>
-        </div>
-      </div>
-      <div class="msec" id="msOff">
-        <button class="mhead" type="button">Offline <i>▾</i></button>
-        <div class="msub">
-          <button class="mitem" data-g="off-bj">Blackjack</button>
-          <button class="mitem" data-g="off-fuse">Fusé</button>
-          <button class="mitem" data-g="off-mine">Mine</button>
-          <button class="mitem" data-g="off-coin">Pile ou Face</button>
-          <button class="mitem" data-g="off-dice">Dés</button>
-          <button class="mitem" data-g="off-horses">Chevaux</button>
-          <button class="mitem" data-g="off-russian">Roulette russe</button>
-          <button class="mitem" data-g="off-slots">Slots</button>
-          <button class="mitem" data-g="off-duel">Duel</button>
-          <button class="mitem" data-g="off-plinko">Plinko</button>
-          <button class="mitem" data-g="off-scratch">Ticket à gratter</button>
-        </div>
-      </div>
-      <div class="msep"></div>
-      <button class="mitem" data-g="top">Classement</button>
-      <button class="mitem" data-g="ranked">Ranked</button>
-      <button class="mitem" data-g="rank">Rangs</button>
-      <button class="mitem" data-g="shop">Boutique</button>
-      <button class="mitem" data-g="tasks">Tasks</button>
-    </div>
-  </div>
+  <nav id="topNav" aria-label="Navigation">
+    <button type="button" class="navl" data-g="hub">Accueil</button>
+    <button type="button" class="navl" data-g="bj">Blackjack</button>
+    <button type="button" class="navl" data-g="poker">Poker</button>
+    <button type="button" class="navl" data-g="roulette">Roulette</button>
+    <button type="button" class="navl" data-g="ranked">Ranked</button>
+    <button type="button" class="navl" data-g="rank">Rangs</button>
+    <button type="button" class="navl" data-g="top">Classement</button>
+    <button type="button" class="navl" data-g="shop">Boutique</button>
+    <button type="button" class="navl" data-g="off-bj">Solo</button>
+  </nav>
   <div class="sp"></div>
-  <button class="hb hide" id="bTasks" aria-hidden="true"></button><button class="hb hide" id="bShop" aria-hidden="true"></button>
-  <button class="hb ico hide" id="bTop" title="Top gains de ce jeu">🏆</button>
-  <button class="hb ico hide" id="bRules" title="Règles">📖</button>
-  <button class="hb ico" id="bSnd" title="Son">🔊</button>
-  <button class="hb ico" id="bFs" title="Plein écran">⛶</button>
-  <button class="hb ico" id="bSet" title="Paramètres">⚙</button>
+  <button class="hb ico hide" id="bTop" title="Top">&#9651;</button>
+  <button class="hb ico hide" id="bRules" title="Regles">&#63;</button>
+  <button class="hb ico" id="bTasks" title="Tasks" style="display:inline-flex" aria-label="Tasks">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="3" width="14" height="18" rx="1.5"/><path d="M8 3v3h6V3"/><path d="M8 11h6M8 15h4"/></svg>
+  </button>
+  <button class="hb ico" id="bSnd" title="Son">&#9835;</button>
+  <button class="hb ico" id="bFs" title="Plein ecran">&#9635;</button>
+  <button class="hb ico" id="bSet" title="Parametres">&#9881;</button>
   <div class="pop" id="bellWrap">
-    <button class="hb ico" id="bBell" title="Notifications" aria-haspopup="true">🔔<span id="bBadge"></span></button>
+    <button class="hb ico" id="bBell" title="Notifications" aria-haspopup="true">&#9783;<span id="bBadge"></span></button>
     <div class="ppanel" id="nPanel"><h3>Notifications</h3><div id="nList"></div></div>
   </div>
   <div class="pop" id="meWrap">
-    <div class="me" id="me" role="button" tabindex="0" aria-haspopup="true"><div class="av" id="meAv">?</div><div id="meName" style="font-weight:700;font-size:12px">…</div><span class="car">▾</span></div>
-    <div class="ppanel" id="mePanel"><div class="mpn"><span>Solde</span><b id="meBal">—</b></div><button class="btn" id="bAccount">Mon compte</button><button class="btn" id="bDaily">Daily</button><button class="btn hide" id="bAdmin">Admin</button><button class="btn" id="bGift">Envoyer des ZTKN</button><button class="btn" id="bLogout"> Déconnexion</button></div>
+    <div class="me" id="me" role="button" tabindex="0" aria-haspopup="true"><div class="av" id="meAv">?</div><div id="meName" style="font-weight:700;font-size:12px">…</div><span class="car">&#9662;</span></div>
+    <div class="ppanel" id="mePanel"><div class="mpn"><span>Solde</span><b id="meBal">—</b></div><button class="btn" id="bAccount">Mon compte</button><button class="btn hide" id="bAdmin">Admin</button><button class="btn" id="bGift">Envoyer des ZTKN</button><button class="btn" id="bLogout">Deconnexion</button></div>
   </div>
 </header>
 <div id="conn">Reconnexion…</div>
@@ -912,7 +896,7 @@ body.fs.vpk #pkInfo{font-size:12px}
       </button>
       <button class="gcard" data-go="ranked" id="gcRanked">
         <span class="gname">Ranked</span>
-        <span class="gdesc">Arène 100 % skill : réflexe, visée, mémoire, précision, calcul · RR, sans mise</span>
+        <span class="gdesc">Blackjack competitif · 10 RR · 2 a 6 joueurs · le classement repartit le pot</span>
         <span class="glive"></span><span class="gplay">Jouer</span>
       </button>
     </div>
@@ -1119,16 +1103,29 @@ body.fs.vpk #pkInfo{font-size:12px}
 
 
 <main id="rkArenaView" class="hide">
-  <div class="rk-top"><h2>Ranked</h2><div class="rk-pips" id="rkPips"></div></div>
-  <div class="rk-main">
-    <section class="rk-stage" id="rkStage"></section>
-    <aside class="rk-side"><h3 id="rkSideT">Joueurs</h3><div id="rkSeats"></div></aside>
-  </div>
-  <div class="rk-dock">
-    <button class="btn go" id="rkJoin">Rejoindre l’arène</button>
-    <button class="btn go hide" id="rkReady">Je suis prêt</button>
-    <button class="btn hide" id="rkUnready">Pas prêt</button>
-    <button class="btn hide" id="rkLeave">Quitter</button>
+  <div class="rk-top"><h2>Ranked Blackjack</h2><span id="rkPotLbl" style="color:#a3a3a3;font-size:13px">Entree 10 RR · 2 a 6 joueurs</span></div>
+  <section id="rkTable" class="ftable" style="min-height:420px;margin:0 8px">
+    <div id="rkDealer" style="display:flex;flex-direction:column;align-items:center;gap:6px;margin-top:8px;position:relative;z-index:1">
+      <div class="dname">CROUPIER</div>
+      <div class="cards" id="rkDCards"></div>
+      <span class="pill" id="rkDTot" style="display:none"></span>
+    </div>
+    <div id="center" style="position:absolute;left:50%;top:48%;transform:translate(-50%,-50%);z-index:3;text-align:center;pointer-events:none">
+      <div id="rkMsg" style="display:inline-block;background:rgba(0,0,0,.72);border:1px solid rgba(255,255,255,.12);padding:7px 18px;border-radius:999px;font-weight:700"></div>
+      <div id="rkCd" style="margin-top:6px;font-size:28px;font-weight:900;color:#fff"></div>
+    </div>
+    <div id="rkSeats" style="width:100%;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px;align-items:end;padding:0 4px 8px;position:relative;z-index:1"></div>
+  </section>
+  <div class="dockp" id="rkDock">
+    <div class="row" id="rkActs">
+      <button class="btn go" id="rkJoin">Rejoindre</button>
+      <button class="btn go hide" id="rkReady">Pret (10 RR)</button>
+      <button class="btn hide" id="rkUnready">Annuler</button>
+      <button class="btn hit hide" id="rkHit">Tirer</button>
+      <button class="btn std hide" id="rkStand">Rester</button>
+      <button class="btn hide" id="rkLeave">Quitter</button>
+    </div>
+    <div class="note" id="rkNote">Minimum 2 joueurs · mise obligatoire 10 RR · le pot est reparti selon le classement des mains</div>
   </div>
 </main>
 
@@ -1142,7 +1139,7 @@ body.fs.vpk #pkInfo{font-size:12px}
 
     <section class="rkme" id="rkMe"><div class="lbnone">…</div></section>
     <section class="lbcol">
-      <div class="lbtitle"><b>Classement RR</b><small>Se gagne uniquement en Ranked : 5 épreuves de skill</small></div>
+      <div class="lbtitle"><b>Classement RR</b><small>Se gagne en Ranked Blackjack (10 RR, 2 a 6 joueurs)</small></div>
       <div id="rkElo"><div class="lbnone">…</div></div>
     </section>
     <section class="lbcol">
@@ -1714,7 +1711,7 @@ $('#bTop').onclick = async () => {
     box.textContent = ''; box.append(t);
   } catch { box.textContent = 'Classement indisponible.'; }
 };
-const sndBtn = $('#bSnd'); const refreshSnd = () => { sndBtn.textContent = sndOn ? '🔊' : '🔇'; sndBtn.title = sndOn ? 'Son' : 'Muet'; }; refreshSnd();
+const sndBtn = $('#bSnd'); const refreshSnd = () => { sndBtn.textContent = sndOn ? '\u266b' : '\u2715'; sndBtn.title = sndOn ? 'Son' : 'Muet'; }; refreshSnd();
 sndBtn.onclick = () => { sndOn = !sndOn; try { localStorage.setItem('znk_snd', sndOn ? '1' : '0'); } catch {} refreshSnd(); if (sndOn) SFX.chip(); };
 document.addEventListener('pointerdown', () => ac(), { once: true });
 // retour sur l'onglet : resynchronise le solde
@@ -2221,14 +2218,13 @@ function routeSet(v, replace) {
   else history.pushState(null, '', path);
 }
 function navHighlight(v) {
-  document.querySelectorAll('#deskNav [data-g], #menuPanel .mitem[data-g]').forEach((b) => {
+  document.querySelectorAll('#topNav [data-g], #deskNav [data-g]').forEach((b) => {
     const g = b.getAttribute('data-g');
-    let on = g === v;
-    if (g === 'hub' && v === 'hub') on = true;
-    b.classList.toggle('on', on);
+    b.classList.toggle('on', g === v || (v.startsWith('off-') && g === 'off-bj' && v !== 'hub'));
   });
-  const lbl = $('#menuLbl');
-  if (lbl) {
+});
+  const lbl = null;
+  if (false) {
     const map = { hub:'Accueil', ranked:'Ranked', rank:'Rank', top:'Classement', shop:'Boutique', tasks:'Tasks', account:'Compte', bj:'Blackjack', poker:'Poker', roulette:'Roulette' };
     lbl.textContent = map[v] || (v.startsWith('off-') ? 'Offline' : 'Menu');
   }
@@ -2300,7 +2296,11 @@ function setView(v) {
 document.querySelectorAll('.gcard').forEach((c) => (c.onclick = () => { ac(); setView(c.dataset.go); }));
 
 // desk nav + header tasks/shop + hub ranked
+document.querySelectorAll('#topNav [data-g]').forEach((b) => {
+  b.onclick = () => { ac(); setView(b.getAttribute('data-g')); };
+});
 document.querySelectorAll('#deskNav [data-g]').forEach((b) => {
+
   b.onclick = () => { ac(); setView(b.getAttribute('data-g')); };
 });
 const _bTasks = $('#bTasks');
@@ -2336,9 +2336,7 @@ function updHub() {
 }
 
 // ---- menu déroulant
-function menuClose() { $('#menu').classList.remove('open'); $('#menuBtn').setAttribute('aria-expanded', 'false'); }
-$('#menuBtn').onclick = (e) => { e.stopPropagation(); const o = $('#menu').classList.toggle('open'); $('#menuBtn').setAttribute('aria-expanded', String(o)); };
-document.querySelectorAll('#menuPanel .mhead').forEach((b) => (b.onclick = (e) => { e.stopPropagation(); b.parentElement.classList.toggle('open'); }));
+function menuClose() {}
 document.addEventListener('click', (e) => { if (!e.target.closest('#menu')) menuClose(); });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') menuClose(); });
 const MENU_LBL = { hub: 'Menu', bj: 'Blackjack', poker: 'Poker', roulette: 'Roulette', 'off-bj': 'Blackjack solo', 'off-fuse': 'Fusé', 'off-mine': 'Mine', 'off-coin': 'Pile ou Face', 'off-dice': 'Dés', 'off-horses': 'Chevaux', 'off-russian': 'Roulette russe', 'off-slots': 'Slots', 'off-duel': 'Duel', 'off-scratch': 'Ticket à gratter', 'off-plinko': 'Plinko', top: 'Classement', rank: 'Rank', admin: 'Admin' };
@@ -3550,7 +3548,8 @@ async function gSearch() {
 function gOpen(admin) { menuClose(); G.admin = admin === true; $('#gTitle').textContent = G.admin ? 'Ajouter de l’argent (admin)' : 'Envoyer des ZTKN'; $('#gSend').textContent = G.admin ? 'Ajouter' : 'Envoyer'; G.to = null; $('#gQ').value = ''; $('#gAmt').value = ''; $('#mGift').classList.add('on'); gSel(); gSearch(); setTimeout(() => $('#gQ').focus(), 50); }
 $('#bGift').onclick = () => { popClose(); gOpen(); };
 $('#bAdmin').onclick = () => { popClose(); setView('admin'); };
-$('#bDaily').onclick = async () => {
+// daily removed
+// $('#bDaily').onclick = async () => {
   const b = $('#bDaily'); if (b.disabled) return; b.disabled = true;
   try {
     const ok = await send('daily'), d = send.last;
@@ -3894,229 +3893,126 @@ if (adGiveBtn) adGiveBtn.onclick = () => gOpen(true);
 
 
 
-// ========== RANKED ARENA v2 (100 % skill) ==========
+// ========== RANKED BLACKJACK ==========
 if (!window.RK) window.RK = {};
-Object.assign(RK, { S: null, off: 0, offs: [], key: '', loop: 0, stage: null, onKey: null });
-const RK_NAMES = { react: 'Réflexe', aim: 'Visée', sequence: 'Mémoire', timing: 'Précision', math: 'Calcul' };
-const RK_RULES = {
-  react: 'Attends que l’écran passe au vert, puis clique. Trop tôt = faux départ.',
-  aim: 'Clique les 6 cibles le plus vite possible. Un clic à côté coûte 0,5 s.',
-  sequence: 'Mémorise les 5 signaux, puis rejoue-les dans l’ordre.',
-  timing: 'Stoppe le curseur dans la zone verte. Plus tu es près du centre, mieux c’est.',
-  math: '3 calculs mentaux : la justesse d’abord, la vitesse ensuite.',
-};
-const SEQC = ['#ff5d5d', '#4da3ff', '#ffd84d', '#34d399'];
-const rkNow = () => Date.now() + RK.off; // horloge serveur estimée
+Object.assign(RK, { S: null, off: 0, offs: [], key: '' });
+const rkNow = () => Date.now() + RK.off;
 function rkSend(action, extra) { return send(action, extra || {}); }
-function rkModeLabel(m) { return RK_NAMES[m] || (m || ''); }
-function rkLoop(fn) { const tok = RK.loop; const step = () => { if (tok !== RK.loop) return; fn(); requestAnimationFrame(step); }; requestAnimationFrame(step); }
 const rkMine = (st) => { const u = me && me.uid; return u ? st.seats.find((p) => p && p.uid === u) || null : null; };
+
+function rkCardEl(c) {
+  if (!c || c.h) {
+    const d = el('div', 'card down'); d.innerHTML = '<div class="inner"><div class="face front"></div><div class="face back"></div></div>'; return d;
+  }
+  const red = c.s === '♥' || c.s === '♦';
+  const d = el('div', 'card');
+  d.innerHTML = '<div class="inner"><div class="face front' + (red ? ' red' : '') + '"><span class="tl">' + c.r + '<i>' + c.s + '</i></span><span class="mid">' + c.s + '</span></div><div class="face back"></div></div>';
+  return d;
+}
 
 function rkRender(st) {
   if (!st) return;
   RK.offs.push(st.now - Date.now()); if (RK.offs.length > 12) RK.offs.shift();
-  RK.off = Math.max(...RK.offs); // l'échantillon au plus faible délai réseau
+  RK.off = Math.max(...RK.offs);
   RK.S = st;
-  rkPips(st); rkSeats(st); rkDock(st);
-  const k = st.phase === 'lobby'
-    ? 'lobby|' + st.deadline + '|' + st.seats.map((p) => (p ? (p.ready ? 2 : 1) : 0)).join('')
-    : [st.phase, st.match, st.round, (st.challenge && st.challenge.stage) || ''].join('|');
-  if (k !== RK.key) { RK.key = k; rkStage(st); }
+  const pot = st.pot || 0;
+  const potEl = $('#rkPotLbl');
+  if (potEl) potEl.textContent = 'Pot ' + pot + ' RR · entree ' + (st.entry || 10) + ' RR · ' + (st.seats.filter(Boolean).length) + '/' + (st.maxPlayers || 6);
+
+  // dealer
+  const dc = $('#rkDCards'); if (dc) { dc.textContent = ''; (st.dealer && st.dealer.cards || []).forEach((c) => dc.append(rkCardEl(c))); }
+  const dt = $('#rkDTot');
+  if (dt) {
+    if (st.dealer && st.dealer.cards && st.dealer.cards.length && st.phase !== 'lobby') {
+      dt.style.display = ''; dt.textContent = st.dealer.bj ? 'BJ' : (st.dealer.total || '');
+      dt.className = 'pill' + (st.dealer.bj ? ' bj' : '');
+    } else dt.style.display = 'none';
+  }
+
+  // message
+  const msg = $('#rkMsg');
+  const phaseMap = { lobby: 'En attente de joueurs', dealing: 'Distribution…', playing: 'A vous de jouer', dealer: 'Croupier…', result: 'Resultat' };
+  if (msg) {
+    if (st.phase === 'result' && st.final) msg.textContent = 'Fin de main — pot reparti';
+    else if (st.phase === 'lobby') {
+      const n = st.seats.filter(Boolean).length, r = st.seats.filter((p) => p && p.ready).length;
+      msg.textContent = n < (st.minPlayers || 2) ? 'Minimum ' + (st.minPlayers || 2) + ' joueurs' : r + '/' + n + ' prets';
+    } else msg.textContent = phaseMap[st.phase] || st.phase;
+  }
+  const cd = $('#rkCd');
+  if (cd) cd.textContent = st.deadline ? Math.max(0, Math.ceil((st.deadline - rkNow()) / 1000)) + ' s' : '';
+
+  // seats
+  const box = $('#rkSeats'); if (!box) return;
+  box.textContent = '';
+  const mine = rkMine(st);
+  for (let i = 0; i < (st.maxPlayers || 6); i++) {
+    const p = st.seats[i];
+    const seat = el('div', 'seat' + (p && me && p.uid === me.uid ? ' mine' : '') + (st.turn && st.turn.seat === i ? ' turn' : ''));
+    if (!p) {
+      seat.append(el('div', 'empty', 'Libre'));
+      box.append(seat); continue;
+    }
+    const hands = el('div', 'hands');
+    (p.hands || []).forEach((h) => {
+      const hand = el('div', 'hand' + (st.turn && st.turn.seat === i ? ' act' : ''));
+      const cards = el('div', 'cards');
+      (h.cards || []).forEach((c) => cards.append(rkCardEl(c)));
+      hand.append(cards);
+      if (h.total) {
+        const pill = el('span', 'pill' + (h.state === 'bust' ? ' bust' : h.state === 'bj' ? ' bj' : h.total === 21 ? ' t21' : ''), h.state === 'bj' ? 'BJ' : String(h.total));
+        hand.append(pill);
+      }
+      if (h.result) {
+        const res = el('div', 'res ' + h.result, h.result === 'win' ? '+' + (h.net || '') : h.result === 'lose' ? String(h.net || '') : '=');
+        hand.append(res);
+      }
+      hands.append(hand);
+    });
+    seat.append(hands);
+    if (p.bet) {
+      const spot = el('div', 'betspot');
+      spot.append(el('span', 'betamt', p.bet + ' RR'));
+      seat.append(spot);
+    }
+    const plate = el('div', 'plate');
+    const av = el('div', 'av'); setAvatar(av, p.avatar, p.name);
+    const nm = el('div', 'nm', p.name + (p.ready ? ' · pret' : '') + (p.place ? ' · #' + p.place : ''));
+    const bl = el('div', 'bl', (p.rr != null ? p.rr : '—') + ' RR');
+    plate.append(av, nm, bl);
+    if (p.online === false) { const d = el('span', 'dot off'); plate.append(d); }
+    seat.append(plate);
+    box.append(seat);
+  }
+
+  // dock
+  const lob = st.phase === 'lobby' || st.phase === 'betting';
+  const myTurn = !!(mine && st.turn && st.seats[st.turn.seat] && st.seats[st.turn.seat].uid === me.uid && st.phase === 'playing');
+  $('#rkJoin').classList.toggle('hide', !!mine || !lob);
+  $('#rkReady').classList.toggle('hide', !mine || (mine.ready) || !lob);
+  $('#rkUnready').classList.toggle('hide', !mine || !mine.ready || !lob);
+  $('#rkLeave').classList.toggle('hide', !mine);
+  $('#rkHit').classList.toggle('hide', !myTurn);
+  $('#rkStand').classList.toggle('hide', !myTurn);
+  const note = $('#rkNote');
+  if (note) {
+    if (st.phase === 'result' && st.final) note.textContent = st.final.map((r) => r.name + ' #' + r.place + ' (' + (r.net >= 0 ? '+' : '') + r.net + ' RR)').join(' · ');
+    else note.textContent = 'Minimum 2 joueurs · mise obligatoire 10 RR · le pot est reparti selon le classement des mains';
+  }
 }
 if (!RK.iv) RK.iv = setInterval(() => {
   const e = document.getElementById('rkCd');
   if (e && RK.S && RK.S.deadline) e.textContent = Math.max(0, Math.ceil((RK.S.deadline - rkNow()) / 1000)) + ' s';
 }, 250);
-document.addEventListener('keydown', (e) => {
-  if (e.code === 'Space' && W.view === 'ranked' && RK.onKey && !/INPUT|TEXTAREA/.test(e.target.tagName)) { e.preventDefault(); RK.onKey(); }
-});
-
-function rkPips(st) {
-  const box = $('#rkPips'); box.textContent = '';
-  for (let i = 0; i < st.rounds; i++) {
-    const g = st.plan && st.plan[i];
-    const done = st.phase !== 'lobby' && st.phase !== 'match_end' ? (i + 1 < st.round || (i + 1 === st.round && st.phase === 'round_result')) : st.phase === 'match_end';
-    const cur = !done && (st.phase === 'intro' || st.phase === 'playing') && i + 1 === st.round;
-    box.append(el('span', 'rk-pip' + (done ? ' done' : cur ? ' cur' : ''), g ? rkModeLabel(g) : 'Manche ' + (i + 1)));
-  }
-}
-function rkSeats(st) {
-  const box = $('#rkSeats'); box.textContent = '';
-  const inM = st.phase !== 'lobby';
-  $('#rkSideT').textContent = inM ? 'Score du match' : 'Joueurs ' + st.seats.filter(Boolean).length + '/' + st.maxPlayers;
-  const list = st.seats.map((p, i) => ({ p, i }));
-  if (inM) list.sort((a, b) => ((b.p && b.p.score) || -1) - ((a.p && a.p.score) || -1));
-  list.forEach(({ p }) => {
-    const d = el('div', 'rk-pl' + (p && me && p.uid === me.uid ? ' me' : '') + (!p ? ' empty' : p.online === false ? ' off' : ''));
-    if (!p) { d.append(el('div', 'av2', '·'), el('div', 'nm', 'Place libre'), el('span')); box.append(d); return; }
-    const av = el('div', 'av2'); setAvatar(av, p.avatar, p.name);
-    const nm = el('div'); nm.append(el('div', 'nm', p.name));
-    nm.append(el('small', null, p.online === false ? 'a abandonné' : inM ? (p.inMatch ? (st.phase === 'playing' ? (p.answered ? 'a répondu' : 'joue…') : '') : 'spectateur') : p.ready ? 'prêt' : 'en attente'));
-    const right = el('div', 'sc', inM ? String(p.score) : p.ready ? '✓' : '');
-    d.append(av, nm, right); box.append(d);
-  });
-}
-function rkDock(st) {
-  const mine = rkMine(st), lob = st.phase === 'lobby';
-  $('#rkJoin').classList.toggle('hide', !!mine || !lob);
-  $('#rkReady').classList.toggle('hide', !mine || mine.ready || !lob);
-  $('#rkUnready').classList.toggle('hide', !mine || !mine.ready || !lob);
-  $('#rkLeave').classList.toggle('hide', !mine);
-  $('#rkLeave').textContent = mine && mine.inMatch && !lob ? 'Abandonner' : 'Quitter';
-}
-
-function rkStage(st) {
-  RK.loop++; RK.onKey = null;
-  const old = $('#rkStage'); const S = old.cloneNode(false); old.replaceWith(S); RK.stage = S;
-  const mine = rkMine(st);
-  const play = !!(mine && mine.inMatch && mine.online !== false && !st.answered);
-  const big = (t) => S.append(el('div', 'rk-big', t));
-  const sm = (t) => S.append(el('p', 'rk-sm', t));
-  const cd = (pre) => { const c = el('div', 'rk-count', pre + '…'); c.id = 'rkCd'; S.append(c); };
-
-  if (st.phase === 'lobby') {
-    const n = st.seats.filter(Boolean).length, r = st.seats.filter((p) => p && p.ready).length;
-    big(st.deadline ? 'Départ imminent' : 'L’arène vous attend');
-    sm(st.deadline ? 'Tout le monde est prêt.' : !mine ? 'Rejoins l’arène, puis appuie sur « Je suis prêt ».' : n < st.minPlayers ? 'Il faut au moins ' + st.minPlayers + ' joueurs. Invite un ami.' : r + '/' + n + ' prêts — le match démarre quand tout le monde l’est.');
-    if (st.deadline) cd('Début dans');
-    sm('5 épreuves : réflexe, visée, mémoire, précision, calcul. Même défi pour tous, aucun hasard dans le résultat. Tu gagnes du RR, pas de ZTKN.');
-    return;
-  }
-  if (st.phase === 'intro') {
-    big(rkModeLabel(st.gameMode)); sm(RK_RULES[st.gameMode] || ''); cd('Manche ' + st.round + '/' + st.rounds + ' — départ dans');
-    return;
-  }
-  if (st.phase === 'round_result' || st.phase === 'match_end') {
-    const fin = st.phase === 'match_end';
-    const rows = fin ? (st.final || []) : (st.lastRound && st.lastRound.rows) || [];
-    big(fin ? 'Match terminé' : 'Manche ' + st.round + ' · ' + rkModeLabel(st.lastRound && st.lastRound.mode));
-    const box = el('div', 'rk-res');
-    rows.forEach((r) => {
-      const row = el('div', 'rk-row' + (me && r.uid === me.uid ? ' me' : ''));
-      row.append(el('b', null, '#' + r.place), el('span', null, r.name));
-      row.append(el('span', fin ? '' : 'pt', fin ? r.score + ' pts' : r.label));
-      row.append(el('span', fin ? (r.delta >= 0 ? 'up' : 'dn') : 'pt', fin ? (r.delta == null ? '' : (r.delta >= 0 ? '+' : '') + r.delta + ' RR') : '+' + r.pts));
-      box.append(row);
-    });
-    S.append(box);
-    if (fin) { const m = (st.final || []).find((r) => me && r.uid === me.uid); sm(m && m.placement ? 'Placement : encore ' + m.placementLeft + ' partie(s) avant ton rang officiel.' : 'Retour au lobby dans quelques secondes.'); }
-    return;
-  }
-  const c = st.challenge; if (!c) { sm('…'); return; }
-  if (!play) { const t = el('div', 'rk-count', mine ? 'Réponse envoyée' : 'Tu regardes ce match'); S.append(t); }
-  if (c.type === 'react') rkReact(st, c, S, play);
-  else if (c.type === 'aim') rkAim(st, c, S, play);
-  else if (c.type === 'sequence') rkSeq(st, c, S, play);
-  else if (c.type === 'timing') rkTiming(st, c, S, play);
-  else if (c.type === 'math') rkMath(st, c, S, play);
-}
-
-function rkReact(st, c, S, play) {
-  const b = el('button', 'rk-react', 'Attends…'); b.type = 'button'; b.disabled = !play;
-  S.append(b, el('p', 'rk-sm', 'Clic, toucher ou Espace dès que c’est vert.'));
-  let state = play ? 'wait' : 'done';
-  const hit = (e) => {
-    if (e) e.preventDefault();
-    if (state !== 'wait' && state !== 'go') return;
-    const t = rkNow();
-    if (t < c.goAt) { state = 'bad'; b.className = 'rk-react bad'; b.textContent = 'Trop tôt !'; rkSend('rkact', { answer: { early: true } }); return; }
-    state = 'done'; b.className = 'rk-react done'; b.textContent = Math.round(t - c.goAt) + ' ms'; rkSend('rkact', { answer: { t } });
-  };
-  b.addEventListener('pointerdown', hit); RK.onKey = hit;
-  rkLoop(() => { if (state === 'wait' && rkNow() >= c.goAt) { state = 'go'; b.className = 'rk-react go'; b.textContent = 'CLIQUE !'; } });
-}
-function rkAim(st, c, S, play) {
-  const info = el('div', 'rk-count'); const field = el('div', 'rk-aim'); S.append(info, field);
-  let i = 0, misses = 0, done = !play, cur = null;
-  const place = () => {
-    if (cur) cur.remove(); cur = null; if (i >= c.n) return;
-    const t = c.targets[i], d = Math.round(68 - i * 5);
-    cur = el('div', 'rk-tg'); cur.style.cssText = 'left:' + t.x * 100 + '%;top:' + t.y * 100 + '%;width:' + d + 'px;height:' + d + 'px'; field.append(cur);
-  };
-  field.addEventListener('pointerdown', (e) => {
-    e.preventDefault(); if (done || rkNow() < c.startsAt || !cur) return;
-    const r = cur.getBoundingClientRect(), rad = r.width / 2 + 4;
-    if (Math.hypot(e.clientX - (r.left + r.width / 2), e.clientY - (r.top + r.height / 2)) <= rad) {
-      i++;
-      if (i >= c.n) { done = true; cur.remove(); cur = null; info.textContent = 'Terminé'; rkSend('rkact', { answer: { t: rkNow(), misses } }); } else place();
-    } else misses++;
-  });
-  rkLoop(() => {
-    if (done) return;
-    const left = c.startsAt - rkNow();
-    if (left > 0) info.textContent = 'Prépare-toi… ' + Math.ceil(left / 1000);
-    else { info.textContent = 'Cible ' + (i + 1) + '/' + c.n + (misses ? ' · ' + misses + ' raté' + (misses > 1 ? 's' : '') : ''); if (!cur) place(); }
-  });
-}
-function rkSeq(st, c, S, play) {
-  const msg = el('p', 'rk-sm'), grid = el('div', 'rk-pads'), dots = el('div', 'rk-dots');
-  const pads = SEQC.map((col) => { const b = el('button', 'rk-pad'); b.type = 'button'; b.style.setProperty('--c', col); b.disabled = true; grid.append(b); return b; });
-  S.append(msg, grid, dots);
-  if (c.stage === 'show') {
-    msg.textContent = 'Regarde bien…';
-    rkLoop(() => {
-      const t = rkNow() - c.showStart; let on = -1;
-      if (t >= 0) { const k = Math.floor(t / (c.show + c.gap)); if (k < c.len && t - k * (c.show + c.gap) < c.show) on = c.seq[k]; }
-      pads.forEach((p, i) => p.classList.toggle('on', i === on));
-    });
-    return;
-  }
-  msg.textContent = play ? 'À toi : rejoue la séquence.' : '';
-  for (let i = 0; i < c.len; i++) dots.append(el('i'));
-  const got = []; let done = !play;
-  pads.forEach((p, i) => {
-    p.disabled = done;
-    p.addEventListener('pointerdown', (e) => {
-      e.preventDefault(); if (done) return;
-      got.push(i); p.classList.add('on'); setTimeout(() => p.classList.remove('on'), 140);
-      dots.children[got.length - 1].classList.add('f');
-      if (got.length >= c.len) { done = true; pads.forEach((x) => (x.disabled = true)); rkSend('rkact', { answer: { seq: got } }); }
-    });
-  });
-}
-function rkTiming(st, c, S, play) {
-  const info = el('div', 'rk-count'), bar = el('div', 'rk-bar'), zone = el('div', 'rk-zone'), cur = el('div', 'rk-cur');
-  zone.style.left = (c.center - c.width / 2) * 100 + '%'; zone.style.width = c.width * 100 + '%'; bar.append(zone, cur);
-  S.append(info, bar, el('p', 'rk-sm', 'Clic, toucher ou Espace pour stopper le curseur.'));
-  let stopped = !play, frozen = null;
-  const posAt = (t) => { const ph = ((((t - c.startedAt) % c.period) + c.period) % c.period) / c.period; return ph < 0.5 ? ph * 2 : 2 - ph * 2; };
-  const stop = (e) => {
-    if (e) e.preventDefault(); if (stopped) return;
-    const t = rkNow(); if (t < c.startedAt) return;
-    stopped = true; frozen = posAt(t); cur.style.left = frozen * 100 + '%'; info.textContent = 'Envoyé'; rkSend('rkact', { answer: { t } });
-  };
-  S.addEventListener('pointerdown', stop); RK.onKey = stop;
-  rkLoop(() => {
-    if (frozen != null) return;
-    const t = rkNow();
-    if (t < c.startedAt) { info.textContent = 'Prépare-toi…'; cur.style.left = '0%'; return; }
-    if (!stopped) info.textContent = 'Maintenant !';
-    cur.style.left = posAt(t) * 100 + '%';
-  });
-}
-function rkMath(st, c, S, play) {
-  const info = el('div', 'rk-count'), q = el('div', 'rk-q'), inp = el('input', 'rk-in');
-  inp.type = 'text'; inp.inputMode = 'numeric'; inp.autocomplete = 'off'; inp.disabled = true; S.append(info, q, inp);
-  let i = 0, done = !play; const ans = [];
-  const show = () => { q.textContent = c.qs[i] + ' = ?'; inp.value = ''; };
-  inp.addEventListener('keydown', (e) => {
-    if (e.key !== 'Enter' || done) return;
-    const v = inp.value.trim().replace(',', '.'); if (v === '') return;
-    ans.push(Number(v)); i++;
-    if (i >= c.qs.length) { done = true; inp.disabled = true; q.textContent = 'Envoyé'; rkSend('rkact', { answer: { answers: ans } }); } else show();
-  });
-  rkLoop(() => {
-    if (done) return;
-    const left = c.startedAt - rkNow();
-    if (left > 0) { info.textContent = 'Prépare-toi… ' + Math.ceil(left / 1000); q.textContent = '…'; }
-    else { if (inp.disabled) { inp.disabled = false; show(); inp.focus(); } info.textContent = 'Calcul ' + (i + 1) + '/' + c.qs.length + ' · Entrée pour valider'; }
-  });
-}
 
 $('#rkJoin').onclick = () => rkSend('rkjoin');
 $('#rkReady').onclick = () => rkSend('rkready', { on: true });
 $('#rkUnready').onclick = () => rkSend('rkunready');
 $('#rkLeave').onclick = () => rkSend('rkleave');
+$('#rkHit').onclick = () => rkSend('rkhit');
+$('#rkStand').onclick = () => rkSend('rkstand');
+if ($('#rkPlayBtn')) $('#rkPlayBtn').onclick = () => setView('ranked');
+
 if ($('#rkPlayBtn')) $('#rkPlayBtn').onclick = () => setView('ranked');
 
 
