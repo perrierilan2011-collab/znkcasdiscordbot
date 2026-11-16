@@ -2637,7 +2637,8 @@ function rkRenderMe(d) {
   main.append(el('div', 'rk-elo', String(m.elo) + ' RR'));
   const bar = el('div', 'rk-prog'); bar.append(Object.assign(document.createElement('i'), { style: 'width:' + Math.round((m.pct || 0) * 100) + '%' }));
   main.append(bar);
-  if (!m.maxed && m.toNext != null) const sub = el('div'); sub.style.cssText = 'font-size:12px;color:var(--mut);margin-top:6px';
+  const sub = el('div');
+  sub.style.cssText = 'font-size:12px;color:var(--mut);margin-top:6px';
   sub.textContent = m.maxed ? 'Rang maximum' : ('Prochain palier dans ' + Math.round(m.toNext || 0) + ' RR');
   main.append(sub);
   const stats = el('div', 'rkstats');
@@ -4054,8 +4055,7 @@ if (adGiveBtn) adGiveBtn.onclick = () => gOpen(true);
 
 
 // ========== RANKED ARENA ==========
-const RK = window.RK || { S: null, timer: null };
-window.RK = RK;
+// RK déjà déclaré pour le panel de rang
 function rkCard(c) {
   if (!c || c.h) return '<div class="card down"><div class="inner"><div class="face front"></div><div class="face back"></div></div></div>';
   const red = c.s === '♥' || c.s === '♦';
@@ -4098,9 +4098,8 @@ function rkRender(st) {
     }
     box.append(d);
   });
-  const me = st.seats.find((p) => p && me && p.uid === me.uid) || st.seats.find((p) => p && window.me && p.uid === window.me.uid);
-  const uid = (window.me && window.me.uid) || (typeof me !== 'undefined' && me && me.uid);
-  const mine = st.seats.find((p) => p && uid && p.uid === uid);
+  const uid = (typeof me !== 'undefined' && me && me.uid) || null;
+  const mine = uid ? st.seats.find((p) => p && p.uid === uid) : null;
   $('#rkJoin').classList.toggle('hide', !!mine);
   $('#rkReady').classList.toggle('hide', !mine || mine.ready || (st.phase !== 'lobby' && st.phase !== 'match_end'));
   $('#rkUnready').classList.toggle('hide', !mine || !mine.ready || (st.phase !== 'lobby' && st.phase !== 'match_end'));
