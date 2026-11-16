@@ -354,9 +354,17 @@ function init(deps) {
   // À configurer : DISCORD_CLIENT_SECRET (Discord Developer Portal → OAuth2) + ajouter l'URL de redirection  PUBLIC_URL/auth/callback
   const CLIENT_SECRET = String(process.env.DISCORD_CLIENT_SECRET || '').trim();
   const clientId = () => String(process.env.DISCORD_CLIENT_ID || (deps.clientId && deps.clientId()) || '').trim();
-  const REDIRECT = PUBLIC_URL + '/auth/callback';
+  const ENV_PUBLIC = !!String(process.env.PUBLIC_URL || '').trim();
+  // si PUBLIC_URL n'est pas défini, on déduit l'adresse depuis la requête (Railway / proxy) pour que redirect_uri corresponde toujours
+  const baseOf = (req) => {
+    if (ENV_PUBLIC) return PUBLIC_URL;
+    const proto = String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim() || (req.socket && req.socket.encrypted ? 'https' : 'http');
+    const host = String(req.headers['x-forwarded-host'] || req.headers.host || '').split(',')[0].trim();
+    return host ? proto + '://' + host : PUBLIC_URL;
+  };
+  const redirectOf = (req) => baseOf(req) + '/auth/callback';
   const oauthOn = () => !!(CLIENT_SECRET && clientId() && deps.resolveMember);
-  const SECURE = /^https:/.test(PUBLIC_URL) ? '; Secure' : '';
+  const secureOf = (req) => (/^https:/.test(baseOf(req)) ? '; Secure' : '');
   const cookieOf = (req, k) => { const m = String(req.headers.cookie || '').split(/;\s*/).find((c) => c.startsWith(k + '=')); return m ? m.slice(k.length + 1) : ''; };
   const esc = (t) => String(t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const page = (res, code, body, extra = {}) => {
@@ -370,11 +378,11 @@ function init(deps) {
     try { const [p, sg] = String(t || '').split('.'); if (!p || !sg || sign(p) !== sg) return null; const d = JSON.parse(unb64(p)); return d.e > Date.now() ? d : null; } catch { return null; }
   };
   async function handleAuth(req, res, url) {
-    if (!oauthOn()) return page(res, 503, '<h2>Connexion Discord indisponible</h2><p>L’administrateur doit configurer <b>DISCORD_CLIENT_SECRET</b> sur le serveur.</p>');
+    if (!oauthOn()) return page(res, 503, '<h2>Connexion Discord indisponible</h2><p>L’administrateur doit configurer <b>DISCORD_CLIENT_SECRET</b> (et attendre que le bot soit connecté) sur le serveur.</p><p>Tu peux aussi ouvrir le site via le bouton <b>Play Online</b> dans Discord.</p><a style="' + BTN + '" href="/">Retour</a>');
     if (url.pathname === '/login') {
       const state = crypto.randomBytes(16).toString('base64url');
-      const q = new URLSearchParams({ client_id: clientId(), response_type: 'code', redirect_uri: REDIRECT, scope: 'identify guilds', state, prompt: 'none' });
-      res.writeHead(302, { Location: 'https://discord.com/oauth2/authorize?' + q, 'Cache-Control': 'no-store', 'Set-Cookie': `znk_oauth=${state}; Path=/auth; Max-Age=600; HttpOnly; SameSite=Lax${SECURE}`, ...SEC });
+      const q = new URLSearchParams({ client_id: clientId(), response_type: 'code', redirect_uri: redirectOf(req), scope: 'identify guilds', state });
+      res.writeHead(302, { Location: 'https://discord.com/oauth2/authorize?' + q, 'Cache-Control': 'no-store', 'Set-Cookie': `znk_oauth=${state}; Path=/auth; Max-Age=600; HttpOnly; SameSite=Lax${secureOf(req)}`, ...SEC });
       return res.end();
     }
     if (url.pathname === '/auth/guild') { // choix du serveur (si le joueur est dans plusieurs serveurs du casino)
@@ -385,11 +393,11 @@ function init(deps) {
     // /auth/callback
     const state = url.searchParams.get('state') || '', code = url.searchParams.get('code');
     const fail = (m) => page(res, 400, `<h2>Connexion impossible</h2><p>${esc(m)}</p><a style="${BTN}" href="/login">Réessayer</a>`);
-    if (url.searchParams.get('error')) return fail('Connexion annulée.');
+    if (url.searchParams.get('error')) return fail(url.searchParams.get('error') === 'access_denied' ? 'Connexion annulée.' : 'Discord a refusé la connexion (' + String(url.searchParams.get('error_description') || url.searchParams.get('error')).slice(0, 80) + ').');
     if (!code || !state || state !== cookieOf(req, 'znk_oauth')) return fail('Session invalide, réessaie.');
     try {
-      const tk = await fetch('https://discord.com/api/oauth2/token', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ client_id: clientId(), client_secret: CLIENT_SECRET, grant_type: 'authorization_code', code, redirect_uri: REDIRECT }) }).then((r) => r.json());
-      if (!tk.access_token) throw new Error('refus de Discord');
+      const tk = await fetch('https://discord.com/api/oauth2/token', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ client_id: clientId(), client_secret: CLIENT_SECRET, grant_type: 'authorization_code', code, redirect_uri: redirectOf(req) }) }).then((r) => r.json());
+      if (!tk.access_token) throw new Error('refus de Discord : ' + (tk.error_description || tk.error || 'token'));
       const H = { Authorization: 'Bearer ' + tk.access_token };
       const [u, gl] = await Promise.all([fetch('https://discord.com/api/users/@me', { headers: H }).then((r) => r.json()), fetch('https://discord.com/api/users/@me/guilds', { headers: H }).then((r) => r.json())]);
       if (!u || !u.id) throw new Error('profil introuvable');
@@ -398,7 +406,7 @@ function init(deps) {
       if (opts.length === 1) return goHome(res, { id: u.id, name: opts[0].name, avatar: opts[0].avatar, role: opts[0].role }, opts[0].guildId);
       const k = seal({ u: String(u.id), o: opts.slice(0, 20).map((o) => ({ guildId: String(o.guildId), name: String(o.name), avatar: String(o.avatar || ''), role: String(o.role || ''), gn: String(o.guildName || o.guildId) })) });
       return page(res, 200, '<h2>Choisis ton serveur</h2>' + opts.slice(0, 20).map((o) => `<a style="${BTN}" href="/auth/guild?k=${encodeURIComponent(k)}&g=${encodeURIComponent(o.guildId)}">${esc(o.guildName || o.guildId)}</a>`).join(''), { 'Set-Cookie': 'znk_oauth=; Path=/auth; Max-Age=0' });
-    } catch (e) { console.error('[web] oauth', e?.message || e); return fail('Discord n’a pas répondu, réessaie.'); }
+    } catch (e) { console.error('[web] oauth', e?.message || e); return fail('Erreur de connexion avec Discord, réessaie. (' + String(e?.message || e).slice(0, 80) + ')'); }
   }
 
   // ---------- http ----------
@@ -895,6 +903,11 @@ function init(deps) {
       }
       if (req.method === 'GET' && (url.pathname === '/login' || url.pathname === '/auth/callback' || url.pathname === '/auth/guild')) return await handleAuth(req, res, url);
       if (req.method === 'GET' && url.pathname === '/healthz') return json(res, 200, { ok: true });
+      if (req.method === 'GET' && url.pathname === '/api/me') {
+        const u = readToken(url.searchParams.get('t'));
+        if (!u) return json(res, 401, { ok: false, error: 'expired' });
+        return json(res, 200, { ok: true, uid: u.uid, name: u.name, avatar: u.avatar });
+      }
       if (req.method === 'GET' && url.pathname === '/api/stream') return handleStream(req, res, url);
       if (req.method === 'GET' && url.pathname === '/api/top') return json(res, 200, { top: (url.searchParams.get('g') === 'poker' ? pokerStats : statsApi).top() });
       if (req.method === 'GET' && url.pathname === '/api/rank') { // page « Rank » : mon rang + classement ELO
