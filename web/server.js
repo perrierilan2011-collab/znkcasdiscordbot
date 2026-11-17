@@ -17,6 +17,7 @@ const path = require('path');
 const { Room, SEATS } = require('./table');
 const { PokerRoom, INFO: POKER_INFO } = require('./poker');
 const { RouletteRoom, INFO: ROULETTE_INFO } = require('./roulette');
+const { RocketRaceRoom, INFO: ROCKET_INFO } = require('./rocketrace');
 const { create: createOffline } = require('./offline');
 const { create: createRank } = require('./rank');
 const { create: createShop } = require('./shop');
@@ -26,10 +27,10 @@ const { create: createShop } = require('./shop');
 const PUBLIC_URL = String(process.env.PUBLIC_URL || 'https://znk.up.railway.app').replace(/\/+$/, '');
 const TOKEN_TTL_MS = 12 * 3600 * 1000;
 // chat en direct : un salon par jeu (par serveur Discord), historique gardé en mémoire
-const CHAT_ROOMS = new Set(['hub', 'bj', 'poker', 'roulette', 'ranked', 'off-bj', 'off-fuse', 'off-mine', 'off-coin', 'off-dice', 'off-horses', 'off-russian', 'off-slots', 'off-duel', 'off-scratch', 'off-plinko']);
+const CHAT_ROOMS = new Set(['hub', 'bj', 'poker', 'roulette', 'rocket', 'ranked', 'off-bj', 'off-fuse', 'off-mine', 'off-coin', 'off-dice', 'off-horses', 'off-russian', 'off-slots', 'off-duel', 'off-scratch', 'off-plinko']);
 const CHAT_KEEP = 60;
 // salon de chat de chaque jeu : les victoires y sont annoncées automatiquement (+ dans l'accueil)
-const GAME_ROOM = { blackjack: 'bj', poker: 'poker', roulette: 'roulette', ranked: 'ranked', 'bj-solo': 'off-bj', fuse: 'off-fuse', mines: 'off-mine', coin: 'off-coin', dice: 'off-dice', horses: 'off-horses', russian: 'off-russian', slots: 'off-slots', duel: 'off-duel', scratch: 'off-scratch', plinko: 'off-plinko', lucky7: 'off-lucky7', bubbles: 'off-bubbles', frozen: 'off-frozen', candy: 'off-candy', heist: 'off-heist', orbit: 'off-orbit', cards: 'off-cards', rocket: 'off-rocket', cannon: 'off-cannon', jewels: 'off-jewels' };
+const GAME_ROOM = { blackjack: 'bj', poker: 'poker', roulette: 'roulette', rocket: 'rocket', ranked: 'ranked', 'bj-solo': 'off-bj', fuse: 'off-fuse', mines: 'off-mine', coin: 'off-coin', dice: 'off-dice', horses: 'off-horses', russian: 'off-russian', slots: 'off-slots', duel: 'off-duel', scratch: 'off-scratch', plinko: 'off-plinko' };
 const EMOTES = new Set(['🔥', '👏', '😈', '🍀', '😱', '😂', '💸', '🎉']);
 const DATA_DIR = path.join(__dirname, '..', 'data');
 
@@ -564,6 +565,14 @@ function init(deps) {
       onRoundEnd: (r) => roundEnd(guildId, r),
       onChange: (w) => broadcast(`event: roulette\ndata: ${JSON.stringify(w.snapshot())}\n\n`),
     });
+    entry.rocketrace = new RocketRaceRoom(guildId, {
+      getBalance: deps.getBalance,
+      debit: deps.debit,
+      credit: deps.credit,
+      pending,
+      onRoundEnd: (r) => roundEnd(guildId, r),
+      onChange: (w) => broadcast(`event: rocket\ndata: ${JSON.stringify(w.snapshot())}\n\n`),
+    });
     entry.bjs = new Map(); // tid -> Room (blackjack)
     entry.pokers = new Map(); // tid -> PokerRoom
     entry.syncTables = () => syncTables(entry);
@@ -673,7 +682,7 @@ function init(deps) {
     if (d.bye !== true && now - (lastAct.get(user.uid) || 0) < (/^[ro]/.test(String(d.action)) ? 50 : 120)) return json(res, 429, { ok: false, error: 'Slow down.' });
     if (d.bye !== true) lastAct.set(user.uid, now);
     const entry = roomOf(user.guildId);
-    const { roulette } = entry;
+    const { roulette, rocketrace } = entry;
     const tid = tidOf(d);
     const act = String(d.action);
     const needBj = ['sit', 'leave', 'bet', 'clear', 'hit', 'stand', 'double', 'split', 'emote', 'sync'].includes(act);
@@ -852,6 +861,33 @@ function init(deps) {
           if (p) {
             p.bal = await deps.getBalance(user.uid);
             roulette.emit();
+          }
+          break;
+        }
+        // ---- rocket race (course de fusées en ligne)
+        case 'rzjoin': {
+          const bal = await deps.getBalance(user.uid);
+          await rocketrace.run(async () => rocketrace.join(user, bal));
+          break;
+        }
+        case 'rzbet': {
+          await rocketrace.run(() => rocketrace.bet(user.uid, d.amount));
+          break;
+        }
+        case 'rzclear':
+          await rocketrace.run(() => rocketrace.clear(user.uid));
+          break;
+        case 'rzleave':
+          await rocketrace.run(() => rocketrace.leave(user.uid));
+          break;
+        case 'rzgo':
+          await rocketrace.run(() => rocketrace.go(user.uid));
+          break;
+        case 'rzsync': {
+          const p = rocketrace.players.get(user.uid);
+          if (p) {
+            p.bal = await deps.getBalance(user.uid);
+            rocketrace.emit();
           }
           break;
         }
@@ -1186,7 +1222,7 @@ function init(deps) {
       'X-Accel-Buffering': 'no',
       ...SEC,
     });
-    res.write(`retry: 2000\nevent: hello\ndata: ${JSON.stringify({ uid: user.uid, name: user.name, avatar: user.avatar, seats: SEATS, coin: deps.coin || '🪙', roulette: ROULETTE_INFO, poker: POKER_INFO })}\n\n`);
+    res.write(`retry: 2000\nevent: hello\ndata: ${JSON.stringify({ uid: user.uid, name: user.name, avatar: user.avatar, seats: SEATS, coin: deps.coin || '🪙', roulette: ROULETTE_INFO, poker: POKER_INFO, rocket: ROCKET_INFO })}\n\n`);
     res.uid = user.uid; // sert au snapshot personnalisé du poker
     Promise.resolve(deps.isAdmin ? deps.isAdmin(user.uid) : false).then((a) => { if (a) try { res.write(`event: admin\ndata: {"admin":true}\n\n`); } catch { /* fermée */ } }).catch(() => {});
     if (user.avatar) avatarMap.set(user.uid, user.avatar);
@@ -1205,6 +1241,7 @@ function init(deps) {
     }
     deps.getBalance(user.uid).then((b) => { try { res.write(`event: bal\ndata: ${JSON.stringify({ bal: b })}\n\n`); } catch { /* fermée */ } }).catch(() => {});
     try { entry.roulette.setPresence(user.uid, true); res.write(`event: roulette\ndata: ${JSON.stringify(entry.roulette.snapshot())}\n\n`); } catch (e) { console.error('[stream] roulette', e?.message || e); }
+    try { entry.rocketrace.setPresence(user.uid, true); res.write(`event: rocket\ndata: ${JSON.stringify(entry.rocketrace.snapshot())}\n\n`); } catch (e) { console.error('[stream] rocket', e?.message || e); }
     try {
       entry.ranked.setPresence(user.uid, true);
       res.write(`event: state\ndata: ${JSON.stringify({ ...entry.ranked.snapshot(), tid: 'ranked', mode: 'ranked' })}\n\n`);
@@ -1230,6 +1267,7 @@ function init(deps) {
             for (const r of entry.bjs.values()) r.setPresence(user.uid, false);
             for (const r of entry.pokers.values()) r.setPresence(user.uid, false);
             entry.roulette.setPresence(user.uid, false);
+            entry.rocketrace.setPresence(user.uid, false);
             try { entry.ranked.setPresence(user.uid, false); } catch {}
           }
         }, 8000); // tolérance : rechargement de page / coupure réseau brève

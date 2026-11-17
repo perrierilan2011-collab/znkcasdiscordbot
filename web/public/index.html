@@ -925,6 +925,83 @@ header .sp{flex:1 1 0}
 #topNav::-webkit-scrollbar{display:none}
 #topNav .navl{flex:0 0 auto}
 }
+/* ================= Rocket Race : course de fusées en ligne ================= */
+#rocketView{flex:1;min-height:0;padding:10px 10px 56px;overflow:auto;align-items:center}
+#rocketGrid{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:12px;width:100%;max-width:1320px;align-items:start}
+#rocketMain{min-width:0;display:flex;flex-direction:column}
+.ftable.rt#rocketTable{width:100%;flex:none;min-height:0;padding:14px 16px 18px;justify-content:flex-start;align-items:stretch;gap:10px;border-width:12px}
+.rqtop{position:relative;z-index:1;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+#rocketMsg{display:inline-block;background:rgba(0,0,0,.72);border:1px solid rgba(255,255,255,.12);padding:7px 18px;border-radius:999px;font-weight:700;font-size:clamp(12px,1.6vw,16px);min-height:20px}
+#rocketCd{font-size:30px;font-weight:900;line-height:1;color:var(--gold);text-shadow:0 0 16px rgba(251,191,36,.7);font-variant-numeric:tabular-nums;min-height:30px}
+#rocketScene{position:relative;z-index:1;width:100%;height:clamp(300px,48vh,470px);border-radius:16px;overflow:hidden;border:1px solid #2a2a30;
+  background:radial-gradient(circle at 50% 50%,#131018 0%,#07070c 55%,#020204 100%);box-shadow:inset 0 0 60px rgba(0,0,0,.95)}
+#rocketCanvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+#rocketCountdown{position:absolute;left:50%;top:38%;transform:translate(-50%,-50%);font:900 clamp(48px,14vw,120px)/1 system-ui,sans-serif;color:#fde68a;text-shadow:0 0 40px rgba(251,191,36,.9),0 10px 30px #000;pointer-events:none;opacity:0;white-space:nowrap}
+#rocketCountdown.on{animation:rkCd .9s ease-out}
+@keyframes rkCd{0%{opacity:0;transform:translate(-50%,-50%) scale(1.8)}25%{opacity:1;transform:translate(-50%,-50%) scale(1)}80%{opacity:1}100%{opacity:0;transform:translate(-50%,-50%) scale(.85)}}
+#rocketWinner{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%) scale(.8);opacity:0;pointer-events:none;text-align:center;white-space:nowrap;
+  font:900 clamp(20px,4vw,38px)/1.15 system-ui,sans-serif;color:#fde68a;text-shadow:0 0 30px rgba(251,191,36,.9),0 8px 24px #000;transition:opacity .3s,transform .4s cubic-bezier(.2,1.6,.4,1)}
+#rocketWinner.on{opacity:1;transform:translate(-50%,-50%) scale(1)}
+#rocketWinner small{display:block;font-size:.5em;color:#fff;margin-top:8px}
+#rocketDock{max-width:none;margin-bottom:0}
+#rocketDock .row{width:100%;justify-content:center;flex-wrap:wrap}
+#rocketDock .amt input{width:clamp(120px,35vw,190px)}
+#rocketOdds{font-size:12px;color:var(--mut);text-align:center;width:100%}
+#rocketPlayers{display:flex;flex-direction:column;gap:4px;padding:8px;max-height:330px;overflow:auto}
+.rpl{display:grid;grid-template-columns:24px minmax(0,1fr) auto;gap:8px;align-items:center;padding:7px 9px;border-radius:10px;background:#0d0d0d;border:1px solid #232323}
+.rpl.me{border-color:var(--gold);background:rgba(251,191,36,.1)}
+.rpl .av2{width:24px;height:24px;border-radius:50%;overflow:hidden;background:#222;display:grid;place-items:center;font-weight:800;font-size:11px}
+.rpl .av2 img{width:100%;height:100%;object-fit:cover}
+.rpl .nm{font-weight:700;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rpl .nm small{display:block;color:var(--mut);font-size:10px;font-weight:600}
+.rpl .rk{font-weight:900;font-variant-numeric:tabular-nums;color:var(--gold);font-size:13px}
+#rocketFeed{padding:8px 12px;border-top:1px solid #262626;color:var(--mut);font-size:11px;max-height:120px;overflow:auto}
+#rocketFeed div{padding:2px 0}
+/* ================= Améliorations MOBILE (style inchangé sur PC) ================= */
+@media(max-width:900px){
+  /* navigation : bandeau défilant avec repère à droite au lieu d'un simple scroll invisible */
+  #topNav{mask-image:linear-gradient(90deg,#000 0,#000 calc(100% - 26px),transparent 100%);-webkit-mask-image:linear-gradient(90deg,#000 0,#000 calc(100% - 26px),transparent 100%);padding-right:26px}
+  #topNav .navl{padding:9px 13px;font-size:13px;min-height:40px}
+  #rocketGrid{grid-template-columns:1fr}
+  #rocketSide{order:2}
+  #rocketPlayers{max-height:170px}
+  .ftable.rt#rocketTable{border-width:10px;padding:12px 10px 16px}
+  #rocketScene{height:clamp(260px,42vh,400px)}
+}
+@media(max-width:600px){
+  /* champs : 16px minimum -> iOS Safari ne zoom pas au focus */
+  .gin,input,select,textarea,#chatIn,.adform input,.adform select,.adform textarea,#accInvite{font-size:16px}
+  .ocode{font-size:clamp(16px,5vw,22px);letter-spacing:.08em;word-break:break-all}
+  /* cibles tactiles confortables */
+  .btn{min-height:44px}
+  .hb.ico{min-width:44px;min-height:44px;display:grid;place-items:center}
+  .tdot{width:14px;height:14px}
+  .tbtn{min-height:44px;padding:8px 14px}
+  /* modales : fond de sécurité + hauteur mobile */
+  .modal{padding:10px;padding-bottom:calc(10px + env(safe-area-inset-bottom));overflow:auto;-webkit-overflow-scrolling:touch}
+  .box{max-height:88dvh;padding:16px;border-radius:16px}
+  /* chat : ne pas masquer le contenu sous la barre système */
+  #chat:not(.open){right:calc(12px + env(safe-area-inset-right));bottom:calc(12px + env(safe-area-inset-bottom))}
+  .cpop{right:calc(12px + env(safe-area-inset-right));bottom:calc(66px + env(safe-area-inset-bottom))}
+  #toast{bottom:calc(70px + env(safe-area-inset-bottom))}
+  /* accueil : cartes plus simples et pleine largeur */
+  #hubView{gap:28px;padding:20px 12px 64px}
+  .games{grid-template-columns:1fr;gap:10px}
+  .gcard{padding:16px;min-height:96px;justify-content:center}
+  .gname{font-size:19px}
+  .gdesc{min-height:0;font-size:12px}
+  .gplay{min-height:42px;display:grid;place-items:center;width:100%}
+  /* roulette : grille défilante avec repère au lieu d'un pan horizontal aveugle */
+  #rBoard{margin:0 -4px;border-radius:10px;mask-image:linear-gradient(90deg,#000 0,#000 calc(100% - 24px),transparent 100%);-webkit-mask-image:linear-gradient(90deg,#000 0,#000 calc(100% - 24px),transparent 100%)}
+  #rTable{grid-template-columns:44px repeat(12,minmax(40px,1fr)) 50px}
+  .rc{font-size:13px}
+  #rocketDock .row .btn{flex:1 1 44%;min-width:132px}
+}
+@media(max-width:400px){
+  .games{grid-template-columns:1fr}
+  #rocketDock .row .btn{flex:1 1 100%}
+  .rqtop{gap:6px}
+}
 </style>
 </head>
 <body>
@@ -992,6 +1069,11 @@ header .sp{flex:1 1 0}
         <span class="gdesc">Roulette européenne · rouge, noir, pair, impair, numéros pleins</span>
         <span class="glive" id="gRlLive"></span><span class="gplay">Jouer</span>
       </button>
+      <button class="gcard" data-go="rocket" id="gcRocket">
+        <span class="gname">🚀 Rocket Race</span>
+        <span class="gdesc">Course de fusées · chacun la sienne avec son pseudo · le premier au tour du Soleil gagne le pot</span>
+        <span class="glive" id="gRocketLive"></span><span class="gplay">Jouer</span>
+      </button>
     </div>
   </section>
   <section class="cat">
@@ -1053,16 +1135,6 @@ header .sp{flex:1 1 0}
         <span class="gdesc">Gratte pour de vrai, trois montants identiques gagnent</span>
         <span class="glive"></span><span class="gplay">Jouer</span>
       </button>
-      <button class="gcard" data-go="off-lucky7"><span class="gname">Lucky 7</span><span class="gdesc">Trois rouleaux · aligne trois 7 pour le jackpot</span><span class="glive"></span><span class="gplay">Jouer</span></button>
-      <button class="gcard" data-go="off-bubbles"><span class="gname">Bubble Pop</span><span class="gdesc">Éclate la bonne bulle, zone sûre ou risquée</span><span class="glive"></span><span class="gplay">Jouer</span></button>
-      <button class="gcard" data-go="off-frozen"><span class="gname">Ice Breaker</span><span class="gdesc">Brise la tuile qui cache le meilleur multiplicateur</span><span class="glive"></span><span class="gplay">Jouer</span></button>
-      <button class="gcard" data-go="off-candy"><span class="gname">Candy Rush</span><span class="gdesc">La roue des bonbons, jusqu’à x22</span><span class="glive"></span><span class="gplay">Jouer</span></button>
-      <button class="gcard" data-go="off-heist"><span class="gname">Bank Heist</span><span class="gdesc">Choisis le coffre, jackpot x12.5</span><span class="glive"></span><span class="gplay">Jouer</span></button>
-      <button class="gcard" data-go="off-orbit"><span class="gname">Orbit</span><span class="gdesc">Lâche la sonde sur l’orbite gagnante</span><span class="glive"></span><span class="gplay">Jouer</span></button>
-      <button class="gcard" data-go="off-cards"><span class="gname">Speed Cards</span><span class="gdesc">Tire 3 cartes, mise sur la bonne couleur</span><span class="glive"></span><span class="gplay">Jouer</span></button>
-      <button class="gcard" data-go="off-rocket"><span class="gname">Rocket Race</span><span class="gdesc">Quatre fusées, un seul vainqueur</span><span class="glive"></span><span class="gplay">Jouer</span></button>
-      <button class="gcard" data-go="off-cannon"><span class="gname">Cannon Blast</span><span class="gdesc">Vise la cible, du bord au cœur</span><span class="glive"></span><span class="gplay">Jouer</span></button>
-      <button class="gcard" data-go="off-jewels"><span class="gname">Jewel Cascade</span><span class="gdesc">Cascade de joyaux, jusqu’à x11.5</span><span class="glive"></span><span class="gplay">Jouer</span></button>
     </div>
   </section>
 </main>
@@ -1575,6 +1647,48 @@ create table if not exists roulette_event_results (
     </aside>
   </div>
 </main>
+<main id="rocketView" class="hide">
+  <div id="rocketGrid">
+    <div id="rocketMain">
+      <section class="ftable rt" id="rocketTable">
+        <div class="rqtop">
+          <div id="rocketMsg">Connexion…</div>
+          <div id="rocketCd"></div>
+        </div>
+        <div id="rocketScene">
+          <canvas id="rocketCanvas"></canvas>
+          <div id="rocketCountdown"></div>
+          <div id="rocketWinner"></div>
+        </div>
+      </section>
+      <section class="dockp" id="rocketDock">
+        <div class="row">
+          <div class="amt"><input id="rocketAmt" inputmode="decimal" autocomplete="off" placeholder="Ta mise" aria-label="Montant de la mise"><span id="rocketCoin"></span></div>
+          <button class="btn go" id="rocketJoin">Rejoindre la course</button>
+        </div>
+        <div class="row">
+          <button class="btn go" id="rocketBet">Miser / Ajouter</button>
+          <button class="btn" id="rocketClear">Retirer ma mise</button>
+          <button class="btn" id="rocketGo">Lancer maintenant</button>
+          <button class="btn" id="rocketLeave">Quitter</button>
+        </div>
+        <div class="hint" id="rocketOdds"></div>
+      </section>
+    </div>
+    <aside class="panel" id="rocketSide">
+      <div class="rsh">Partants <b id="rocketCount">0</b><span id="rocketPot"></span></div>
+      <div id="rocketPlayers"></div>
+      <div id="rocketFeed"></div>
+    </aside>
+  </div>
+</main>
+<div class="modal" id="mRocketRules"><div class="box"><h2>🚀 Rocket Race</h2><ul>
+<li>Une course partagée par serveur : <b>chaque joueur a sa propre fusée</b> avec son pseudo affiché au-dessus.</li>
+<li>Mise librement (jetons ou champ), puis la course démarre automatiquement après le décompte — ou clique sur <b>Lancer maintenant</b> dès 2 partants.</li>
+<li>Les fusées décollent de la <b>Terre</b>, font le tour du <b>Soleil</b> entre les planètes, puis reviennent se poser sur la Terre. Le <b>premier arrivé gagne le plus</b>.</li>
+<li>Le pot est redistribué au classement : part du pot proportionnelle à ta mise selon ton rang (1er ≈ 55 %, 2e ≈ 27 %, 3e ≈ 18 % …), avec 5 % de commission.</li>
+<li>Quitter ou retirer ta mise avant le départ te rembourse intégralement.</li>
+</ul><p style="text-align:right"><button class="btn" data-close>Fermer</button></p></div></div>
 <div id="rFocus" aria-hidden="true">
   <button class="btn" id="rShrink">Réduire</button>
   <div id="rBigBox"><canvas id="rCanvasBig"></canvas></div>
@@ -1760,6 +1874,7 @@ function exitBeacon(action, extra, key) {
 function cleanupOnExit() {
   if ((W.view === 'bj' || W.view === 'ranked') && mySeat()) exitBeacon('leave', { tid: W.btid }, 'bj');
   if (W.view === 'roulette' && W.joined) exitBeacon('rleave', {}, 'roulette');
+  if (W.view === 'rocket' && ROC.joined) exitBeacon('rzleave', {}, 'rocket');
   if (W.view === 'poker' && pMe()) exitBeacon('pleave', { tid: P.cur }, 'poker');
 }
 window.addEventListener('pagehide', cleanupOnExit);
@@ -1769,6 +1884,7 @@ async function send(action, extra = {}) {
     if (extra.tid == null) { if (/^p/.test(action)) extra = { ...extra, tid: P.cur }; else if (BJ_ACTS.has(action)) extra = { ...extra, tid: W.btid }; }
     if (action === 'sit') EXIT_SENT.delete('bj');
     if (action === 'rjoin') EXIT_SENT.delete('roulette');
+    if (action === 'rzjoin') EXIT_SENT.delete('rocket');
     if (action === 'psit') EXIT_SENT.delete('poker');
     const r = await fetch('/api/act', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ t: TOKEN, action, ...extra }) });
     const d = await r.json(); send.last = d;
@@ -1780,6 +1896,7 @@ async function send(action, extra = {}) {
 function showGate(t) { const gm = document.getElementById('gatemsg'); if (gm && t) gm.textContent = t; const g = document.getElementById('gate'); if (g) g.classList.add('on'); try { localStorage.removeItem('znk_t'); } catch(e) {} }
 
 let es;
+let RK_INFO = { min: 1, max: 1e8, rockets: [], betSeconds: 15, houseEdge: .05 };
 function connect() {
   try { if (es) es.close(); } catch (e) {}
   es = new EventSource('/api/stream?t=' + encodeURIComponent(TOKEN));
@@ -1794,6 +1911,7 @@ function connect() {
       BJT.clear(); P.tables.clear();
       try { bootRouteOnce(); } catch (err) {}
       try { rOnHello(d); } catch (err) {}
+      try { rocOnHello(d); } catch (err) {}
       try { pOnHello(d); } catch (err) {}
     } catch (err) { console.error('hello', err); }
   });
@@ -1805,6 +1923,7 @@ function connect() {
     } catch {}
   });
 es.addEventListener('roulette', (e) => { const st = JSON.parse(e.data); offset = st.now - Date.now(); rRender(st); });
+  es.addEventListener('rocket', (e) => { const st = JSON.parse(e.data); offset = st.now - Date.now(); rocRender(st); });
   es.addEventListener('poker', (e) => { const st = JSON.parse(e.data); offset = st.now - Date.now(); pUpdate(st); });
   es.addEventListener('admin', () => $('#bAdmin').classList.remove('hide'));
   es.addEventListener('bal', (e) => { W.bal = JSON.parse(e.data).bal; pHeader(); if (W.view !== 'ranked' && !O.hold && W.bal != null) $('#meBal').textContent = num(W.bal) + ' ' + COIN; });
@@ -2094,7 +2213,7 @@ const C = { msgs: {}, open: false, unread: 0 };
 const SET = { winOthers: '1', winMine: '1', chatNotif: 'silent' };
 try { Object.assign(SET, JSON.parse(localStorage.getItem('znk_set') || '{}')); } catch {}
 const cShow = (m) => m.sys !== 'win' || (me && m.uid === me.uid ? SET.winMine !== '0' : SET.winOthers !== '0');
-const CNAME = { hub: 'Accueil', bj: 'Blackjack', poker: 'Poker', roulette: 'Roulette', 'off-bj': 'Blackjack solo', 'off-fuse': 'Fusé', 'off-mine': 'Mine', 'off-coin': 'Pile ou Face', 'off-dice': 'Dés', 'off-horses': 'Chevaux', 'off-russian': 'Roulette russe', 'off-slots': 'Slots', 'off-duel': 'Duel', 'off-scratch': 'Ticket à gratter', 'off-plinko': 'Plinko' };
+const CNAME = { hub: 'Accueil', bj: 'Blackjack', poker: 'Poker', roulette: 'Roulette', rocket: 'Rocket Race', 'off-bj': 'Blackjack solo', 'off-fuse': 'Fusé', 'off-mine': 'Mine', 'off-coin': 'Pile ou Face', 'off-dice': 'Dés', 'off-horses': 'Chevaux', 'off-russian': 'Roulette russe', 'off-slots': 'Slots', 'off-duel': 'Duel', 'off-scratch': 'Ticket à gratter', 'off-plinko': 'Plinko' };
 const GLAB = { blackjack: 'Blackjack', poker: 'Poker', roulette: 'Roulette', 'bj-solo': 'Blackjack solo', fuse: 'Fusé', mines: 'Mines', coin: 'Pile ou Face', dice: 'Dés', horses: 'Chevaux', russian: 'Roulette russe', slots: 'Slots', duel: 'Duel', scratch: 'Ticket à gratter', plinko: 'Plinko' };
 const cRoom = () => (W.view === 'top' || W.view === 'rank' || W.view === 'admin' ? 'hub' : W.view);
 function cLine(m) {
@@ -2640,9 +2759,8 @@ function pTick() {
 // ---- vues
 
 // ========== Routing URL (hash) — refresh garde la page ==========
-const ROUTE_OK = new Set(['hub','bj','poker','roulette','rank','ranked','top','admin','shop','tasks','account',
-  'off-bj','off-fuse','off-mine','off-coin','off-dice','off-horses','off-russian','off-slots','off-duel','off-plinko','off-scratch',
-  'off-lucky7','off-bubbles','off-frozen','off-candy','off-heist','off-orbit','off-cards','off-rocket','off-cannon','off-jewels']);
+const ROUTE_OK = new Set(['hub','bj','poker','roulette','rocket','rank','ranked','top','admin','shop','tasks','account',
+  'off-bj','off-fuse','off-mine','off-coin','off-dice','off-horses','off-russian','off-slots','off-duel','off-plinko','off-scratch']);
 function routeFromHash() {
   const h = (location.hash || '').replace(/^#\/?/, '').trim();
   if (h && ROUTE_OK.has(h)) return h;
@@ -2673,9 +2791,6 @@ const LB_GAME_KEY = {
   'off-bj': 'bj-solo', 'off-fuse': 'fuse', 'off-mine': 'mines', 'off-coin': 'coin',
   'off-dice': 'dice', 'off-horses': 'horses', 'off-russian': 'russian', 'off-slots': 'slots',
   'off-duel': 'duel', 'off-plinko': 'plinko', 'off-scratch': 'scratch',
-  'off-lucky7': 'lucky7', 'off-bubbles': 'bubbles', 'off-frozen': 'frozen', 'off-candy': 'candy',
-  'off-heist': 'heist', 'off-orbit': 'orbit', 'off-cards': 'cards', 'off-rocket': 'rocket',
-  'off-cannon': 'cannon', 'off-jewels': 'jewels',
 };
 function ensureGameLB() {
   const host = $('#ofView');
@@ -2738,6 +2853,7 @@ function setView(v) {
   $('#bjView').classList.toggle('hide', !bjMode);
   $('#pkView').classList.toggle('hide', v !== 'poker');
   $('#rlView').classList.toggle('hide', v !== 'roulette');
+  $('#rocketView').classList.toggle('hide', v !== 'rocket');
   $('#ofView').classList.toggle('hide', !v.startsWith('off-'));
   $('#topView').classList.toggle('hide', v !== 'top');
   $('#rankView').classList.toggle('hide', v !== 'rank');
@@ -2753,7 +2869,7 @@ function setView(v) {
   pFitSoon();
   document.querySelectorAll('.mitem').forEach((t) => t.classList.toggle('on', t.dataset.g === v));
   menuSync(v);
-  document.title = v === 'ranked' ? 'Casino · Ranked' : v === 'shop' ? 'Casino · Boutique' : v === 'tasks' ? 'Casino · Tasks' : v === 'account' ? 'Casino · Compte' : v.startsWith('off-') ? 'Casino · Jeux offline' : v === 'roulette' ? 'Casino · Roulette' : v === 'bj' ? 'Casino · Blackjack' : v === 'poker' ? 'Casino · Poker' : v === 'top' ? 'Casino · Classement' : v === 'rank' ? 'Casino · Rank' : v === 'admin' ? 'Casino · Admin' : 'Casino · Jeux';
+  document.title = v === 'ranked' ? 'Casino · Ranked' : v === 'shop' ? 'Casino · Boutique' : v === 'tasks' ? 'Casino · Tasks' : v === 'account' ? 'Casino · Compte' : v.startsWith('off-') ? 'Casino · Jeux offline' : v === 'roulette' ? 'Casino · Roulette' : v === 'rocket' ? 'Casino · Rocket Race' : v === 'bj' ? 'Casino · Blackjack' : v === 'poker' ? 'Casino · Poker' : v === 'top' ? 'Casino · Classement' : v === 'rank' ? 'Casino · Rank' : v === 'admin' ? 'Casino · Admin' : 'Casino · Jeux';
   $('#bTop').classList.toggle('hide', !bjMode && v !== 'poker');
   $('#bRules').classList.toggle('hide', v === 'hub' || v === 'top' || v === 'rank' || v === 'admin' || v === 'shop' || v === 'tasks' || v === 'account' || v.startsWith('off-'));
   try { sessionStorage.setItem('znk_v', v); } catch {}
@@ -2763,7 +2879,7 @@ function setView(v) {
     else if (v === 'top') tab = 'top';
     else if (v === 'hub') tab = document.querySelector('#hubTabs button.on')?.dataset.hub || sessionStorage.getItem('znk_hub') || 'online';
     else if (String(v).startsWith('off-')) tab = 'offline';
-    else if (v === 'bj' || v === 'ranked' || v === 'poker' || v === 'roulette') tab = 'online';
+    else if (v === 'bj' || v === 'ranked' || v === 'poker' || v === 'roulette' || v === 'rocket') tab = 'online';
     else if (v === 'tasks') tab = 'tasks';
     else if (v === 'shop' || v === 'account') tab = 'online';
     document.querySelectorAll('#botNav .bn').forEach((b) => b.classList.toggle('on', b.dataset.tab === tab));
@@ -2794,6 +2910,7 @@ function setView(v) {
   if (v.startsWith('off-')) ofOpen(v);
   if (v === 'poker') { pSend('psync'); if (P.S) pRender(P.S); }
   if (v === 'roulette') { rEnter(); if (W.S) rRender(W.S); else $('#meBal').textContent = num(rBal()) + ' ' + COIN; }
+  else if (v === 'rocket') { rocEnter(); if (ROC.st) rocRender(ROC.st); else $('#meBal').textContent = W.bal != null ? num(W.bal) + ' ' + COIN : 'Casino'; }
   else { const m = v === 'poker' ? null : mySeat(); const UC = v === 'ranked' ? 'RR' : COIN; $('#meBal').textContent = m ? num(m.bal) + ' ' + UC : bjMode ? 'Spectateur' : (W.bal != null ? num(W.bal) + ' ' + UC : 'Casino'); }
   if (LB_GAME_KEY[v]) loadGameLB(v);
 }
