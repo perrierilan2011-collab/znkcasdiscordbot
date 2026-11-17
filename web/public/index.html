@@ -51,6 +51,14 @@ header{display:flex;align-items:center;gap:10px;padding:8px 14px;background:#000
 .glive{font-size:12px;font-weight:600;color:#86efac;min-height:16px}
 .gcard:disabled{cursor:not-allowed;opacity:.55;filter:none}
 .gcard:disabled .gplay{background:#262626;color:#a3a3a3}
+/* catégorie RANKED, tout en haut de l'accueil */
+.cat-ranked{padding:18px;border-radius:18px;border:1px solid rgba(251,191,36,.55);background:radial-gradient(900px 180px at 50% -30%,rgba(251,191,36,.18),transparent 70%),linear-gradient(180deg,#0c0a04,#050505);box-shadow:0 18px 55px rgba(0,0,0,.75),inset 0 0 0 1px rgba(255,255,255,.03)}
+.cat-ranked h2{color:#fde68a;letter-spacing:.16em;font-size:17px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.rkcat-tag{font-size:10px;letter-spacing:.12em;color:#000;background:var(--gold);padding:4px 8px;border-radius:999px;font-weight:900}
+.cat-ranked .catd{color:#d6cba9}
+.cat-ranked .gcard.ranked{border-color:rgba(251,191,36,.65);background:linear-gradient(135deg,rgba(251,191,36,.12),#080808 60%);box-shadow:inset 0 0 35px rgba(251,191,36,.06)}
+.cat-ranked .gcard.ranked:hover{border-color:#fde68a;background:linear-gradient(135deg,rgba(251,191,36,.2),#0b0b0b 60%)}
+.cat-ranked .gcard.ranked .gplay{background:var(--gold);color:#000}
 /* bandeau Ranked Blackjack (affiché seulement sur la table ranked) */
 #bjRankedTag{display:none;align-items:center;gap:12px;justify-content:center;flex-wrap:wrap;width:100%;padding:8px 14px;border-radius:10px;border:1px solid var(--gold);background:linear-gradient(90deg,rgba(251,191,36,.16),rgba(251,191,36,.03));color:#fde68a;font-weight:900;letter-spacing:.14em;font-size:13px}
 #bjRankedTag.on{display:flex}
@@ -272,6 +280,31 @@ th{color:var(--mut);font-size:12px}
 .adfields label{display:flex;flex-direction:column;font-size:12px;color:var(--mut);font-weight:700}
 .adfields label.hide{display:none!important}
 @media(max-width:600px){#adminView{padding:16px 8px 64px}.adgrid,.adfields{grid-template-columns:1fr}}
+/* nouveaux jeux : scène cinématique */
+.nsc{position:relative;overflow:hidden;border-radius:16px;background:radial-gradient(700px 260px at 50% -20%,rgba(251,191,36,.16),transparent 70%),linear-gradient(180deg,#0b0b0d,#030303);border:1px solid #232323;box-shadow:inset 0 0 60px rgba(0,0,0,.9)}
+.nstage{position:relative;width:100%;height:330px}
+.nstage canvas{width:100%;height:100%;display:block}
+.nflash{position:absolute;inset:0;pointer-events:none;opacity:0;background:radial-gradient(circle at 50% 55%,rgba(255,255,255,.85),rgba(251,191,36,.35) 35%,transparent 70%);mix-blend-mode:screen}
+.npop{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%) scale(.6);opacity:0;pointer-events:none;font:900 54px system-ui,sans-serif;color:#fde68a;text-shadow:0 0 25px rgba(251,191,36,.8),0 8px 20px #000;white-space:nowrap}
+.nban{position:absolute;left:50%;top:12px;transform:translateX(-50%);font:800 13px ui-monospace,Menlo,monospace;letter-spacing:.18em;color:rgba(255,255,255,.6);pointer-events:none}
+.nsc.shake,.shake{animation:nshake .42s ease}
+@keyframes nshake{0%,100%{transform:translate(0,0)}20%{transform:translate(-7px,3px)}40%{transform:translate(6px,-3px)}60%{transform:translate(-4px,-2px)}80%{transform:translate(3px,2px)}}
+/* couche cinématique partagée */
+.fxburst{position:fixed;inset:0;pointer-events:none;z-index:18;overflow:hidden}
+.fxray{position:absolute;left:50%;top:50%;width:2px;height:70vmax;transform-origin:50% 0;background:linear-gradient(180deg,rgba(253,230,138,.9),transparent 78%);filter:blur(1px)}
+.fxpart{position:absolute;width:6px;height:6px;border-radius:50%;background:#fde68a;box-shadow:0 0 12px #fbbf24}
+/* roulette événement */
+.rewrap{margin:10px auto 4px;max-width:600px}
+.rehead{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:8px}
+.reclock{font:900 15px ui-monospace,Menlo,monospace;color:#fde68a;background:#120e04;border:1px solid rgba(251,191,36,.35);border-radius:999px;padding:6px 12px}
+.restage{position:relative;width:min(560px,100%);aspect-ratio:1;margin:0 auto;border-radius:50%;box-shadow:0 0 0 6px #0b0b0b,0 0 0 8px rgba(251,191,36,.6),0 0 55px rgba(251,191,36,.18),inset 0 0 40px rgba(0,0,0,.9)}
+.restage canvas{width:100%;height:100%;border-radius:50%;display:block}
+.reneedle{position:absolute;left:50%;top:-14px;transform:translateX(-50%);width:0;height:0;border-left:13px solid transparent;border-right:13px solid transparent;border-top:26px solid #fbbf24;filter:drop-shadow(0 3px 6px #000);z-index:2}
+.rewinner{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);padding:10px 18px;border-radius:999px;background:rgba(0,0,0,.82);border:1px solid #fbbf24;color:#fde68a;font-weight:900;text-align:center;white-space:nowrap;box-shadow:0 8px 30px #000;z-index:3}
+.renames{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:12px;max-height:110px;overflow:auto}
+.renames .rn{display:flex;align-items:center;gap:6px;padding:4px 9px 4px 4px;border-radius:999px;background:#111;border:1px solid #2a2a2a;font-size:12px;max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.renames .rn img{width:22px;height:22px;border-radius:50%;object-fit:cover;background:#222}
+.renames .rn.win{border-color:#fbbf24;color:#fde68a;box-shadow:0 0 16px rgba(251,191,36,.25)}
 /* notifications d'événement */
 .nit.ev{align-items:flex-start}
 .nit .nbtn{margin-top:6px;padding:6px 14px;border-radius:999px;background:#fff;color:#000;font-weight:800;font-size:12px;border:0}
@@ -857,8 +890,8 @@ header .sp{flex:1 1 0}
 </head>
 <body>
 <div class="modal" id="mOrder"><div class="box" style="max-width:400px;padding:20px;text-align:center">
-  <h3 style="margin:0 0 8px">Commande créée</h3>
-  <p style="color:var(--mut);font-size:13px;margin:0 0 12px">Copie ton order code et ouvre un ticket « Claim rewards » sur Discord</p>
+  <h3 style="margin:0 0 8px" id="mOrderTitle">Commande créée</h3>
+  <p style="color:var(--mut);font-size:13px;margin:0 0 12px" id="mOrderHint">Copie ton order code et ouvre un ticket « Claim rewards » sur Discord</p>
   <div class="ocode" id="mOrderCode">————</div>
   <p id="mOrderName" style="margin:12px 0;font-weight:700"></p>
   <button class="btn go" id="mOrderCopy" style="width:100%">Copier le code</button>
@@ -891,6 +924,17 @@ header .sp{flex:1 1 0}
 </header>
 <div id="conn">Reconnexion…</div>
 <main id="hubView">
+  <section class="cat cat-ranked" id="catRanked">
+    <h2>🏆 RANKED <span class="rkcat-tag">BLACKJACK CLASSÉ</span></h2>
+    <p class="catd">La table de compétition. Tu mises tes <b>RR</b> (pas tes ZTKN). Chaque manche fait évoluer ton classement.</p>
+    <div class="games">
+      <button class="gcard ranked" data-go="ranked" id="gcRanked">
+        <span class="gname">Ranked Blackjack</span>
+        <span class="gdesc">Table dédiée · mises en RR · ELO / RR conservés</span>
+        <span class="glive" id="gRankedLive"></span><span class="gplay">Entrer</span>
+      </button>
+    </div>
+  </section>
   <section class="cat">
     <h2>En ligne</h2>
     <p class="catd">Tables partagées avec tous les joueurs du serveur.</p>
@@ -910,16 +954,11 @@ header .sp{flex:1 1 0}
         <span class="gdesc">Roulette européenne · rouge, noir, pair, impair, numéros pleins</span>
         <span class="glive" id="gRlLive"></span><span class="gplay">Jouer</span>
       </button>
-      <button class="gcard" data-go="ranked" id="gcRanked">
-        <span class="gname">Ranked</span>
-        <span class="gdesc">Blackjack classé · RR en jeu · table dédiée</span>
-        <span class="glive"></span><span class="gplay">Jouer</span>
-      </button>
     </div>
   </section>
   <section class="cat">
     <h2>Hors ligne</h2>
-    <p class="catd">Jouables directement en MP Discord, et aussi sur le site.</p>
+    <p class="catd">Jeux solo sur le site, avec animations cinématiques. Le serveur fait foi sur les tirages.</p>
     <div class="games" id="gOffline">
       <button class="gcard" data-go="off-bj" id="gcOffBj">
         <span class="gname">Blackjack</span>
@@ -976,6 +1015,19 @@ header .sp{flex:1 1 0}
         <span class="gdesc">Gratte pour de vrai, trois montants identiques gagnent</span>
         <span class="glive"></span><span class="gplay">Jouer</span>
       </button>
+    </div>
+    <div class="lbtitle" style="margin-top:22px"><b>Nouveaux jeux animés</b><small>10 jeux solo, chacun avec sa propre cinématique</small></div>
+    <div class="games" id="gNewGames">
+      <button class="gcard" data-go="off-lucky7"><span class="gname">Lucky 7</span><span class="gdesc">Trois rouleaux · aligne trois 7 pour le jackpot</span><span class="glive"></span><span class="gplay">Jouer</span></button>
+      <button class="gcard" data-go="off-bubbles"><span class="gname">Bubble Pop</span><span class="gdesc">Éclate la bonne bulle, zone sûre ou risquée</span><span class="glive"></span><span class="gplay">Jouer</span></button>
+      <button class="gcard" data-go="off-frozen"><span class="gname">Ice Breaker</span><span class="gdesc">Brise la tuile qui cache le meilleur multiplicateur</span><span class="glive"></span><span class="gplay">Jouer</span></button>
+      <button class="gcard" data-go="off-candy"><span class="gname">Candy Rush</span><span class="gdesc">La roue des bonbons, jusqu’à x22</span><span class="glive"></span><span class="gplay">Jouer</span></button>
+      <button class="gcard" data-go="off-heist"><span class="gname">Bank Heist</span><span class="gdesc">Choisis le coffre, jackpot x12.5</span><span class="glive"></span><span class="gplay">Jouer</span></button>
+      <button class="gcard" data-go="off-orbit"><span class="gname">Orbit</span><span class="gdesc">Lâche la sonde sur l’orbite gagnante</span><span class="glive"></span><span class="gplay">Jouer</span></button>
+      <button class="gcard" data-go="off-cards"><span class="gname">Speed Cards</span><span class="gdesc">Tire 3 cartes, mise sur la bonne couleur</span><span class="glive"></span><span class="gplay">Jouer</span></button>
+      <button class="gcard" data-go="off-rocket"><span class="gname">Rocket Race</span><span class="gdesc">Quatre fusées, un seul vainqueur</span><span class="glive"></span><span class="gplay">Jouer</span></button>
+      <button class="gcard" data-go="off-cannon"><span class="gname">Cannon Blast</span><span class="gdesc">Vise la cible, du bord au cœur</span><span class="glive"></span><span class="gplay">Jouer</span></button>
+      <button class="gcard" data-go="off-jewels"><span class="gname">Jewel Cascade</span><span class="gdesc">Cascade de joyaux, jusqu’à x11.5</span><span class="glive"></span><span class="gplay">Jouer</span></button>
     </div>
   </section>
 </main>
@@ -1069,6 +1121,7 @@ header .sp{flex:1 1 0}
           <button type="button" class="btn" data-eco="set">🎯 Set</button>
           <button type="button" class="btn" data-eco="view">👀 View</button>
           <button type="button" class="btn" data-eco="player_stats">📊 Player stats</button>
+          <button type="button" class="btn" data-eco="reset_balance" style="background:#7f1d1d">🧹 Reset solde joueur</button>
         </div>
         <div style="display:flex;flex-wrap:wrap;gap:8px">
           <button type="button" class="btn go" data-eco="gift_all">🎁 Gift all</button>
@@ -1100,6 +1153,7 @@ header .sp{flex:1 1 0}
           <label id="adFAmount">Montant par gagnant<input class="gin" id="adAmount" inputmode="decimal" autocomplete="off" placeholder="ex : 50"></label>
           <label id="adFWinners">Nombre de gagnants<input class="gin" id="adWinners" inputmode="numeric" autocomplete="off" value="1"></label>
           <label id="adFMinutes"><span id="adMinLbl">Durée (minutes)</span><input class="gin" id="adMinutes" inputmode="numeric" autocomplete="off" value="15"></label>
+          <label id="adFSeconds" class="hide"><span>Durée (secondes)</span><input class="gin" id="adSeconds" inputmode="numeric" autocomplete="off" value="60"></label>
         </div>
         <p style="text-align:right;margin:8px 0 0"><button class="btn go" id="adLaunch">Lancer l’événement</button></p>
       </div>
@@ -1204,6 +1258,63 @@ create table if not exists shop_ticket_cfg (
   category_id text,
   panel_channel_id text,
   updated_at timestamptz not null default now()
+);
+
+-- Rôles livrés directement (aucun code, aucun ticket)
+create table if not exists shop_role_grants (
+  id bigint generated always as identity primary key,
+  user_id text not null,
+  user_name text not null default '',
+  guild_id text not null default '',
+  reward_id text not null default '',
+  reward_name text not null default '',
+  role_id text not null default '',
+  price numeric(18,2) not null default 0,
+  status text not null default 'delivered',
+  error text not null default '',
+  created_at timestamptz not null default now()
+);
+
+-- Événement roulette
+create table if not exists roulette_events (
+  id text primary key,
+  guild_id text not null,
+  title text not null default 'Roulette événement',
+  amount numeric(18,2) not null default 0,
+  status text not null default 'running',
+  seconds integer not null default 60,
+  starts_at timestamptz,
+  ends_at timestamptz,
+  finished_at timestamptz,
+  winner_id text,
+  winner_name text not null default '',
+  winner_avatar text not null default '',
+  participants jsonb not null default '[]'::jsonb,
+  launched_by text not null default '',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists roulette_event_participants (
+  id bigint generated always as identity primary key,
+  event_id text not null,
+  guild_id text not null default '',
+  user_id text not null,
+  user_name text not null default '',
+  avatar text not null default '',
+  joined_at timestamptz not null default now(),
+  unique (event_id, user_id)
+);
+
+create table if not exists roulette_event_results (
+  id bigint generated always as identity primary key,
+  event_id text not null,
+  guild_id text not null default '',
+  winner_id text not null,
+  winner_name text not null default '',
+  amount numeric(18,2) not null default 0,
+  created_at timestamptz not null default now(),
+  unique (event_id, winner_id)
 );</pre>
       </div>
     </section>
@@ -1451,6 +1562,11 @@ create table if not exists shop_ticket_cfg (
   <div class="gq"><button class="btn" data-q="100">100</button><button class="btn" data-q="1k">1k</button><button class="btn" data-q="10k">10k</button><button class="btn" data-q="100k">100k</button></div>
   <p style="text-align:right"><button class="btn" data-close>Annuler</button> <button class="btn go" id="gSend">Envoyer</button></p></div></div>
 <div class="modal" id="mTop"><div class="box"><h2 id="topTitle">Classement du blackjack (gains nets)</h2><div id="topBody">…</div><p style="text-align:right"><button class="btn" data-close>Fermer</button></p></div></div>
+<div class="modal" id="mStatsCard"><div class="box" style="max-width:920px;padding:16px;text-align:center">
+  <h2 style="margin:0 0 10px">Fiche joueur</h2>
+  <canvas id="statsCanvas" width="1200" height="675" style="width:100%;height:auto;border-radius:14px;display:block;background:#000"></canvas>
+  <p style="margin:12px 0 0"><button class="btn" id="statsDownload">Télécharger la image</button> <button class="btn" data-close>Fermer</button></p>
+</div></div>
 <div class="modal" id="mRules"><div class="box"><h2>Règles du blackjack</h2><ul>
 <li>Bats le croupier sans dépasser <b>21</b>. Figures = 10, As = 1 ou 11.</li>
 <li><b>Mise libre</b> : tape le montant que tu veux (ex. <code>250</code>, <code>1.5k</code>, <code>2m</code>) ou clique sur les jetons. « Tapis » = tout ton solde.</li>
@@ -1465,7 +1581,20 @@ create table if not exists shop_ticket_cfg (
 <aside id="chat"><div id="chatHead"><span id="chatTitle">Chat</span><span id="chatBadge" class="hide"></span></div>
 <div id="chatBody"><div id="chatList" aria-live="polite"></div><form id="chatForm" autocomplete="off"><input id="chatIn" maxlength="200" placeholder="Écrire un message" aria-label="Message"><button class="btn" type="submit">Envoyer</button></form></div></aside>
 <div id="toast"></div>
-<div class="modal" id="mEvent"><div class="box"><h2 id="evT"></h2><p id="evX"></p><div id="evB"></div><p style="text-align:right"><button class="btn" data-close>Fermer</button></p></div></div>
+<div class="modal" id="mEvent"><div class="box" style="max-width:760px">
+  <h2 id="evT"></h2><p id="evX"></p>
+  <div id="evWheelWrap" class="rewrap hide">
+    <div class="rehead"><span id="reCount" class="reclock">—</span><span id="reStatus" class="reclock"></span></div>
+    <div class="restage"><canvas id="reCanvas" width="560" height="560"></canvas><div id="reNeedle" class="reneedle"></div><div id="reWinner" class="rewinner hide"></div></div>
+    <div id="reNames" class="renames"></div>
+  </div>
+  <div id="evB"></div>
+  <div id="reActions" class="adbtnrow hide" style="justify-content:center">
+    <button class="btn go" id="reJoin">Participer</button>
+    <button class="btn" id="reOpen">Rouvrir la roue</button>
+  </div>
+  <p style="text-align:right"><button class="btn" data-close>Fermer</button></p>
+</div></div>
 <script>
 'use strict';
 (() => {
@@ -1625,9 +1754,10 @@ function connect() {
 es.addEventListener('roulette', (e) => { const st = JSON.parse(e.data); offset = st.now - Date.now(); rRender(st); });
   es.addEventListener('poker', (e) => { const st = JSON.parse(e.data); offset = st.now - Date.now(); pUpdate(st); });
   es.addEventListener('admin', () => $('#bAdmin').classList.remove('hide'));
-  es.addEventListener('bal', (e) => { W.bal = JSON.parse(e.data).bal; pHeader(); if (!O.hold && W.bal != null) $('#meBal').textContent = num(W.bal) + ' ' + COIN; });
+  es.addEventListener('bal', (e) => { W.bal = JSON.parse(e.data).bal; pHeader(); if (W.view !== 'ranked' && !O.hold && W.bal != null) $('#meBal').textContent = num(W.bal) + ' ' + COIN; });
   es.addEventListener('inbox', (e) => nSet(JSON.parse(e.data), false));
   es.addEventListener('notif', (e) => nAdd(JSON.parse(e.data)));
+  es.addEventListener('roulette_event', (e) => { try { reSetEvent(JSON.parse(e.data), false); } catch {} });
   es.addEventListener('chathist', (e) => { C.msgs = JSON.parse(e.data); cRender(); });
   es.addEventListener('chat', (e) => cOnMsg(JSON.parse(e.data)));
   es.addEventListener('state', (e) => { $('#conn').style.display = 'none'; const st = JSON.parse(e.data); offset = st.now - Date.now(); bjUpdate(st); });
@@ -1745,7 +1875,7 @@ function render(st) {
       se.plate.append(av, tx, dot, bar);
     }
     se.plate.querySelector('.nm').textContent = p.name + (p.leaving ? ' (part)' : '');
-    se.plate.querySelector('.bl').textContent = num(p.bal) + ' ' + COIN;
+    se.plate.querySelector('.bl').textContent = num(p.bal) + ' ' + (W.view === 'ranked' ? 'RR' : COIN);
     se.plate.querySelector('.dot').className = 'dot' + (p.online ? '' : ' off');
     // mise
     const inRound = p.hands.length > 0;
@@ -1792,8 +1922,9 @@ function render(st) {
   const tk = st.turn ? st.round + ':' + st.turn.seat + ':' + st.turn.hand : '';
   if (tk && tk !== lastTurnKey && myTurn) { SFX.turn(); try { navigator.vibrate && navigator.vibrate(120); } catch {} }
   lastTurnKey = tk;
-  // solde en-tête
-  const ms = mySeat(); $('#meBal').textContent = ms ? num(ms.bal) + ' ' + COIN : 'Spectateur';
+  // solde en-tête — en classé on mise des RR, pas des ZTKN
+  const ms = mySeat(); const UC = W.view === 'ranked' ? 'RR' : COIN;
+  $('#meBal').textContent = ms ? num(ms.bal) + ' ' + UC : 'Spectateur';
   // flux
   const feed = $('#feed'); feed.textContent = ''; st.feed.slice(-4).forEach((f) => feed.append(el('div', '', noEmo(f.text))));
   updateCenter(st); updateDock(st, mi, myTurn);
@@ -1824,7 +1955,8 @@ function updateDock(st, mi, myTurn) {
   if (!ms) info.innerHTML = 'Tu regardes la table. <b>Prends une place libre</b> pour jouer avec ton solde.';
   else if (myTurn) info.textContent = '';
   else if (betting) {
-    const cur = ms.bet; info.innerHTML = cur ? `Mise placée : <b>${num(cur)} ${COIN}</b> — tu peux la modifier avant la distribution.` : 'Choisis ta mise (n’importe quel montant ≤ ton solde) puis <b>Miser</b>.';
+    const cur = ms.bet; const UC = W.view === 'ranked' ? 'RR' : COIN;
+    info.innerHTML = cur ? `Mise placée : <b>${num(cur)} ${UC}</b> — tu peux la modifier avant la distribution.` : (W.view === 'ranked' ? 'Choisis ta mise en <b>RR</b> (minimum 1, pas en dessous de 100 RR) puis <b>Miser</b>.' : 'Choisis ta mise (n’importe quel montant ≤ ton solde) puis <b>Miser</b>.');
   } else if (st.phase === 'playing') info.textContent = ms.hands.length ? 'Les autres jouent… tu vois toutes leurs cartes.' : 'Tu n’as pas misé : tu joueras la prochaine manche.';
   else if (st.phase === 'dealer') info.textContent = 'Le croupier tire…';
   else if (st.phase === 'result') info.textContent = ms.hands.length ? 'Résultat de la manche affiché sur la table.' : '';
@@ -2116,6 +2248,7 @@ async function loadRankedTag() {
     const res = await fetch('/api/rank?t=' + encodeURIComponent(TOKEN));
     if (!res.ok) throw new Error('rank');
     const d = await res.json(), m = d.me || {};
+    const gl = $('#gRankedLive'); if (gl) gl.textContent = m.elo != null ? num(m.elo) + ' RR · table classée' : 'Table classée · RR';
     info.textContent = m.prov
       ? 'Placement ' + (m.placementDone || 0) + '/' + (d.placementN || 5) + ' · RR masqué'
       : (m.elo != null ? num(m.elo) + ' RR' : 'RR …') + (m.pos ? ' · #' + m.pos : '');
@@ -2562,7 +2695,7 @@ function setView(v) {
   if (v.startsWith('off-')) ofOpen(v);
   if (v === 'poker') { pSend('psync'); if (P.S) pRender(P.S); }
   if (v === 'roulette') { rEnter(); if (W.S) rRender(W.S); else $('#meBal').textContent = num(rBal()) + ' ' + COIN; }
-  else { const m = v === 'poker' ? null : mySeat(); $('#meBal').textContent = m ? num(m.bal) + ' ' + COIN : bjMode ? 'Spectateur' : (W.bal != null ? num(W.bal) + ' ' + COIN : 'Casino'); }
+  else { const m = v === 'poker' ? null : mySeat(); const UC = v === 'ranked' ? 'RR' : COIN; $('#meBal').textContent = m ? num(m.bal) + ' ' + UC : bjMode ? 'Spectateur' : (W.bal != null ? num(W.bal) + ' ' + UC : 'Casino'); }
 }
 document.querySelectorAll('.gcard').forEach((c) => (c.onclick = () => { ac(); setView(c.dataset.go); }));
 document.querySelectorAll('#topNav [data-g]').forEach((b) => {
@@ -2658,6 +2791,7 @@ function lbWatch(on) {
 
 // ---- page Admin : ajout d'argent + événements (mêmes événements que le bot Discord)
 const AD_TYPES = [
+  { id: 'roulette', label: '🎡 Roulette', desc: 'Roue avec pseudos + photos de profil. Tirage après le chrono (en secondes), ZTKN au gagnant.', f: ['amount', 'seconds'], min: 60, minLbl: 'Durée avant tirage (secondes)' },
   { id: 'claim', label: 'Claim rapide', desc: 'Les N premiers qui cliquent gagnent', f: ['amount', 'winners', 'minutes'], min: 5, minLbl: 'Durée max (0 = illimité)' },
   { id: 'giveaway', label: 'Giveaway', desc: 'Inscriptions, tirage à la fin du timer', f: ['amount', 'winners', 'minutes'], min: 10, minLbl: 'Durée avant tirage (min)' },
   { id: 'x2win', label: 'x2 Gains', desc: 'Tous les gains sont doublés pendant X min', f: ['minutes'], min: 15 },
@@ -2672,7 +2806,9 @@ function adPick(id) {
   document.querySelectorAll('#adTypes button').forEach((b) => b.classList.toggle('on', b.dataset.id === id));
   $('#adEvDesc').textContent = t.desc;
   $('#adFAmount').classList.toggle('hide', !t.f.includes('amount')); $('#adFWinners').classList.toggle('hide', !t.f.includes('winners'));
+  $('#adFMinutes').classList.toggle('hide', !t.f.includes('minutes')); $('#adFSeconds').classList.toggle('hide', !t.f.includes('seconds'));
   $('#adMinutes').value = String(t.min); $('#adMinLbl').textContent = t.minLbl || 'Durée (minutes)';
+  $('#adSeconds').value = String(t.min);
 }
 function adInit() {
   const box = $('#adTypes');
@@ -2684,10 +2820,14 @@ function adInit() {
   if (launch) launch.onclick = async () => {
     const t = AD_TYPES.find((x) => x.id === AD.kind), b = $('#adLaunch');
     const body = { kind: t.id, minutes: Math.floor(Number($('#adMinutes').value) || 0) };
+    if (t.f.includes('seconds')) body.seconds = Math.floor(Number($('#adSeconds').value) || 0);
     if (t.f.includes('amount')) { body.amount = parseAmt($('#adAmount').value); if (!(body.amount > 0)) return toast('Montant invalide.'); body.winners = Math.floor(Number($('#adWinners').value) || 1); }
-    if (!confirm('Lancer « ' + t.label + ' » ? Tous les joueurs recevront une notification (et un MP Discord).')) return;
+    if (!confirm('Lancer « ' + t.label + ' » ? Tous les joueurs recevront une notification.')) return;
     b.disabled = true; const ok = await send('adminevent', body); b.disabled = false;
-    if (ok) { SFX.win(); toast('Événement lancé : ' + t.label); }
+    if (ok) {
+      SFX.win(); toast('Événement lancé : ' + t.label);
+      if (t.id === 'roulette') { reSetEvent((send.last && send.last.event) || null, true); reOpen(); }
+    }
   };
 }
 adInit();
@@ -3138,6 +3278,7 @@ function scShow(s) {
   const net = Math.round((s.win - s.bet) * 100) / 100;
   $('#oMsg').replaceChildren(el('span', s.win > 0 ? 'win' : 'lose', s.win > 0 ? 'GAGNÉ x' + s.mult + ' · +' + num(net) + ' ' + COIN : 'Perdu… retente ta chance'));
   if (s.win > 0) { SFX.win(); confetti($('#oTk'), s.mult >= 100 ? 80 : 26, s.mult === 1000 ? ['#a855f7', '#fde047', '#fff'] : ['#fde047', '#fbbf24', '#e9d5ff']); }
+  fxStart(s.win > 0, '#fde047'); fxPulse($('#oTk'), s.win > 0);
   if (s.mult === 1000) { [523, 659, 784, 1047, 1319].forEach((q, i) => tone(q, .3, 'triangle', .07, i * .11)); }
   scStats(s);
 }
@@ -3190,8 +3331,11 @@ function scAuto() {
 // ============================================================= JEUX OFFLINE (solo, serveur : offline.js)
 const O = { game: null, st: null, bal: null, bet: '100', mines: 3, auto: '', hist: { fuse: [], mines: [], bj: [], coin: [], dice: [], horses: [], russian: [], slots: [], duel: [], scratch: [] }, timer: 0, pp: [], run: 0, anim: false, hold: false, pick: { coin: 'pile', dice: 'over', horses: '1', russian: '1', slots: '1', duel: '0' } };
 const OMAP = { 'off-bj': 'bj', 'off-fuse': 'fuse', 'off-mine': 'mines', 'off-coin': 'coin', 'off-dice': 'dice', 'off-horses': 'horses', 'off-russian': 'russian', 'off-slots': 'slots', 'off-duel': 'duel', 'off-scratch': 'scratch', 'off-plinko': 'plinko' };
+const NG_DEFAULT = { lucky7: '7', bubbles: 'safe', frozen: '0', candy: 'cherry', heist: '1', orbit: 'mid', cards: '♠', rocket: '0', cannon: 'center', jewels: '1' };
+NEW_IDS.forEach((k) => { OMAP['off-' + k] = k; O.hist[k] = []; O.pick[k] = NG_DEFAULT[k]; });
 O.hist.plinko = []; O.pick.plinko = 'med'; O.balls = 1;
-const OT = { bj: 'BLACKJACK SOLO', fuse: 'FUSÉ', mines: 'MINES', coin: 'PILE OU FACE', dice: 'DÉS', horses: 'COURSE DE CHEVAUX', russian: 'ROULETTE RUSSE', slots: 'SLOTS', duel: 'DUEL', scratch: 'TICKET À GRATTER', plinko: 'PLINKO' };
+const OT = { bj: 'BLACKJACK SOLO', fuse: 'FUSÉ', mines: 'MINES', coin: 'PILE OU FACE', dice: 'DÉS', horses: 'COURSE DE CHEVAUX', russian: 'ROULETTE RUSSE', slots: 'SLOTS', duel: 'DUEL', scratch: 'TICKET À GRATTER', plinko: 'PLINKO',
+  lucky7: 'LUCKY 7', bubbles: 'BUBBLE POP', frozen: 'ICE BREAKER', candy: 'CANDY RUSH', heist: 'BANK HEIST', orbit: 'ORBIT', cards: 'SPEED CARDS', rocket: 'ROCKET RACE', cannon: 'CANNON BLAST', jewels: 'JEWEL CASCADE' };
 const GEM = '<svg viewBox="0 0 24 24"><path d="M6 3h12l4 6-10 12L2 9z" fill="#bbf7d0" stroke="#fff" stroke-width="1.2" stroke-linejoin="round"/><path d="M2 9h20M9 3l3 6 3-6M12 9v12" fill="none" stroke="#16a34a" stroke-width="1"/></svg>';
 const BOMB = '<svg viewBox="0 0 24 24"><circle cx="11" cy="14" r="7.5" fill="#1c1c1c" stroke="#fca5a5" stroke-width="1.4"/><path d="M16 8l3-3M18 3v3M17 4h3" stroke="#fbbf24" stroke-width="1.6" stroke-linecap="round"/><circle cx="8.5" cy="11.5" r="1.8" fill="#fff" opacity=".5"/></svg>';
 async function osend(action, extra = {}) {
@@ -3434,7 +3578,9 @@ function ofDock() {
   row(act('go', O.game === 'scratch' ? 'Acheter un ticket' : s ? 'Rejouer' : 'Jouer', ofStart));
 }
 // ---- jeux « un coup » : pile ou face, dés, chevaux, roulette russe (tirage côté serveur, animation côté site)
+const NEW_IDS = ['lucky7', 'bubbles', 'frozen', 'candy', 'heist', 'orbit', 'cards', 'rocket', 'cannon', 'jewels'];
 const INST = { coin: 1, dice: 1, horses: 1, russian: 1, slots: 1, duel: 1, plinko: 1 };
+NEW_IDS.forEach((k) => { INST[k] = 1; });
 const FOES = [{ n: 'Recrue', p: 60, m: 1.6 }, { n: 'Pistolero', p: 45, m: 2.1 }, { n: 'Légende', p: 25, m: 3.8 }, { n: 'Fantôme', p: 10, m: 9.6 }];
 const HM = [2.4, 3.8, 5.3, 8.6, 15.8], HP = [40, 25, 18, 11, 6], HCOL = ['#ef4444', '#3b82f6', '#22c55e', '#f59e0b', '#a855f7'];
 const rusM = (k) => Math.floor(0.96 * 6 / (6 - k) * 100) / 100;
@@ -3446,12 +3592,207 @@ const CH = {
   plinko: [['low', 'Faible', 5.6, 'gain max'], ['med', 'Moyen', 26, 'gain max'], ['high', 'Élevé', 130, 'gain max']],
   duel: FOES.map((f, i) => [String(i), f.n, f.m, f.p + ' % de réussite']),
   russian: [1, 2, 3, 4, 5].map((k) => [String(k), k + ' balle' + (k > 1 ? 's' : ''), rusM(k), Math.round(k / 6 * 100) + ' % de risque']),
+  lucky7: Array.from({ length: 10 }, (_, i) => [String(i), 'Chiffre ' + i, i === 7 ? 9.2 : i === 0 ? 0 : 1.8, i === 7 ? 'jackpot' : '']),
+  bubbles: [['safe', 'Zone sûre', 3.6, 'peu de risque'], ['risky', 'Zone risquée', 7.4, 'gros gain']],
+  frozen: Array.from({ length: 6 }, (_, i) => [String(i), 'Tuile ' + (i + 1), [0, 0, 0.4, 1.1, 2.6, 6.2][i], '']),
+  candy: Object.entries({ cherry: ['Cerise', 2.1], lemon: ['Citron', 3.2], mint: ['Menthe', 5.1], berry: ['Framboise', 9.4], gold: ['Bonbon d’or', 22] }).map(([k, v]) => [k, v[0], v[1], '']),
+  heist: [1, 2, 3, 4].map((i) => [String(i), 'Coffre ' + i, [2.2, 3.8, 5.6, 12.5][i - 1], 'jackpot possible']),
+  orbit: [['inner', 'Orbite interne', 8.2, 'risqué'], ['mid', 'Orbite moyenne', 3.4, ''], ['outer', 'Orbite externe', 1.9, 'sûr']],
+  cards: [['♠', 'Pique', 2.4], ['♥', 'Cœur', 2.4], ['♦', 'Carreau', 3.6], ['♣', 'Trèfle', 4.8]].map((a) => [a[0], a[1], a[2], '3 cartes']),
+  rocket: [{ n: 'Rouge', m: 2.35 }, { n: 'Bleue', m: 3.5 }, { n: 'Verte', m: 4.7 }, { n: 'Or', m: 7.1 }].map((f, i) => [String(i), 'Fusée ' + f.n, f.m, '']),
+  cannon: [['center', 'Cœur de cible', 12, 'difficile'], ['ring', 'Couronne', 3.8, ''], ['edge', 'Bord', 1.7, 'facile']],
+  jewels: [1, 2, 3, 4, 5].map((i) => [String(i), 'Joyau ' + i, [0.2, 0.5, 1.4, 3.8, 11.5][i - 1], '']),
 };
 const IDLE = { coin: 'Choisis pile ou face, puis lance la pièce', dice: 'Choisis ton pari, puis lance les dés', horses: 'Clique sur ton cheval, puis lance la course', russian: 'Choisis le nombre de balles, puis tire', slots: 'Lance les rouleaux : trois Z violets = jackpot', duel: 'Choisis ton adversaire, puis dégaine', plinko: 'Choisis le risque et le nombre de billes, puis lâche-les' };
 const BUSY = { coin: 'La pièce tourne…', dice: 'Les dés roulent…', horses: 'La course est lancée…', russian: 'Le barillet tourne…', slots: 'Les rouleaux tournent…', duel: 'Le duel commence…', plinko: 'Les billes tombent…' };
+NEW_IDS.forEach((k) => { IDLE[k] = 'Choisis ton option puis lance l’animation'; BUSY[k] = 'Animation en cours…'; });
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 const alive = (tok) => O.run === tok;
 const flr2 = (x) => Math.floor(x * 100 + 1e-9) / 100;
+
+// ---- couche cinématique partagée (utilisée par TOUS les jeux non protégés)
+const FX = { on: false };
+function fxStart(win, color) {
+  fxEnd(); FX.on = true;
+  const layer = el('div', 'fxburst'); layer.id = 'fxLayer';
+  for (let i = 0; i < 18; i++) {
+    const r = el('div', 'fxray'); r.style.transform = `translate(-50%,0) rotate(${i * 20}deg)`;
+    r.style.opacity = String(0.12 + (i % 3) * 0.07); r.style.background = `linear-gradient(180deg,${color || '#fde68a'},transparent 78%)`;
+    r.animate([{ transform: `translate(-50%,0) rotate(${i * 20}deg) scaleY(.2)`, opacity: 0 }, { transform: `translate(-50%,0) rotate(${i * 20}deg) scaleY(1)`, opacity: .8, offset: .45 }, { transform: `translate(-50%,0) rotate(${i * 20}deg) scaleY(1.25)`, opacity: 0 }], { duration: 900, easing: 'cubic-bezier(.2,.8,.2,1)' });
+    layer.append(r);
+  }
+  for (let i = 0; i < (win ? 60 : 26); i++) {
+    const p = el('div', 'fxpart'), a = Math.random() * 6.28, d = 90 + Math.random() * (win ? 460 : 260);
+    p.style.background = i % 3 ? (color || '#fde68a') : '#fff';
+    p.style.left = '50%'; p.style.top = '52%';
+    p.animate([{ transform: 'translate(-50%,-50%) scale(.2)', opacity: 1 }, { transform: `translate(calc(-50% + ${Math.cos(a) * d}px),calc(-50% + ${Math.sin(a) * d}px)) scale(${0.4 + Math.random()})`, opacity: 0 }], { duration: 700 + Math.random() * 800, easing: 'cubic-bezier(.15,.7,.25,1)' });
+    layer.append(p);
+  }
+  document.body.append(layer);
+  setTimeout(fxEnd, 1500);
+}
+function fxEnd() { const l = $('#fxLayer'); if (l) l.remove(); FX.on = false; }
+function fxPulse(el, win) {
+  if (!el) return;
+  el.animate([{ transform: 'scale(1)', filter: 'brightness(1)' }, { transform: 'scale(1.06)', filter: 'brightness(1.7)' }, { transform: 'scale(1)', filter: 'brightness(1)' }], { duration: win ? 620 : 400, iterations: win ? 2 : 1, easing: 'ease-out' });
+}
+
+// ---- moteur d'animation des 10 nouveaux jeux (même ADN visuel : charge, spin, lock, révélation)
+const NG_C = ['#fbbf24', '#22d3ee', '#a78bfa', '#34d399', '#fb7185', '#60a5fa', '#f472b6', '#facc15'];
+function ngRoundRect(x, X, Y, W, H, r) { x.beginPath(); x.roundRect(X, Y, W, H, r); }
+function ngText(x, t, X, Y, size, color, weight) { x.fillStyle = color || '#fff'; x.font = (weight || 900) + ' ' + size + 'px system-ui,sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(String(t), X, Y); }
+function ngGem(x, cx, cy, r, c) {
+  x.save(); x.translate(cx, cy); x.fillStyle = c; x.strokeStyle = 'rgba(255,255,255,.75)'; x.lineWidth = 1.4;
+  x.shadowColor = c; x.shadowBlur = 14;
+  x.beginPath(); x.moveTo(0, -r); x.lineTo(r * .8, -r * .25); x.lineTo(r * .55, r * .8); x.lineTo(-r * .55, r * .8); x.lineTo(-r * .8, -r * .25); x.closePath(); x.fill(); x.stroke();
+  x.shadowBlur = 0; x.fillStyle = 'rgba(255,255,255,.45)'; x.beginPath(); x.moveTo(0, -r * .8); x.lineTo(r * .35, -r * .1); x.lineTo(0, r * .2); x.closePath(); x.fill(); x.restore();
+}
+function ngDraw(x, w, h, st, t, spin) {
+  x.clearRect(0, 0, w, h);
+  const cx = w / 2, cy = h / 2 + 6;
+  // fond dynamique : grille + halo qui pulse
+  x.fillStyle = '#050506'; x.fillRect(0, 0, w, h);
+  x.strokeStyle = 'rgba(255,255,255,.035)'; x.lineWidth = 1;
+  for (let i = 0; i < w; i += 34) { x.beginPath(); x.moveTo(i, 0); x.lineTo(i, h); x.stroke(); }
+  for (let i = 0; i < h; i += 34) { x.beginPath(); x.moveTo(0, i); x.lineTo(w, i); x.stroke(); }
+  const pulse = 0.16 + Math.sin(t / 180) * 0.05;
+  const gl = x.createRadialGradient(cx, cy, 0, cx, cy, h * .75);
+  gl.addColorStop(0, `rgba(251,191,36,${pulse})`); gl.addColorStop(.55, 'rgba(124,58,237,.08)'); gl.addColorStop(1, 'rgba(0,0,0,0)');
+  x.fillStyle = gl; x.fillRect(0, 0, w, h);
+  // anneaux tournants
+  for (let k = 0; k < 3; k++) {
+    x.save(); x.translate(cx, cy); x.rotate(t / (900 + k * 600) * (k % 2 ? -1 : 1));
+    x.strokeStyle = `rgba(251,191,36,${.22 - k * .05})`; x.lineWidth = 2;
+    x.setLineDash([8 + k * 7, 16 + k * 10]); x.beginPath(); x.arc(0, 0, 92 + k * 42, 0, 7); x.stroke(); x.restore();
+  }
+  x.setLineDash([]);
+  const S = st || {}, rev = !spin && t > 2600;
+  if (S.type === 'lucky7') {
+    const vals = spin ? [0, 1, 2].map((k) => (Math.floor(t / 90 + k * 3) % 10)) : S.reel || [7, 7, 7];
+    vals.forEach((v, i) => {
+      const X = cx + (i - 1) * 118, Y = cy - 62, W = 102, H = 124;
+      ngRoundRect(x, X - W / 2, Y - H / 2, W, H, 14); x.fillStyle = i === 1 ? '#171205' : '#0d0d0d'; x.fill();
+      x.strokeStyle = v === 7 && rev ? '#fbbf24' : '#333'; x.lineWidth = v === 7 && rev ? 3 : 1.5; x.stroke();
+      ngText(x, v, X, Y, 74, v === 7 && rev ? '#fde68a' : '#fff');
+      if (v === 7 && rev) { x.shadowColor = '#fbbf24'; x.shadowBlur = 22; ngText(x, '7', X, Y, 74, '#fde68a'); x.shadowBlur = 0; }
+    });
+  } else if (S.type === 'bubbles') {
+    const hit = rev ? S.hit : Math.floor(t / 160) % 8;
+    for (let i = 0; i < 8; i++) {
+      const a = i * Math.PI / 4 + t / 2600, bx = cx + Math.cos(a) * 128, by = cy + Math.sin(a) * 96;
+      const r = i === hit && rev ? 34 + Math.sin(t / 90) * 3 : 25;
+      const g = x.createRadialGradient(bx - 8, by - 9, 2, bx, by, r);
+      g.addColorStop(0, 'rgba(255,255,255,.8)'); g.addColorStop(.35, i === hit && rev ? '#fbbf24' : '#22d3ee'); g.addColorStop(1, 'rgba(8,47,73,.85)');
+      x.fillStyle = g; x.beginPath(); x.arc(bx, by, r, 0, 7); x.fill();
+      x.strokeStyle = i === hit && rev ? '#fde68a' : 'rgba(255,255,255,.5)'; x.lineWidth = i === hit && rev ? 3 : 1.5; x.stroke();
+    }
+  } else if (S.type === 'frozen') {
+    const vals = spin ? Array.from({ length: 6 }, (_, i) => (Math.floor(t / 130 + i * 2) % 7)) : S.tiles || [];
+    vals.forEach((v, i) => {
+      const X = cx + (i % 3 - 1) * 104, Y = cy + (Math.floor(i / 3) - .5) * 132;
+      ngRoundRect(x, X - 46, Y - 56, 92, 112, 12);
+      x.fillStyle = i === S.pick && rev ? 'rgba(251,191,36,.2)' : 'rgba(190,227,248,.09)'; x.fill();
+      x.strokeStyle = i === S.pick && rev ? '#fbbf24' : 'rgba(224,242,254,.5)'; x.lineWidth = i === S.pick && rev ? 3 : 1.4; x.stroke();
+      ngText(x, rev && i === S.pick ? 'x' + v : '❄', X, Y, rev && i === S.pick ? 32 : 40, i === S.pick && rev ? '#fde68a' : '#e0f2fe');
+    });
+  } else if (S.type === 'candy') {
+    const keys = ['cherry', 'lemon', 'mint', 'berry', 'gold'];
+    const idx = rev ? Math.max(0, keys.indexOf(S.landed)) : Math.floor(t / 120) % 5;
+    for (let i = 0; i < 10; i++) {
+      const a = -Math.PI / 2 + i * Math.PI / 5, r = 118, X = cx + Math.cos(a) * r, Y = cy + Math.sin(a) * r;
+      x.fillStyle = NG_C[i % NG_C.length]; x.globalAlpha = i % 2 ? .35 : .75;
+      x.beginPath(); x.arc(X, Y, 25, 0, 7); x.fill(); x.globalAlpha = 1;
+    }
+    const a = -Math.PI / 2 + idx * Math.PI / 5;
+    x.strokeStyle = '#fde68a'; x.lineWidth = 3; x.beginPath(); x.arc(cx + Math.cos(a) * 118, cy + Math.sin(a) * 118, 31, 0, 7); x.stroke();
+    ngText(x, rev ? (S.landed === S.pick ? 'JACKPOT' : S.landed) : '???', cx, cy, rev ? 34 : 26, rev && S.landed === S.pick ? '#fde68a' : '#fff');
+  } else if (S.type === 'heist') {
+    for (let i = 0; i < 4; i++) {
+      const X = cx + (i % 2 - .5) * 180, Y = cy + (Math.floor(i / 2) - .5) * 150;
+      ngRoundRect(x, X - 76, Y - 60, 152, 120, 14); x.fillStyle = i === S.pick && rev ? 'rgba(251,191,36,.16)' : '#0c0c0c'; x.fill();
+      x.strokeStyle = i === S.pick && rev ? '#fbbf24' : '#333'; x.lineWidth = i === S.pick && rev ? 3 : 1.5; x.stroke();
+      x.beginPath(); x.arc(X, Y - 12, 24, 0, 7); x.stroke(); ngText(x, i + 1, X, Y - 12, 24, '#aaa');
+      ngText(x, rev && i === S.pick ? 'x' + S.value : '🔒', X, Y + 28, rev && i === S.pick ? 30 : 24, i === S.pick && rev ? '#fde68a' : '#666');
+    }
+  } else if (S.type === 'orbit') {
+    for (let k = 0; k < 3; k++) { x.strokeStyle = NG_C[k]; x.globalAlpha = .55; x.lineWidth = 2; x.beginPath(); x.arc(cx, cy, 52 + k * 52, 0, 7); x.stroke(); x.globalAlpha = 1; }
+    const ringN = { inner: 0, mid: 1, outer: 2 }[S.ring || 'mid'];
+    const a = t / 420, rr = rev ? 52 + (S.land || 0) * 20 + ringN * 52 : 52 + ringN * 52 + Math.sin(t / 200) * 10;
+    const bx = cx + Math.cos(a) * rr, by = cy + Math.sin(a) * rr;
+    x.shadowColor = '#fbbf24'; x.shadowBlur = 18; x.fillStyle = '#fde68a'; x.beginPath(); x.arc(bx, by, 9, 0, 7); x.fill(); x.shadowBlur = 0;
+    ngText(x, rev ? 'x' + S.mult : '…', cx, cy, rev ? 46 : 28, rev ? '#fde68a' : '#fff');
+  } else if (S.type === 'cards') {
+    const cs = spin ? ['♠', '♥', '♦', '♣'] : S.cards || ['♠', '♠', '♠'];
+    cs.forEach((c, i) => {
+      const X = cx + (i - 1) * 104, Y = cy + (i === 1 ? -16 : 10);
+      x.save(); x.translate(X, Y); x.rotate((i - 1) * .11 + (spin ? Math.sin(t / 160 + i) * .08 : 0));
+      ngRoundRect(x, -52, -72, 104, 144, 10); x.fillStyle = '#f5f5f4'; x.fill(); x.strokeStyle = '#d4d4d8'; x.lineWidth = 2; x.stroke();
+      ngText(x, c, 0, 0, 62, ['♥', '♦'].includes(c) ? '#dc2626' : '#111'); x.restore();
+    });
+  } else if (S.type === 'rocket') {
+    const prog = rev ? [1, .72, .55, .4] : Array.from({ length: 4 }, (_, i) => .35 + ((t / 1400 + i * .22) % .7));
+    for (let i = 0; i < 4; i++) {
+      const Y = cy - 66 + i * 44, X = cx - 120 + prog[i] * 250;
+      x.fillStyle = NG_C[i]; x.beginPath(); x.moveTo(X + 26, Y); x.lineTo(X - 14, Y - 11); x.lineTo(X - 8, Y); x.lineTo(X - 14, Y + 11); x.closePath(); x.fill();
+      x.fillStyle = 'rgba(255,255,255,.12)'; x.fillRect(cx - 130, Y + 17, 260, 4);
+      x.fillStyle = NG_C[i]; x.fillRect(cx - 130, Y + 17, 260 * prog[i], 4);
+      if (rev && i === S.winner) ngText(x, '🏆', X + 44, Y, 22, '#fde68a');
+    }
+  } else if (S.type === 'cannon') {
+    const rings = [128, 88, 46];
+    rings.forEach((r, i) => { x.strokeStyle = NG_C[i === 0 ? 2 : i === 1 ? 3 : 0]; x.lineWidth = 18; x.beginPath(); x.arc(cx, cy, r, 0, 7); x.stroke(); });
+    const idx = rev ? S.hit : Math.floor(t / 150) % 3, a = t / 320;
+    const bx = cx + Math.cos(a) * (idx === 0 ? 46 : idx === 1 ? 88 : 128), by = cy + Math.sin(a) * (idx === 0 ? 46 : idx === 1 ? 88 : 128);
+    x.shadowColor = '#fbbf24'; x.shadowBlur = 18; x.fillStyle = '#fde68a'; x.beginPath(); x.arc(bx, by, 10, 0, 7); x.fill(); x.shadowBlur = 0;
+    x.strokeStyle = '#fde68a'; x.lineWidth = 3; x.beginPath(); x.moveTo(cx, cy + 160); x.lineTo(bx, by); x.stroke();
+    ngText(x, rev ? 'x' + S.mult : '🎯', cx, cy - 4, rev ? 38 : 30, '#fff');
+  } else if (S.type === 'jewels') {
+    const cells = spin ? Array.from({ length: 25 }, (_, i) => (Math.floor(t / 110 + i * 3) % 5) + 1) : S.grid || [];
+    cells.forEach((v, i) => {
+      const X = cx + (i % 5 - 2) * 64, Y = cy - 70 + Math.floor(i / 5) * 36;
+      const on = rev && Number(v) === Number(S.pick);
+      ngGem(x, X, Y, on ? 22 : 17, NG_C[(Number(v) - 1) % NG_C.length]);
+      if (on) { x.strokeStyle = '#fde68a'; x.lineWidth = 2; x.beginPath(); x.arc(X, Y, 25, 0, 7); x.stroke(); }
+    });
+  }
+}
+async function aNewGame(st, tok) {
+  const cv = $('#oNewCv'), pop = $('#oNewPop'), ban = $('#oNewBan'), flash = $('#oNewFlash'), sc = cv && cv.closest('.nsc');
+  if (!cv) return;
+  const dpr = window.devicePixelRatio || 1, draw = () => {
+    const w = cv.clientWidth || 520, h = cv.clientHeight || 330;
+    if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+    const x = cv.getContext('2d'); x.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { x, w, h };
+  };
+  SFX.wspin();
+  const t0 = performance.now(), D = 3900;
+  let beep = 0;
+  await new Promise((res) => {
+    const step = (now) => {
+      if (!alive(tok)) return res();
+      const t = now - t0;
+      const { x, w, h } = draw();
+      ngDraw(x, w, h, st, t, t < 2600);
+      if (ban) ban.textContent = t < 900 ? 'CHARGEMENT…' : t < 2600 ? 'SPIN…' : t < 3150 ? 'LOCK !' : (st.win > 0 ? 'GAGNÉ !' : 'PERDU');
+      if (t > 2600 && !pop.dataset.on) {
+        pop.dataset.on = '1';
+        pop.textContent = st.win > 0 ? '+' + num(st.win) + ' ' + COIN : '×' + (st.mult || 0);
+        pop.animate([{ opacity: 0, transform: 'translate(-50%,-50%) scale(.4) rotate(-8deg)' }, { opacity: 1, transform: 'translate(-50%,-50%) scale(1.12) rotate(2deg)', offset: .55 }, { opacity: 1, transform: 'translate(-50%,-50%) scale(1)' }], { duration: 620, easing: 'cubic-bezier(.2,.9,.25,1)', fill: 'forwards' });
+        if (flash) flash.animate([{ opacity: 0 }, { opacity: st.win > 0 ? 1 : .38, offset: .2 }, { opacity: 0 }], { duration: 700 });
+        fxPulse(sc, st.win > 0);
+        if (st.win > 0) { fxStart(true, '#fde68a'); SFX.win(); }
+        else tone(160, .12, 'sawtooth', .05);
+      }
+      if (t > 600 && t - beep > 190 && t < 2600) { beep = t; tone(700 + Math.random() * 500, .02, 'square', .018); }
+      if (t >= D) return res();
+      requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  });
+  if (!alive(tok)) return;
+  if (ban) ban.textContent = st.win > 0 ? 'GAGNÉ !' : 'PERDU';
+}
 function ofRelease() { O.anim = false; if (O.hold) { O.hold = false; if (O.bal != null) $('#meBal').textContent = num(O.bal) + ' ' + COIN; } }
 function ofGoLabel() {
   const b = $('#oGo'); if (!b || !INST[O.game]) return;
@@ -3482,14 +3823,27 @@ function rInst(s) {
   else {
     const net = Math.round((s.win - s.bet) * 100) / 100;
     const head = s.type === 'plinko' ? (s.n + ' bille' + (s.n > 1 ? 's' : '') + ' · x' + s.mult) : s.type === 'slots' ? (s.mult ? 'x' + s.mult : 'Pas de ligne') : s.type === 'duel' ? (s.win > 0 ? 'Tu dégaines le premier !' : 'Trop lent…') : s.type === 'coin' ? (s.side === 'pile' ? 'PILE' : 'FACE') : s.type === 'dice' ? s.a + ' + ' + s.b + ' = ' + s.sum : s.type === 'horses' ? 'Cheval n°' + (s.winner + 1) + ' vainqueur' : s.dead ? 'BANG !' : 'Clic… tu survis';
+    if (NEW_IDS.includes(s.type)) head = s.type === 'lucky7' ? 'Rouleaux ' + (s.reel || []).join(' · ') : s.type === 'bubbles' ? 'Bulle ' + (s.hit + 1) : s.type === 'frozen' ? 'Tuile ' + (s.pick + 1) + ' · x' + s.value : s.type === 'candy' ? 'Roue : ' + s.landed : s.type === 'heist' ? 'Coffre ' + (s.pick + 1) + ' · x' + s.value : s.type === 'orbit' ? 'Orbite ' + s.ring : s.type === 'cards' ? (s.cards || []).join(' ') : s.type === 'rocket' ? 'Fusée ' + (s.winner + 1) : s.type === 'cannon' ? 'Zone ' + s.hit : 'Joyaux ' + s.count + ' trouvés';
     msg.replaceChildren(el('span', s.win > 0 ? 'win' : 'lose', head + ' · ' + (net > 0 ? '+' : '') + num(net) + ' ' + COIN));
   }
   ofStatsInst();
 }
 async function ofInstant(st) {
   const tok = ++O.run; O.anim = true; O.st = null; ofRender();
-  try { await ({ coin: aCoin, dice: aDice, horses: aHorses, russian: aRussian, slots: aSlots, duel: aDuel, plinko: aPlinko })[st.type](st, tok); } catch (e) { console.error(e); }
+  try {
+    const anims = { coin: aCoin, dice: aDice, horses: aHorses, russian: aRussian, slots: aSlots, duel: aDuel, plinko: aPlinko };
+    NEW_IDS.forEach((k) => { anims[k] = aNewGame; });
+    const fn = anims[st.type] || aNewGame;
+    await fn(st, tok);
+  } catch (e) { console.error(e); }
   if (!alive(tok)) return;
+  if (!NEW_IDS.includes(st.type)) {
+    // refonte des animations : impact lumineux + particules + pulsation sur TOUS les jeux non protégés
+    const col = st.type === 'dice' || st.type === 'plinko' ? '#93c5fd' : st.type === 'horses' || st.type === 'fuse' ? '#f97316' : st.type === 'slots' ? '#c4b5fd' : st.type === 'duel' ? '#fca5a5' : '#fde68a';
+    fxStart(st.win > 0, col);
+    fxPulse($('#ofTable'), st.win > 0);
+    const sc = $('#ofTable'); if (sc && st.win > 0) { sc.classList.add('shake'); setTimeout(() => sc.classList.remove('shake'), 450); }
+  }
   ofRelease(); O.st = st; ofDone(null, st); ofRender();
 }
 function dieFace(d, n) {
@@ -3524,6 +3878,8 @@ function ofBuildInst(b) {
   } else if (g === 'slots') { b.innerHTML = '<div class="sc"><div class="slm" id="oSlm"><div class="slj">JACKPOT <b>x' + JP + '</b></div><div class="slr" id="oSlr"></div><div class="jpf" id="oJpf"></div></div></div>' + foot; slInit();
   } else if (g === 'plinko') { b.innerHTML = '<div class="sc plk" id="oPlkBox"><canvas id="oPlk"></canvas><div class="jpf" id="oJpf"></div></div>' + foot; plkReset();
   } else if (g === 'duel') { b.innerHTML = '<div class="sc"><div class="arena"><div class="sun"></div><div class="dnm" id="oFoeN"></div><div class="dban" id="oDban"></div><div class="fgt fme" id="oMe">' + FIGHTER('#1d4ed8', '#1e40af') + '</div><div class="fgt ffoe" id="oFoe">' + FIGHTER('#991b1b', '#7f1d1d') + '</div><div class="gnd"></div><div class="dms" id="oDms"></div></div></div>' + foot; duelPre();
+  } else if (NEW_IDS.includes(g)) {
+    b.innerHTML = '<div class="sc nsc"><div class="nstage"><canvas id="oNewCv"></canvas><div class="nflash" id="oNewFlash"></div><div class="npop" id="oNewPop"></div></div><div class="nban" id="oNewBan">PRÊT ?</div></div>' + foot;
   } else { b.innerHTML = '<div class="sc"><div class="rus"><div class="hmr"></div>' + cylSVG() + '</div><div class="flash" id="oFlash"></div></div>' + foot; rusPre(); }
 }
 // ---- animations (le résultat vient du serveur : l'animation ne fait que le révéler)
@@ -3850,6 +4206,163 @@ $('#gSend').onclick = async () => {
 };
 
 
+// ============================================================= ROUE ÉVÉNEMENT (pseudos + avatars + chrono + réouverture)
+const RE = { ev: null, joined: false, angle: 0, spinning: false, timer: 0, imgs: new Map(), shownWinner: '' };
+const RE_COLORS = ['#fbbf24', '#22d3ee', '#a78bfa', '#34d399', '#fb7185', '#60a5fa', '#f472b6', '#facc15', '#4ade80', '#38bdf8'];
+function reClock(ms) {
+  const s = Math.max(0, Math.ceil(ms / 1000));
+  return s >= 60 ? Math.floor(s / 60) + 'min ' + String(s % 60).padStart(2, '0') + 's' : s + ' s';
+}
+function reImg(src) {
+  if (!src) return null;
+  if (RE.imgs.has(src)) return RE.imgs.get(src);
+  const im = new Image(); im.crossOrigin = 'anonymous'; im.src = src; RE.imgs.set(src, im); return im;
+}
+function reDraw() {
+  const cv = $('#reCanvas'); if (!cv) return;
+  const x = cv.getContext('2d'), S = cv.width, R = S / 2, cx = R, cy = R;
+  x.clearRect(0, 0, S, S);
+  const ps = (RE.ev && RE.ev.participants) || [];
+  const n = ps.length;
+  x.fillStyle = '#080808'; x.beginPath(); x.arc(cx, cy, R, 0, 7); x.fill();
+  if (!n) {
+    x.strokeStyle = 'rgba(251,191,36,.35)'; x.lineWidth = 12; x.beginPath(); x.arc(cx, cy, R - 8, 0, 7); x.stroke();
+    x.textAlign = 'center'; x.fillStyle = '#fde68a'; x.font = '900 24px system-ui,sans-serif';
+    x.fillText('En attente de participants', cx, cy - 6);
+    x.fillStyle = 'rgba(255,255,255,.5)'; x.font = '600 16px system-ui,sans-serif';
+    x.fillText('Clique sur Participer dans la notification', cx, cy + 26);
+    return;
+  }
+  const seg = (Math.PI * 2) / n;
+  ps.forEach((p, i) => {
+    const a0 = i * seg + RE.angle, a1 = a0 + seg;
+    x.beginPath(); x.moveTo(cx, cy); x.arc(cx, cy, R - 6, a0, a1); x.closePath();
+    x.fillStyle = RE_COLORS[i % RE_COLORS.length]; x.fill();
+    x.strokeStyle = 'rgba(0,0,0,.55)'; x.lineWidth = 2; x.stroke();
+    // nom + avatar orientés vers l'extérieur
+    x.save(); x.translate(cx, cy); x.rotate(a0 + seg / 2);
+    x.textAlign = 'right'; x.textBaseline = 'middle';
+    x.fillStyle = '#000'; x.font = '900 ' + Math.max(11, Math.min(16, 150 / n + 8)) + 'px system-ui,sans-serif';
+    const nm = String(p.name || p.uid || '?').slice(0, 14);
+    x.fillText(nm, R - 52, 0);
+    const av = reImg(p.avatar);
+    if (av && av.complete && av.naturalWidth) {
+      x.save(); x.beginPath(); x.arc(R - 30, 0, 15, 0, 7); x.clip();
+      try { x.drawImage(av, R - 45, -15, 30, 30); } catch {}
+      x.restore(); x.strokeStyle = '#000'; x.lineWidth = 2; x.beginPath(); x.arc(R - 30, 0, 15, 0, 7); x.stroke();
+    }
+    x.restore();
+  });
+  x.beginPath(); x.arc(cx, cy, 25, 0, 7); x.fillStyle = '#fbbf24'; x.fill();
+  x.strokeStyle = '#000'; x.lineWidth = 4; x.stroke();
+  x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillStyle = '#000'; x.font = '900 14px system-ui,sans-serif'; x.fillText('ZNK', cx, cy);
+  if (RE.ev.winner && RE.ev.winner === RE.shownWinner) {
+    const wi = ps.findIndex((p) => String(p.uid) === String(RE.ev.winner));
+    if (wi >= 0) {
+      x.beginPath(); x.moveTo(cx, cy); x.arc(cx, cy, R - 6, wi * seg + RE.angle, (wi + 1) * seg + RE.angle); x.closePath();
+      x.fillStyle = 'rgba(253,230,138,.26)'; x.fill();
+      x.strokeStyle = '#fff'; x.lineWidth = 5; x.stroke();
+    }
+  }
+}
+function reRenderNames() {
+  const box = $('#reNames'); if (!box) return; box.textContent = '';
+  const ps = (RE.ev && RE.ev.participants) || [];
+  if (!ps.length) { box.append(el('div', 'lbnone', 'Aucun participant pour le moment.')); return; }
+  ps.forEach((p) => {
+    const d = el('div', 'rn' + (RE.ev.winner && String(RE.ev.winner) === String(p.uid) ? ' win' : ''));
+    if (p.avatar) { const im = el('img'); im.src = p.avatar; im.alt = ''; d.append(im); }
+    d.append(document.createTextNode(String(p.name || p.uid).slice(0, 26)));
+    box.append(d);
+  });
+}
+function reTick() {
+  const e = RE.ev; if (!e) return;
+  const cd = $('#reCount'), st = $('#reStatus');
+  if (e.status === 'running' && e.endsAt > Date.now()) {
+    if (cd) cd.textContent = '⏳ ' + reClock(e.endsAt - Date.now());
+    if (st) st.textContent = (e.participants || []).length + ' participant(s) · ' + num(e.amount) + ' ' + COIN;
+  } else {
+    if (cd) cd.textContent = '🎯 Tirage effectué';
+    if (st) st.textContent = e.winner ? ('Gagnant : ' + e.winnerName + ' · ' + num(e.amount) + ' ' + COIN) : 'Aucun participant';
+  }
+  const j = $('#reJoin');
+  if (j) {
+    const canJoin = e.status === 'running' && e.endsAt > Date.now();
+    j.classList.toggle('hide', !canJoin);
+    j.disabled = RE.joined;
+    j.textContent = RE.joined ? '✅ Inscrit' : 'Participer';
+  }
+  const w = $('#reWinner');
+  if (w) {
+    w.classList.toggle('hide', !e.winner);
+    if (e.winner) w.innerHTML = '🏆 <b>' + noEmo(e.winnerName) + '</b> remporte <b>' + num(e.amount) + ' ' + COIN + '</b>';
+  }
+  reRenderNames(); reDraw();
+}
+function reSetEvent(e, open) {
+  if (!e) return;
+  const wasWinner = RE.ev && RE.ev.winner;
+  RE.ev = e;
+  if (me && e.participants) RE.joined = e.participants.some((p) => String(p.uid) === String(me.uid));
+  const wrap = $('#evWheelWrap'), acts = $('#reActions');
+  if (wrap) wrap.classList.remove('hide');
+  if (acts) acts.classList.remove('hide');
+  if (e.winner && !RE.shownWinner) reSpin();
+  else if (wasWinner && RE.shownWinner !== String(e.winner)) reSpin();
+  else reDraw();
+  reTick();
+  if (open) reOpen();
+}
+function reOpen() {
+  const e = RE.ev;
+  $('#evT').textContent = e ? noEmo(e.title || 'Roulette événement') : 'Roulette événement';
+  $('#evX').textContent = e ? noEmo(e.status === 'running' ? 'La roue tournera dans ' + reClock(e.endsAt - Date.now()) + '. ' + num(e.amount) + ' ' + COIN + ' au gagnant.' : 'Roue terminée. Tu peux la reouvrir à tout moment depuis cette notification.') : '';
+  $('#mEvent').classList.add('on');
+  reTick();
+}
+async function reLoad(eid) {
+  try {
+    const r = await fetch('/api/roulette-event?t=' + encodeURIComponent(TOKEN) + (eid ? '&eid=' + encodeURIComponent(eid) : ''), { cache: 'no-store' });
+    if (!r.ok) return;
+    const d = await r.json();
+    if (d.event) reSetEvent(d.event, false);
+  } catch {}
+}
+function reSpin() {
+  const e = RE.ev; if (!e || !e.winner || RE.spinning) return;
+  const ps = e.participants || [], wi = ps.findIndex((p) => String(p.uid) === String(e.winner));
+  if (wi < 0) return;
+  RE.shownWinner = String(e.winner);
+  const seg = (Math.PI * 2) / Math.max(1, ps.length);
+  const target = -Math.PI / 2 - (wi * seg + seg / 2) + Math.PI * 2 * 7;
+  const start = RE.angle, dur = 5200, t0 = performance.now();
+  RE.spinning = true;
+  const step = (now) => {
+    const p = Math.min(1, (now - t0) / dur);
+    const ease = 1 - Math.pow(1 - p, 4);
+    RE.angle = start + (target - start) * ease;
+    reDraw();
+    if (p < 1) requestAnimationFrame(step);
+    else { RE.angle = target % (Math.PI * 2); RE.spinning = false; reDraw(); try { SFX && SFX.win && SFX.win(); } catch {} }
+  };
+  requestAnimationFrame(step);
+}
+clearInterval(RE.timer);
+RE.timer = setInterval(() => {
+  if (!RE.ev) return;
+  if (RE.ev.status === 'running' && RE.ev.endsAt - Date.now() < 1000) reLoad(RE.ev.id);
+  reTick();
+}, 1000);
+const reJoinBtn = $('#reJoin'); if (reJoinBtn) reJoinBtn.onclick = async () => {
+  if (!RE.ev || RE.joined) return;
+  reJoinBtn.disabled = true;
+  const ok = await send('evjoin', { eid: RE.ev.id, kind: 'roulette' });
+  reJoinBtn.disabled = false;
+  if (ok) { RE.joined = true; toast('✅ Inscrit à la roulette !'); reLoad(RE.ev.id); } else toast((send.last && send.last.error) || 'Erreur');
+};
+const reOpenBtn = $('#reOpen'); if (reOpenBtn) reOpenBtn.onclick = () => { if (!RE.ev) reLoad(); else reOpen(); };
+
 // ============================================================= BOÎTE DE RÉCEPTION (cloche) + MENU DU PSEUDO
 const N = { list: [], seen: 0, done: new Set() };
 const nKey = () => 'znk_nseen_' + (me ? me.uid : '');
@@ -3866,6 +4379,11 @@ function nRender() {
     const ni = el('span', 'nic');
     if (n.type === 'event') {
       b.append(el('b', '', noEmo(n.title)), el('span', 'nt', noEmo(n.text)));
+      if (n.kind === 'roulette' && n.eventId) {
+        const bt = el('button', 'nbtn', 'Rouvrir la roue');
+        bt.onclick = async (e) => { e.stopPropagation(); await reLoad(n.eventId); reOpen(); };
+        b.append(bt);
+      }
       if (n.eventId && (n.kind === 'claim' || n.kind === 'giveaway') && (!n.expiresAt || n.expiresAt > Date.now())) {
         const bt = el('button', 'nbtn', n.kind === 'claim' ? 'Réclamer' : 'Participer'), done = N.done.has(n.eventId);
         if (done) { bt.disabled = true; bt.textContent = n.kind === 'claim' ? 'Réclamé' : 'Inscrit'; }
@@ -3887,6 +4405,13 @@ function nRender() {
 // popup d'événement (boost / claim / giveaway) : remplace les MP Discord
 function evPop(n) {
   if (!n || n.type !== 'event') return;
+  if (n.kind === 'roulette' && n.eventId) {
+    $('#evWheelWrap').classList.remove('hide'); $('#reActions').classList.remove('hide');
+    $('#evB').textContent = '';
+    reLoad(n.eventId).then(reOpen);
+    return;
+  }
+  $('#evWheelWrap').classList.add('hide'); $('#reActions').classList.add('hide');
   $('#evT').textContent = noEmo(n.title || 'Événement'); $('#evX').textContent = noEmo(n.text || '');
   const B = $('#evB'); B.textContent = '';
   if (n.eventId && (n.kind === 'claim' || n.kind === 'giveaway') && (!n.expiresAt || n.expiresAt > Date.now())) {
@@ -3992,17 +4517,24 @@ async function loadShop() {
       const o = send.last || {};
       const ord = o.order || {};
       if (o.rbal != null) { W.bal = o.rbal; const mb = $('#meBal'); if (mb) mb.textContent = num(o.rbal) + ' ' + COIN; }
-      const codeEl = $('#mOrderCode'); if (codeEl) codeEl.textContent = o.code || ord.code || '—';
+      const code = o.code || ord.code || '';
+      const isRole = !!ord.autoRole || ord.type === 'role';
+      const titleEl = $('#mOrderTitle'); if (titleEl) titleEl.textContent = isRole ? (ord.roleAdded === false ? 'Rôle non ajouté' : 'Rôle ajouté !') : 'Commande créée';
+      const hintEl = $('#mOrderHint');
+      if (hintEl) hintEl.textContent = isRole
+        ? (ord.roleAdded === false ? (ord.roleErr || 'Le rôle n’a pas pu être ajouté.') : 'Le rôle a été ajouté directement à ton compte Discord. Aucun order code n’est nécessaire.')
+        : 'Copie ton order code et ouvre un ticket « Claim rewards » sur Discord';
+      const codeEl = $('#mOrderCode'); if (codeEl) { codeEl.textContent = code || 'Aucun code nécessaire'; codeEl.style.display = isRole ? 'none' : ''; }
+      const copyEl = $('#mOrderCopy'); if (copyEl) copyEl.style.display = isRole || !code ? 'none' : '';
       const nameEl = $('#mOrderName');
       if (nameEl) {
         let t = ord.rewardName || r.name;
-        if (ord.autoRole) t += ' · rôle livré automatiquement';
+        if (isRole) t += ord.roleAdded === false ? ' · livraison échouée' : ' · rôle livré automatiquement';
         else if (ord.status === 'pending') t += ' · en attente de livraison';
         nameEl.textContent = t;
       }
       const mo = $('#mOrder'); if (mo) mo.classList.add('on');
       try { SFX.win(); } catch(e) {}
-      try { loadShop(); } catch(e) {}
       loadShop();
     };
     c.append(b);
@@ -4128,19 +4660,101 @@ document.querySelectorAll('[data-eco]').forEach((btn) => {
     const userId = ($('#adEcoUid') && $('#adEcoUid').value.trim()) || '';
     const amount = ($('#adEcoAmt') && $('#adEcoAmt').value.trim()) || '';
     const out = $('#adEcoOut');
-    if (['add', 'remove', 'set', 'view', 'player_stats'].includes(op) && !userId) { toast('Choisis un joueur en ligne'); return; }
+    if (['add', 'remove', 'set', 'view', 'player_stats', 'reset_balance'].includes(op) && !userId) { toast('Choisis un joueur en ligne'); return; }
     if (out) out.textContent = 'Traitement…';
     const body = { op };
     if (userId) body.userId = userId;
     if (amount !== '') body.amount = amount;
-    if (['reset_balances', 'reset_alltime', 'reset_stats', 'gift_all'].includes(op)) {
+    if (['reset_balance', 'reset_balances', 'reset_alltime', 'reset_stats', 'gift_all'].includes(op)) {
       if (!confirm('Confirmer ' + op + ' ?')) { if (out) out.textContent = 'Annulé'; return; }
     }
     const ok = await send('admin_eco', body);
     const d = send.last || {};
+    if (op === 'player_stats' && ok) {
+      if (out) out.textContent = 'Fiche générée.';
+      try { renderStatsCard(d, userId); } catch (e) { console.error(e); toast('Impossible de générer la fiche image'); }
+      return;
+    }
     if (out) out.textContent = ok ? (d.msg || 'OK') : (d.error || 'Erreur');
   });
 });
+
+// ---- Fiche joueur en IMAGE (fond noir premium + statistiques)
+let statsPng = '';
+async function renderStatsCard(d, uid) {
+  const cv = $('#statsCanvas'); if (!cv) return;
+  const x = cv.getContext('2d'), W0 = cv.width, H0 = cv.height;
+  const bg = new Image();
+  await new Promise((res) => {
+    bg.onload = bg.onerror = res;
+    bg.src = '/assets/stats_bg.svg';
+  });
+  x.clearRect(0, 0, W0, H0);
+  if (bg.complete && bg.naturalWidth) x.drawImage(bg, 0, 0, W0, H0);
+  else { const g = x.createLinearGradient(0, 0, W0, H0); g.addColorStop(0, '#0a0a0a'); g.addColorStop(1, '#000'); x.fillStyle = g; x.fillRect(0, 0, W0, H0); }
+  x.fillStyle = 'rgba(0,0,0,.58)'; x.fillRect(0, 0, W0, H0);
+
+  const me = d.rank || {};
+  const tier = me.tier || {};
+  const name = me.name || (d.msg || '').replace(/^Player\s+/i, '') || String(uid || 'Joueur');
+  const avatar = me.avatar || '';
+
+  x.textAlign = 'left'; x.textBaseline = 'middle';
+  x.fillStyle = '#fbbf24'; x.font = '800 22px system-ui,sans-serif';
+  x.fillText('ZNK CASINO  /  PLAYER INTEL', 62, 56);
+  x.fillStyle = 'rgba(255,255,255,.45)'; x.font = '600 14px system-ui,sans-serif';
+  x.fillText(new Date().toLocaleString('en-GB'), W0 - 62, 56);
+  x.textAlign = 'right'; x.fillStyle = '#fde68a'; x.font = '900 30px system-ui,sans-serif';
+  x.fillText(String(tier.name || tier.label || (me.prov ? 'PLACEMENT' : 'RANKED')).toUpperCase(), W0 - 62, 106);
+
+  let px = 62;
+  if (avatar) {
+    try {
+      const av = new Image();
+      await new Promise((r) => { av.onload = av.onerror = r; av.src = avatar; });
+      if (av.naturalWidth) {
+        x.save(); x.beginPath(); x.arc(104, 160, 42, 0, 7); x.clip();
+        x.drawImage(av, 62, 118, 84, 84); x.restore();
+        x.strokeStyle = '#fbbf24'; x.lineWidth = 3; x.beginPath(); x.arc(104, 160, 42, 0, 7); x.stroke();
+        px = 170;
+      }
+    } catch {}
+  }
+  x.textAlign = 'left';
+  x.fillStyle = '#fff'; x.font = '900 44px system-ui,sans-serif';
+  x.fillText(String(name).slice(0, 26), px, 145);
+  x.fillStyle = 'rgba(255,255,255,.55)'; x.font = '600 16px system-ui,sans-serif';
+  x.fillText('Discord ID ' + String(uid || me.uid || '—'), px, 188);
+
+  const cards = [
+    ['SOLDE ZTKN', num(d.bal), '#22c55e'],
+    ['RR / ELO', num(me.elo), '#fbbf24'],
+    ['RANG', String(me.pos ? '#' + me.pos : '—'), '#e9d5ff'],
+    ['PIC RR', num(me.peak), '#fbbf24'],
+    ['PARTIES', String(me.games || 0), '#93c5fd'],
+    ['VICTOIRES', String(me.wins || 0), '#86efac'],
+    ['DÉFAITES', String(me.losses || 0), '#fca5a5'],
+    ['WINRATE', (me.games ? Math.round((me.wins / me.games) * 100) : 0) + ' %', '#fff'],
+  ];
+  const cw = 248, ch = 118, gx = 20, gy = 20, x0 = 62, y0 = 250;
+  cards.forEach((c, i) => {
+    const cx = x0 + (i % 4) * (cw + gx), cy = y0 + Math.floor(i / 4) * (ch + gy);
+    x.fillStyle = 'rgba(10,10,10,.86)'; x.strokeStyle = 'rgba(251,191,36,.28)'; x.lineWidth = 1.5;
+    x.beginPath(); x.roundRect(cx, cy, cw, ch, 14); x.fill(); x.stroke();
+    x.fillStyle = 'rgba(255,255,255,.5)'; x.font = '700 14px system-ui,sans-serif'; x.fillText(c[0], cx + 20, cy + 28);
+    x.fillStyle = c[2]; x.font = '900 38px system-ui,sans-serif'; x.fillText(c[1], cx + 20, cy + 72);
+  });
+  x.textAlign = 'center'; x.fillStyle = 'rgba(255,255,255,.32)'; x.font = '600 13px system-ui,sans-serif';
+  x.fillText('Généré par le panneau admin ZNK ·.classement compétitif', W0 / 2, H0 - 32);
+
+  try { statsPng = cv.toDataURL('image/png'); } catch { statsPng = ''; }
+  const modal = $('#mStatsCard'); if (modal) modal.classList.add('on');
+}
+const statsDl = $('#statsDownload');
+if (statsDl) statsDl.onclick = () => {
+  if (!statsPng) return toast('Fiche pas encore générée.');
+  const a = document.createElement('a'); a.href = statsPng; a.download = 'znk-player-stats.png'; a.click();
+};
 
 async function adLadderLoad() {
   const box = $('#adLadderList'); if (!box) return;
