@@ -309,6 +309,28 @@ function create(file, supabase) {
     return { start, end: seasonEndMs(start), id };
   }
 
+  /** Admin: hard reset every player back to the starting rank (RR/ELO + placement + stats). */
+  function resetRankedSeason() {
+    const ids = Object.keys(users);
+    const sid = seasonId(seasonStartMs());
+    for (const id of ids) {
+      const u = users[id];
+      u.elo = RR_START;
+      u.peak = RR_START;
+      u.eg = 0;
+      u.w = 0;
+      u.l = 0;
+      u.place = 0;
+      u.earned = 0;
+    }
+    meta.season = sid;
+    meta.lastReset = Date.now();
+    ids.forEach((id) => dirty.add(id));
+    save(ids);
+    flushDb();
+    return { reset: ids.length };
+  }
+
   /**
    * Résultat d'une partie ranked.
    * players: [{ uid, name, place: 1..n (1=gagnant), avatar? }]
@@ -481,6 +503,7 @@ function create(file, supabase) {
       }
     },
     ensureSeason,
+    resetRankedSeason,
     adminSetLadder,
     getLadder: () => LADDER.map((t) => ({ ...t })),
     adjustRR,
@@ -495,6 +518,8 @@ function create(file, supabase) {
 
 module.exports = {
   create,
+  /** Convenience wrapper: pass the api returned by create() to reset a season. */
+  resetRankedSeason: (api) => (api && typeof api.resetRankedSeason === 'function') ? api.resetRankedSeason() : { reset: 0 },
   progress,
   rankIndex,
   get LADDER() {

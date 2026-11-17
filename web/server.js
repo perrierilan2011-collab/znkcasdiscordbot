@@ -20,7 +20,8 @@ const { RouletteRoom, INFO: ROULETTE_INFO } = require('./roulette');
 const { create: createOffline } = require('./offline');
 const { create: createRank } = require('./rank');
 const { create: createShop } = require('./shop');
-const { RankedArena } = require('./ranked');
+// Ranked is blackjack now: it uses the same Room engine as online blackjack (entry.ranked in roomOf).
+// The old skill-minigame arena module is no longer used by this server.
 
 const PUBLIC_URL = String(process.env.PUBLIC_URL || 'https://znk.up.railway.app').replace(/\/+$/, '');
 const TOKEN_TTL_MS = 12 * 3600 * 1000;
@@ -300,9 +301,11 @@ function init(deps) {
     syncOne(entry, entry.pokers, makePoker, 'poker');
   }
   setInterval(() => { for (const e of rooms.values()) syncTables(e); }, 4000).unref();
-  const tidOf = (d) => (Number.isInteger(Number(d.tid)) && Number(d.tid) > 0 ? Number(d.tid) : 1);
-  function otherSeat(map, uid, tid) {
+  const tidOf = (d) => (String(d.tid) === 'ranked' ? 'ranked' : (Number.isInteger(Number(d.tid)) && Number(d.tid) > 0 ? Number(d.tid) : 1));
+  function otherSeat(map, uid, tid, ranked) {
     for (const [t, r] of map) if (t !== tid && r.findSeat(uid) >= 0) return t;
+    // A player may only sit at one blackjack table at a time, including the ranked table.
+    if (ranked && tid !== 'ranked' && ranked.findSeat(uid) >= 0) return 'ranked';
     return 0;
   }
 
@@ -322,17 +325,43 @@ function init(deps) {
       }
     };
     entry.broadcast = broadcast;
-    entry.arena = new RankedArena(guildId, {
+    const rankedMeta = (uid) => {
+      try { return { mode: 'blackjack', ...rankApi.view(uid, 10) }; }
+      catch { return { mode: 'blackjack' }; }
+    };
+    entry.rankedMeta = rankedMeta;
+    // Ranked is blackjack: same Room engine, separate table that syncTables never deletes.
+    entry.ranked = new Room(guildId, {
+      getBalance: deps.getBalance,
+      debit: deps.debit,
+      credit: deps.credit,
+      pending,
+      stats: statsApi,
+      onRoundEnd: (r) => {
+        // Rank by net profit and record RR/ELO only for the ranked table.
+        try {
+          const players = ((r && r.players) || [])
+            .filter((p) => p && p.uid)
+            .map((p) => ({ uid: String(p.uid), name: p.name, avatar: avatarMap.get(String(p.uid)) || '', net: Number(p.net) || 0 }))
+            .sort((a, b) => b.net - a.net);
+          if (players.length >= 2) {
+            rankApi.recordRanked(players.map((p, i) => ({ ...p, place: i + 1 })), (uid) => avatarMap.get(uid));
+          }
+        } catch (e) { console.error('[web] ranked rr', e?.message || e); }
+        try { roundEnd(guildId, { ...(r || {}), game: 'ranked' }); }
+        catch (e) { console.error('[web] ranked roundEnd', e?.message || e); }
+      },
       onChange: (room) => {
+        const state = `event: state\ndata: ${JSON.stringify({ ...room.snapshot(), tid: 'ranked', mode: 'ranked' })}\n\n`;
         for (const res of entry.clients) {
           try {
-            res.write(`event: ranked\ndata: ${JSON.stringify(room.snapshot(res.uid))}\n\n`);
-          } catch { /* fermée */ }
+            res.write(state);
+            res.write(`event: ranked\ndata: ${JSON.stringify(rankedMeta(res.uid))}\n\n`);
+          } catch { /* closed */ }
         }
       },
-      rankRecord: (players) => rankApi.recordRanked(players, (uid) => avatarMap.get(uid)),
-      onMatchEnd: (r) => roundEnd(guildId, r),
     });
+    entry.ranked.tid = 'ranked';
     entry.roulette = new RouletteRoom(guildId, {
       getBalance: deps.getBalance,
       debit: deps.debit,
@@ -433,29 +462,30 @@ function init(deps) {
     let body = '';
     for await (const chunk of req) {
       body += chunk;
-      if (body.length > 4096) return json(res, 413, { ok: false, error: 'Requête trop grosse.' });
+      if (body.length > 4096) return json(res, 413, { ok: false, error: 'Request too large.' });
     }
     let d;
     try {
       d = JSON.parse(body || '{}');
     } catch {
-      return json(res, 400, { ok: false, error: 'JSON invalide.' });
+      return json(res, 400, { ok: false, error: 'Invalid JSON.' });
     }
     const user = readToken(d.t);
-    if (!user) return json(res, 401, { ok: false, error: 'Lien expiré : reclique sur « Jouer » dans Discord.' });
+    if (!user) return json(res, 401, { ok: false, error: 'Link expired: click "Play" in Discord again.' });
     if (user.avatar) avatarMap.set(user.uid, user.avatar);
     const now = Date.now();
-    if (now - (lastAct.get(user.uid) || 0) < (/^[ro]/.test(String(d.action)) ? 50 : 120)) return json(res, 429, { ok: false, error: 'Doucement.' });
-    lastAct.set(user.uid, now);
+    // Page-exit "leave" requests may include bye:true — never rate-limit fast reloads.
+    if (d.bye !== true && now - (lastAct.get(user.uid) || 0) < (/^[ro]/.test(String(d.action)) ? 50 : 120)) return json(res, 429, { ok: false, error: 'Slow down.' });
+    if (d.bye !== true) lastAct.set(user.uid, now);
     const entry = roomOf(user.guildId);
     const { roulette } = entry;
     const tid = tidOf(d);
     const act = String(d.action);
     const needBj = ['sit', 'leave', 'bet', 'clear', 'hit', 'stand', 'double', 'split', 'emote', 'sync'].includes(act);
     const needPk = /^p/.test(act);
-    const room = needBj ? entry.bjs.get(tid) : null;
+    const room = needBj ? (tid === 'ranked' ? entry.ranked : entry.bjs.get(tid)) : null;
     const poker = needPk ? entry.pokers.get(tid) : null;
-    if ((needBj && !room) || (needPk && !poker)) return json(res, 200, { ok: false, error: 'Cette table n’existe plus.' });
+    if ((needBj && !room) || (needPk && !poker)) return json(res, 200, { ok: false, error: 'That table no longer exists.' });
     let walBal; // solde du portefeuille renvoyé après une action de poker
     let created; // numéro de la table créée par un joueur (action tnew)
     let daily; // résultat du daily (action daily)
@@ -467,17 +497,17 @@ function init(deps) {
         case 'gift': {
           const to = String(d.to || '');
           const amt = Math.floor(Number(d.amount) * 100 + 1e-6) / 100;
-          if (!/^\d{5,25}$/.test(to)) throw new Error('Choisis un joueur.');
-          if (to === user.uid) throw new Error('Tu ne peux pas t’envoyer de pièces à toi-même.');
-          if (!Number.isFinite(amt) || amt < 1) throw new Error('Montant minimum : 1.');
-          if (deps.isMember && !(await deps.isMember(user.guildId, to))) throw new Error('Ce joueur n’est pas sur le serveur.');
+          if (!/^\d{5,25}$/.test(to)) throw new Error('Choose a player.');
+          if (to === user.uid) throw new Error('You cannot send coins to yourself.');
+          if (!Number.isFinite(amt) || amt < 1) throw new Error('Minimum amount: 1.');
+          if (deps.isMember && !(await deps.isMember(user.guildId, to))) throw new Error('That player is not on the server.');
           const nb = await deps.debit(user.uid, amt);
-          if (nb === null) throw new Error('Solde insuffisant.');
+          if (nb === null) throw new Error('Insufficient balance.');
           try {
             await deps.credit(to, amt);
           } catch (e) {
             await deps.credit(user.uid, amt).catch(() => {}); // échec : on rembourse l’expéditeur
-            throw new Error('Envoi impossible, réessaie.');
+            throw new Error('Could not send coins, try again.');
           }
           walBal = nb;
           const rb = await deps.getBalance(to).catch(() => null);
@@ -494,13 +524,13 @@ function init(deps) {
         }
         // ---- admin : créer de l'argent pour n'importe quel joueur (réservé au(x) compte(s) admin)
         case 'admingive': {
-          if (!deps.isAdmin || !(await deps.isAdmin(user.uid))) throw new Error('Action réservée à l’administrateur.');
+          if (!deps.isAdmin || !(await deps.isAdmin(user.uid))) throw new Error('Admin only.');
           const to = String(d.to || '');
           const amt = Math.floor(Number(d.amount) * 100 + 1e-6) / 100;
-          if (!/^\d{5,25}$/.test(to)) throw new Error('Choisis un joueur.');
-          if (!Number.isFinite(amt) || amt < 1 || amt > 1e12) throw new Error('Montant invalide.');
+          if (!/^\d{5,25}$/.test(to)) throw new Error('Choose a player.');
+          if (!Number.isFinite(amt) || amt < 1 || amt > 1e12) throw new Error('Invalid amount.');
           const nb = await deps.credit(to, amt);
-          console.log(`[web] ADMIN ${user.name} (${user.uid}) ajoute ${amt} à ${to}`);
+          console.log(`[web] ADMIN ${user.name} (${user.uid}) added ${amt} to ${to}`);
           const notif = { id: crypto.randomBytes(6).toString('hex'), t: Date.now(), type: 'gift', from: user.name, amount: amt };
           pushNotif(to, notif);
           const rb = typeof nb === 'number' ? nb : await deps.getBalance(to).catch(() => null);
@@ -515,17 +545,17 @@ function init(deps) {
         }
         // ---- admin : lancer un événement (mêmes événements que le bot Discord) → MP + notif dans la boîte de réception
         case 'adminevent': {
-          if (!deps.isAdmin || !(await deps.isAdmin(user.uid))) throw new Error('Action réservée à l’administrateur.');
+          if (!deps.isAdmin || !(await deps.isAdmin(user.uid))) throw new Error('Admin only.');
           const kind = String(d.kind || '');
           let r;
           if (kind === 'claim' || kind === 'giveaway') {
-            if (!deps.launchEvent) throw new Error('Événements indisponibles.');
+            if (!deps.launchEvent) throw new Error('Events unavailable.');
             r = await deps.launchEvent(user.guildId, user.uid, kind, d.amount, d.winners, d.minutes);
           } else {
-            if (!deps.launchBoost) throw new Error('Événements indisponibles.');
+            if (!deps.launchBoost) throw new Error('Events unavailable.');
             r = await deps.launchBoost(user.guildId, user.uid, kind, d.minutes);
           }
-          console.log(`[web] ADMIN ${user.name} (${user.uid}) lance l'événement ${kind}`);
+          console.log(`[web] ADMIN ${user.name} (${user.uid}) launched event ${kind}`);
           created = undefined;
           break;
         }
@@ -533,9 +563,9 @@ function init(deps) {
         case 'evclaim':
         case 'evjoin': {
           const fn = d.action === 'evclaim' ? deps.eventClaim : deps.eventJoin;
-          if (!fn) throw new Error('Événements indisponibles.');
+          if (!fn) throw new Error('Events unavailable.');
           const r = await fn(user.uid, user.guildId, String(d.eid || ''));
-          if (!r || !r.ok) throw new Error((r && r.msg) || 'Événement indisponible.');
+          if (!r || !r.ok) throw new Error((r && r.msg) || 'Event unavailable.');
           evMsg = r.msg;
           if (r.balance != null) {
             walBal = r.balance;
@@ -548,9 +578,9 @@ function init(deps) {
         }
         // ---- daily : récompense quotidienne (même règle que le bouton Discord)
         case 'daily': {
-          if (!deps.claimDaily) throw new Error('Daily indisponible pour le moment.');
+          if (!deps.claimDaily) throw new Error('Daily unavailable right now.');
           const r = await deps.claimDaily(user.uid);
-          if (!r) throw new Error('Daily indisponible, réessaie.');
+          if (!r) throw new Error('Daily unavailable, try again.');
           daily = { claimed: !!r.claimed, amount: r.amount };
           if (r.balance != null) {
             walBal = r.balance;
@@ -578,10 +608,10 @@ function init(deps) {
         // ---- chat en direct
         case 'chatsend': {
           const chatRoom = String(d.room);
-          if (!CHAT_ROOMS.has(chatRoom)) throw new Error('Salon inconnu.');
+          if (!CHAT_ROOMS.has(chatRoom)) throw new Error('Unknown room.');
           const text = String(d.text || '').replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 200);
           if (!text) break;
-          if (now - (lastChat.get(user.uid) || 0) < 1200) throw new Error('Doucement : un message par seconde maximum.');
+          if (now - (lastChat.get(user.uid) || 0) < 1200) throw new Error('Slow down: one message per second maximum.');
           lastChat.set(user.uid, now);
           const rk = rankApi.info(user.uid); // le rang du casino remplace le rôle Discord
           const msg = { room: chatRoom, uid: user.uid, name: user.name, rk: { id: rk.id, fi: rk.fi, name: rk.name, sym: rk.sym, pips: rk.pips, c1: rk.c1, c2: rk.c2 }, avatar: user.avatar, text, t: now };
@@ -626,7 +656,7 @@ function init(deps) {
         // ---- poker (Texas Hold'em)
         case 'psit': {
           const o = otherSeat(entry.pokers, user.uid, tid);
-          if (o) throw new Error(`Tu es déjà assis à la table ${o} : quitte-la d’abord.`);
+          if (o) throw new Error(`You are already seated at table ${o}: leave it first.`);
           await poker.run(() => poker.sit(user, Number(d.seat), d.amount));
           walBal = await deps.getBalance(user.uid);
           break;
@@ -660,8 +690,8 @@ function init(deps) {
           break;
         // ---- blackjack
         case 'sit': {
-          const o = otherSeat(entry.bjs, user.uid, tid);
-          if (o) throw new Error(`Tu es déjà assis à la table ${o} : quitte-la d’abord.`);
+          const o = otherSeat(entry.bjs, user.uid, tid, entry.ranked);
+          if (o) throw new Error(`You are already seated at table ${o}: leave it first.`);
           const seat = Number(d.seat);
           const bal = await deps.getBalance(user.uid);
           await room.run(async () => room.sit(user, seat, bal));
@@ -698,32 +728,22 @@ function init(deps) {
         }
 
 
-        // ---- ranked arena
-        case 'rkjoin': {
-          await entry.arena.run(() => entry.arena.join(user));
-          break;
-        }
-        case 'rkleave': {
-          await entry.arena.run(() => entry.arena.leave(user.uid));
-          break;
-        }
-        case 'rkready': {
-          await entry.arena.run(() => entry.arena.ready(user.uid, d.on !== false));
-          break;
-        }
-        case 'rkunready': {
-          await entry.arena.run(() => entry.arena.ready(user.uid, false));
+        // ---- legacy ranked skill actions (ranked is blackjack now): harmless no-ops
+        case 'rkjoin':
+        case 'rkleave':
+        case 'rkready':
+        case 'rkunready':
+        case 'rkact': {
           break;
         }
         case 'rksync': {
-          break;
-        }
-        case 'rkact': {
-          await entry.arena.run(() => entry.arena.act(user.uid, d.answer || d));
-          break;
+          return json(res, 200, { ok: true, rank: entry.rankedMeta(user.uid) });
         }
 
         // ---- boutique / tasks / profil
+        case 'bal': {
+          return json(res, 200, { ok: true, bal: await deps.getBalance(user.uid) });
+        }
         case 'shop_list': {
           shopApi.markLogin(user.uid);
           return json(res, 200, { ok: true, rewards: shopApi.listRewards(false) });
@@ -731,13 +751,21 @@ function init(deps) {
         case 'shop_buy': {
           const order = await shopApi.buy(user.uid, String(d.id || ''), user.guildId, user.name);
           let autoRole = false, roleErr = '';
+          let msg = 'Purchase complete. Order code: ' + order.code;
           if (order.type === 'role' && order.roleId && deps.grantRole) {
             try {
               await deps.grantRole(user.guildId, user.uid, order.roleId);
-              try { shopApi.markDelivered(order.code); } catch {}
+              try { await shopApi.markDelivered(order.code); } catch {}
               order.status = 'delivered';
               autoRole = true;
-            } catch (e) { roleErr = String(e?.message || e).slice(0, 120); }
+              msg = 'Role added to your account.';
+              try {
+                if (deps.notifyUser) await deps.notifyUser(user.uid, '✅ **Role added**\nThe role **' + order.rewardName + '** has been added to your account.\nOrder code: `' + order.code + '`');
+              } catch (e) { console.error('[web] role notify', e?.message || e); }
+            } catch (e) {
+              roleErr = String(e?.message || e).slice(0, 120);
+              msg = 'The role could not be added' + (roleErr ? ': ' + roleErr : '') + '. Order code: ' + order.code;
+            }
           }
           walBal = await deps.getBalance(user.uid);
           for (const c of entry.clients) {
@@ -745,9 +773,9 @@ function init(deps) {
             try { c.write(`event: bal\ndata: ${JSON.stringify({ bal: walBal })}\n\n`); } catch {}
           }
           try {
-            const adminText = `${user.name} a acheté « ${order.rewardName} » (${order.price}) · code ${order.code}` + (autoRole ? ' · rôle livré' : '');
+            const adminText = `${user.name} bought "${order.rewardName}" (${order.price}) · code ${order.code}` + (autoRole ? ' · role delivered' : '');
             const adminIds = String(process.env.ADMIN_IDS || '').split(',').map((x) => x.trim()).filter(Boolean);
-            const adminNotif = { id: crypto.randomBytes(6).toString('hex'), t: Date.now(), type: 'shop', title: 'Achat boutique', text: adminText };
+            const adminNotif = { id: crypto.randomBytes(6).toString('hex'), t: Date.now(), type: 'shop', title: 'Shop purchase', text: adminText };
             for (const aid of adminIds) {
               pushNotif(aid, adminNotif);
               for (const c of entry.clients) {
@@ -759,12 +787,22 @@ function init(deps) {
           return json(res, 200, {
             ok: true,
             code: order.code,
-            order: { code: order.code, rewardName: order.rewardName, type: order.type, price: order.price, status: order.status, autoRole, roleErr },
+            msg,
+            order: { code: order.code, rewardName: order.rewardName, type: order.type, price: order.price, status: order.status, autoRole, roleErr, msg },
             rbal: walBal,
           });
         }
         case 'shop_orders': {
           return json(res, 200, { ok: true, orders: shopApi.listOrders({ uid: user.uid, limit: 30 }) });
+        }
+        case 'shop_orders_clear': {
+          const n = await shopApi.clearOrders(user.uid);
+          return json(res, 200, { ok: true, cleared: n });
+        }
+        case 'admin_orders_clear': {
+          if (!deps.isAdmin || !(await deps.isAdmin(user.uid))) throw new Error('Admin only.');
+          const n = await shopApi.clearOrders(d.uid || null);
+          return json(res, 200, { ok: true, cleared: n });
         }
         case 'tasks_list': {
           shopApi.markLogin(user.uid);
@@ -794,28 +832,34 @@ function init(deps) {
           });
         }
         case 'admin_shop_list': {
-          if (!deps.isAdmin || !(await deps.isAdmin(user.uid))) throw new Error('Action réservée à l’administrateur.');
+          if (!deps.isAdmin || !(await deps.isAdmin(user.uid))) throw new Error('Admin only.');
           return json(res, 200, { ok: true, rewards: shopApi.listRewards(true), tasks: shopApi.listTasks(true), orders: shopApi.listOrders({ limit: 50 }) });
         }
         case 'admin_reward_save': {
-          if (!deps.isAdmin || !(await deps.isAdmin(user.uid))) throw new Error('Action réservée à l’administrateur.');
+          if (!deps.isAdmin || !(await deps.isAdmin(user.uid))) throw new Error('Admin only.');
           const entry = shopApi.adminUpsertReward(d);
           return json(res, 200, { ok: true, reward: entry, rewards: shopApi.listRewards(true) });
         }
         case 'admin_reward_del': {
-          if (!deps.isAdmin || !(await deps.isAdmin(user.uid))) throw new Error('Action réservée à l’administrateur.');
+          if (!deps.isAdmin || !(await deps.isAdmin(user.uid))) throw new Error('Admin only.');
           shopApi.adminDeleteReward(String(d.id || ''));
           return json(res, 200, { ok: true, rewards: shopApi.listRewards(true) });
         }
         case 'admin_task_save': {
-          if (!deps.isAdmin || !(await deps.isAdmin(user.uid))) throw new Error('Action réservée à l’administrateur.');
+          if (!deps.isAdmin || !(await deps.isAdmin(user.uid))) throw new Error('Admin only.');
           const entry = shopApi.adminUpsertTask(d);
           return json(res, 200, { ok: true, task: entry, tasks: shopApi.listTasks(true) });
         }
         case 'admin_task_del': {
-          if (!deps.isAdmin || !(await deps.isAdmin(user.uid))) throw new Error('Action réservée à l’administrateur.');
+          if (!deps.isAdmin || !(await deps.isAdmin(user.uid))) throw new Error('Admin only.');
           shopApi.adminDeleteTask(String(d.id || ''));
           return json(res, 200, { ok: true, tasks: shopApi.listTasks(true) });
+        }
+
+        case 'admin_rank_reset': {
+          if (!deps.isAdmin || !(await deps.isAdmin(user.uid))) throw new Error('Admin only.');
+          await rankApi.resetRankedSeason();
+          return json(res, 200, { ok: true, msg: 'Ranked season reset. All RR/ELO back to the starting rank.' });
         }
 
         case 'admin_bot_cmd': {
@@ -944,7 +988,11 @@ function init(deps) {
     }
     deps.getBalance(user.uid).then((b) => { try { res.write(`event: bal\ndata: ${JSON.stringify({ bal: b })}\n\n`); } catch { /* fermée */ } }).catch(() => {});
     try { entry.roulette.setPresence(user.uid, true); res.write(`event: roulette\ndata: ${JSON.stringify(entry.roulette.snapshot())}\n\n`); } catch (e) { console.error('[stream] roulette', e?.message || e); }
-    try { entry.arena.setPresence(user.uid, true); res.write(`event: ranked\ndata: ${JSON.stringify(entry.arena.snapshot(user.uid))}\n\n`); } catch (e) { console.error('[stream] ranked', e?.message || e); }
+    try {
+      entry.ranked.setPresence(user.uid, true);
+      res.write(`event: state\ndata: ${JSON.stringify({ ...entry.ranked.snapshot(), tid: 'ranked', mode: 'ranked' })}\n\n`);
+      res.write(`event: ranked\ndata: ${JSON.stringify(entry.rankedMeta(user.uid))}\n\n`);
+    } catch (e) { console.error('[stream] ranked', e?.message || e); }
     res.write(`event: chathist\ndata: ${JSON.stringify(Object.fromEntries(entry.chat))}\n\n`);
     res.write(`event: inbox\ndata: ${JSON.stringify([...(inbox[user.uid] || []), ...eventsOf(user.guildId)].sort((a, b) => b.t - a.t).slice(0, 30))}\n\n`);
     const hb = setInterval(() => {
@@ -965,7 +1013,7 @@ function init(deps) {
             for (const r of entry.bjs.values()) r.setPresence(user.uid, false);
             for (const r of entry.pokers.values()) r.setPresence(user.uid, false);
             entry.roulette.setPresence(user.uid, false);
-            try { entry.arena.setPresence(user.uid, false); } catch {}
+            try { entry.ranked.setPresence(user.uid, false); } catch {}
           }
         }, 8000); // tolérance : rechargement de page / coupure réseau brève
       } else entry.conns.set(user.uid, n);
@@ -996,6 +1044,19 @@ function init(deps) {
         return json(res, 200, rankApi.view(u.uid));
       }
       if (req.method === 'GET' && url.pathname === '/api/boards') return json(res, 200, await Promise.resolve(deps.getBoards ? deps.getBoards() : null).catch(() => null) || { rich: [], alltime: [] });
+      if (req.method === 'GET' && url.pathname === '/api/online') { // admin: currently connected players (fallback to recent visitors)
+        const u = readToken(url.searchParams.get('t'));
+        if (!u) return json(res, 401, { error: 'expired' });
+        const entry = roomOf(u.guildId);
+        const connected = [...entry.conns.keys()].map((uid) => {
+          const s = entry.seen.get(uid) || { uid, name: uid, avatar: '' };
+          return { uid: String(uid), name: String(s.name || uid), avatar: s.avatar || '' };
+        });
+        const players = connected.length
+          ? connected
+          : [...entry.seen.values()].slice(0, 50).map((p) => ({ uid: String(p.uid), name: String(p.name || p.uid), avatar: p.avatar || '' }));
+        return json(res, 200, { players });
+      }
       if (req.method === 'GET' && url.pathname === '/api/players') { // recherche d'un joueur (menu « Envoyer des pièces »)
         const u = readToken(url.searchParams.get('t'));
         if (!u) return json(res, 401, { players: [] });
@@ -1023,7 +1084,7 @@ function init(deps) {
   server.listen(port, '0.0.0.0', () => console.log(`[web] blackjack + poker + roulette en ligne → ${PUBLIC_URL} (port ${port})`));
   server.on('error', (e) => console.error('[web] serveur :', e?.message || e));
 
-  return { makeLink, pushEvent, enabled: true, rooms, server, publicUrl: PUBLIC_URL, oauth: oauthOn, shop: shopApi };
+  return { makeLink, pushEvent, enabled: true, rooms, server, publicUrl: PUBLIC_URL, oauth: oauthOn, shop: shopApi, rankApi };
 }
 
 module.exports = { init };

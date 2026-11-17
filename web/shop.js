@@ -133,7 +133,7 @@ function create(dataDir, deps = {}) {
   }
 
   async function upsertOrderDb(order) {
-    if (!sb || !order) return;
+    if (!sb || !order) return { ok: true, error: null };
     const { error } = await sb.from('shop_orders').upsert(
       {
         code: order.code,
@@ -151,11 +151,15 @@ function create(dataDir, deps = {}) {
       },
       { onConflict: 'code' }
     );
-    if (error) console.error('[shop] sb order', error.message || error);
+    if (error) {
+      console.error('[shop] sb order', error.message || error);
+      return { ok: false, error: error.message || String(error) };
+    }
+    return { ok: true, error: null };
   }
 
   async function upsertProgressDb(uid, u) {
-    if (!sb || !u) return;
+    if (!sb || !u) return { ok: true, error: null };
     const { error } = await sb.from('shop_task_progress').upsert(
       {
         user_id: String(uid),
@@ -166,7 +170,11 @@ function create(dataDir, deps = {}) {
       },
       { onConflict: 'user_id,day' }
     );
-    if (error) console.error('[shop] sb progress', error.message || error);
+    if (error) {
+      console.error('[shop] sb progress', error.message || error);
+      return { ok: false, error: error.message || String(error) };
+    }
+    return { ok: true, error: null };
   }
 
   async function loadFromSupabase() {
@@ -259,6 +267,87 @@ function create(dataDir, deps = {}) {
     }
   }
 
+  /** Pull the newest orders from Supabase into the local map so the bot sees new codes quickly. */
+  async function syncOrdersFromDb() {
+    if (!sb) return 0;
+    try {
+      const { data: od, error } = await sb.from('shop_orders').select('*').order('created_at', { ascending: false }).limit(2000);
+      if (error) throw error;
+      if (!od || !od.length) return 0;
+      let added = 0;
+      for (const o of od) {
+        if (!o.code) continue;
+        const prev = orders[o.code];
+        const row = {
+          code: o.code,
+          uid: o.user_id,
+          name: o.user_name || '',
+          guildId: o.guild_id || '',
+          rewardId: o.reward_id,
+          rewardName: o.reward_name || '',
+          type: o.type || 'custom',
+          roleId: o.role_id || '',
+          price: Number(o.price) || 0,
+          status: o.status || 'pending',
+          createdAt: o.created_at,
+          deliveredAt: o.delivered_at || null,
+        };
+        // Keep a local "delivered" flag if the DB row is still pending (write in flight).
+        if (prev && prev.status === 'delivered' && row.status === 'pending') {
+          row.status = 'delivered';
+          row.deliveredAt = prev.deliveredAt;
+        }
+        if (!prev) added++;
+        orders[o.code] = row;
+      }
+      persistOrders();
+      return added;
+    } catch (e) {
+      console.error('[shop] sync orders', e?.message || e);
+      return 0;
+    }
+  }
+
+  /** Resolve an order by code, refreshing from Supabase once if it is not in the local map. */
+  async function getOrderAsync(code) {
+    const local = getOrder(code);
+    if (local) return local;
+    await syncOrdersFromDb();
+    return getOrder(code);
+  }
+
+  /** Remove orders for one user (uid given) or all orders; mirrors the deletions to Supabase. */
+  async function clearOrders(uid) {
+    const target = uid ? String(uid) : null;
+    const codes = [];
+    let removed = 0;
+    for (const [code, o] of Object.entries(orders)) {
+      if (target && String(o.uid) !== target) continue;
+      delete orders[code];
+      codes.push(code);
+      removed++;
+    }
+    persistOrders();
+    if (!removed) return 0;
+    if (sb) {
+      try {
+        if (target) {
+          const { error } = await sb.from('shop_orders').delete().eq('user_id', target);
+          if (error) throw error;
+        } else {
+          const { error } = await sb.from('shop_orders').delete().neq('code', '');
+          if (error) throw error;
+        }
+      } catch (e) {
+        console.error('[shop] clear orders db', e?.message || e);
+        for (const code of codes) {
+          try { await sb.from('shop_orders').delete().eq('code', code); } catch { /* ignore */ }
+        }
+      }
+    }
+    return removed;
+  }
+
   if (!tasks.length) {
     tasks = [
       { id: 'daily_login', name: 'Connexion du jour', desc: 'Ouvre le casino aujourd’hui', reward: 5, type: 'login', target: 1, active: true },
@@ -268,11 +357,17 @@ function create(dataDir, deps = {}) {
     persistTasks();
   }
 
-  if (sb) loadFromSupabase().then(() => {
-    // push seeds if DB empty
-    syncRewardsUp().catch(() => {});
-    syncTasksUp().catch(() => {});
-  });
+  if (sb) {
+    loadFromSupabase().then(() => {
+      // push seeds if DB empty
+      syncRewardsUp().catch(() => {});
+      syncTasksUp().catch(() => {});
+    });
+    // New order codes are created by the web shop and redeemed by the Discord bot.
+    // Keep the local map fresh so getOrderAsync() finds a code within ~2 s.
+    syncOrdersFromDb().catch(() => {});
+    setInterval(() => { syncOrdersFromDb().catch(() => {}); }, 2000).unref();
+  }
 
   function listRewards(admin = false) {
     return rewards
@@ -370,7 +465,7 @@ function create(dataDir, deps = {}) {
     };
     orders[code] = order;
     persistOrders();
-    upsertOrderDb(order);
+    await upsertOrderDb(order); // row must exist in Supabase before the response is sent
     return order;
   }
 
@@ -386,13 +481,13 @@ function create(dataDir, deps = {}) {
     return list.slice(0, limit);
   }
 
-  function markDelivered(code) {
+  async function markDelivered(code) {
     const o = getOrder(code);
     if (!o) throw new Error('Order introuvable.');
     o.status = 'delivered';
     o.deliveredAt = new Date().toISOString();
     persistOrders();
-    upsertOrderDb(o);
+    await upsertOrderDb(o);
     return o;
   }
 
@@ -516,6 +611,9 @@ function create(dataDir, deps = {}) {
     adminDeleteReward,
     buy,
     getOrder,
+    getOrderAsync,
+    syncOrdersFromDb,
+    clearOrders,
     listOrders,
     markDelivered,
     listTasks,
