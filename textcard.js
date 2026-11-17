@@ -19,7 +19,7 @@ module.exports = { install() { console.log('[textcard] disabled'); } };
  *
  * Installation (dans index.js, après la création du client) :
  *   require('./textcard').install({ client, discord: require('discord.js'), canvasLib, ... })
- */
+ *
 
 // ----------------------------------------------------------------------------
 //  Constantes de mise en page (repère logique 800 px de large, rendu x1.5)
