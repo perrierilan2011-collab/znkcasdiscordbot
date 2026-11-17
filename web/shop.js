@@ -522,6 +522,18 @@ function create(dataDir, deps = {}) {
       orders[code] = order;
       persistOrders();
       await upsertOrderDb(order); // row must exist in Supabase before the response is sent
+      // Le code est envoyé en MP Discord en plus d'être affiché sur le site.
+      if (deps.notifyUser) {
+        try {
+          await deps.notifyUser(
+            base.uid,
+            '🎁 **Commande créée**\nRécompense : **' + base.rewardName + '**\n' +
+              'Code de commande : `' + code + '`\n\n' +
+              'Copie ce code et ouvre un ticket « Claim rewards » sur le serveur Discord. ' +
+              'Tu peux aussi le retrouver à tout moment sur le site, dans **Mon compte**.'
+          );
+        } catch (e) { console.error('[shop] order notify', e?.message || e); }
+      }
       order.msg = 'Purchase complete. Order code: ' + order.code;
       return order;
     } finally {

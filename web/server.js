@@ -1030,7 +1030,7 @@ function init(deps) {
             games: Math.max(games, rankGames),
             inviteUrl: inviteUrl || '',
             inviteReward: Number(process.env.INVITE_REWARD) || 10,
-            orders: shopApi.listOrders({ uid: user.uid, limit: 10 }),
+            orders: shopApi.listOrders({ uid: user.uid, limit: 30 }),
           });
         }
         case 'admin_shop_list': {

@@ -8923,6 +8923,8 @@ function ticketPanelRow() {
     new ButtonBuilder().setCustomId('ticket_claim_open').setLabel('Open a ticket').setEmoji('🎫').setStyle(ButtonStyle.Primary)
   );
 }
+// Un seul ticket par code : verrou anti double-clic / doubles soumissions.
+const ticketCreating = new Set();
 
 async function cmdTicketSetup(msg) {
   if (!isCrown(msg)) return msg.reply(CROWN_ONLY).catch(() => {});
@@ -8931,8 +8933,34 @@ async function cmdTicketSetup(msg) {
   if (!shop) return msg.reply('Web shop unavailable (shop module).');
   if (category) shop.setTicketCfg(msg.guild.id, { categoryId: category.id });
   const payload = { embeds: [buildTicketPanelEmbed()], components: [ticketPanelRow()] };
+  const cfg = shop.getTicketCfg(msg.guild.id) || {};
+  // Un seul panneau par serveur : on édite le message existant au lieu d'en créer un deuxième.
+  if (cfg.panelChannelId) {
+    try {
+      const candidates = [];
+      const push = (c) => { if (c && c.messages?.fetch && !candidates.includes(c)) candidates.push(c); };
+      const known = cfg.panelSourceChannelId &&
+        (msg.guild.channels.cache.get(String(cfg.panelSourceChannelId)) || await msg.guild.channels.fetch(String(cfg.panelSourceChannelId)).catch(() => null));
+      if (known) push(known);
+      push(msg.channel);
+      const all = await msg.guild.channels.fetch().catch(() => null);
+      if (all) for (const c of all.values()) push(c);
+      for (const c of candidates.slice(0, 60)) {
+        const old = await c.messages.fetch(cfg.panelChannelId).catch(() => null);
+        if (old?.edit) {
+          await old.edit(payload);
+          shop.setTicketCfg(msg.guild.id, { panelSourceChannelId: c.id });
+          return msg.reply({ content: '♻️ Ticket panel mis à jour (aucun doublon).' + (category ? ' Category: ' + category.name : '') }).catch(() => {});
+        }
+      }
+    } catch (e) { console.error('[ticket] update panel', e?.message || e); }
+  }
   const sent = await msg.channel.send(payload);
-  shop.setTicketCfg(msg.guild.id, { panelChannelId: sent.id, categoryId: category?.id || shop.getTicketCfg(msg.guild.id)?.categoryId || null });
+  shop.setTicketCfg(msg.guild.id, {
+    panelChannelId: sent?.id || null,
+    panelSourceChannelId: sent?.channel?.id || msg.channel?.id || null,
+    categoryId: category?.id || shop.getTicketCfg(msg.guild.id)?.categoryId || null,
+  });
   return msg.reply({ content: 'Ticket panel posted.' + (category ? ' Category: ' + category.name : ' (optional: /ticketsetup + category)') }).catch(() => {});
 }
 
@@ -8983,6 +9011,10 @@ async function handleTicketButton(i) {
     }
     try {
       await i.channel.send(`✅ **Reward delivered** by <@${i.user.id}>\nOrder code \`${code}\` (\`${order.rewardName}\`) is now closed and can no longer be used.`);
+    } catch {}
+    // MP Discord : l'acheteur est prévenu que sa récompense est bien livrée.
+    try {
+      await dmUser(order.uid, '🎉 **Récompense reçue**\nVotre récompense **' + order.rewardName + '** (code `' + code + '`) vient d’être marquée comme **livrée** sur le serveur Discord. Merci pour votre achat !');
     } catch {}
     return true;
   }
@@ -9038,15 +9070,21 @@ async function handleTicketModal(i) {
   const base = `${slugName}-${order.code}`.toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 90);
 
   // Idempotency: never create a second ticket for the same order code, even if
-  // the modal is submitted twice or two bot processes see the same interaction.
+  // the modal is submitted twice. Fetch via the API (not only the cache) so an
+  // existing ticket is detected after a restart too.
   const topicTag = `Order ${order.code} ·`;
-  const existing = i.guild.channels.cache.find((c) => c.type === ChannelType.GuildText && String(c.topic || '').startsWith(topicTag));
-  if (existing) {
-    return i.reply({ content: `✅ Ticket already opened in #${existing.name} — ${existing}`, flags: EPH });
+  if (ticketCreating.has(order.code)) {
+    return i.reply({ content: '⏳ Un ticket est déjà en cours de création pour cette commande.', flags: EPH });
   }
-
+  ticketCreating.add(order.code);
   let ch;
   try {
+    const channels = await i.guild.channels.fetch().catch(() => i.guild.channels.cache);
+    const existing = [...(channels?.values?.() || [])].find((c) => c && c.type === ChannelType.GuildText &&
+      (String(c.topic || '').startsWith(topicTag) || c.name === base));
+    if (existing) {
+      return i.reply({ content: `✅ Ticket already opened in #${existing.name} — ${existing}`, flags: EPH });
+    }
     ch = await i.guild.channels.create({
       name: base,
       type: ChannelType.GuildText,
@@ -9062,6 +9100,8 @@ async function handleTicketModal(i) {
   } catch (e) {
     console.error('[ticket]', e);
     return i.reply({ content: 'Could not create the channel (bot needs Manage Channels).', flags: EPH });
+  } finally {
+    ticketCreating.delete(order.code);
   }
 
   const embed = new EmbedBuilder()
