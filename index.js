@@ -301,6 +301,13 @@ const LANG_FILE = path.join(__dirname, 'data', 'lang.json');
 const PING_FILE = path.join(__dirname, 'data', 'winping.json');
 const FAV_FILE = path.join(__dirname, 'data', 'favorites.json');
 const SKIP_FILE = path.join(__dirname, 'data', 'skipanim.json');
+const INVITE_LINKS_FILE = path.join(__dirname, 'data', 'invite_links.json');
+// Persistant: invite code -> Discord user id. Lets a personal web invite credit its owner even though the bot creates it.
+const inviteLinkOwners = (() => {
+  try { return JSON.parse(fs.readFileSync(INVITE_LINKS_FILE, 'utf8') || '{}'); }
+  catch { return {}; }
+})();
+function saveInviteLinkOwners() { saveJson(INVITE_LINKS_FILE, inviteLinkOwners); }
 const userLang = new Map(); // userId -> 'fr' | 'en'
 
 const winPingOff = new Set(); // userIds who don't want pings in the wins channel
@@ -7083,14 +7090,30 @@ try {
         return (u && (u.eg || 0)) || 0;
       } catch { return 0; }
     },
-    inviteUrl: async (guildId) => {
+    inviteUrl: async (guildId, uid) => {
       try {
-        const g = client.guilds.cache.get(String(guildId));
+        const gid = String(guildId || '');
+        const userId = String(uid || '');
+        const g = client.guilds.cache.get(gid);
         if (!g) return '';
+        // Reuse this player's existing personal invite instead of creating a new one on every profile load.
+        const ownerKey = userId ? gid + ':' + userId : '';
+        if (ownerKey) {
+          const oldCode = Object.keys(inviteLinkOwners).find((code) => inviteLinkOwners[code] === ownerKey);
+          if (oldCode) {
+            const old = await g.invites.fetch(oldCode).catch(() => null);
+            if (old) return old.url;
+            delete inviteLinkOwners[oldCode];
+            saveInviteLinkOwners();
+          }
+        }
         const ch = g.systemChannel || g.channels.cache.find((c) => c.isTextBased?.() && c.viewable);
         if (ch && ch.createInvite) {
-          const inv = await ch.createInvite({ maxAge: 0, maxUses: 0, unique: false, reason: 'ZNK shop invite link' }).catch(() => null);
-          if (inv) return inv.url;
+          const inv = await ch.createInvite({ maxAge: 0, maxUses: 0, unique: true, reason: userId ? `ZNK invite link for ${userId}` : 'ZNK shop invite link' }).catch(() => null);
+          if (inv) {
+            if (ownerKey) { inviteLinkOwners[inv.code] = ownerKey; saveInviteLinkOwners(); }
+            return inv.url;
+          }
         }
         // fallback vanity or generic
         if (g.vanityURLCode) return 'https://discord.gg/' + g.vanityURLCode;
@@ -8715,13 +8738,20 @@ client.on(Events.InteractionCreate, async (i) => {
 // ============================================================
 const inviteCache = new Map();
 const rewardedLocal = new Set();
+const ownerOfInviteCode = (code) => {
+  const owner = inviteLinkOwners[String(code)];
+  if (!owner) return null;
+  const i = String(owner).indexOf(':');
+  return i < 0 ? String(owner) : String(owner).slice(i + 1);
+};
+const inviteEntry = (inv) => ({ uses: inv.uses ?? 0, max: inv.maxUses ?? 0, inviterId: ownerOfInviteCode(inv.code) || inv.inviter?.id || null });
 
 async function cacheInvites(guild) {
   try {
     const invites = await guild.invites.fetch();
     inviteCache.set(
       guild.id,
-      new Map(invites.map((inv) => [inv.code, { uses: inv.uses ?? 0, max: inv.maxUses ?? 0, inviterId: inv.inviter?.id ?? null }]))
+      new Map(invites.map((inv) => [inv.code, inviteEntry(inv)]))
     );
     return true;
   } catch (e) {
@@ -8757,7 +8787,7 @@ client.on(Events.GuildMemberAdd, async (member) => {
     let inviterId = null;
     if (old) {
       const used = fresh.find((inv) => (inv.uses ?? 0) > (old.get(inv.code)?.uses ?? 0));
-      if (used) inviterId = used.inviter?.id ?? null;
+      if (used) inviterId = ownerOfInviteCode(used.code) || used.inviter?.id || null;
       else {
         for (const [code2, o] of old) {
           if (!fresh.has(code2) && o.max > 0 && o.uses + 1 >= o.max) {
@@ -8769,7 +8799,7 @@ client.on(Events.GuildMemberAdd, async (member) => {
     }
     inviteCache.set(
       guild.id,
-      new Map(fresh.map((inv) => [inv.code, { uses: inv.uses ?? 0, max: inv.maxUses ?? 0, inviterId: inv.inviter?.id ?? null }]))
+      new Map(fresh.map((inv) => [inv.code, inviteEntry(inv)]))
     );
 
     if (!inviterId || inviterId === member.id) return;
@@ -8812,7 +8842,7 @@ client.on(Events.GuildMemberAdd, async (member) => {
 client.on(Events.InviteCreate, (inv) => {
   if (!inv.guild) return;
   const m = inviteCache.get(inv.guild.id) || new Map();
-  m.set(inv.code, { uses: inv.uses ?? 0, max: inv.maxUses ?? 0, inviterId: inv.inviter?.id ?? null });
+  m.set(inv.code, inviteEntry(inv));
   inviteCache.set(inv.guild.id, m);
 });
 client.on(Events.InviteDelete, () => {});

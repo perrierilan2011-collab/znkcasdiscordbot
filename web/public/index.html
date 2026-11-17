@@ -54,6 +54,7 @@ header{display:flex;align-items:center;gap:10px;padding:8px 14px;background:#000
 /* catégorie RANKED, tout en haut de l'accueil */
 /* ranked : aucun grand rectangle, juste le petit badge jaune */
 .cat-ranked{padding:0;border:0;background:none;box-shadow:none}
+.btn.ico{width:38px;height:36px;padding:0;display:grid;place-items:center;flex:none}
 .cat-ranked h2{color:#fde68a;letter-spacing:.16em;font-size:17px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 .rkcat-tag{font-size:10px;letter-spacing:.12em;color:#000;background:var(--gold);padding:4px 8px;border-radius:999px;font-weight:900}
 .cat-ranked .gcard.ranked{border-color:#262626;background:#0a0a0a;box-shadow:none}
@@ -1023,7 +1024,7 @@ header .sp{flex:1 1 0}
   <button class="btn go" id="mOrderCopy" style="width:100%">Copier le code</button>
   <button class="btn" id="mOrderClose" style="width:100%;margin-top:8px">Fermer</button>
 </div></div>
-<div id="gate"><div><h1>Casino</h1><p id="gatemsg">Connecte-toi avec ton compte Discord pour jouer avec ton solde du casino.</p><a class="dsc" href="/login">Se connecter avec Discord</a><a class="join" href="https://discord.gg/Wq7UkttYGa" target="_blank" rel="noopener noreferrer">Rejoindre le serveur Discord</a></div></div>
+<div id="gate"><div><h1>Casino</h1><p id="gatemsg">Connecte-toi avec ton compte Discord pour jouer avec ton wallet du casino.</p><a class="dsc" href="/login">Se connecter avec Discord</a><a class="join" href="https://discord.gg/Wq7UkttYGa" target="_blank" rel="noopener noreferrer">Rejoindre le serveur Discord</a></div></div>
 <header>
   <nav id="topNav" aria-label="Navigation">
     <button type="button" class="navl" data-g="hub">Accueil</button>
@@ -1045,7 +1046,7 @@ header .sp{flex:1 1 0}
   </div>
   <div class="pop" id="meWrap">
     <div class="me" id="me" role="button" tabindex="0" aria-haspopup="true"><div class="av" id="meAv">?</div><div id="meName" style="font-weight:700;font-size:12px">…</div><span class="car"><svg class="ic" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></span></div>
-    <div class="ppanel" id="mePanel"><div class="mpn"><span>Solde</span><b id="meBal">—</b></div><button class="btn" id="bAccount">Mon compte</button><button class="btn hide" id="bAdmin">Admin</button><button class="btn" id="bGift">Envoyer des ZTKN</button><button class="btn" id="bLogout">Deconnexion</button></div>
+    <div class="ppanel" id="mePanel"><div class="mpn"><span>Wallet</span><b id="meBal">—</b></div><button class="btn" id="bAccount">Mon compte</button><button class="btn hide" id="bAdmin">Admin</button><button class="btn" id="bGift">Envoyer des ZTKN</button><button class="btn" id="bLogout">Deconnexion</button></div>
   </div>
 </header>
 <div id="conn">Reconnexion…</div>
@@ -1152,8 +1153,8 @@ header .sp{flex:1 1 0}
   <div class="lbwrap">
     <div class="lbhead"><div><h2>Classement</h2><p>Les plus gros joueurs du casino.</p></div><span id="lbUpd"></span></div>
     <div class="lbgrid">
-      <section class="lbcol"><div class="lbtitle"><b>Classement actuel</b><small>Soldes actuels, du plus riche au moins riche</small></div><div id="lbCur"><div class="lbnone">…</div></div></section>
-      <section class="lbcol"><div class="lbtitle"><b>Classement all-time</b><small>Plus haut solde jamais atteint</small></div><div id="lbAll"><div class="lbnone">…</div></div></section>
+      <section class="lbcol"><div class="lbtitle"><b>Classement actuel</b><small>Wallets actuels, du plus riche au moins riche</small></div><div id="lbCur"><div class="lbnone">…</div></div></section>
+      <section class="lbcol"><div class="lbtitle"><b>Classement all-time</b><small>Plus haut wallet jamais atteint</small></div><div id="lbAll"><div class="lbnone">…</div></div></section>
     </div>
   </div>
 </main>
@@ -1241,11 +1242,11 @@ header .sp{flex:1 1 0}
           <button type="button" class="btn" data-eco="set">🎯 Set</button>
           <button type="button" class="btn" data-eco="view">👀 View</button>
           <button type="button" class="btn" data-eco="player_stats">📊 Player stats</button>
-          <button type="button" class="btn" data-eco="reset_balance" style="background:#7f1d1d">🧹 Reset solde joueur</button>
+          <button type="button" class="btn" data-eco="reset_balance" style="background:#7f1d1d">🧹 Reset wallet joueur</button>
         </div>
         <div style="display:flex;flex-wrap:wrap;gap:8px">
           <button type="button" class="btn go" data-eco="gift_all">🎁 Gift all</button>
-          <button type="button" class="btn" data-eco="reset_balances" style="background:#7f1d1d">💥 Reset balances</button>
+          <button type="button" class="btn" data-eco="reset_balances" style="background:#7f1d1d">💥 Reset wallets</button>
           <button type="button" class="btn" data-eco="reset_alltime" style="background:#7f1d1d">👑 Reset all-time</button>
           <button type="button" class="btn" data-eco="reset_stats" style="background:#7f1d1d">📈 Reset stats</button>
         </div>
@@ -1478,10 +1479,10 @@ create table if not exists roulette_event_results (
 </main>
 <main id="accountView" class="hide">
   <div class="lbwrap" style="align-items:center">
-    <div class="lbhead"><div><h2>Mon compte</h2><p>Solde, invitations et commandes</p></div></div>
+    <div class="lbhead"><div><h2>Mon compte</h2><p>Wallet, invitations et commandes</p></div></div>
     <div class="accbox" id="accBox">
       <div class="accstat">
-        <div><span>Solde</span><b id="accBal">—</b></div>
+        <div><span>Wallet</span><b id="accBal">—</b></div>
         <div><span>Invitations</span><b id="accInv">—</b></div>
         <div><span>Parties jouées</span><b id="accGames">—</b></div>
         <div><span>Récompense invite</span><b id="accInvR">+10</b></div>
@@ -1492,6 +1493,10 @@ create table if not exists roulette_event_results (
           <input class="gin" id="accInvite" readonly placeholder="Chargement du lien…" style="width:100%;background:#000;border:1px solid #333;border-radius:10px;color:#fff;padding:12px;font:inherit">
           <button class="btn go" id="accCopyInvite">Copier le lien</button>
         </div>
+      </section>
+      <section class="lbcol">
+        <div class="lbtitle"><b>Ma fiche joueur</b><small>Voir tes stats, choisir un fond et télécharger ta fiche</small></div>
+        <div class="adbtnrow" style="padding:14px"><button type="button" class="btn go" id="accStats">Voir mes stats</button></div>
       </section>
       <section class="lbcol">
         <div class="lbtitle"><b>Mes dernières commandes</b><small>Code de commande et statut de livraison · le code est aussi envoyé en MP Discord</small></div>
@@ -1715,7 +1720,7 @@ create table if not exists roulette_event_results (
 </ul><p style="text-align:right"><button class="btn" data-close>Fermer</button></p></div></div>
 <div class="modal" id="mPRules"><div class="box"><h2>Règles du poker (Texas Hold'em No-Limit)</h2><ul>
 <li>Chaque joueur reçoit <b>2 cartes privées</b> (toi seul les vois). 5 cartes communes sont retournées : <b>flop</b> (3), <b>turn</b> (1), <b>river</b> (1). Ta main = les 5 meilleures cartes parmi tes 2 cartes et les 5 du board.</li>
-<li><b>Cave</b> : en t'asseyant, tu choisis ta cave (min/max affichés). Elle est débitée de ton solde et devient ton stack à la table. Tu récupères ton stack en quittant la table ; tu peux en rajouter entre deux mains.</li>
+<li><b>Cave</b> : en t'asseyant, tu choisis ta cave (min/max affichés). Elle est débitée de ton wallet et devient ton stack à la table. Tu récupères ton stack en quittant la table ; tu peux en rajouter entre deux mains.</li>
 <li><b>Blinds</b> : petite et grosse blind obligatoires, le bouton (D) tourne à chaque main. À deux joueurs, le bouton est petite blind.</li>
 <li>Actions : <b>Se coucher</b>, <b>Check</b> (si personne n'a misé), <b>Suivre</b>, <b>Relancer</b> (montant « à », au moins la relance précédente) ou <b>Tapis</b>. Tu as 25 s par décision (sinon check, ou tu te couches).</li>
 <li><b>Tapis</b> et pots annexes : si tu es à tapis pour moins que les autres, tu ne peux gagner que la part du pot à laquelle tu as participé.</li>
@@ -1742,11 +1747,16 @@ create table if not exists roulette_event_results (
 <div class="modal" id="mStatsCard"><div class="box" style="max-width:920px;padding:16px;text-align:center">
   <h2 style="margin:0 0 10px">Fiche joueur</h2>
   <canvas id="statsCanvas" width="1200" height="675" style="width:100%;height:auto;border-radius:14px;display:block;background:#000"></canvas>
-  <p style="margin:12px 0 0"><button class="btn" id="statsDownload">Télécharger la image</button> <button class="btn" data-close>Fermer</button></p>
+  <p class="statTools" style="margin:12px 0 0;display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:center">
+    <label class="btn" for="statsBgFile" title="Choisir une image de fond">Choisir une image de fond</label>
+    <input id="statsBgFile" type="file" accept="image/*" class="hide">
+    <button class="btn ico" id="statsDownload" title="Télécharger la fiche" aria-label="Télécharger la fiche"></button>
+    <button class="btn" data-close>Fermer</button>
+  </p>
 </div></div>
 <div class="modal" id="mRules"><div class="box"><h2>Règles du blackjack</h2><ul>
 <li>Bats le croupier sans dépasser <b>21</b>. Figures = 10, As = 1 ou 11.</li>
-<li><b>Mise libre</b> : tape le montant que tu veux (ex. <code>250</code>, <code>1.5k</code>, <code>2m</code>) ou clique sur les jetons. « Tapis » = tout ton solde.</li>
+<li><b>Mise libre</b> : tape le montant que tu veux (ex. <code>250</code>, <code>1.5k</code>, <code>2m</code>) ou clique sur les jetons. « Tapis » = tout ton wallet.</li>
 <li>Les mises s'ouvrent à chaque manche ; la distribution démarre 15 s après la 1re mise (4 s si tout le monde a misé).</li>
 <li><b>Ordre de passage</b> : de la place 1 à la place 5, comme à une vraie table. Tu as 25 s par décision (sinon tu restes).</li>
 <li>Tu vois les cartes de tous les joueurs ; seule la 2e carte du croupier est cachée.</li>
@@ -1755,7 +1765,7 @@ create table if not exists roulette_event_results (
 <li>Le croupier tire jusqu'à 17 et <b>tient sur tous les 17</b>. Sabot de 6 jeux.</li>
 <li>Raccourcis : <kbd>H</kbd> tirer · <kbd>S</kbd> rester · <kbd>D</kbd> doubler · <kbd>P</kbd> séparer.</li>
 </ul><p style="text-align:right"><button class="btn" data-close>Fermer</button></p></div></div>
-<aside id="chat"><div id="chatHead"><span id="chatTitle">Chat</span><span id="chatBadge" class="hide"></span></div>
+<aside id="chat"><div id="chatHead" title="Chat" aria-label="Chat"><span id="chatIcon"></span><span id="chatTitle"></span><span id="chatBadge" class="hide"></span><button class="btn" id="chatClose" title="Fermer le chat" aria-label="Fermer le chat">×</button></div>
 <div id="chatBody"><div id="chatList" aria-live="polite"></div><form id="chatForm" autocomplete="off"><input id="chatIn" maxlength="200" placeholder="Écrire un message" aria-label="Message"><button class="btn" type="submit">Envoyer</button></form></div></aside>
 <div id="toast"></div>
 <div class="modal" id="mEvent"><div class="box" style="max-width:760px">
@@ -1804,11 +1814,13 @@ const IC = {
   gift: '<path d="M20 12v9H4v-9M2 7h20v5H2zM12 21V7M12 7H8a2.5 2.5 0 1 1 0-5c3 0 4 5 4 5zM12 7h4a2.5 2.5 0 1 0 0-5c-3 0-4 5-4 5z"/>',
   chat: '<path d="M21 12a8 8 0 0 1-11.6 7.1L3 21l1.9-5.4A8 8 0 1 1 21 12z"/>',
   cards: '<rect x="5" y="3" width="11" height="16" rx="2"/><path d="M19 7v12a2 2 0 0 1-2 2H9"/>',
+  download: '<path d="M12 3v12M7 10l5 5 5-5M4 21h16"/>',
 };
 const icon = (n, s = 18) => '<svg class="ic" viewBox="0 0 24 24" width="' + s + '" height="' + s + '" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + IC[n] + '</svg>';
 const EMO = /[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{FE0F}]/gu;
 const noEmo = (t) => String(t).replace(EMO, '').replace(/\s{2,}/g, ' ').trim();
 document.querySelectorAll('[data-ic]').forEach((b) => b.insertAdjacentHTML('afterbegin', icon(b.dataset.ic, b.classList.contains('ico') ? 19 : 17)));
+{ const ci = $('#chatIcon'); if (ci) ci.innerHTML = icon('chat', 18); }
 
 const nowS = () => Date.now() + offset;
 const isRed = (s) => s === '♥' || s === '♦';
@@ -1899,6 +1911,7 @@ async function send(action, extra = {}) {
     const r = await fetch('/api/act', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ t: TOKEN, action, ...extra }) });
     const d = await r.json(); send.last = d;
     if (d.rbal != null) W.bal = d.rbal;
+    if (d.ok && !/^(shop_list|shop_orders|tasks_list|profile|my_stats|admin_)/.test(action)) queueLiveRefresh(300);
     if (!d.ok) { toast(d.error || 'Erreur'); if (r.status === 401) showGate('Ta session a expiré : reconnecte-toi avec Discord.'); }
     return d.ok;
   } catch { toast('Connexion perdue…'); return false; }
@@ -1932,18 +1945,19 @@ function connect() {
       if (st && String(st.tid) === RANKED_TID) bjUpdate(st);
       else if (W.view === 'ranked') rkRender(st);
     } catch {}
+    queueLiveRefresh(150);
   });
-es.addEventListener('roulette', (e) => { const st = JSON.parse(e.data); offset = st.now - Date.now(); rRender(st); });
-  es.addEventListener('rocket', (e) => { const st = JSON.parse(e.data); offset = st.now - Date.now(); rocRender(st); });
-  es.addEventListener('poker', (e) => { const st = JSON.parse(e.data); offset = st.now - Date.now(); pUpdate(st); });
+es.addEventListener('roulette', (e) => { const st = JSON.parse(e.data); offset = st.now - Date.now(); rRender(st); queueLiveRefresh(150); });
+  es.addEventListener('rocket', (e) => { const st = JSON.parse(e.data); offset = st.now - Date.now(); rocRender(st); queueLiveRefresh(150); });
+  es.addEventListener('poker', (e) => { const st = JSON.parse(e.data); offset = st.now - Date.now(); pUpdate(st); queueLiveRefresh(150); });
   es.addEventListener('admin', () => $('#bAdmin').classList.remove('hide'));
-  es.addEventListener('bal', (e) => { W.bal = JSON.parse(e.data).bal; pHeader(); if (W.view !== 'ranked' && !O.hold && W.bal != null) $('#meBal').textContent = num(W.bal) + ' ' + COIN; });
-  es.addEventListener('inbox', (e) => nSet(JSON.parse(e.data), false));
-  es.addEventListener('notif', (e) => nAdd(JSON.parse(e.data)));
+  es.addEventListener('bal', (e) => { W.bal = JSON.parse(e.data).bal; pHeader(); if (W.view !== 'ranked' && !O.hold && W.bal != null) $('#meBal').textContent = num(W.bal) + ' ' + COIN; queueLiveRefresh(150); });
+  es.addEventListener('inbox', (e) => { nSet(JSON.parse(e.data), false); queueLiveRefresh(150); });
+  es.addEventListener('notif', (e) => { nAdd(JSON.parse(e.data)); queueLiveRefresh(150); });
   es.addEventListener('roulette_event', (e) => { try { reSetEvent(JSON.parse(e.data), false); } catch {} });
   es.addEventListener('chathist', (e) => { C.msgs = JSON.parse(e.data); cRender(); });
   es.addEventListener('chat', (e) => cOnMsg(JSON.parse(e.data)));
-  es.addEventListener('state', (e) => { $('#conn').style.display = 'none'; const st = JSON.parse(e.data); offset = st.now - Date.now(); bjUpdate(st); });
+  es.addEventListener('state', (e) => { $('#conn').style.display = 'none'; const st = JSON.parse(e.data); offset = st.now - Date.now(); bjUpdate(st); queueLiveRefresh(150); });
   es.addEventListener('tabledel', (e) => tableDel(JSON.parse(e.data)));
   es.addEventListener('emote', (e) => { const d = JSON.parse(e.data); if (d.tid && d.tid !== W.btid) return; const i = S && S.seats.findIndex((p) => p && p.uid === d.uid); if (i >= 0) { const x = el('div', 'emo', d.e); seatEls[i].root.append(x); setTimeout(() => x.remove(), 1900); } });
   es.onerror = () => {
@@ -2105,7 +2119,7 @@ function render(st) {
   const tk = st.turn ? st.round + ':' + st.turn.seat + ':' + st.turn.hand : '';
   if (tk && tk !== lastTurnKey && myTurn) { SFX.turn(); try { navigator.vibrate && navigator.vibrate(120); } catch {} }
   lastTurnKey = tk;
-  // solde en-tête — en classé on mise des RR, pas des ZTKN
+  // wallet en-tête — en classé on mise des RR, pas des ZTKN
   const ms = mySeat(); const UC = W.view === 'ranked' ? 'RR' : COIN;
   $('#meBal').textContent = ms ? num(ms.bal) + ' ' + UC : 'Spectateur';
   // flux
@@ -2135,11 +2149,11 @@ function updateDock(st, mi, myTurn) {
   $('#emotes').style.display = ms ? '' : 'none';
   $('#bLeave').style.display = ms ? '' : 'none';
   const info = $('#pInfo');
-  if (!ms) info.innerHTML = 'Tu regardes la table. <b>Prends une place libre</b> pour jouer avec ton solde.';
+  if (!ms) info.innerHTML = 'Tu regardes la table. <b>Prends une place libre</b> pour jouer avec ton wallet.';
   else if (myTurn) info.textContent = '';
   else if (betting) {
     const cur = ms.bet; const UC = W.view === 'ranked' ? 'RR' : COIN;
-    info.innerHTML = cur ? `Mise placée : <b>${num(cur)} ${UC}</b> — tu peux la modifier avant la distribution.` : (W.view === 'ranked' ? 'Choisis ta mise en <b>RR</b> (minimum 1, pas en dessous de 100 RR) puis <b>Miser</b>.' : 'Choisis ta mise (n’importe quel montant ≤ ton solde) puis <b>Miser</b>.');
+    info.innerHTML = cur ? `Mise placée : <b>${num(cur)} ${UC}</b> — tu peux la modifier avant la distribution.` : (W.view === 'ranked' ? 'Choisis ta mise en <b>RR</b> (minimum 1, pas en dessous de 100 RR) puis <b>Miser</b>.' : 'Choisis ta mise (n’importe quel montant ≤ ton wallet) puis <b>Miser</b>.');
   } else if (st.phase === 'playing') info.textContent = ms.hands.length ? 'Les autres jouent… tu vois toutes leurs cartes.' : 'Tu n’as pas misé : tu joueras la prochaine manche.';
   else if (st.phase === 'dealer') info.textContent = 'Le croupier tire…';
   else if (st.phase === 'result') info.textContent = ms.hands.length ? 'Résultat de la manche affiché sur la table.' : '';
@@ -2216,8 +2230,8 @@ $('#bTop').onclick = async () => {
 const sndBtn = $('#bSnd'); const refreshSnd = () => { sndBtn.innerHTML = icon(sndOn ? 'volOn' : 'volOff', 18); sndBtn.title = sndOn ? 'Son' : 'Muet'; }; refreshSnd();
 sndBtn.onclick = () => { sndOn = !sndOn; try { localStorage.setItem('znk_snd', sndOn ? '1' : '0'); } catch {} refreshSnd(); if (sndOn) SFX.chip(); };
 document.addEventListener('pointerdown', () => ac(), { once: true });
-// retour sur l'onglet : resynchronise le solde
-document.addEventListener('visibilitychange', () => { if (!document.hidden && mySeat()) send('sync'); if (!document.hidden && W.view === 'roulette' && W.joined) send('rsync'); if (!document.hidden && W.view === 'poker') pSend('psync'); });
+// retour sur l'onglet : resynchronise le wallet
+document.addEventListener('visibilitychange', () => { if (!document.hidden && mySeat()) send('sync'); if (!document.hidden && W.view === 'roulette' && W.joined) send('rsync'); if (!document.hidden && W.view === 'poker') pSend('psync'); if (!document.hidden) refreshActiveView(); });
 
 // ============================================================= CHAT EN DIRECT (un salon par jeu)
 const C = { msgs: {}, open: false, unread: 0 };
@@ -2230,19 +2244,22 @@ const cRoom = () => (W.view === 'top' || W.view === 'rank' || W.view === 'admin'
 function cLine(m) {
   if (m.sys === 'win') { // annonce automatique d'une victoire (tous les jeux du site)
     const d = el('div', 'cm win' + (me && m.uid === me.uid ? ' mine' : '')), t = new Date(m.t);
-    d.append((() => { const s = el('span', 'cic'); s.innerHTML = icon('trophy', 14); return s; })(), el('b', 'cn', m.name), document.createTextNode(' a gagné '), el('b', 'cg', '+' + num(m.net) + ' ' + COIN),
+    d.append((() => { const s = el('span', 'cic'); s.innerHTML = icon('trophy', 14); return s; })(), el('b', 'cn', noEmo(m.name)), document.createTextNode(' a gagné '), el('b', 'cg', '+' + num(m.net) + ' ' + COIN),
       document.createTextNode(' à ' + (GLAB[m.game] || 'un jeu') + (m.mult ? ' · x' + m.mult : '') + (m.detail ? ' · ' + m.detail : '') + ' · mise ' + num(m.bet)),
       el('small', '', String(t.getHours()).padStart(2, '0') + ':' + String(t.getMinutes()).padStart(2, '0')));
     return d;
   }
   const d = el('div', 'cm' + (me && m.uid === me.uid ? ' mine' : '')), t = new Date(m.t);
-  const cn = el('span', 'cn'); if (m.rk) { const lg = rkLogoEl(m.rk, 18); lg.style.verticalAlign = 'middle'; lg.style.marginRight = '5px'; cn.append(lg); } cn.append(document.createTextNode(m.name));
+  const cn = el('span', 'cn');
+  if (m.rk) { const lg = rkLogoEl(m.rk, 18); lg.style.verticalAlign = 'middle'; lg.style.marginRight = '5px'; cn.append(lg); }
+  cn.append(document.createTextNode(noEmo(m.name)));
+  if (m.rkpos > 0 && m.rkpos <= 3) cn.append(el('span', 'crk t' + m.rkpos, '(#' + m.rkpos + ')'));
   d.append(cn, document.createTextNode(m.text), el('small', '', String(t.getHours()).padStart(2, '0') + ':' + String(t.getMinutes()).padStart(2, '0')));
   return d;
 }
 function cRender() {
   const room = cRoom(), list = $('#chatList'), arr = (C.msgs[room] || []).filter(cShow);
-  setTxtC($('#chatTitle'), 'Chat · ' + (CNAME[room] || ''));
+  setTxtC($('#chatTitle'), CNAME[room] || 'Discussion');
   const b = $('#chatBadge'); b.classList.toggle('hide', !C.unread || C.open); b.textContent = String(C.unread);
   list.replaceChildren(...(arr.length ? arr.map(cLine) : [el('div', 'cempty', 'Aucun message. Lance la discussion.')]));
   list.scrollTop = list.scrollHeight;
@@ -2259,12 +2276,13 @@ function cOnMsg(m) {
 }
 function cNotify(m) { // petite bulle (avec ou sans son selon les paramètres)
   document.querySelectorAll('.cpop').forEach((x) => x.remove());
-  const p = el('div', 'cpop'); const ci = el('span', 'cic'); ci.innerHTML = icon('chat', 14); p.append(ci, el('b', '', m.name), document.createTextNode(m.text.slice(0, 80)));
+  const p = el('div', 'cpop'); const ci = el('span', 'cic'); ci.innerHTML = icon('chat', 14); p.append(ci, el('b', '', noEmo(m.name)), document.createTextNode(m.text.slice(0, 80)));
   p.onclick = () => { p.remove(); if (!C.open) $('#chatHead').click(); };
   document.body.append(p); setTimeout(() => p.remove(), 4000);
   if (SET.chatNotif === 'sound') { const was = sndOn; sndOn = true; try { tone(880, .09, 'sine', .07); tone(1175, .12, 'sine', .06, .09); } finally { sndOn = was; } }
 }
 $('#chatHead').onclick = () => { C.open = !C.open; $('#chat').classList.toggle('open', C.open); if (C.open) { C.unread = 0; cRender(); $('#chatIn').focus(); } };
+$('#chatClose').onclick = (e) => { e.stopPropagation(); C.open = false; $('#chat').classList.remove('open'); };
 $('#chatForm').onsubmit = async (e) => {
   e.preventDefault(); const i = $('#chatIn'), t = i.value.trim(); if (!t) return;
   i.value = ''; if (!(await send('chatsend', { room: cRoom(), text: t }))) i.value = t;
@@ -2827,12 +2845,12 @@ function lbFillGame(top) {
     return row;
   }));
 }
-async function loadGameLB(view) {
+async function loadGameLB(view, quiet = false) {
   const key = LB_GAME_KEY[view];
   if (!key) return;
   ensureGameLB();
   const body = $('#ofView')?.querySelector(':scope > .glb .glbbody');
-  if (body) body.replaceChildren(el('div', 'lbnone', 'Chargement…'));
+  if (body && !quiet) body.replaceChildren(el('div', 'lbnone', 'Chargement…'));
   try {
     const d = await (await fetch('/api/game-top?game=' + encodeURIComponent(key), { cache: 'no-store' })).json();
     lbFillGame(d && d.top);
@@ -2880,7 +2898,10 @@ function setView(v) {
   pFitSoon();
   document.querySelectorAll('.mitem').forEach((t) => t.classList.toggle('on', t.dataset.g === v));
   menuSync(v);
-  document.title = v === 'ranked' ? 'Casino · Ranked' : v === 'shop' ? 'Casino · Boutique' : v === 'tasks' ? 'Casino · Tasks' : v === 'account' ? 'Casino · Compte' : v.startsWith('off-') ? 'Casino · Jeux offline' : v === 'roulette' ? 'Casino · Roulette' : v === 'rocket' ? 'Casino · Rocket Race' : v === 'bj' ? 'Casino · Blackjack' : v === 'poker' ? 'Casino · Poker' : v === 'top' ? 'Casino · Classement' : v === 'rank' ? 'Casino · Rank' : v === 'admin' ? 'Casino · Admin' : 'Casino · Jeux';
+  const TITLES = LANG === 'en'
+    ? { ranked: 'Casino · Ranked', shop: 'Casino · Shop', tasks: 'Casino · Tasks', account: 'Casino · Account', roulette: 'Casino · Roulette', rocket: 'Casino · Rocket Race', bj: 'Casino · Blackjack', poker: 'Casino · Poker', top: 'Casino · Leaderboard', rank: 'Casino · Rank', admin: 'Casino · Admin' }
+    : { ranked: 'Casino · Ranked', shop: 'Casino · Boutique', tasks: 'Casino · Tasks', account: 'Casino · Compte', roulette: 'Casino · Roulette', rocket: 'Casino · Rocket Race', bj: 'Casino · Blackjack', poker: 'Casino · Poker', top: 'Casino · Classement', rank: 'Casino · Rank', admin: 'Casino · Admin' };
+  document.title = v.startsWith('off-') ? (LANG === 'en' ? 'Casino · Offline games' : 'Casino · Jeux offline') : (TITLES[v] || (LANG === 'en' ? 'Casino · Games' : 'Casino · Jeux'));
   $('#bTop').classList.toggle('hide', !bjMode && v !== 'poker');
   $('#bRules').classList.toggle('hide', v === 'hub' || v === 'top' || v === 'rank' || v === 'admin' || v === 'shop' || v === 'tasks' || v === 'account' || v.startsWith('off-'));
   try { sessionStorage.setItem('znk_v', v); } catch {}
@@ -3014,7 +3035,7 @@ async function lbLoad() {
 }
 function lbWatch(on) {
   clearInterval(LB.timer); LB.timer = null;
-  if (on) { lbLoad(); LB.timer = setInterval(lbLoad, 30000); }
+  if (on) { lbLoad(); LB.timer = setInterval(lbLoad, 15000); }
 }
 
 
@@ -3181,7 +3202,7 @@ async function rkLoad() {
 }
 function rkWatch(on) {
   clearInterval(RK.timer); RK.timer = null;
-  if (on) { rkLoad(); RK.timer = setInterval(rkLoad, 20000); }
+  if (on) { rkLoad(); RK.timer = setInterval(rkLoad, 5000); }
 }
 
 // ---- poker plein écran : réduit les cartes tant que la table déborde de l'écran (aucun scroll)
@@ -4345,8 +4366,8 @@ requestAnimationFrame(ofLoop);
 
 
 // ============================================================= PARAMÈTRES (langue)
-const EN_DICT = {"Casino": "Casino", "Mes dernières commandes": "My recent orders", "Code de commande et statut de livraison · le code est aussi envoyé en MP Discord": "Order code and delivery status · the code is also sent by Discord DM", "Aucune commande pour le moment.": "No orders yet.", "✅ Livré": "✅ Delivered", "⏳ En attente": "⏳ Pending", "Copier": "Copy", "Livraison terminée": "Delivery complete", "Livraison via ticket Discord": "Delivery via Discord ticket", "Joueur sélectionné :": "Selected player:", "Aucun": "None", "Rechercher un joueur…": "Search a player…", "Chargement des joueurs…": "Loading players…", "Aucun joueur en ligne": "No online players", "En ligne": "Online", "Hors ligne": "Offline", "Récompenses actives": "Active rewards", "Échelle des rangs (RR)": "Rank ladder (RR)", "Visible par tous · modifie les seuils · enregistré dans Supabase": "Visible to everyone · edit thresholds · saved in Supabase", "Tâches du jour": "Today's tasks", "Achète une récompense avec tes ZTKN · tu reçois un code de commande à coller dans le ticket Discord": "Buy a reward with your ZTKN · you get an order code to paste in the Discord ticket", "Garde ton code de commande précieusement": "Keep your order code safe", "Réinitialisation partielle chaque lundi · RR seulement": "Soft reset every Monday · RR only", "Se gagne au blackjack classé : victoires et régularité": "Earned in ranked blackjack: wins and consistency", "Chargement…": "Loading…", "Aucun rang": "No ladder", "Enregistrement…": "Saving…", "Enregistré": "Saved", "Récompenses": "Rewards", "Tâches": "Tasks", "Commandes": "Orders", "Économie": "Economy", "Rangs RR": "RR ranks", "Événements": "Events", "SQL": "SQL", "en attente = livraison via ticket": "pending = delivered via ticket", "Effacer tout l’historique": "Clear all history", "Mêmes actions que le panneau admin Discord (sauf les salons)": "Same actions as the Discord admin panel (no channel tools)", "Joueur en ligne…": "Online player…", "Actualiser les joueurs": "Refresh players", "Montant": "Amount", "Enregistrer": "Save", "Recharger": "Reload", "Réinitialiser les RR": "Reset RR", "Schéma SQL": "SQL schema", "Colle dans l’éditeur Supabase · tables utilisées par le casino": "Paste into the Supabase editor · tables used by the casino", "Copier le SQL": "Copy SQL", "Blackjack classé · RR en jeu · table dédiée": "Ranked blackjack · RR at stake · dedicated table", "BLACKJACK RANKED": "RANKED BLACKJACK", "RR …": "RR …", "RR indisponible": "RR unavailable", "RR masqué": "RR hidden", "Blackjack classé": "Ranked blackjack", "Blackjack normal": "Normal blackjack", "Solde actualisé": "Balance refreshed", "Actualiser le solde": "Refresh balance", "Choisis un joueur en ligne": "Choose an online player", "Traitement…": "Working…", "Annulé": "Cancelled", "Effacer mon historique": "Clear my history", "Effacer cet historique de commandes ?": "Clear this order history?", "Historique effacé": "History cleared", "Commandes effacées": "Orders cleared", "Réinitialiser tous les RR et les rangs ?": "Reset all RR and ranks?", "RR réinitialisés": "RR reset", "SQL copié": "SQL copied", "Copie impossible": "Copy failed", "Erreur": "Error", "Connecte-toi avec ton compte Discord pour jouer avec ton solde du casino.": "Log in with your Discord account to play with your casino balance.", "Se connecter avec Discord": "Log in with Discord", "Rejoindre le serveur Discord": "Join the server", "Menu": "Menu", "Accueil": "Home", "Online": "Online", "Offline": "Offline", "Blackjack": "Blackjack", "Poker": "Poker", "Roulette": "Roulette", "Fusé": "Crash", "Mine": "Mines", "Mines": "Mines", "Pile ou Face": "Coin Flip", "Dés": "Dice", "Chevaux": "Horses", "Roulette russe": "Russian Roulette", "Classement": "Leaderboard", "Top gains": "Top wins", "Règles": "Rules", "Son": "Sound", "Muet": "Muted", "Muet": "Muted", "Plein écran": "Fullscreen", "Reconnexion…": "Reconnecting…", "Connexion…": "Connecting…", "Tables partagées avec tous les joueurs du serveur.": "Tables shared with every player on the server.", "Table à 5 places · mise libre · blackjack payé 3:2": "5-seat table · free bet · blackjack pays 3:2", "Jouer": "Play", "Texas Hold'em No-Limit · 5 places · relances libres et tapis": "Texas Hold'em No-Limit · 5 seats · free raises and all-in", "Roulette européenne · rouge, noir, pair, impair, numéros pleins": "European roulette · red, black, even, odd, straight numbers", "Jouables directement en MP Discord, et aussi sur le site.": "Playable in Discord DMs, and on the site too.", "Parties solo contre le croupier": "Solo games against the dealer", "Encaisse avant que la fusée explose": "Cash out before the rocket explodes", "Évite les mines, encaisse quand tu veux": "Avoid the mines, cash out whenever you want", "Une chance sur deux, gain x1.95": "50/50 chance, win x1.95", "Parie sur la somme de 2 dés": "Bet on the sum of 2 dice", "Course à 5 chevaux, jusqu’à x15.8": "5-horse race, up to x15.8", "Survis au barillet, plus de balles = plus de gain": "Survive the cylinder, more bullets = bigger win", "Les plus gros joueurs du casino.": "The biggest players of the casino.", "Classement actuel": "Current ranking", "Soldes actuels, du plus riche au moins riche": "Current balances, richest first", "Classement all-time": "All-time ranking", "Plus haut solde jamais atteint": "Highest balance ever reached", "CROUPIER": "DEALER", "TOI": "YOU", "Blackjack paie 3 pour 2 · le croupier tient sur 17": "Blackjack pays 3 to 2 · dealer stands on 17", "Tapis": "All-in", "Dernière mise": "Last bet", "Miser": "Bet", "Retirer la mise": "Remove bet", "Tirer": "Hit", "Rester": "Stand", "Doubler": "Double", "Séparer": "Split", "Quitter la table": "Leave table", "Cave min": "Min buy-in", "Max": "Max", "Se coucher": "Fold", "Check": "Check", "Min": "Min", "½ pot": "½ pot", "¾ pot": "¾ pot", "Pot": "Pot", "Relancer": "Raise", "Suivre": "Call", "Ajouter des jetons (entre deux mains)": "Add chips (between hands)", "Ajouter": "Add", "Rejouer mes mises": "Rebet", "Retirer mes mises": "Clear my bets", "Joueurs": "Players", "Réduire": "Collapse", "Fermer": "Close", "Annuler": "Cancel", "Chat": "Chat", "Victoires des autres joueurs": "Other players’ wins", "Mes victoires": "My wins", "Afficher": "Show", "Masquer": "Hide", "Notification de message": "Message notification", "Aucune": "None", "Silencieuse": "Silent", "Avec son": "With sound", "Aucun message. Lance la discussion.": "No messages. Start the conversation.", "Notifications": "Notifications", "Aucune notification.": "No notifications.", "t’a envoyé": "sent you", "Solde": "Balance", "Déconnexion": "Log out", "a gagné": "won", "Envoyer": "Send", "Règles du blackjack": "Blackjack rules", "Règles du poker (Texas Hold'em No-Limit)": "Poker rules (Texas Hold'em No-Limit)", "Classement des mains au poker": "Poker hand rankings", "Classement du blackjack (gains nets)": "Blackjack ranking (net winnings)", "Classement du poker (gains nets)": "Poker ranking (net winnings)", "Du plus fort (1) au plus faible (10). Les cartes éclairées forment la combinaison.": "Strongest (1) to weakest (10). Highlighted cards form the hand.", "Joueur": "Player", "Gains nets": "Net winnings", "Manches": "Rounds", "Victoires": "Wins", "Personne n’a encore terminé de manche.": "Nobody has finished a round yet.", "Classement indisponible.": "Leaderboard unavailable.", "Aucun joueur pour le moment.": "No players yet.", "Paramètres": "Settings", "Paramètres": "Settings", "Langue": "Language", "Envoyer des ZTKN": "Send ZTKN", "Chercher un joueur…": "Search a player…", "Montant": "Amount", "Aucun joueur trouvé.": "No player found.", "Destinataire : ": "Recipient: ", "Choisis un joueur.": "Pick a player.", "Montant invalide.": "Invalid amount.", "Solde insuffisant.": "Insufficient balance.", "Connexion perdue…": "Connection lost…", "Doucement.": "Easy there.", "Table libre": "Table free", "pleine": "full", "Une partie est déjà en cours.": "A game is already in progress.", "Aucune partie en cours.": "No game in progress.", "Cette table n’existe plus.": "This table no longer exists.", "Action inconnue.": "Unknown action.", "Tu ne peux pas t’envoyer de pièces à toi-même.": "You can't send coins to yourself.", "Montant minimum : 1.": "Minimum amount: 1.", "Ce joueur n’est pas sur le serveur.": "This player isn't on the server.", "Envoi impossible, réessaie.": "Couldn't send, try again.", "Nouvelle table": "New table", "＋ Nouvelle table": "＋ New table", "Mains": "Hands", "Table précédente": "Previous table", "Table suivante": "Next table", "Ton solde": "Your balance", "Mise": "Bet", "Mise :": "Bet:", "Distribuer": "Deal", "Encaisser": "Cash out", "Lancer": "Start", "Pile": "Heads", "Face": "Tails", "Moins de 7": "Under 7", "Plus de 7": "Over 7", "Exactement 7": "Exactly 7", "À toi de jouer": "Your turn", "Choisis ta mise puis distribue": "Pick your bet then deal", "Montant de la mise": "Bet amount", "Mise par clic": "Bet per click", "Écrire un message": "Write a message", "Message": "Message", "Agrandir la roue": "Enlarge the wheel", "Top gains de ce jeu": "Top wins of this game"};
-const EN_RE = [["^Placement (\\d+)/(\\d+) · RR masqué$", "Placement $1/$2 · RR hidden"], ["^(\\d+) RR · #(\\d+)$", "$1 RR · #$2"], ["^Table (\\d+)$", "Table $1"], ["^Mis à jour à (.+)$", "Updated at $1"], ["^Chat · (.+)$", "@Chat · $1"], ["^(\\d+) joueurs? à table$", "$1 player(s) at the table"], ["^🎁 (.+) t’a envoyé (.+)$", "🎁 $1 sent you $2"], ["^Mise minimale : (.+)$", "Minimum bet: $1"], ["^Mise maximale : (.+)$", "Maximum bet: $1"], ["^Tu es déjà assis à la table (\\d+) : quitte-la d’abord\\.$", "You're already seated at table $1: leave it first."], ["^Maximum (\\d+) tables\\.$", "Maximum $1 tables."], ["^à (.+?) · mise (.+)$", "@at $1 · bet $2"], ["^blinds (.+)$", "blinds $1"], ["^Ta session a expiré : reconnecte-toi avec Discord\\.$", "Your session expired: log in with Discord again."]].map(([a, b]) => [new RegExp(a), b]);
+const EN_DICT = {"Casino":"Casino","Mes dernières commandes":"My recent orders","Code de commande et statut de livraison · le code est aussi envoyé en MP Discord":"Order code and delivery status · the code is also sent by Discord DM","Aucune commande pour le moment.":"No orders yet.","✅ Livré":"✅ Delivered","⏳ En attente":"⏳ Pending","Copier":"Copy","Livraison terminée":"Delivery complete","Livraison via ticket Discord":"Delivery via Discord ticket","Joueur sélectionné :":"Selected player:","Aucun":"None","Rechercher un joueur…":"Search a player…","Chargement des joueurs…":"Loading players…","Aucun joueur en ligne":"No online players","En ligne":"Online","Hors ligne":"Offline","Récompenses actives":"Active rewards","Échelle des rangs (RR)":"Rank ladder (RR)","Visible par tous · modifie les seuils · enregistré dans Supabase":"Visible to everyone · edit thresholds · saved in Supabase","Tâches du jour":"Today's tasks","Achète une récompense avec tes ZTKN · tu reçois un code de commande à coller dans le ticket Discord":"Buy a reward with your ZTKN · you get an order code to paste in the Discord ticket","Garde ton code de commande précieusement":"Keep your order code safe","Réinitialisation partielle chaque lundi · RR seulement":"Soft reset every Monday · RR only","Se gagne au blackjack classé : victoires et régularité":"Earned in ranked blackjack: wins and consistency","Chargement…":"Loading…","Aucun rang":"No ladder","Enregistrement…":"Saving…","Enregistré":"Saved","Récompenses":"Rewards","Tâches":"Tasks","Commandes":"Orders","Économie":"Economy","Rangs RR":"RR ranks","Événements":"Events","SQL":"SQL","en attente = livraison via ticket":"pending = delivered via ticket","Effacer tout l’historique":"Clear all history","Mêmes actions que le panneau admin Discord (sauf les salons)":"Same actions as the Discord admin panel (no channel tools)","Joueur en ligne…":"Online player…","Actualiser les joueurs":"Refresh players","Montant":"Amount","Enregistrer":"Save","Recharger":"Reload","Réinitialiser les RR":"Reset RR","Schéma SQL":"SQL schema","Colle dans l’éditeur Supabase · tables utilisées par le casino":"Paste into the Supabase editor · tables used by the casino","Copier le SQL":"Copy SQL","Blackjack classé · RR en jeu · table dédiée":"Ranked blackjack · RR at stake · dedicated table","BLACKJACK RANKED":"RANKED BLACKJACK","RR …":"RR …","RR indisponible":"RR unavailable","RR masqué":"RR hidden","Blackjack classé":"Ranked blackjack","Blackjack normal":"Normal blackjack","Wallet actualisé":"Wallet refreshed","Actualiser le wallet":"Refresh wallet","Choisis un joueur en ligne":"Choose an online player","Traitement…":"Working…","Annulé":"Cancelled","Effacer mon historique":"Clear my history","Effacer cet historique de commandes ?":"Clear this order history?","Historique effacé":"History cleared","Commandes effacées":"Orders cleared","Réinitialiser tous les RR et les rangs ?":"Reset all RR and ranks?","RR réinitialisés":"RR reset","SQL copié":"SQL copied","Copie impossible":"Copy failed","Erreur":"Error","Connecte-toi avec ton compte Discord pour jouer avec ton wallet du casino.":"Log in with your Discord account to play with your casino balance.","Se connecter avec Discord":"Log in with Discord","Rejoindre le serveur Discord":"Join the server","Menu":"Menu","Accueil":"Home","Online":"Online","Offline":"Offline","Blackjack":"Blackjack","Poker":"Poker","Roulette":"Roulette","Fusé":"Crash","Mine":"Mines","Mines":"Mines","Pile ou Face":"Coin Flip","Dés":"Dice","Chevaux":"Horses","Roulette russe":"Russian Roulette","Classement":"Leaderboard","Top gains":"Top wins","Règles":"Rules","Son":"Sound","Muet":"Muted","Plein écran":"Fullscreen","Reconnexion…":"Reconnecting…","Connexion…":"Connecting…","Tables partagées avec tous les joueurs du serveur.":"Tables shared with every player on the server.","Table à 5 places · mise libre · blackjack payé 3:2":"5-seat table · free bet · blackjack pays 3:2","Jouer":"Play","Texas Hold'em No-Limit · 5 places · relances libres et tapis":"Texas Hold'em No-Limit · 5 seats · free raises and all-in","Roulette européenne · rouge, noir, pair, impair, numéros pleins":"European roulette · red, black, even, odd, straight numbers","Jouables directement en MP Discord, et aussi sur le site.":"Playable in Discord DMs, and on the site too.","Parties solo contre le croupier":"Solo games against the dealer","Encaisse avant que la fusée explose":"Cash out before the rocket explodes","Évite les mines, encaisse quand tu veux":"Avoid the mines, cash out whenever you want","Une chance sur deux, gain x1.95":"50/50 chance, win x1.95","Parie sur la somme de 2 dés":"Bet on the sum of 2 dice","Course à 5 chevaux, jusqu’à x15.8":"5-horse race, up to x15.8","Survis au barillet, plus de balles = plus de gain":"Survive the cylinder, more bullets = bigger win","Les plus gros joueurs du casino.":"The biggest players of the casino.","Classement actuel":"Current ranking","Wallets actuels, du plus riche au moins riche":"Current wallets, richest to poorest","Classement all-time":"All-time ranking","Plus haut wallet jamais atteint":"Highest wallet ever reached","CROUPIER":"DEALER","TOI":"YOU","Blackjack paie 3 pour 2 · le croupier tient sur 17":"Blackjack pays 3 to 2 · dealer stands on 17","Tapis":"All-in","Dernière mise":"Last bet","Miser":"Bet","Retirer la mise":"Remove bet","Tirer":"Hit","Rester":"Stand","Doubler":"Double","Séparer":"Split","Quitter la table":"Leave table","Cave min":"Min buy-in","Max":"Max","Se coucher":"Fold","Check":"Check","Min":"Min","½ pot":"½ pot","¾ pot":"¾ pot","Pot":"Pot","Relancer":"Raise","Suivre":"Call","Ajouter des jetons (entre deux mains)":"Add chips (between hands)","Ajouter":"Add","Rejouer mes mises":"Rebet","Retirer mes mises":"Clear my bets","Joueurs":"Players","Réduire":"Collapse","Fermer":"Close","Annuler":"Cancel","Chat":"Chat","Victoires des autres joueurs":"Other players’ wins","Mes victoires":"My wins","Afficher":"Show","Masquer":"Hide","Notification de message":"Message notification","Aucune":"None","Silencieuse":"Silent","Avec son":"With sound","Aucun message. Lance la discussion.":"No messages. Start the conversation.","Notifications":"Notifications","Aucune notification.":"No notifications.","t’a envoyé":"sent you","Wallet":"Wallet","Déconnexion":"Log out","a gagné":"won","Envoyer":"Send","Règles du blackjack":"Blackjack rules","Règles du poker (Texas Hold'em No-Limit)":"Poker rules (Texas Hold'em No-Limit)","Classement des mains au poker":"Poker hand rankings","Classement du blackjack (gains nets)":"Blackjack ranking (net winnings)","Classement du poker (gains nets)":"Poker ranking (net winnings)","Du plus fort (1) au plus faible (10). Les cartes éclairées forment la combinaison.":"Strongest (1) to weakest (10). Highlighted cards form the hand.","Joueur":"Player","Gains nets":"Net winnings","Manches":"Rounds","Victoires":"Wins","Personne n’a encore terminé de manche.":"Nobody has finished a round yet.","Classement indisponible.":"Leaderboard unavailable.","Aucun joueur pour le moment.":"No players yet.","Paramètres":"Settings","Langue":"Language","Envoyer des ZTKN":"Send ZTKN","Chercher un joueur…":"Search a player…","Aucun joueur trouvé.":"No player found.","Destinataire : ":"Recipient: ","Choisis un joueur.":"Pick a player.","Montant invalide.":"Invalid amount.","Wallet insuffisant.":"Not enough wallet.","Connexion perdue…":"Connection lost…","Doucement.":"Easy there.","Table libre":"Table free","pleine":"full","Une partie est déjà en cours.":"A game is already in progress.","Aucune partie en cours.":"No game in progress.","Cette table n’existe plus.":"This table no longer exists.","Action inconnue.":"Unknown action.","Tu ne peux pas t’envoyer de pièces à toi-même.":"You can't send coins to yourself.","Montant minimum : 1.":"Minimum amount: 1.","Ce joueur n’est pas sur le serveur.":"This player isn't on the server.","Envoi impossible, réessaie.":"Couldn't send, try again.","Nouvelle table":"New table","＋ Nouvelle table":"＋ New table","Mains":"Hands","Table précédente":"Previous table","Table suivante":"Next table","Ton wallet":"Your wallet","Mise":"Bet","Mise :":"Bet:","Distribuer":"Deal","Encaisser":"Cash out","Lancer":"Start","Pile":"Heads","Face":"Tails","Moins de 7":"Under 7","Plus de 7":"Over 7","Exactement 7":"Exactly 7","À toi de jouer":"Your turn","Choisis ta mise puis distribue":"Pick your bet then deal","Montant de la mise":"Bet amount","Mise par clic":"Bet per click","Écrire un message":"Write a message","Message":"Message","Agrandir la roue":"Enlarge the wheel","Top gains de ce jeu":"Top wins of this game","Boutique":"Shop","Mon compte":"My account","Wallet, invitations et commandes":"Wallet, invites and orders","Reset wallet joueur":"Reset player wallet","Reset wallets":"Reset wallets","Ma fiche joueur":"My player card","Voir tes stats, choisir un fond et télécharger ta fiche":"View your stats, choose a background and download your card","Voir mes stats":"View my stats","Choisir une image de fond":"Choose background image","Télécharger la fiche":"Download card","Image de fond appliquée":"Background applied","Image invalide":"Invalid image","Fiche pas encore générée.":"Card not generated yet.","Impossible de générer la fiche image":"Could not generate the stats card","Fiche générée.":"Card generated.","Profil indisponible":"Profile unavailable","Chargement du lien…":"Loading link…","Demande à un modo le lien d’invitation du serveur":"Ask a moderator for the server invite link","Copier le lien":"Copy link","Lien copié":"Link copied","Récompense invite":"Invite reward","Lien d’invitation":"Invite link","Invite des amis et gagne des ZTKN quand ils rejoignent":"Invite friends and earn ZTKN when they join","Parties jouées":"Games played","Dernières commandes":"Recent orders","Mes commandes":"My orders","Réinitialisation chaque jour à minuit (Paris)":"Resets every day at midnight (Paris)","Boutique indisponible.":"Shop unavailable.","Acheter":"Buy","Aucune reward pour le moment.":"No rewards yet.","Tasks indisponibles.":"Tasks unavailable.","En cours":"In progress","Réclamer":"Claim","Réclamé":"Claimed","Aucune task aujourd’hui.":"No tasks today.","invite(s)":"invite(s)","partie(s)":"game(s)","Stock : ":"Stock: ","Commande créée":"Order created","Copie ton order code et ouvre un ticket « Claim rewards » sur Discord":"Copy your order code and open a “Claim rewards” ticket on Discord","Copier le code":"Copy code","Aucun code nécessaire":"No code needed","Rôle non ajouté":"Role not added","Rôle ajouté !":"Role added!","en attente de livraison":"pending delivery","rôle livré automatiquement":"role delivered automatically","livraison échouée":"delivery failed","BLACKJACK CLASSÉ":"RANKED BLACKJACK","Table dédiée · mises en RR · ELO / RR conservés":"Dedicated table · RR bets · ELO / RR kept","Course de fusées · chacun la sienne avec son pseudo · le premier au tour du Soleil gagne le pot":"Rocket race · one rocket each with your name · first to orbit the Sun wins the pot","Jeux solo sur le site, avec animations cinématiques. Le serveur fait foi sur les tirages.":"Solo games on the site, with cinematic animations. Server draws are authoritative.","Dégaine plus vite que ton adversaire":"Draw faster than your opponent","Lâche la bille dans les piquets, jusqu’à x130":"Drop the ball through the pegs, up to x130","Ticket à gratter":"Scratch ticket","Gratte pour de vrai, trois montants identiques gagnent":"Scratch for real, three matching amounts win","Récompenses · Tâches · Économie · Événements · SQL":"Rewards · Tasks · Economy · Events · SQL","Une course partagée par serveur : ":"A shared race per server: ","chaque joueur a sa propre fusée":"each player has their own rocket"," avec son pseudo affiché au-dessus.":" with their name shown above.","Mise librement (jetons ou champ), puis la course démarre automatiquement après le décompte — ou clique sur ":"Bet freely (chips or field), then the race starts automatically after the countdown — or click ","Lancer maintenant":"Start now"," dès 2 partants.":" as soon as 2 players have joined.","Les fusées décollent de la ":"Rockets take off from ","Terre":"Earth",", font le tour du ":", orbit the ","Soleil":"Sun"," entre les planètes, puis reviennent se poser sur la Terre. Le ":" between the planets, then return to land on Earth. The ","premier arrivé gagne le plus":"first to arrive wins the most","Le pot est redistribué au classement : part du pot proportionnelle à ta mise selon ton rang (1er ≈ 55 %, 2e ≈ 27 %, 3e ≈ 18 % …), avec 5 % de commission.":"The pot is redistributed by ranking: share of the pot proportional to your bet based on your rank (1st ≈ 55%, 2nd ≈ 27%, 3rd ≈ 18%…), with a 5% house commission.","Quitter ou retirer ta mise avant le départ te rembourse intégralement.":"Leaving or removing your bet before the start refunds you in full.","Rejoindre la course":"Join the race","Retirer ma mise":"Remove my bet","Roulette européenne":"European roulette","Une table partagée par serveur : tous les joueurs connectés misent sur le même tour. 37 cases, un seul zéro.":"A shared table per server: every connected player bets on the same spin. 37 slots, a single zero.","Choisis un montant (jetons ou champ : ":"Pick an amount (chips or field: ",", « Tapis »), puis clique sur une case pour miser. Chaque clic ajoute ce montant ; les mises sur plusieurs cases se cumulent.":", “All in”), then click a slot to bet. Each click adds that amount; bets on several slots add up.","Numéro plein : ":"Straight number: ",". Les gains incluent la mise.":". Payouts include the bet.","Le zéro fait perdre toutes les mises extérieures (sauf une mise pleine sur le 0).":"Zero loses all outside bets (except a straight bet on 0).","Le compte à rebours de 20 s démarre à la première mise. Pendant le tour, les mises sont fermées.":"The 20 s countdown starts at the first bet. Bets are closed during the spin.","Quitter la table avant le tour rembourse tes mises.":"Leaving the table before the spin refunds your bets.","La roue est réduite pendant les mises pour bien voir la table (bouton ⤢ pour l’agrandir). Quand ton tour part, elle s’ouvre en grand toute seule, puis la table revient après le résultat.":"The wheel is small during betting so you can see the table (⤢ button to enlarge it). When your spin starts, it opens full size by itself, then the table returns after the result.","Derniers numéros (le plus récent en premier)":"Recent numbers (newest first)","Ta mise":"Your bet","Rouvrir la roue":"Reopen the wheel","Bats le croupier sans dépasser":"Beat the dealer without going over","Mise libre":"Free bet",": tape le montant que tu veux (ex. ":": type the amount you want (e.g. ",") ou clique sur les jetons. « Tapis » = tout ton wallet.":") or click the chips. “All in” = your whole wallet.","Les mises s’ouvrent à chaque manche ; la distribution démarre 15 s après la 1re mise (4 s si tout le monde a misé).":"Betting opens each round; dealing starts 15 s after the first bet (4 s if everyone has bet).",": de la place 1 à la place 5, comme à une vraie table. Tu as 25 s par décision (sinon tu restes).":": from seat 1 to seat 5, like a real table. You have 25 s per decision (otherwise you stand).","Tu vois les cartes de tous les joueurs ; seule la 2e carte du croupier est cachée.":"You see every player’s cards; only the dealer’s second card is hidden.","(As + figure) payé":"(Ace + face card) pays","3 pour 2":"3 to 2",". Victoire payée 1 pour 1, égalité = mise rendue.":". Win pays 1 to 1, push = bet returned.",": sur tes 2 premières cartes, mise doublée, une seule carte.":": on your first 2 cards, double the bet, one card only.",": paire → 2 mains (une seule fois). Pas d’assurance.":": pair → 2 hands (once only). No insurance.","Le croupier tire jusqu’à 17 et":"The dealer draws until 17 and","tient sur tous les 17":"stands on all 17s","Raccourcis : ":"Shortcuts: ","séparer.":"split.","Cave":"Buy-in","Relancer à":"Raise to","Jetons à ajouter":"Chips to add","Rejoindre l’arène":"Join the arena","Je suis prêt":"I’m ready","Pas prêt":"Not ready","Jouer Ranked":"Play Ranked","Classement RR":"RR leaderboard","Tous les rangs":"All ranks","Du Bronze à Immortel ZNK : ton RR monte et descend selon tes résultats":"From Bronze to ZNK Immortal: your RR goes up and down with your results","Créer / modifier une reward":"Create / edit a reward","Nitro, rôle auto, ou custom · conditions optionnelles":"Nitro, auto role, or custom · optional conditions","Rôle Discord (auto)":"Discord role (auto)","ID du rôle Discord (si type rôle)":"Discord role ID (if role type)","Min. parties jouées":"Min. games played","Stock (vide = illimité)":"Stock (empty = unlimited)","Créer / modifier une task quotidienne":"Create / edit a daily task","Reset chaque jour à minuit (Paris)":"Resets every day at midnight (Paris)","Récompense ZTKN":"ZTKN reward","Connexion du jour":"Daily login","Lancer un événement":"Launch an event","Choisis un type":"Choose a type","Durée (minutes)":"Duration (minutes)","Durée (secondes)":"Duration (seconds)","Lancer l’événement":"Launch the event","Court texte affiché en boutique":"Short text shown in the shop","illimité":"unlimited","ex : Jouer 5 parties":"e.g. Play 5 games","Rechercher un joueur":"Search a player","Français":"French","Destinataire :":"Recipient: ","Stock :":"Stock: ","Une course partagée par serveur :":"A shared race per server:","avec son pseudo affiché au-dessus.":"with their name shown above.","Mise librement (jetons ou champ), puis la course démarre automatiquement après le décompte — ou clique sur":"Bet freely (chips or field), then the race starts automatically after the countdown — or click","dès 2 partants.":"as soon as 2 players have joined.","Les fusées décollent de la":"Rockets take off from",", font le tour du":", orbit the","entre les planètes, puis reviennent se poser sur la Terre. Le":"between the planets, then return to land on Earth. The","Choisis un montant (jetons ou champ :":"Pick an amount (chips or field:","Numéro plein :":"Straight number:",": tape le montant que tu veux (ex.":": type the amount you want (e.g.","Raccourcis :":"Shortcuts: ","🧹 Reset wallet joueur":"🧹 Reset player wallet","Fermer le chat":"Close chat","-- ZNK Casino · schéma Supabase (SQL editor)":"-- ZNK Casino · Supabase schema (SQL editor)","-- Historique des parties (alimente le classement « plus gros gain en une fois »)":"-- Game history (feeds the \"biggest single win\" leaderboard)","-- Rôles livrés directement (aucun code, aucun ticket)":"-- Roles delivered directly (no code, no ticket)","-- Événement roulette":"-- Roulette event","title text not null default 'Roulette événement',":"title text not null default 'Roulette event',","Achète une récompense avec tes ZTKN · tu reçois un":"Buy a reward with your ZTKN · you get an","à coller dans le ticket Discord":"to paste in the Discord ticket","Chaque joueur reçoit":"Each player receives","2 cartes privées":"2 private cards","(toi seul les vois). 5 cartes communes sont retournées :":"(only you see them). 5 community cards are dealt:","(1). Ta main = les 5 meilleures cartes parmi tes 2 cartes et les 5 du board.":"(1). Your hand = the best 5 cards among your 2 cards and the 5 board cards.",": en t'asseyant, tu choisis ta cave (min/max affichés). Elle est débitée de ton wallet et devient ton stack à la table. Tu récupères ton stack en quittant la table ; tu peux en rajouter entre deux mains.":": when you sit down, you pick your buy-in (min/max shown). It is debited from your wallet and becomes your table stack. You get your stack back when you leave; you can add more between hands.",": petite et grosse blind obligatoires, le bouton (D) tourne à chaque main. À deux joueurs, le bouton est petite blind.":": small and big blind are mandatory, the button (D) moves each hand. With two players, the button is the small blind.","(si personne n'a misé),":"(if nobody has bet),","(montant « à », au moins la relance précédente) ou":"(“to” amount, at least the previous raise) or",". Tu as 25 s par décision (sinon check, ou tu te couches).":". You have 25 s per decision (otherwise check, or you fold).","et pots annexes : si tu es à tapis pour moins que les autres, tu ne peux gagner que la part du pot à laquelle tu as participé.":"and side pots: if you are all-in for less than the others, you can only win the part of the pot you contributed to.","Meilleure main : quinte flush > carré > full > couleur > quinte > brelan > double paire > paire > carte haute. Égalité : le pot est partagé.":"Best hand: straight flush > four of a kind > full house > flush > straight > three of a kind > two pair > pair > high card. Tie: the pot is split.","Si tout le monde se couche, le dernier joueur gagne sans montrer ses cartes.":"If everyone folds, the last player wins without showing their cards.","Si tu quittes en pleine main, tu te couches et ton stack t'est rendu à la fin de la main. Si le bot redémarre, tes jetons en jeu te sont remboursés.":"If you leave mid-hand, you fold and your stack is returned at the end of the hand. If the bot restarts, your chips in play are refunded.","Les mises s'ouvrent à chaque manche ; la distribution démarre 15 s après la 1re mise (4 s si tout le monde a misé).":"Betting opens each round; dealing starts 15 s after the first bet (4 s if everyone has bet).",": paire → 2 mains (une seule fois). Pas d'assurance.":": pair → 2 hands (once only). No insurance.","Le croupier tire jusqu'à 17 et":"The dealer draws until 17 and","Ta session a expiré : reconnecte-toi avec Discord.":"Your session expired: log in with Discord again.","Session invalide ou expirée. Reconnecte-toi via le bouton Jouer dans Discord, ou /login.":"Session invalid or expired. Log in again with the Play button in Discord, or /login.","GAGNÉ":"WON","ÉGALITÉ":"PUSH","Place ta mise pour lancer la manche":"Place your bet to start the round","Résultats — prochaine manche dans un instant":"Results — next round shortly","Prends une place libre":"Take a free seat","pour jouer avec ton wallet.":"to play with your wallet.","tu peux la modifier avant la distribution.":"you can change it before the deal.","Choisis ta mise en":"Choose your bet in","pas en dessous de 100 RR":"not below 100 RR","puis":"then","n’importe quel montant ≤ ton wallet":"any amount ≤ your wallet","Tu n’as pas misé : tu joueras la prochaine manche.":"You did not bet: you will play the next round.","Résultat de la manche affiché sur la table.":"Round result shown at the table.","Modifier la mise":"Edit bet","Dernière : ":"Last: ","Quitter la table ? (ta mise éventuelle avant distribution est remboursée)":"Leave the table? (any bet before the deal is refunded)","Aucune partie enregistrée pour ce jeu.":"No games recorded for this game.","🏆 Top 10 · plus gros gains all-time":"🏆 Top 10 · biggest all-time wins","Plus gros gain remporté en une seule fois":"Biggest single win ever","mise ":"bet ","Une fusée est en vol : tu perdras ta mise si tu quittes.":"A rocket is in flight: you will lose your bet if you leave.","Quitter la roulette ? Tes mises en cours seront remboursées.":"Leave roulette? Your pending bets will be refunded.","Quitter la table de poker ? Tu seras couché et ton stack te sera rendu.":"Leave the poker table? You will fold and your stack will be returned.","Casino · Boutique":"Casino · Shop","Casino · Compte":"Casino · Account","Casino · Classement":"Casino · Leaderboard","Parties ranked avant ton rang officiel. 5 victoires → meilleur RR de départ.":"Ranked games before your official rank. 5 wins → best starting RR.","RR caché":"RR hidden","Joue une partie Ranked pour être classé.":"Play a Ranked game to be ranked.","Personne n’est encore classé. Joue une manche à plusieurs (poker, blackjack ou roulette) pour apparaître ici.":"Nobody is ranked yet. Play a multiplayer round (poker, blackjack or roulette) to appear here.","Pas encore classé : lance une partie Ranked dans l’Arène.":"Not ranked yet: start a Ranked game in the Arena."," parties ranked avant le rang officiel. Soft reset chaque lundi.":" ranked games before the official rank. Soft reset every Monday.","Départ":"Start","Rang indisponible.":"Rank unavailable.","Personne à la table.":"Nobody at the table.","Placez vos mises : le tour démarre à la première mise":"Place your bets: the round starts at the first bet","Numéro ":"Number "," · mise rendue":" · bet returned","Pot redistribué au classement · commission ":"Pot redistributed by ranking · commission ","Mises ouvertes · départ dans ":"Betting open · starting in ","Mises ouvertes · le départ se lance à la 1ʳᵉ mise":"Betting open · the start begins at the 1st bet","Prêts, partez !":"Ready, go!","Course terminée · nouvelle manche dans ":"Race finished · new round in ","Personne à la course.":"Nobody in the race.","Prêts…":"Ready…","Dos à dos…":"Neck and neck…","TU AS GAGNÉ !":"YOU WON!","GAGNÉ x":"WON x","Achète un ticket, puis gratte-le":"Buy a ticket, then scratch it","FUSÉ":"ROCKET","DÉS":"DICE","TICKET À GRATTER":"SCRATCH TICKET","Première case":"First tile","Dernière":"Last","Encaissé":"Cashed out","Mine touchée":"Mine hit","Mise perdue":"Bet lost","Encaissé ":"Cashed out ","Choisis ta mise puis lance la fusée.":"Choose your bet then launch the rocket.","Décollage dans ":"Takeoff in ","ENCAISSÉ":"CASHED OUT"," · la fusée a explosé à ":" · the rocket exploded at ","La fusée a explosé : mise perdue":"The rocket exploded: bet lost"," · la fusée continue… ":" · the rocket keeps going… "," · encaissement auto à ":" · auto cash-out at ","Gratte les cases avec la souris ou le doigt, ou révèle tout d’un coup.":"Scratch the tiles with your mouse or finger, or reveal all at once.","Chaque case sûre augmente le gain : encaisse avant de toucher une mine.":"Each safe tile raises the win: cash out before hitting a mine.","Révèle au moins une case pour pouvoir encaisser.":"Reveal at least one tile to cash out.","Encaisse avant que la fusée explose.":"Cash out before the rocket explodes.","Légende":"Legend","Fantôme":"Ghost","Élevé":"High"," % de réussite":" % success rate","Choisis pile ou face, puis lance la pièce":"Pick heads or tails, then flip the coin","Choisis ton pari, puis lance les dés":"Pick your wager, then roll the dice","Choisis le nombre de balles, puis tire":"Pick the number of bullets, then shoot","Choisis ton adversaire, puis dégaine":"Pick your opponent, then draw","Choisis le risque et le nombre de billes, puis lâche-les":"Pick the risk and number of balls, then drop them","La pièce tourne…":"The coin is spinning…","Les dés roulent…":"The dice are rolling…","La course est lancée…":"The race has started…","Coût total":"Total cost","Tu dégaines le premier !":"You draw first!","Daily récupéré : +":"Daily claimed: +","Daily déjà récupéré aujourd’hui. Reviens après minuit (Paris).":"Daily already claimed today. Come back after midnight (Paris).","Le rôle n’a pas pu être ajouté.":"The role could not be added.","Le rôle a été ajouté directement à ton compte Discord. Aucun order code n’est nécessaire.":"The role was added directly to your Discord account. No order code is needed."," · livraison échouée":" · delivery failed"," · rôle livré automatiquement":" · role delivered automatically","Aucune commande":"No orders","livré":"delivered","Code copié":"Code copied"," · reset à minuit (Paris)":" · resets at midnight (Paris)","Récompense":"Reward","Édit":"Edit","Reward enregistrée":"Reward saved","Task enregistrée":"Task saved","Réflexe":"Reflex","Visée":"Aim","Mémoire":"Memory","Précision":"Precision","Attends que l’écran passe au vert, puis clique. Trop tôt = faux départ.":"Wait for the screen to turn green, then click. Too early = false start.","Clique les 6 cibles le plus vite possible. Un clic à côté coûte 0,5 s.":"Click the 6 targets as fast as possible. A miss costs 0.5 s.","Mémorise les 5 signaux, puis rejoue-les dans l’ordre.":"Memorize the 5 signals, then repeat them in order.","Stoppe le curseur dans la zone verte. Plus tu es près du centre, mieux c’est.":"Stop the cursor in the green zone. The closer to the center, the better.","Entrer":"Play","Aligne trois Z violets : jackpot x400":"Line up three purple Zs: jackpot x400","Fiche joueur":"Player card","code de commande":"order code","Discussion":"Chat"};
+const EN_RE = [["^Placement (\\d+)/(\\d+) · RR masqué$", "Placement $1/$2 · RR hidden"], ["^(\\d+) RR · #(\\d+)$", "$1 RR · #$2"], ["^Table (\\d+)$", "Table $1"], ["^Mis à jour à (.+)$", "Updated at $1"], ["^Chat · (.+)$", "@Chat · $1"], ["^(\\d+) joueurs? à table$", "$1 player(s) at the table"], ["^🎁 (.+) t’a envoyé (.+)$", "🎁 $1 sent you $2"], ["^Mise minimale : (.+)$", "Minimum bet: $1"], ["^Mise maximale : (.+)$", "Maximum bet: $1"], ["^Tu es déjà assis à la table (\\d+) : quitte-la d’abord\\.$", "You're already seated at table $1: leave it first."], ["^Maximum (\\d+) tables\\.$", "Maximum $1 tables."], ["^à (.+?) · mise (.+)$", "@at $1 · bet $2"], ["^blinds (.+)$", "blinds $1"], ["^Ta session a expiré : reconnecte-toi avec Discord\\.$", "Your session expired: log in with Discord again."], ["^Jour (.+) · reset à minuit \\(Paris\\)$", "Day $1 · resets at midnight (Paris)"]].map(([a, b]) => [new RegExp(a), b]);
 let LANG = 'en'; try { LANG = localStorage.getItem('znk_lang') === 'fr' ? 'fr' : 'en'; } catch {}
 const trWords = (s) => {
   const m = /^(\s*)([\s\S]*?)(\s*)$/.exec(s), core = m[2];
@@ -4687,13 +4708,13 @@ async function refreshBalance(e) {
     const txt = num(W.bal) + ' ' + COIN;
     const mb = $('#meBal'); if (mb) mb.textContent = txt;
     const ab = $('#accBal'); if (ab) ab.textContent = txt;
-    toast('Solde actualisé');
+    toast('Wallet actualisé');
   }
 }
 const balRow = document.querySelector('#mePanel .mpn');
 if (balRow) {
   balRow.style.cursor = 'pointer';
-  balRow.title = 'Actualiser le solde';
+  balRow.title = 'Actualiser le wallet';
   balRow.addEventListener('click', refreshBalance);
 }
 document.querySelectorAll('.ppanel').forEach((p) => (p.onclick = (e) => e.stopPropagation()));
@@ -4712,9 +4733,9 @@ setSync();
 
 
 // ========== SHOP / TASKS / ACCOUNT / ADMIN SHOP ==========
-async function loadShop() {
+async function loadShop(quiet = false) {
   const grid = $('#shopGrid'), ord = $('#shopOrders');
-  grid.innerHTML = '<div class="lbnone">Chargement…</div>';
+  if (!quiet) grid.innerHTML = '<div class="lbnone">Chargement…</div>';
   const ok = await send('shop_list');
   const d = send.last;
   if (!ok || !d) { grid.innerHTML = '<div class="lbnone">Boutique indisponible.</div>'; return; }
@@ -4780,9 +4801,9 @@ async function loadShop() {
     ord.append(row);
   });
 }
-async function loadTasks() {
+async function loadTasks(quiet = false) {
   const box = $('#tasksList');
-  box.innerHTML = '<div class="lbnone">Chargement…</div>';
+  if (!quiet) box.innerHTML = '<div class="lbnone">Chargement…</div>';
   const ok = await send('tasks_list');
   const d = send.last;
   if (!ok || !d) { box.innerHTML = '<div class="lbnone">Tasks indisponibles.</div>'; return; }
@@ -4856,6 +4877,28 @@ async function loadAccount() {
     ord.append(card);
   });
 }
+// ---- rafraîchissement automatique des vues qui affichent des données changeantes
+const LIVE = { busy: false, timer: 0 };
+async function refreshActiveView() {
+  if (LIVE.busy || document.hidden) return;
+  const v = W.view;
+  if (!['tasks', 'shop', 'account', 'rank', 'top'].includes(v) && !LB_GAME_KEY[v]) return;
+  LIVE.busy = true;
+  try {
+    if (v === 'tasks') await loadTasks(true);
+    else if (v === 'shop') await loadShop(true);
+    else if (v === 'account') await loadAccount();
+    else if (v === 'rank') await rkLoad();
+    else if (v === 'top') await lbLoad();
+    if (LB_GAME_KEY[v]) await loadGameLB(v, true);
+  } catch {} finally { LIVE.busy = false; }
+}
+function queueLiveRefresh(ms = 250) {
+  clearTimeout(LIVE.timer);
+  LIVE.timer = setTimeout(() => refreshActiveView(), ms);
+}
+setInterval(() => refreshActiveView(), 5000);
+
 $('#accCopyInvite').onclick = () => {
   const v = $('#accInvite').value;
   if (v) navigator.clipboard?.writeText(v).then(() => toast('Lien copié')).catch(() => toast(v));
@@ -4940,14 +4983,18 @@ document.querySelectorAll('[data-eco]').forEach((btn) => {
 });
 
 // ---- Fiche joueur en IMAGE (fond noir premium + statistiques)
-let statsPng = '';
-async function renderStatsCard(d, uid) {
+let statsPng = '', statsData = null, statsUid = null, statsBg = '';
+const statsBgKey = (uid) => 'znk_stats_bg_' + String(uid || 'me');
+function savedStatsBg(uid) { try { return localStorage.getItem(statsBgKey(uid)) || ''; } catch { return ''; } }
+async function renderStatsCard(d, uid, bgSrc) {
   const cv = $('#statsCanvas'); if (!cv) return;
+  statsData = d; statsUid = uid || (me && me.uid) || null;
+  statsBg = bgSrc || savedStatsBg(statsUid);
   const x = cv.getContext('2d'), W0 = cv.width, H0 = cv.height;
   const bg = new Image();
   await new Promise((res) => {
     bg.onload = bg.onerror = res;
-    bg.src = '/assets/stats_bg.svg';
+    bg.src = statsBg || '/assets/stats_bg.svg';
   });
   x.clearRect(0, 0, W0, H0);
   if (bg.complete && bg.naturalWidth) x.drawImage(bg, 0, 0, W0, H0);
@@ -4986,14 +5033,15 @@ async function renderStatsCard(d, uid) {
   x.fillStyle = 'rgba(255,255,255,.55)'; x.font = '600 16px system-ui,sans-serif';
   x.fillText('Discord ID ' + String(uid || me.uid || '—'), px, 188);
 
+  const en = LANG === 'en';
   const cards = [
-    ['SOLDE ZTKN', num(d.bal), '#22c55e'],
+    ['WALLET ZTKN', num(d.bal), '#22c55e'],
     ['RR / ELO', num(me.elo), '#fbbf24'],
-    ['RANG', String(me.pos ? '#' + me.pos : '—'), '#e9d5ff'],
-    ['PIC RR', num(me.peak), '#fbbf24'],
-    ['PARTIES', String(me.games || 0), '#93c5fd'],
-    ['VICTOIRES', String(me.wins || 0), '#86efac'],
-    ['DÉFAITES', String(me.losses || 0), '#fca5a5'],
+    [en ? 'RANK' : 'RANG', String(me.pos ? '#' + me.pos : '—'), '#e9d5ff'],
+    [en ? 'PEAK RR' : 'PIC RR', num(me.peak), '#fbbf24'],
+    [en ? 'GAMES' : 'PARTIES', String(me.games || 0), '#93c5fd'],
+    [en ? 'WINS' : 'VICTOIRES', String(me.wins || 0), '#86efac'],
+    [en ? 'LOSSES' : 'DÉFAITES', String(me.losses || 0), '#fca5a5'],
     ['WINRATE', (me.games ? Math.round((me.wins / me.games) * 100) : 0) + ' %', '#fff'],
   ];
   const cw = 248, ch = 118, gx = 20, gy = 20, x0 = 62, y0 = 250;
@@ -5005,15 +5053,53 @@ async function renderStatsCard(d, uid) {
     x.fillStyle = c[2]; x.font = '900 38px system-ui,sans-serif'; x.fillText(c[1], cx + 20, cy + 72);
   });
   x.textAlign = 'center'; x.fillStyle = 'rgba(255,255,255,.32)'; x.font = '600 13px system-ui,sans-serif';
-  x.fillText('Généré par le panneau admin ZNK ·.classement compétitif', W0 / 2, H0 - 32);
+  x.fillText(LANG === 'en' ? 'ZNK CASINO · competitive ladder' : 'ZNK CASINO · classement compétitif', W0 / 2, H0 - 32);
 
   try { statsPng = cv.toDataURL('image/png'); } catch { statsPng = ''; }
   const modal = $('#mStatsCard'); if (modal) modal.classList.add('on');
 }
 const statsDl = $('#statsDownload');
-if (statsDl) statsDl.onclick = () => {
-  if (!statsPng) return toast('Fiche pas encore générée.');
-  const a = document.createElement('a'); a.href = statsPng; a.download = 'znk-player-stats.png'; a.click();
+if (statsDl) {
+  statsDl.innerHTML = icon('download', 18);
+  statsDl.onclick = () => {
+    if (!statsPng) return toast('Fiche pas encore générée.');
+    const a = document.createElement('a'); a.href = statsPng; a.download = 'znk-player-stats.png'; a.click();
+  };
+}
+const statsFile = $('#statsBgFile');
+if (statsFile) statsFile.onchange = () => {
+  const f = statsFile.files && statsFile.files[0]; if (!f) return;
+  if (!/^image\//.test(f.type)) { toast('Image invalide'); return; }
+  const reader = new FileReader();
+  reader.onload = () => {
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const c = document.createElement('canvas'); c.width = 1200; c.height = 675;
+        const cx = c.getContext('2d');
+        const scale = Math.max(c.width / img.naturalWidth, c.height / img.naturalHeight);
+        const w = img.naturalWidth * scale, h = img.naturalHeight * scale;
+        cx.drawImage(img, (c.width - w) / 2, (c.height - h) / 2, w, h);
+        const src = c.toDataURL('image/jpeg', 0.86);
+        const key = statsUid || (me && me.uid) || 'me';
+        try { localStorage.setItem(statsBgKey(key), src); } catch {}
+        statsBg = src;
+        if (statsData) renderStatsCard(statsData, statsUid, src);
+        toast('Image de fond appliquée');
+      } catch { toast('Image invalide'); }
+    };
+    img.onerror = () => toast('Image invalide');
+    img.src = reader.result;
+  };
+  reader.readAsDataURL(f);
+};
+const accStats = $('#accStats');
+if (accStats) accStats.onclick = async () => {
+  accStats.disabled = true;
+  const ok = await send('my_stats');
+  accStats.disabled = false;
+  if (!ok) return;
+  try { renderStatsCard(send.last || {}, me && me.uid); } catch (e) { console.error(e); toast('Impossible de générer la fiche image'); }
 };
 
 async function adLadderLoad() {

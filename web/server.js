@@ -825,7 +825,9 @@ function init(deps) {
           if (now - (lastChat.get(user.uid) || 0) < 1200) throw new Error('Slow down: one message per second maximum.');
           lastChat.set(user.uid, now);
           const rk = rankApi.info(user.uid); // le rang du casino remplace le rôle Discord
-          const msg = { room: chatRoom, uid: user.uid, name: user.name, rk: { id: rk.id, fi: rk.fi, name: rk.name, sym: rk.sym, pips: rk.pips, c1: rk.c1, c2: rk.c2 }, avatar: user.avatar, text, t: now };
+          let rkpos = 0;
+          try { rkpos = rankApi.view(user.uid, 1).me.pos || 0; } catch {}
+          const msg = { room: chatRoom, uid: user.uid, name: user.name, rk: { id: rk.id, fi: rk.fi, name: rk.name, sym: rk.sym, pips: rk.pips, c1: rk.c1, c2: rk.c2 }, rkpos, avatar: user.avatar, text, t: now };
           const list = entry.chat.get(chatRoom) || [];
           list.push(msg);
           if (list.length > CHAT_KEEP) list.shift();
@@ -1051,6 +1053,22 @@ function init(deps) {
           walBal = out.balance;
           return json(res, 200, { ok: true, reward: out.reward, msg: `+${out.reward} · ${out.task}`, rbal: walBal, tasks: shopApi.tasksForUser(user.uid) });
         }
+        case 'my_stats': {
+          // User-facing version of admin_eco/player_stats: always limited to the signed-in player.
+          shopApi.markLogin(user.uid);
+          const uid = String(user.uid);
+          const bal = await deps.getBalance(uid);
+          const rv = rankApi.view(uid, 1);
+          const me = rv.me || {};
+          const s = entry.seen.get(uid);
+          return json(res, 200, {
+            ok: true,
+            msg: `Player ${uid}`,
+            bal,
+            rank: { ...me, uid, name: s?.name || me.name || uid, avatar: s?.avatar || me.avatar || '' },
+            ladder: rv.ladder,
+          });
+        }
         case 'profile': {
           shopApi.markLogin(user.uid);
           const inv = deps.getInviteCount ? await deps.getInviteCount(user.uid, user.guildId).catch(() => 0) : 0;
@@ -1058,7 +1076,7 @@ function init(deps) {
           let rankGames = 0;
           try { rankGames = rankApi.view(user.uid, 1).me.games || 0; } catch {}
           const bal = await deps.getBalance(user.uid);
-          const inviteUrl = deps.inviteUrl ? await deps.inviteUrl(user.guildId).catch(() => '') : '';
+          const inviteUrl = deps.inviteUrl ? await deps.inviteUrl(user.guildId, user.uid).catch(() => '') : '';
           return json(res, 200, {
             ok: true,
             bal,
@@ -1281,6 +1299,16 @@ function init(deps) {
       if (req.method === 'GET' && (url.pathname === '/' || url.pathname === '/index.html')) {
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', ...SEC });
         return res.end(loadHtml());
+      }
+      if (req.method === 'GET' && url.pathname.startsWith('/assets/')) {
+        const rel = decodeURIComponent(url.pathname.slice('/assets/'.length));
+        if (!/^[\w./-]+$/.test(rel) || rel.includes('..')) return json(res, 404, { error: 'Not found' });
+        const file = path.join(__dirname, 'public', 'assets', rel);
+        let buf;
+        try { buf = await fs.promises.readFile(file); } catch { return json(res, 404, { error: 'Not found' }); }
+        const type = /\.svg$/i.test(rel) ? 'image/svg+xml' : /\.png$/i.test(rel) ? 'image/png' : /\.jpe?g$/i.test(rel) ? 'image/jpeg' : /\.webp$/i.test(rel) ? 'image/webp' : 'application/octet-stream';
+        res.writeHead(200, { 'Content-Type': type, 'Cache-Control': 'public, max-age=3600', ...SEC });
+        return res.end(buf);
       }
       if (req.method === 'GET' && (url.pathname === '/login' || url.pathname === '/auth/callback' || url.pathname === '/auth/guild')) return await handleAuth(req, res, url);
       if (req.method === 'GET' && url.pathname === '/healthz') return json(res, 200, { ok: true });
