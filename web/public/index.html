@@ -262,6 +262,16 @@ th{color:var(--mut);font-size:12px}
 .lbnone{color:var(--mut);text-align:center;padding:26px 12px;font-size:13px}
 @media(max-width:600px){#topView{padding:16px 8px 64px}.lbgrid{gap:8px}.lbtitle{padding:10px}.lbtitle b{font-size:14px}.lbtitle small{display:none}
   .lbrow{grid-template-columns:24px minmax(0,1fr);gap:2px 8px;padding:8px 10px}.lbrk{width:22px;height:22px;font-size:11px}.lbval{grid-column:2;font-size:12px}}
+/* ---------- CLASSEMENT PAR JEU (bas de chaque jeu) ---------- */
+.glb{margin:18px auto 8px;max-width:760px;background:#0a0a0a;border:1px solid #262626;border-radius:14px;overflow:hidden}
+.glb .lbtitle{padding:10px 14px}
+.glb .lbtitle b{font-size:14px}
+.glb .lbtitle small{font-size:11px}
+.glbbody .lbrow{grid-template-columns:28px minmax(0,1fr) auto auto;gap:8px;padding:7px 14px}
+.glbbody .lbsub{font-size:11px;color:var(--mut);font-weight:600}
+.glbbody .lbval small{display:block;text-align:right;color:var(--mut);font-size:10px}
+.glbbody .lbnone{padding:16px 12px}
+@media(max-width:600px){.glbbody .lbrow{grid-template-columns:24px minmax(0,1fr) auto}.glbbody .lbsub{display:none}.glbbody .lbval small{display:none}}
 /* ---------- ADMIN ---------- */
 #adminView{align-items:center;padding:24px 16px 64px;overflow:auto}
 .adwrap{width:100%;max-width:760px;display:flex;flex-direction:column;gap:14px}
@@ -1015,9 +1025,6 @@ header .sp{flex:1 1 0}
         <span class="gdesc">Gratte pour de vrai, trois montants identiques gagnent</span>
         <span class="glive"></span><span class="gplay">Jouer</span>
       </button>
-    </div>
-    <div class="lbtitle" style="margin-top:22px"><b>Nouveaux jeux animés</b><small>10 jeux solo, chacun avec sa propre cinématique</small></div>
-    <div class="games" id="gNewGames">
       <button class="gcard" data-go="off-lucky7"><span class="gname">Lucky 7</span><span class="gdesc">Trois rouleaux · aligne trois 7 pour le jackpot</span><span class="glive"></span><span class="gplay">Jouer</span></button>
       <button class="gcard" data-go="off-bubbles"><span class="gname">Bubble Pop</span><span class="gdesc">Éclate la bonne bulle, zone sûre ou risquée</span><span class="glive"></span><span class="gplay">Jouer</span></button>
       <button class="gcard" data-go="off-frozen"><span class="gname">Ice Breaker</span><span class="gdesc">Brise la tuile qui cache le meilleur multiplicateur</span><span class="glive"></span><span class="gplay">Jouer</span></button>
@@ -1173,6 +1180,21 @@ create table if not exists players (
   invites integer not null default 0,
   updated_at timestamptz not null default now()
 );
+
+-- Historique des parties (alimente le classement « plus gros gain en une fois »)
+create table if not exists game_history (
+  id bigint generated always as identity primary key,
+  user_id text not null,
+  game text not null,
+  bet numeric not null default 0,
+  multiplier numeric not null default 0,
+  payout numeric not null default 0,
+  profit numeric not null default 0,
+  detail text,
+  created_at timestamptz not null default now()
+);
+create index if not exists game_history_user_idx on game_history (user_id, created_at desc);
+create index if not exists game_history_game_payout_idx on game_history (game, payout desc);
 
 create table if not exists player_rank (
   user_id text primary key,
@@ -2178,7 +2200,7 @@ function pOnHello(d) {
 function hubPoker(ok) { const g = $('#gcPoker'); if (g) g.disabled = !ok; const t = document.querySelector('.mitem[data-g="poker"]'); if (t) t.disabled = !ok; }
 function pHub() {
   const w = $('#gPkLive'); if (!w) return;
-  if (!P.info) { w.textContent = 'Indisponible'; return; }
+  if (!P.info) { w.textContent = ''; return; }
   const n = P.tables.size ? [...P.tables.values()].reduce((a, s) => a + s.seats.filter(Boolean).length, 0) : null;
   w.textContent = n == null ? '' : n ? n + ' joueur' + (n > 1 ? 's' : '') + ' à table' : 'Table libre';
 }
@@ -2588,7 +2610,8 @@ function pTick() {
 
 // ========== Routing URL (hash) — refresh garde la page ==========
 const ROUTE_OK = new Set(['hub','bj','poker','roulette','rank','ranked','top','admin','shop','tasks','account',
-  'off-bj','off-fuse','off-mine','off-coin','off-dice','off-horses','off-russian','off-slots','off-duel','off-plinko','off-scratch']);
+  'off-bj','off-fuse','off-mine','off-coin','off-dice','off-horses','off-russian','off-slots','off-duel','off-plinko','off-scratch',
+  'off-lucky7','off-bubbles','off-frozen','off-candy','off-heist','off-orbit','off-cards','off-rocket','off-cannon','off-jewels']);
 function routeFromHash() {
   const h = (location.hash || '').replace(/^#\/?/, '').trim();
   if (h && ROUTE_OK.has(h)) return h;
@@ -2612,6 +2635,56 @@ function navHighlight(v) {
     const map = { hub:'Accueil', ranked:'Ranked', rank:'Rank', top:'Classement', shop:'Boutique', tasks:'Tasks', account:'Compte', bj:'Blackjack', poker:'Poker', roulette:'Roulette' };
     lbl.textContent = map[v] || (v.startsWith('off-') ? 'Offline' : 'Menu');
   }
+}
+
+// ---- classement « plus gros gain en une fois » en bas de chaque jeu ----
+const LB_GAME_KEY = {
+  bj: 'blackjack', ranked: 'ranked', poker: 'poker', roulette: 'roulette',
+  'off-bj': 'bj-solo', 'off-fuse': 'fuse', 'off-mine': 'mines', 'off-coin': 'coin',
+  'off-dice': 'dice', 'off-horses': 'horses', 'off-russian': 'russian', 'off-slots': 'slots',
+  'off-duel': 'duel', 'off-plinko': 'plinko', 'off-scratch': 'scratch',
+  'off-lucky7': 'lucky7', 'off-bubbles': 'bubbles', 'off-frozen': 'frozen', 'off-candy': 'candy',
+  'off-heist': 'heist', 'off-orbit': 'orbit', 'off-cards': 'cards', 'off-rocket': 'rocket',
+  'off-cannon': 'cannon', 'off-jewels': 'jewels',
+};
+const LB_HOST = { bj: '#bjView', ranked: '#bjView', poker: '#pkView', roulette: '#rlView' };
+function ensureGameLB() {
+  ['#bjView', '#pkView', '#rlView', '#ofView'].forEach((sel) => {
+    const host = $(sel);
+    if (!host || host.querySelector(':scope > .glb')) return;
+    const sec = el('section', 'glb');
+    sec.append(el('div', 'lbtitle'));
+    const t = sec.firstChild;
+    t.append(el('b', '', '🏆 Top 10 · plus gros gain'), el('small', '', 'Plus gros gain remporté en une seule fois'));
+    const body = el('div', 'glbbody'); body.append(el('div', 'lbnone', '…'));
+    sec.append(body); host.append(sec);
+  });
+}
+function lbFillGame(view, top) {
+  const host = $(LB_HOST[view] || '#ofView');
+  const body = host && host.querySelector(':scope > .glb .glbbody');
+  if (!body) return;
+  const rows = Array.isArray(top) ? top : [];
+  if (!rows.length) { body.replaceChildren(el('div', 'lbnone', 'Aucune partie enregistrée pour ce jeu.')); return; }
+  body.replaceChildren(...rows.map((r, i) => {
+    const row = el('div', 'lbrow' + (i < 3 ? ' r' + (i + 1) : '') + (String(r.uid) === (me && me.uid) ? ' me' : ''));
+    row.append(el('span', 'lbrk', String(i + 1)), el('span', 'lbname', r.name || String(r.uid).slice(0, 8)));
+    row.append(el('span', 'lbval', num(r.payout) + ' ' + COIN));
+    row.append(el('span', 'lbsub', 'mise ' + num(r.bet)));
+    return row;
+  }));
+}
+async function loadGameLB(view) {
+  const key = LB_GAME_KEY[view];
+  if (!key) return;
+  ensureGameLB();
+  const host = $(LB_HOST[view] || '#ofView');
+  const body = host && host.querySelector(':scope > .glb .glbbody');
+  if (body) body.replaceChildren(el('div', 'lbnone', 'Chargement…'));
+  try {
+    const d = await (await fetch('/api/game-top?game=' + encodeURIComponent(key), { cache: 'no-store' })).json();
+    lbFillGame(view, d && d.top);
+  } catch { if (body) body.replaceChildren(el('div', 'lbnone', 'Classement indisponible.')); }
 }
 
 function setView(v) {
@@ -2696,6 +2769,7 @@ function setView(v) {
   if (v === 'poker') { pSend('psync'); if (P.S) pRender(P.S); }
   if (v === 'roulette') { rEnter(); if (W.S) rRender(W.S); else $('#meBal').textContent = num(rBal()) + ' ' + COIN; }
   else { const m = v === 'poker' ? null : mySeat(); const UC = v === 'ranked' ? 'RR' : COIN; $('#meBal').textContent = m ? num(m.bal) + ' ' + UC : bjMode ? 'Spectateur' : (W.bal != null ? num(W.bal) + ' ' + UC : 'Casino'); }
+  if (LB_GAME_KEY[v]) loadGameLB(v);
 }
 document.querySelectorAll('.gcard').forEach((c) => (c.onclick = () => { ac(); setView(c.dataset.go); }));
 document.querySelectorAll('#topNav [data-g]').forEach((b) => {
@@ -2741,7 +2815,7 @@ function updHub() {
   const n = BJT.size ? [...BJT.values()].reduce((a, s) => a + s.seats.filter(Boolean).length, 0) : null;
   $('#gBjLive').textContent = n == null ? '' : n ? plural(n, 'joueur') + ' à table' : 'Table libre';
   const w = $('#gRlLive');
-  if (!W.info) { w.textContent = 'Indisponible'; return; }
+  if (!W.info) { w.textContent = ''; return; }
   const m = W.S ? W.S.players.length : null;
   w.textContent = m == null ? '' : m ? plural(m, 'joueur') + ' en jeu' : 'Table ouverte';
 }
@@ -2964,7 +3038,7 @@ function pFit() {
   for (let i = 0; i < 9 && t.scrollHeight > t.clientHeight + 1 && k > 0.45; i++) { k = Math.round((k - 0.07) * 100) / 100; t.style.setProperty('--pk', String(k)); }
 }
 try { new MutationObserver(pFitSoon).observe(document.getElementById('pTable'), { childList: true, subtree: true }); } catch {}
-hubRoulette(false); hubPoker(false); setInterval(() => { updHub(); pHub(); }, 1000); updHub();
+hubRoulette(true); hubPoker(true); setInterval(() => { updHub(); pHub(); }, 1000); updHub();
 document.querySelectorAll('.mitem[data-g]').forEach((t) => (t.onclick = () => { ac(); menuClose(); setView(t.dataset.g); }));
 $('#bRules').onclick = () => $(W.view === 'roulette' ? '#mRRules' : W.view === 'poker' ? '#mPRules' : '#mRules').classList.add('on');
 function rOnHello(d) { W.info = d.roulette; W.joined = false; if (W.info) rBuild(); if (W.view === 'roulette') rEnter(); hubRoulette(!!W.info); updHub(); }
@@ -3332,6 +3406,7 @@ function scAuto() {
 const O = { game: null, st: null, bal: null, bet: '100', mines: 3, auto: '', hist: { fuse: [], mines: [], bj: [], coin: [], dice: [], horses: [], russian: [], slots: [], duel: [], scratch: [] }, timer: 0, pp: [], run: 0, anim: false, hold: false, pick: { coin: 'pile', dice: 'over', horses: '1', russian: '1', slots: '1', duel: '0' } };
 const OMAP = { 'off-bj': 'bj', 'off-fuse': 'fuse', 'off-mine': 'mines', 'off-coin': 'coin', 'off-dice': 'dice', 'off-horses': 'horses', 'off-russian': 'russian', 'off-slots': 'slots', 'off-duel': 'duel', 'off-scratch': 'scratch', 'off-plinko': 'plinko' };
 const NG_DEFAULT = { lucky7: '7', bubbles: 'safe', frozen: '0', candy: 'cherry', heist: '1', orbit: 'mid', cards: '♠', rocket: '0', cannon: 'center', jewels: '1' };
+const NEW_IDS = ['lucky7', 'bubbles', 'frozen', 'candy', 'heist', 'orbit', 'cards', 'rocket', 'cannon', 'jewels'];
 NEW_IDS.forEach((k) => { OMAP['off-' + k] = k; O.hist[k] = []; O.pick[k] = NG_DEFAULT[k]; });
 O.hist.plinko = []; O.pick.plinko = 'med'; O.balls = 1;
 const OT = { bj: 'BLACKJACK SOLO', fuse: 'FUSÉ', mines: 'MINES', coin: 'PILE OU FACE', dice: 'DÉS', horses: 'COURSE DE CHEVAUX', russian: 'ROULETTE RUSSE', slots: 'SLOTS', duel: 'DUEL', scratch: 'TICKET À GRATTER', plinko: 'PLINKO',
@@ -3578,7 +3653,6 @@ function ofDock() {
   row(act('go', O.game === 'scratch' ? 'Acheter un ticket' : s ? 'Rejouer' : 'Jouer', ofStart));
 }
 // ---- jeux « un coup » : pile ou face, dés, chevaux, roulette russe (tirage côté serveur, animation côté site)
-const NEW_IDS = ['lucky7', 'bubbles', 'frozen', 'candy', 'heist', 'orbit', 'cards', 'rocket', 'cannon', 'jewels'];
 const INST = { coin: 1, dice: 1, horses: 1, russian: 1, slots: 1, duel: 1, plinko: 1 };
 NEW_IDS.forEach((k) => { INST[k] = 1; });
 const FOES = [{ n: 'Recrue', p: 60, m: 1.6 }, { n: 'Pistolero', p: 45, m: 2.1 }, { n: 'Légende', p: 25, m: 3.8 }, { n: 'Fantôme', p: 10, m: 9.6 }];
@@ -3822,7 +3896,7 @@ function rInst(s) {
   else if (!s) msg.replaceChildren(el('span', '', IDLE[O.game]));
   else {
     const net = Math.round((s.win - s.bet) * 100) / 100;
-    const head = s.type === 'plinko' ? (s.n + ' bille' + (s.n > 1 ? 's' : '') + ' · x' + s.mult) : s.type === 'slots' ? (s.mult ? 'x' + s.mult : 'Pas de ligne') : s.type === 'duel' ? (s.win > 0 ? 'Tu dégaines le premier !' : 'Trop lent…') : s.type === 'coin' ? (s.side === 'pile' ? 'PILE' : 'FACE') : s.type === 'dice' ? s.a + ' + ' + s.b + ' = ' + s.sum : s.type === 'horses' ? 'Cheval n°' + (s.winner + 1) + ' vainqueur' : s.dead ? 'BANG !' : 'Clic… tu survis';
+    let head = s.type === 'plinko' ? (s.n + ' bille' + (s.n > 1 ? 's' : '') + ' · x' + s.mult) : s.type === 'slots' ? (s.mult ? 'x' + s.mult : 'Pas de ligne') : s.type === 'duel' ? (s.win > 0 ? 'Tu dégaines le premier !' : 'Trop lent…') : s.type === 'coin' ? (s.side === 'pile' ? 'PILE' : 'FACE') : s.type === 'dice' ? s.a + ' + ' + s.b + ' = ' + s.sum : s.type === 'horses' ? 'Cheval n°' + (s.winner + 1) + ' vainqueur' : s.dead ? 'BANG !' : 'Clic… tu survis';
     if (NEW_IDS.includes(s.type)) head = s.type === 'lucky7' ? 'Rouleaux ' + (s.reel || []).join(' · ') : s.type === 'bubbles' ? 'Bulle ' + (s.hit + 1) : s.type === 'frozen' ? 'Tuile ' + (s.pick + 1) + ' · x' + s.value : s.type === 'candy' ? 'Roue : ' + s.landed : s.type === 'heist' ? 'Coffre ' + (s.pick + 1) + ' · x' + s.value : s.type === 'orbit' ? 'Orbite ' + s.ring : s.type === 'cards' ? (s.cards || []).join(' ') : s.type === 'rocket' ? 'Fusée ' + (s.winner + 1) : s.type === 'cannon' ? 'Zone ' + s.hit : 'Joyaux ' + s.count + ' trouvés';
     msg.replaceChildren(el('span', s.win > 0 ? 'win' : 'lose', head + ' · ' + (net > 0 ? '+' : '') + num(net) + ' ' + COIN));
   }
