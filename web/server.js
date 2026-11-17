@@ -285,6 +285,7 @@ function init(deps) {
   } catch {}
 
   const avatarMap = new Map(); // uid -> avatar (affiché dans les classements)
+  const nameMap = new Map();   // uid -> nom (affiché dans les classements par jeu)
   const rankApi = createRank(path.join(DATA_DIR, 'rank.json'), deps.supabase);
   const shopApi = createShop(DATA_DIR, {
     getBalance: deps.getBalance,
@@ -306,6 +307,31 @@ function init(deps) {
   // ---------- fin de manche : rang / ELO + récap Discord + annonce des gagnants dans le chat du site ----------
   function roundEnd(guildId, r) {
     try { rankApi.record(r, (uid) => avatarMap.get(uid)); } catch (e) { console.error('[web] rang/elo', e?.message || e); }
+    //历史 / historique : alimente le classement « plus gros gain en une fois » par jeu
+    try {
+      if (deps.supabase && r && Array.isArray(r.players)) {
+        const rows = r.players
+          .filter((p) => p && p.uid && Number(p.bet) > 0)
+          .map((p) => {
+            const bet = Number(p.bet) || 0;
+            const net = Number(p.net != null ? p.net : (p.win != null ? p.win - bet : 0)) || 0;
+            return {
+              user_id: String(p.uid),
+              game: String(r.game || 'unknown'),
+              bet,
+              multiplier: Number(p.mult) || 0,
+              payout: Math.round((bet + net) * 100) / 100,
+              profit: Math.round(net * 100) / 100,
+              detail: p.detail ? String(p.detail).slice(0, 200) : null,
+            };
+          });
+        if (rows.length) {
+          Promise.resolve(deps.supabase.from('game_history').insert(rows))
+            .then(({ error }) => { if (error) console.error('[web history]', error.message); })
+            .catch((e) => console.error('[web history]', e?.message || e));
+        }
+      }
+    } catch (e) { console.error('[web history]', e?.message || e); }
     try { for (const p of (r && r.players) || []) if (p && p.uid) shopApi.bumpProgress(p.uid, 'games', 1); } catch (e) { console.error('[web] shop tasks', e?.message || e); }
     try {
       const room = GAME_ROOM[r && r.game];
@@ -642,6 +668,7 @@ function init(deps) {
     const user = readToken(d.t);
     if (!user) return json(res, 401, { ok: false, error: 'Link expired: click "Play" in Discord again.' });
     if (user.avatar) avatarMap.set(user.uid, user.avatar);
+    if (user.name) nameMap.set(user.uid, user.name);
     const now = Date.now();
     // Page-exit "leave" requests may include bye:true — never rate-limit fast reloads.
     if (d.bye !== true && now - (lastAct.get(user.uid) || 0) < (/^[ro]/.test(String(d.action)) ? 50 : 120)) return json(res, 429, { ok: false, error: 'Slow down.' });
@@ -1163,6 +1190,7 @@ function init(deps) {
     res.uid = user.uid; // sert au snapshot personnalisé du poker
     Promise.resolve(deps.isAdmin ? deps.isAdmin(user.uid) : false).then((a) => { if (a) try { res.write(`event: admin\ndata: {"admin":true}\n\n`); } catch { /* fermée */ } }).catch(() => {});
     if (user.avatar) avatarMap.set(user.uid, user.avatar);
+    if (user.name) nameMap.set(user.uid, user.name);
     entry.seen.set(user.uid, { uid: user.uid, name: user.name, avatar: user.avatar });
     if (entry.seen.size > 300) entry.seen.delete(entry.seen.keys().next().value);
     entry.clients.add(res);
@@ -1229,10 +1257,39 @@ function init(deps) {
         const u = readToken(url.searchParams.get('t'));
         if (!u) return json(res, 401, { error: 'expired' });
         if (u.avatar) avatarMap.set(u.uid, u.avatar);
+        if (u.name) nameMap.set(u.uid, u.name);
         rankApi.touch(u.uid, u.name, u.avatar);
         return json(res, 200, rankApi.view(u.uid));
       }
       if (req.method === 'GET' && url.pathname === '/api/boards') return json(res, 200, await Promise.resolve(deps.getBoards ? deps.getBoards() : null).catch(() => null) || { rich: [], alltime: [] });
+      if (req.method === 'GET' && url.pathname === '/api/game-top') {
+        // Top 10 des plus gros gains en une seule fois, pour un jeu donné.
+        const game = String(url.searchParams.get('game') || '').slice(0, 40);
+        if (!game || !deps.supabase) return json(res, 200, { top: [] });
+        try {
+          const { data, error } = await deps.supabase
+            .from('game_history')
+            .select('user_id, bet, multiplier, payout, profit, created_at')
+            .eq('game', game)
+            .gt('payout', 0)
+            .order('payout', { ascending: false })
+            .limit(10);
+          if (error) throw error;
+          const top = (data || []).map((r) => ({
+            uid: String(r.user_id),
+            name: nameMap.get(String(r.user_id)) || String(r.user_id).slice(0, 8),
+            avatar: avatarMap.get(String(r.user_id)) || '',
+            bet: Number(r.bet) || 0,
+            payout: Number(r.payout) || 0,
+            profit: Number(r.profit) || 0,
+            mult: Number(r.multiplier) || 0,
+          }));
+          return json(res, 200, { top });
+        } catch (e) {
+          console.error('[web game-top]', e?.message || e);
+          return json(res, 200, { top: [] });
+        }
+      }
       if (req.method === 'GET' && url.pathname === '/api/roulette-event') {
         const u = readToken(url.searchParams.get('t'));
         if (!u) return json(res, 401, { error: 'expired' });
