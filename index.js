@@ -5025,9 +5025,9 @@ function buildHelpEmbed() {
         inline: false,
       },
       {
-        name: '🎮 Casino',
+        name: '🎮 Jeux',
         value:
-          '`/casino` · `/jeux` — publish the game panel\n' +
+          'Les jeux de casino ne sont plus jouables depuis Discord : ouvre le site puis **Accueil**.\n' +
           '`/setup` · `/salon` — configure channels\n' +
           '`/wins` — wins channel\n' +
           '`/classement` — auto leaderboard message\n' +
@@ -7000,11 +7000,8 @@ try {
           return { ok: true, msg: 'Invites for ' + target + ': ' + count, invites: count };
         }
         case 'casino':
-        case 'jeux': {
-          if (!channel) throw new Error('Casino channel not found — run /setup first.');
-          await channel.send(buildPanelPayload());
-          return { ok: true, msg: 'Game panel posted in #' + channel.name + '.' };
-        }
+        case 'jeux':
+          return { ok: true, msg: 'Casino game commands are disabled on Discord. Use the website instead.' };
         case 'setup':
         case 'salon':
           await cmdSetup(fakeMsg);
@@ -8605,7 +8602,16 @@ client.on(Events.MessageCreate, async (msg) => {
 // ============================================================
 //  BUTTONS, MENUS AND POP-UPS
 // ============================================================
+// Discord peut renvoyer la même interaction (réseau / relais). On verrouille
+// l'ID pour ne jamais créer deux salons ni envoyer deux messages.
+const seenInteractions = new Set();
 client.on(Events.InteractionCreate, async (i) => {
+  const iid = String(i.id || '');
+  if (iid && seenInteractions.has(iid)) return;
+  if (iid) {
+    seenInteractions.add(iid);
+    setTimeout(() => seenInteractions.delete(iid), 120000).unref?.();
+  }
   try {
     if (i.isChatInputCommand()) {
       return handleSlashCommand(i);
@@ -8629,19 +8635,23 @@ client.on(Events.InteractionCreate, async (i) => {
 
     if ((id.startsWith('poker_') || id.startsWith('online_')) && i.isButton()) return await handlePokerButton(i);
     if (id === 'modal_search_game' && i.isModalSubmit()) {
-      const q = i.fields.getTextInputValue('q')?.trim() || '';
-      if (!q) return respondText(i, 'Enter a keyword.');
-      return i.reply({ ...buildGameMenuPayload(i.user.id, 0, 'search', q), flags: EPH });
+      return i.reply({ content: '🎮 Casino games are no longer available on Discord. Use the website instead.', flags: EPH });
     }
 
-    const isGame =
-      id.startsWith('panel_') ||
-      id.startsWith('mines_') ||
-      id.startsWith('bj_') ||
-      id.startsWith('rl_') ||
-      id.startsWith('ig_') ||
-      id.startsWith('replay|') ||
-      id.startsWith('modal_');
+    // Tous les jeux de casino Discord sont supprimés. Les seules interactions
+    // conservées ici sont les transfers de ZTKN (panel_send_pick / modal_send_*).
+    const isCasinoGame =
+      ['mines_', 'bj_', 'rl_', 'ig_', 'replay|'].some((p) => id.startsWith(p)) ||
+      (id.startsWith('panel_') && id !== 'panel_send_pick') ||
+      (id.startsWith('modal_') && !id.startsWith('modal_send_'));
+    if (isCasinoGame) {
+      return i.reply({
+        content: '🎮 Casino games are no longer available on Discord. Open the site and go to **Accueil** to play.',
+        flags: EPH,
+      });
+    }
+
+    const isGame = id === 'panel_send_pick' || id.startsWith('modal_send_');
     if (!isGame) return;
 
     if (i.isModalSubmit()) return await handleModalSubmit(i);
@@ -8953,7 +8963,7 @@ async function handleTicketButton(i) {
     if (!order) return i.reply({ content: '❌ Order code not found.', flags: EPH });
     if (order.status === 'delivered') return i.reply({ content: '✅ Already marked as delivered.', flags: EPH });
     try {
-      shop.markDelivered(code);
+      await shop.markDelivered(code);
     } catch (e) {
       return i.reply({ content: '❌ Could not update order: ' + (e?.message || e), flags: EPH });
     }
@@ -9011,31 +9021,10 @@ async function handleTicketModal(i) {
     return i.reply({ content: '✅ This order was already delivered. The code no longer works.', flags: EPH });
   }
 
-  // Auto-role delivery: grant immediately, confirm by DM, and never open a ticket on success.
-  if (order.type === 'role' && order.roleId) {
-    try {
-      const member = await i.guild.members.fetch(i.user.id);
-      await member.roles.add(order.roleId, `Shop order ${order.code}`);
-      try {
-        shop.markDelivered(order.code);
-      } catch (markErr) {
-        console.error('[ticket] role markDelivered', markErr?.message || markErr);
-      }
-      const confirmText =
-        `✅ **Role added**\n` +
-        `The role **${order.rewardName}** has been added to your account.\n` +
-        `Order code: \`${order.code}\``;
-      try {
-        await i.user.send({ content: confirmText });
-      } catch (dmErr) {
-        console.error('[ticket] role DM', dmErr?.message || dmErr);
-      }
-      // Always reply ephemerally too, so the confirmation is visible even if the DM failed.
-      return i.reply({ content: confirmText, flags: EPH });
-    } catch (e) {
-      console.error('[ticket] role', e?.message || e);
-      // fall through to create ticket if role grant failed
-    }
+  // Role rewards are delivered instantly by the website with NO order code.
+  // Any legacy role order must never open a ticket (that used to duplicate channels/messages/roles).
+  if (order.type === 'role') {
+    return i.reply({ content: '✅ Role rewards are added automatically when purchased on the site. No ticket or order code is needed.', flags: EPH });
   }
 
   const cfg = shop.getTicketCfg(i.guild.id) || {};
@@ -9047,6 +9036,14 @@ async function handleTicketModal(i) {
     .replace(/^-+|-+$/g, '')
     .slice(0, 80) || 'reward';
   const base = `${slugName}-${order.code}`.toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 90);
+
+  // Idempotency: never create a second ticket for the same order code, even if
+  // the modal is submitted twice or two bot processes see the same interaction.
+  const topicTag = `Order ${order.code} ·`;
+  const existing = i.guild.channels.cache.find((c) => c.type === ChannelType.GuildText && String(c.topic || '').startsWith(topicTag));
+  if (existing) {
+    return i.reply({ content: `✅ Ticket already opened in #${existing.name} — ${existing}`, flags: EPH });
+  }
 
   let ch;
   try {
@@ -9162,10 +9159,8 @@ async function handleSlashCommand(i) {
         return i.reply({ ...(await buildInvitesPayload(i.guild, targetId)), flags: EPH });
       }
       case 'casino':
-      case 'jeux': {
-        await i.channel.send(buildPanelPayload());
-        return i.reply({ content: '✅ Game panel posted.', flags: EPH });
-      }
+      case 'jeux':
+        return i.reply({ content: '🎮 Casino games are now available on the website only: open the site and go to Accueil. This command has been removed from Discord.', flags: EPH });
       case 'setup':
       case 'salon':
         return cmdSetup(msg);
@@ -9222,8 +9217,6 @@ async function registerSlashCommands() {
         .setName('invites')
         .setDescription('Invite statistics (owner)')
         .addUserOption((o) => o.setName('membre').setDescription('Member (default: you)')),
-      new SlashCommandBuilder().setName('casino').setDescription('Posts the game panel (owner)'),
-      new SlashCommandBuilder().setName('jeux').setDescription('Alias of /casino'),
       new SlashCommandBuilder().setName('setup').setDescription('Configures the casino channels (owner)'),
       new SlashCommandBuilder().setName('salon').setDescription('Alias of /setup'),
       new SlashCommandBuilder().setName('wins').setDescription('Creates the wins channel (owner)'),
