@@ -389,6 +389,38 @@ function create(file, supabase) {
     return changes;
   }
 
+  /**
+   * Ranked blackjack: RR is already won/lost per player by the table (each hand
+   * against the dealer). This only tracks stats + placement — no ELO
+   * redistribution, so the biggest hand never takes the other players' RR.
+   * players: [{ uid, name, net, outcome }]
+   */
+  function recordBlackjack(players, avatarOf) {
+    ensureSeason();
+    const list = (players || []).filter((p) => p && p.uid);
+    const changes = [];
+    for (const p of list) {
+      const u = get(String(p.uid), p.name, (avatarOf && avatarOf(String(p.uid))) || p.avatar);
+      const before = u.elo;
+      const net = Number(p.net) || 0;
+      u.eg = (u.eg || 0) + 1;
+      if (net > 0) u.w = (u.w || 0) + 1;
+      else if (net < 0) u.l = (u.l || 0) + 1;
+      // Le placement sert seulement à masquer les RR le temps des premières manches.
+      if ((u.place || 0) < PLACEMENT_N) u.place = (u.place || 0) + 1;
+      changes.push({
+        uid: String(p.uid),
+        name: p.name || u.n,
+        net,
+        delta: Math.round(u.elo - before),
+        elo: Math.round(u.elo),
+        placementLeft: Math.max(0, PLACEMENT_N - (u.place || 0)),
+      });
+    }
+    if (list.length) save(list.map((p) => String(p.uid)));
+    return changes;
+  }
+
   /** legacy cash tables : n'affecte plus le RR ranked */
   function record() {
     /* no-op pour poker/bj/roulette cash */
@@ -495,6 +527,7 @@ function create(file, supabase) {
     info,
     record,
     recordRanked,
+    recordBlackjack,
     view,
     touch: (uid, name, avatar) => {
       if (users[uid]) {

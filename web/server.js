@@ -533,15 +533,14 @@ function init(deps) {
       minBet: 1,
       stats: statsApi,
       onRoundEnd: (r) => {
-        // Rank by net profit and record RR/ELO only for the ranked table.
+        // Chaque joueur gagne/perd ses propres RR contre le croupier (déjà fait
+        // par la table). On enregistre seulement ses stats — aucune
+        // redistribution ELO : la plus grosse main ne prend pas le RR des autres.
         try {
           const players = ((r && r.players) || [])
             .filter((p) => p && p.uid)
-            .map((p) => ({ uid: String(p.uid), name: p.name, avatar: avatarMap.get(String(p.uid)) || '', net: Number(p.net) || 0 }))
-            .sort((a, b) => b.net - a.net);
-          if (players.length >= 2) {
-            rankApi.recordRanked(players.map((p, i) => ({ ...p, place: i + 1 })), (uid) => avatarMap.get(uid));
-          }
+            .map((p) => ({ uid: String(p.uid), name: p.name, avatar: avatarMap.get(String(p.uid)) || '', net: Number(p.net) || 0, outcome: p.outcome }));
+          if (players.length) rankApi.recordBlackjack(players, (uid) => avatarMap.get(uid));
         } catch (e) { console.error('[web] ranked rr', e?.message || e); }
         try { roundEnd(guildId, { ...(r || {}), game: 'ranked' }); }
         catch (e) { console.error('[web] ranked roundEnd', e?.message || e); }
@@ -896,7 +895,8 @@ function init(deps) {
           const o = otherSeat(entry.bjs, user.uid, tid, entry.ranked);
           if (o) throw new Error(`You are already seated at table ${o}: leave it first.`);
           const seat = Number(d.seat);
-          const bal = await deps.getBalance(user.uid);
+          // Use the table's own currency: RR on the ranked table, ZTKN on cash tables.
+          const bal = await room.deps.getBalance(user.uid);
           await room.run(async () => room.sit(user, seat, bal));
           break;
         }
@@ -924,7 +924,7 @@ function init(deps) {
         case 'sync': {
           const i = room.findSeat(user.uid);
           if (i >= 0) {
-            room.seats[i].bal = await deps.getBalance(user.uid);
+            room.seats[i].bal = await room.deps.getBalance(user.uid);
             room.emit();
           }
           break;
