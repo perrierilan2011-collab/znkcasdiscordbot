@@ -52,11 +52,12 @@ header{display:flex;align-items:center;gap:10px;padding:8px 14px;background:#000
 .gcard:disabled{cursor:not-allowed;opacity:.55;filter:none}
 .gcard:disabled .gplay{background:#262626;color:#a3a3a3}
 /* catégorie RANKED, tout en haut de l'accueil */
-.cat-ranked{padding:18px;border-radius:18px;border:1px solid rgba(251,191,36,.55);background:radial-gradient(900px 180px at 50% -30%,rgba(251,191,36,.18),transparent 70%),linear-gradient(180deg,#0c0a04,#050505);box-shadow:0 18px 55px rgba(0,0,0,.75),inset 0 0 0 1px rgba(255,255,255,.03)}
+/* ranked : aucun grand rectangle, juste le petit badge jaune */
+.cat-ranked{padding:0;border:0;background:none;box-shadow:none}
 .cat-ranked h2{color:#fde68a;letter-spacing:.16em;font-size:17px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 .rkcat-tag{font-size:10px;letter-spacing:.12em;color:#000;background:var(--gold);padding:4px 8px;border-radius:999px;font-weight:900}
-.cat-ranked .gcard.ranked{border-color:rgba(251,191,36,.65);background:linear-gradient(135deg,rgba(251,191,36,.12),#080808 60%);box-shadow:inset 0 0 35px rgba(251,191,36,.06)}
-.cat-ranked .gcard.ranked:hover{border-color:#fde68a;background:linear-gradient(135deg,rgba(251,191,36,.2),#0b0b0b 60%)}
+.cat-ranked .gcard.ranked{border-color:#262626;background:#0a0a0a;box-shadow:none}
+.cat-ranked .gcard.ranked:hover{border-color:#737373;background:#111}
 .cat-ranked .gcard.ranked .gplay{background:var(--gold);color:#000}
 /* bandeau Ranked Blackjack (affiché seulement sur la table ranked) */
 #bjRankedTag{display:none;align-items:center;gap:12px;justify-content:center;flex-wrap:wrap;width:100%;padding:8px 14px;border-radius:10px;border:1px solid var(--gold);background:linear-gradient(90deg,rgba(251,191,36,.16),rgba(251,191,36,.03));color:#fde68a;font-weight:900;letter-spacing:.14em;font-size:13px}
@@ -278,6 +279,12 @@ th{color:var(--mut);font-size:12px}
   #ofView.has-lb{display:grid;grid-template-columns:280px minmax(0,1fr);align-items:start;justify-items:center;gap:14px;padding:10px 14px 56px}
   #ofView.has-lb>.glb{grid-column:1;grid-row:1;margin:0;width:100%;max-width:none;position:sticky;top:10px}
   #ofView.has-lb>.ofplay{grid-column:2;grid-row:1;max-width:900px}
+}
+/* mobile/tablette : le classement des meilleurs gains reste SOUS le jeu */
+@media(max-width:1099px){
+  #ofView.has-lb{flex-direction:column}
+  #ofView.has-lb>.ofplay{order:1}
+  #ofView.has-lb>.glb{order:2;margin:14px 0 0;position:static}
 }
 /* ---------- ADMIN ---------- */
 #adminView{align-items:center;padding:24px 16px 64px;overflow:auto}
@@ -698,8 +705,17 @@ svg.ic{display:block;flex:none}
 /* ---------- chat en direct ---------- */
 main{padding-bottom:56px!important}
 #chat{position:fixed;right:12px;bottom:12px;width:330px;max-width:calc(100vw - 24px);z-index:15;background:#0a0a0a;border:1px solid #333;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.6)}
-#chatHead{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px;font-weight:700;cursor:pointer;user-select:none}
-#chatBadge{background:#fff;color:#000;border-radius:999px;font-size:11px;font-weight:800;padding:1px 7px}
+#chatHead{display:flex;align-items:center;gap:8px;padding:10px 12px;font-weight:700;cursor:pointer;user-select:none}
+#chatIcon{display:grid;place-items:center;color:var(--gold);flex:none}
+#chatIcon svg{width:16px;height:16px}
+#chatTitle{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#chatBadge{background:#fff;color:#000;border-radius:999px;font-size:11px;font-weight:800;padding:1px 7px;flex:none}
+#chatClose{flex:none;width:26px;height:26px;display:grid;place-items:center;border-radius:8px;background:#1b1b1b;color:#c9c9c9;font-size:14px;line-height:1;font-weight:800}
+#chatClose:hover{background:#333;color:#fff}
+#chat:not(.open) #chatClose,#chat:not(.open) #chatTitle{display:none}
+#chat:not(.open) #chatIcon svg{width:22px;height:22px}
+.crk{font-size:11px;font-weight:900;margin-left:5px;white-space:nowrap}
+.crk.t1{color:#fbbf24}.crk.t2{color:#d4d4d4}.crk.t3{color:#c2763a}
 #chatBody{display:none;flex-direction:column;border-top:1px solid #262626}
 #chat.open #chatBody{display:flex}
 #chat:not(.open){width:auto;background:none;border:0;box-shadow:none;border-radius:50%}
@@ -3396,7 +3412,7 @@ const RK_TAU = Math.PI * 2;
 function rocBind() {
   if (ROC.bound) return; ROC.bound = true;
   $('#rocketJoin').onclick = async () => { ac(); if (!ROC.joined) { ROC.joined = true; await send('rzjoin'); } };
-  $('#rocketBet').onclick = async () => { ac(); const v = parseAmt($('#rocketAmt').value, rMe() ? rMe().bal : null); if (!v) return toast('Entre un montant.'); await send('rzbet', { amount: v }); };
+  $('#rocketBet').onclick = async () => { ac(); const v = parseAmt($('#rocketAmt').value, rocMe() ? rocMe().bal : null); if (!v) return toast('Entre un montant.'); await send('rzbet', { amount: v }); };
   $('#rocketClear').onclick = () => { ac(); send('rzclear'); };
   $('#rocketGo').onclick = () => { ac(); send('rzgo'); };
   $('#rocketLeave').onclick = async () => { ac(); await send('rzleave'); ROC.joined = false; };
@@ -3405,13 +3421,15 @@ function rocBind() {
   window.addEventListener('resize', fit); fit();
 }
 function rocOnHello(d) {
+  const wasHere = ROC.joined || W.view === 'rocket';
   ROC.info = d.rocket || RK_INFO; RK_INFO = ROC.info || RK_INFO;
   ROC.joined = false;
   const amt = $('#rocketAmt'); if (!amt.value) amt.value = String(RK_INFO.min || 1);
   $('#rocketCoin').textContent = COIN;
-  const sh = RK_INFO.shares || null;
   $('#rocketOdds').textContent = 'Pot redistribué au classement · commission ' + Math.round((RK_INFO.houseEdge || .05) * 100) + ' % · mise ' + num(RK_INFO.min) + ' – ' + num(RK_INFO.max) + ' ' + COIN;
   rocBind(); updHub();
+  // reconnexion : on se réinscrit automatiquement à la course
+  if (wasHere) rocEnter();
 }
 function rocEnter() {
   rocBind();
@@ -3440,7 +3458,7 @@ function rocRender(st) {
   for (const p of order) {
     const row = el('div', 'rpl' + (me && p.uid === me.uid ? ' me' : ''));
     const av = el('div', 'av2'); setAvatar(av, p.avatar, p.name);
-    const mid = el('div', 'nm'); mid.append(document.createTextNode(p.name), el('small', '', p.bet > 0 ? num(p.bet) + ' ' + COIN : 'Observe'));
+    const mid = el('div', 'nm'); mid.append(document.createTextNode(noEmo(p.name)), el('small', '', p.bet > 0 ? num(p.bet) + ' ' + COIN : 'Observe'));
     const rk = el('div', 'rk', p.rank ? '#' + p.rank : (p.bet > 0 ? '🟢' : '—'));
     row.append(av, mid, rk); box.append(row);
   }
@@ -3461,7 +3479,7 @@ function rocRender(st) {
   if (ph === 'result' && st.result && ROC.shownRound !== st.round) {
     ROC.shownRound = st.round;
     const top = st.result.ranking[0]; const w = st.players.find((p) => p.uid === top);
-    winEl.replaceChildren(document.createTextNode('🏆 ' + (w ? w.name : 'Gagnant') + ' gagne !'));
+    winEl.replaceChildren(document.createTextNode('🏆 ' + (w ? noEmo(w.name) : 'Gagnant') + ' gagne !'));
     if (w && w.net != null) winEl.append(el('small', '', (w.net > 0 ? '+' : '') + num(w.net) + ' ' + COIN));
     winEl.classList.add('on'); if (mine && mine.net != null) mine.net > 0 ? SFX.win() : SFX.lose();
   } else if (ph !== 'result') { winEl.classList.remove('on'); }
@@ -3482,6 +3500,7 @@ function rocStars() {
   ROC.stars = Array.from({ length: 130 }, () => ({ x: rnd(), y: rnd(), r: .4 + rnd() * 1.5, a: .25 + rnd() * .75, tw: rnd() * RK_TAU }));
   return ROC.stars;
 }
+let gr;
 function rocDraw() {
   const cv = $('#rocketCanvas'); if (!cv) return;
   const b = cv.getBoundingClientRect(), w = Math.max(1, Math.round(b.width)), h = Math.max(1, Math.round(b.height));
@@ -3553,11 +3572,10 @@ function rocDraw() {
       if (u >= 1) { g.strokeStyle = 'rgba(255,255,255,.35)'; g.lineWidth = 1; g.beginPath(); g.arc(x, y, 12 + Math.sin(t / 200) * 2, 0, RK_TAU); g.stroke(); }
       // pseudo au-dessus
       g.font = '700 11px system-ui,sans-serif'; g.textAlign = 'center'; g.fillStyle = '#fff';
-      g.shadowColor = '#000'; g.shadowBlur = 4; g.fillText(String(ln.name || '').slice(0, 16), x, y - 14); g.shadowBlur = 0;
+      g.shadowColor = '#000'; g.shadowBlur = 4; g.fillText(noEmo(String(ln.name || '')).slice(0, 16), x, y - 14); g.shadowBlur = 0;
     }
   }
 }
-let gr;
 function rocLoop() { if (W.view === 'rocket' && ROC.info) rocDraw(); requestAnimationFrame(rocLoop); }
 rocBind(); requestAnimationFrame(rocLoop);
 
