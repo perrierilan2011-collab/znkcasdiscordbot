@@ -55,7 +55,6 @@ header{display:flex;align-items:center;gap:10px;padding:8px 14px;background:#000
 .cat-ranked{padding:18px;border-radius:18px;border:1px solid rgba(251,191,36,.55);background:radial-gradient(900px 180px at 50% -30%,rgba(251,191,36,.18),transparent 70%),linear-gradient(180deg,#0c0a04,#050505);box-shadow:0 18px 55px rgba(0,0,0,.75),inset 0 0 0 1px rgba(255,255,255,.03)}
 .cat-ranked h2{color:#fde68a;letter-spacing:.16em;font-size:17px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 .rkcat-tag{font-size:10px;letter-spacing:.12em;color:#000;background:var(--gold);padding:4px 8px;border-radius:999px;font-weight:900}
-.cat-ranked .catd{color:#d6cba9}
 .cat-ranked .gcard.ranked{border-color:rgba(251,191,36,.65);background:linear-gradient(135deg,rgba(251,191,36,.12),#080808 60%);box-shadow:inset 0 0 35px rgba(251,191,36,.06)}
 .cat-ranked .gcard.ranked:hover{border-color:#fde68a;background:linear-gradient(135deg,rgba(251,191,36,.2),#0b0b0b 60%)}
 .cat-ranked .gcard.ranked .gplay{background:var(--gold);color:#000}
@@ -264,8 +263,8 @@ th{color:var(--mut);font-size:12px}
 .lbnone{color:var(--mut);text-align:center;padding:26px 12px;font-size:13px}
 @media(max-width:600px){#topView{padding:16px 8px 64px}.lbgrid{gap:8px}.lbtitle{padding:10px}.lbtitle b{font-size:14px}.lbtitle small{display:none}
   .lbrow{grid-template-columns:24px minmax(0,1fr);gap:2px 8px;padding:8px 10px}.lbrk{width:22px;height:22px;font-size:11px}.lbval{grid-column:2;font-size:12px}}
-/* ---------- CLASSEMENT PAR JEU (bas de chaque jeu) ---------- */
-.glb{margin:18px auto 8px;max-width:760px;background:#0a0a0a;border:1px solid #262626;border-radius:14px;overflow:hidden}
+/* ---------- CLASSEMENT « PLUS GROS GAINS ALL-TIME » (jeux solo uniquement) ---------- */
+.glb{margin:18px auto 8px;width:100%;max-width:760px;background:#0a0a0a;border:1px solid #262626;border-radius:14px;overflow:hidden}
 .glb .lbtitle{padding:10px 14px}
 .glb .lbtitle b{font-size:14px}
 .glb .lbtitle small{font-size:11px}
@@ -274,6 +273,12 @@ th{color:var(--mut);font-size:12px}
 .glbbody .lbval small{display:block;text-align:right;color:var(--mut);font-size:10px}
 .glbbody .lbnone{padding:16px 12px}
 @media(max-width:600px){.glbbody .lbrow{grid-template-columns:24px minmax(0,1fr) auto}.glbbody .lbsub{display:none}.glbbody .lbval small{display:none}}
+/* sur PC, le classement passe à gauche de la table de jeu solo */
+@media(min-width:1100px){
+  #ofView.has-lb{display:grid;grid-template-columns:280px minmax(0,1fr);align-items:start;justify-items:center;gap:14px;padding:10px 14px 56px}
+  #ofView.has-lb>.glb{grid-column:1;grid-row:1;margin:0;width:100%;max-width:none;position:sticky;top:10px}
+  #ofView.has-lb>.ofplay{grid-column:2;grid-row:1;max-width:900px}
+}
 /* ---------- ADMIN ---------- */
 #adminView{align-items:center;padding:24px 16px 64px;overflow:auto}
 .adwrap{width:100%;max-width:760px;display:flex;flex-direction:column;gap:14px}
@@ -443,6 +448,7 @@ th{color:var(--mut);font-size:12px}
 @media(prefers-reduced-motion:reduce){.rc.win{animation:none}#rBigBox{transform:none}}
 /* ---------- jeux offline (solo) : même tapis que les tables online ---------- */
 #ofView{flex:1;align-items:center;padding:10px 10px 56px;gap:10px;overflow:auto}
+.ofplay{width:100%;min-width:0;display:flex;flex-direction:column;align-items:center;gap:10px}
 .ftable.of{width:100%;max-width:900px;flex:none;min-height:0;justify-content:flex-start;align-items:stretch;gap:12px;padding:16px 16px 22px}
 .ftable.of>*{position:relative;z-index:1}
 .ftable.of>.shoe{position:absolute;right:4%;top:56px;z-index:1}
@@ -938,7 +944,6 @@ header .sp{flex:1 1 0}
 <main id="hubView">
   <section class="cat cat-ranked" id="catRanked">
     <h2>🏆 RANKED <span class="rkcat-tag">BLACKJACK CLASSÉ</span></h2>
-    <p class="catd">La table de compétition. Tu mises tes <b>RR</b> (pas tes ZTKN). Chaque manche fait évoluer ton classement.</p>
     <div class="games">
       <button class="gcard ranked" data-go="ranked" id="gcRanked">
         <span class="gname">Ranked Blackjack</span>
@@ -1510,7 +1515,7 @@ create table if not exists roulette_event_results (
     <div class="row"><button class="btn" id="pkLeave" style="display:none;padding:6px 12px;font-size:12px">Quitter la table</button></div>
   </section>
 </main>
-<main id="ofView" class="hide"><section class="ftable of" id="ofTable"></section><section class="dockp" id="ofDock"></section></main>
+<main id="ofView" class="hide"><div class="ofplay"><section class="ftable of" id="ofTable"></section><section class="dockp" id="ofDock"></section></div></main>
 <main id="rlView" class="hide">
   <div id="rGrid">
     <div id="rMain">
@@ -2639,9 +2644,8 @@ function navHighlight(v) {
   }
 }
 
-// ---- classement « plus gros gain en une fois » en bas de chaque jeu ----
+// ---- classement « plus gros gains all-time » : jeux solo uniquement, à gauche sur PC ----
 const LB_GAME_KEY = {
-  bj: 'blackjack', ranked: 'ranked', poker: 'poker', roulette: 'roulette',
   'off-bj': 'bj-solo', 'off-fuse': 'fuse', 'off-mine': 'mines', 'off-coin': 'coin',
   'off-dice': 'dice', 'off-horses': 'horses', 'off-russian': 'russian', 'off-slots': 'slots',
   'off-duel': 'duel', 'off-plinko': 'plinko', 'off-scratch': 'scratch',
@@ -2649,22 +2653,19 @@ const LB_GAME_KEY = {
   'off-heist': 'heist', 'off-orbit': 'orbit', 'off-cards': 'cards', 'off-rocket': 'rocket',
   'off-cannon': 'cannon', 'off-jewels': 'jewels',
 };
-const LB_HOST = { bj: '#bjView', ranked: '#bjView', poker: '#pkView', roulette: '#rlView' };
 function ensureGameLB() {
-  ['#bjView', '#pkView', '#rlView', '#ofView'].forEach((sel) => {
-    const host = $(sel);
-    if (!host || host.querySelector(':scope > .glb')) return;
-    const sec = el('section', 'glb');
-    sec.append(el('div', 'lbtitle'));
-    const t = sec.firstChild;
-    t.append(el('b', '', '🏆 Top 10 · plus gros gain'), el('small', '', 'Plus gros gain remporté en une seule fois'));
-    const body = el('div', 'glbbody'); body.append(el('div', 'lbnone', '…'));
-    sec.append(body); host.append(sec);
-  });
+  const host = $('#ofView');
+  if (!host || host.querySelector(':scope > .glb')) return;
+  const sec = el('section', 'glb');
+  sec.append(el('div', 'lbtitle'));
+  const t = sec.firstChild;
+  t.append(el('b', '', '🏆 Top 10 · plus gros gains all-time'), el('small', '', 'Plus gros gain remporté en une seule fois'));
+  const body = el('div', 'glbbody'); body.append(el('div', 'lbnone', '…'));
+  sec.append(body); host.append(sec);
+  host.classList.add('has-lb');
 }
-function lbFillGame(view, top) {
-  const host = $(LB_HOST[view] || '#ofView');
-  const body = host && host.querySelector(':scope > .glb .glbbody');
+function lbFillGame(top) {
+  const body = $('#ofView')?.querySelector(':scope > .glb .glbbody');
   if (!body) return;
   const rows = Array.isArray(top) ? top : [];
   if (!rows.length) { body.replaceChildren(el('div', 'lbnone', 'Aucune partie enregistrée pour ce jeu.')); return; }
@@ -2680,12 +2681,11 @@ async function loadGameLB(view) {
   const key = LB_GAME_KEY[view];
   if (!key) return;
   ensureGameLB();
-  const host = $(LB_HOST[view] || '#ofView');
-  const body = host && host.querySelector(':scope > .glb .glbbody');
+  const body = $('#ofView')?.querySelector(':scope > .glb .glbbody');
   if (body) body.replaceChildren(el('div', 'lbnone', 'Chargement…'));
   try {
     const d = await (await fetch('/api/game-top?game=' + encodeURIComponent(key), { cache: 'no-store' })).json();
-    lbFillGame(view, d && d.top);
+    lbFillGame(d && d.top);
   } catch { if (body) body.replaceChildren(el('div', 'lbnone', 'Classement indisponible.')); }
 }
 
