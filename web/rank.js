@@ -512,6 +512,7 @@ function create(file, supabase) {
       return LADDER;
     },
     RR_START,
+    RR_FLOOR,
     PLACEMENT_N,
   };
 }

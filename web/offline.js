@@ -18,8 +18,10 @@ const CELLS = 25; // mines : grille 5x5
 const RATE = 0.00012; // fusé : le multiplicateur vaut exp(RATE * ms)
 const LEAD_MS = 900; // fusé : délai avant décollage
 const MAX_CRASH = 10000;
-const TYPES = { mines: 'mines', fuse: 'fuse', bj: 'bj', coin: 'coin', dice: 'dice', horses: 'horses', russian: 'russian', slots: 'slots', duel: 'duel', scratch: 'scratch', plinko: 'plinko' };
-const INSTANT = new Set(['coin', 'dice', 'horses', 'russian', 'slots', 'duel', 'plinko']); // jeux « un coup » : résolus d'un coup côté serveur, animés côté site
+const TYPES = { mines: 'mines', fuse: 'fuse', bj: 'bj', coin: 'coin', dice: 'dice', horses: 'horses', russian: 'russian', slots: 'slots', duel: 'duel', scratch: 'scratch', plinko: 'plinko',
+  lucky7: 'lucky7', bubbles: 'bubbles', frozen: 'frozen', candy: 'candy', heist: 'heist', orbit: 'orbit', cards: 'cards', rocket: 'rocket', cannon: 'cannon', jewels: 'jewels' };
+const INSTANT = new Set(['coin', 'dice', 'horses', 'russian', 'slots', 'duel', 'plinko',
+  'lucky7', 'bubbles', 'frozen', 'candy', 'heist', 'orbit', 'cards', 'rocket', 'cannon', 'jewels']); // jeux « un coup » : résolus d'un coup côté serveur, animés côté site
 const COIN_MULT = 1.95;
 const DICE_MULT = { under: 2.3, over: 2.3, seven: 5.8 };
 const HORSES = [{ p: 0.4, mult: 2.4 }, { p: 0.25, mult: 3.8 }, { p: 0.18, mult: 5.3 }, { p: 0.11, mult: 8.6 }, { p: 0.06, mult: 15.8 }];
@@ -54,6 +56,26 @@ const MINES_EDGE = 0.94; // mines : retour joueur ~94 % (un peu moins que les au
 const minesMult = (m, k) => { let r = MINES_EDGE; for (let i = 0; i < k; i++) r *= (CELLS - i) / (CELLS - m - i); return r; };
 const round2 = (x) => Math.floor(x * 100) / 100;
 const russianMult = (k) => round2((0.96 * 6) / (6 - k));
+
+// ---- 10 nouveaux jeux solo (tirages serveur, animations côté site)
+const NEW_GAMES = {
+  lucky7: { label: 'Lucky 7', values: [0, 0, 0.5, 0, 0, 0, 9.2, 0, 0, 1.8] },
+  bubbles: { safe: [0, 0.3, 0.6, 1.1, 0.4, 0.2, 0, 3.6], risky: [0, 0, 0, 0.8, 0, 0, 0, 7.4] },
+  frozen: [0, 0, 0.4, 1.1, 2.6, 6.2],
+  candy: { cherry: 2.1, lemon: 3.2, mint: 5.1, berry: 9.4, gold: 22 },
+  heist: [[0.4, 0.8, 1.3, 2.2], [0.3, 0.6, 3.8, 1.1], [0.2, 5.6, 0.5, 0.9], [0.1, 0.3, 0.7, 12.5]],
+  orbit: { inner: [8.2, 0.2, 0.4, 0.1], mid: [0.3, 3.4, 0.6, 0.2], outer: [0.1, 0.3, 1.9, 0.5] },
+  cards: { '♠': 2.4, '♥': 2.4, '♦': 3.6, '♣': 4.8 },
+  rocket: [{ p: 0.4, m: 2.35 }, { p: 0.27, m: 3.5 }, { p: 0.2, m: 4.7 }, { p: 0.13, m: 7.1 }],
+  cannon: { center: [12, 0.2, 0.4], ring: [0.2, 3.8, 0.6], edge: [0.1, 0.3, 1.7] },
+  jewels: { 1: 0.2, 2: 0.5, 3: 1.4, 4: 3.8, 5: 11.5 },
+};
+const pickWeighted = (arr) => {
+  const total = arr.reduce((a, b) => a + Math.max(0, Number(b) || 0), 0);
+  let r = randomInt(1_000_000) / 1_000_000 * total;
+  for (let i = 0; i < arr.length; i++) { r -= Math.max(0, Number(arr[i]) || 0); if (r < 0) return i; }
+  return arr.length - 1;
+};
 // tirage d'un jeu « un coup » (le choix du joueur est validé AVANT le débit)
 function rollInstant(g) {
   if (g.type === 'coin') {
@@ -96,6 +118,62 @@ function rollInstant(g) {
     if (!Number.isInteger(f) || f < 0 || f >= FOES.length) throw new Error('Adversaire invalide.');
     const won = randomInt(1_000_000) / 1_000_000 < FOES[f].p, fast = 170 + randomInt(110), slow = fast + 30 + randomInt(90);
     g.foe = f; g.me = won ? fast : slow; g.foeMs = won ? slow : fast; g.mult = won ? FOES[f].mult : 0;
+  } else if (g.type === 'lucky7') {
+    const pick = Number(g.choice);
+    if (!Number.isInteger(pick) || pick < 0 || pick > 9) throw new Error('Choisis un chiffre de 0 à 9.');
+    const reel = Array.from({ length: 3 }, () => pickWeighted(NEW_GAMES.lucky7.values));
+    const hits = reel.filter((v) => v === pick).length;
+    g.pick = pick; g.reel = reel; g.hits = hits;
+    g.mult = hits === 3 ? 9.2 : hits === 2 ? 1.8 : hits === 1 && pick === 7 ? 1.2 : 0;
+  } else if (g.type === 'bubbles') {
+    const mode = g.choice === 'risky' ? 'risky' : 'safe';
+    const arr = NEW_GAMES.bubbles[mode];
+    const hit = pickWeighted(arr.map((v, i) => (v > 0 ? i === 7 ? 80 : Math.round(v * 100) : 1)));
+    g.mode = mode; g.bubbles = shuffle(Array.from({ length: 8 }, (_, i) => i)); g.hit = hit;
+    g.mult = arr[hit] || 0;
+  } else if (g.type === 'frozen') {
+    const pick = Number(g.choice);
+    if (!Number.isInteger(pick) || pick < 0 || pick > 5) throw new Error('Choisis une tuile de 1 à 6.');
+    const tiles = shuffle(NEW_GAMES.frozen.slice());
+    g.pick = pick; g.tiles = tiles; g.value = tiles[pick]; g.mult = tiles[pick];
+  } else if (g.type === 'candy') {
+    const keys = Object.keys(NEW_GAMES.candy);
+    if (!keys.includes(g.choice)) throw new Error('Bonbon invalide.');
+    const wheel = keys.flatMap((k, i) => Array(i + 1).fill(k));
+    const landed = wheel[pickWeighted(wheel.map((k) => 7 - keys.indexOf(k)))];
+    g.pick = g.choice; g.landed = landed; g.mult = landed === g.choice ? NEW_GAMES.candy[landed] : 0;
+  } else if (g.type === 'heist') {
+    const pick = Number(g.choice) - 1;
+    if (!Number.isInteger(pick) || pick < 0 || pick > 3) throw new Error('Choisis un coffre de 1 à 4.');
+    const vaults = shuffle(NEW_GAMES.heist.slice());
+    g.vaults = vaults.map((v) => shuffle(v.slice())); g.pick = pick; g.value = g.vaults[pick][0]; g.mult = g.value;
+  } else if (g.type === 'orbit') {
+    const ring = ['inner', 'mid', 'outer'].includes(g.choice) ? g.choice : 'mid';
+    const lands = pickWeighted(NEW_GAMES.orbit[ring]);
+    g.ring = ring; g.land = lands; g.mult = NEW_GAMES.orbit[ring][lands];
+  } else if (g.type === 'cards') {
+    if (!NEW_GAMES.cards[g.choice]) throw new Error('Choisis une couleur.');
+    const suits = Object.keys(NEW_GAMES.cards);
+    g.pick = g.choice; g.cards = Array.from({ length: 3 }, () => suits[pickWeighted(suits.map((s, i) => 5 - i))]);
+    g.matches = g.cards.filter((s) => s === g.pick).length;
+    g.mult = g.matches === 3 ? NEW_GAMES.cards[g.pick] : g.matches === 2 ? round2(NEW_GAMES.cards[g.pick] / 4) : 0;
+  } else if (g.type === 'rocket') {
+    const pick = Number(g.choice) - 1;
+    if (!Number.isInteger(pick) || pick < 0 || pick > 3) throw new Error('Choisis une fusée de 1 à 4.');
+    const winner = pickWeighted(NEW_GAMES.rocket.map((r) => r.p * 100));
+    const order = shuffle([0, 1, 2, 3].filter((i) => i !== winner));
+    g.pick = pick; g.winner = winner; g.order = [winner, ...order]; g.mult = winner === pick ? NEW_GAMES.rocket[pick].m : 0;
+  } else if (g.type === 'cannon') {
+    const zone = ['center', 'ring', 'edge'].includes(g.choice) ? g.choice : 'center';
+    const hit = pickWeighted(NEW_GAMES.cannon[zone]);
+    g.zone = zone; g.hit = hit; g.mult = NEW_GAMES.cannon[zone][hit];
+  } else if (g.type === 'jewels') {
+    const pick = Number(g.choice);
+    if (!Number.isInteger(pick) || pick < 1 || pick > 5) throw new Error('Choisis un joyau de 1 à 5.');
+    const gems = Object.keys(NEW_GAMES.jewels);
+    g.pick = pick; g.grid = Array.from({ length: 25 }, () => gems[pickWeighted(gems.map((s, i) => 5 - i))]);
+    g.count = g.grid.filter((v) => Number(v) === pick).length;
+    g.mult = g.count >= 8 ? NEW_GAMES.jewels[pick] : g.count >= 5 ? round2(NEW_GAMES.jewels[pick] / 4) : 0;
   } else {
     const k = Number(g.choice);
     if (!Number.isInteger(k) || k < 1 || k > 5) throw new Error('Nombre de balles invalide (1 à 5).');
@@ -136,7 +214,8 @@ function create(deps, pending) {
     if (net > 0 && deps.onRoundEnd) {
       const detail = g.type === 'mines' ? `${g.picks.length} case(s) · ${g.m} mine(s)` : g.type === 'fuse' ? `encaissé à ${g.at}x`
         : g.type === 'coin' ? NAMES[g.side] : g.type === 'dice' ? `${g.a}+${g.b}=${g.sum} (${NAMES[g.choice]})`
-        : g.type === 'horses' ? `cheval n°${g.winner + 1}` : g.type === 'slots' ? `x${g.mult}` : g.type === 'duel' ? FOES[g.foe].n : g.type === 'scratch' ? `ticket x${g.mult}` : g.type === 'plinko' ? `${g.n} bille${g.n > 1 ? 's' : ''} · x${round2(g.mult)}` : g.type === 'russian' ? `${g.k} balle${g.k > 1 ? 's' : ''}, survécu` : g.outcome === 'bj' ? 'BLACKJACK' : '';
+        : g.type === 'horses' ? `cheval n°${g.winner + 1}` : g.type === 'slots' ? `x${g.mult}` : g.type === 'duel' ? FOES[g.foe].n : g.type === 'scratch' ? `ticket x${g.mult}` : g.type === 'plinko' ? `${g.n} bille${g.n > 1 ? 's' : ''} · x${round2(g.mult)}` : g.type === 'russian' ? `${g.k} balle${g.k > 1 ? 's' : ''}, survécu`
+          : NEW_GAMES[g.type] ? `${g.type} · x${round2(g.mult)}` : g.outcome === 'bj' ? 'BLACKJACK' : '';
       try {
         deps.onRoundEnd(u.guildId, { game: g.type === 'bj' ? 'bj-solo' : g.type, players: [{ uid: u.uid, name: u.name, bet: stake, win: g.win, net, mult: floor2(g.win / stake), detail }] });
       } catch (e) { console.error('[offline] recap', e?.message || e); }
@@ -157,6 +236,16 @@ function create(deps, pending) {
     slots: (g) => ({ type: 'slots', bet: g.bet, grid: g.grid, wins: g.wins, mult: g.mult, over: true, win: g.win || 0, outcome: g.win > 0 ? 'win' : 'lose' }),
     plinko: (g) => ({ type: 'plinko', bet: g.bet, each: round2(g.bet / g.n), risk: g.risk, n: g.n, drops: g.drops, mult: round2(g.mult), over: true, win: g.win || 0, outcome: g.win > 0 ? 'win' : 'lose' }),
     duel: (g) => ({ type: 'duel', bet: g.bet, foe: g.foe, me: g.me, foeMs: g.foeMs, mult: g.mult, over: true, win: g.win || 0, outcome: g.win > 0 ? 'win' : 'lose' }),
+    lucky7: (g) => ({ type: 'lucky7', bet: g.bet, pick: g.pick, reel: g.reel, hits: g.hits, mult: g.mult, over: true, win: g.win || 0, outcome: g.win > 0 ? 'win' : 'lose' }),
+    bubbles: (g) => ({ type: 'bubbles', bet: g.bet, mode: g.mode, bubbles: g.bubbles, hit: g.hit, mult: g.mult, over: true, win: g.win || 0, outcome: g.win > 0 ? 'win' : 'lose' }),
+    frozen: (g) => ({ type: 'frozen', bet: g.bet, pick: g.pick, tiles: g.tiles, value: g.value, mult: g.mult, over: true, win: g.win || 0, outcome: g.win > 0 ? 'win' : 'lose' }),
+    candy: (g) => ({ type: 'candy', bet: g.bet, pick: g.pick, landed: g.landed, mult: g.mult, over: true, win: g.win || 0, outcome: g.win > 0 ? 'win' : 'lose' }),
+    heist: (g) => ({ type: 'heist', bet: g.bet, pick: g.pick, vaults: g.vaults, value: g.value, mult: g.mult, over: true, win: g.win || 0, outcome: g.win > 0 ? 'win' : 'lose' }),
+    orbit: (g) => ({ type: 'orbit', bet: g.bet, ring: g.ring, land: g.land, mult: g.mult, over: true, win: g.win || 0, outcome: g.win > 0 ? 'win' : 'lose' }),
+    cards: (g) => ({ type: 'cards', bet: g.bet, pick: g.pick, cards: g.cards, matches: g.matches, mult: g.mult, over: true, win: g.win || 0, outcome: g.win > 0 ? 'win' : 'lose' }),
+    rocket: (g) => ({ type: 'rocket', bet: g.bet, pick: g.pick, winner: g.winner, order: g.order, mult: g.mult, over: true, win: g.win || 0, outcome: g.win > 0 ? 'win' : 'lose' }),
+    cannon: (g) => ({ type: 'cannon', bet: g.bet, zone: g.zone, hit: g.hit, mult: g.mult, over: true, win: g.win || 0, outcome: g.win > 0 ? 'win' : 'lose' }),
+    jewels: (g) => ({ type: 'jewels', bet: g.bet, pick: g.pick, grid: g.grid, count: g.count, mult: g.mult, over: true, win: g.win || 0, outcome: g.win > 0 ? 'win' : 'lose' }),
     scratch: (g) => ({ type: 'scratch', id: g.id, bet: g.bet, cells: g.cells.map((v, i) => (g.seen.has(i) ? v : null)), over: g.over, mult: g.over ? g.mult : undefined, hit: g.over ? g.hit : undefined, win: g.win || 0, outcome: g.win > 0 ? 'win' : 'lose' }),
     bj: (g) => {
       const dl = g.over ? g.dealer : [g.dealer[0]];

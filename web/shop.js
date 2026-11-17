@@ -49,9 +49,13 @@ function makeCode() {
 
 /**
  * @param {string} dataDir
- * @param {{ getBalance, debit, credit, getInviteCount?, getGamesPlayed?, supabase? }} deps
+ * @param {{ getBalance, debit, credit, getInviteCount?, getGamesPlayed?, supabase?,
+ *          grantRole?, notifyUser? }} deps
  */
 function create(dataDir, deps = {}) {
+  // évite qu'un double-clic / double event crée deux achats pour la même récompense
+  const buying = new Set();
+
   const sb = deps.supabase || null;
   const REWARDS_FILE = path.join(dataDir, 'shop_rewards.json');
   const ORDERS_FILE = path.join(dataDir, 'shop_orders.json');
@@ -156,6 +160,25 @@ function create(dataDir, deps = {}) {
       return { ok: false, error: error.message || String(error) };
     }
     return { ok: true, error: null };
+  }
+
+  // Les rôles sont livrés directement : aucun order code n'est créé.
+  // On garde quand même une trace durable dans shop_role_grants.
+  async function recordRoleGrantDb(row) {
+    if (!sb) return;
+    const { error } = await sb.from('shop_role_grants').insert({
+      user_id: String(row.uid),
+      user_name: row.name || '',
+      guild_id: String(row.guildId || ''),
+      reward_id: String(row.rewardId || ''),
+      reward_name: row.rewardName || '',
+      role_id: String(row.roleId || ''),
+      price: Number(row.price) || 0,
+      status: row.status || 'delivered',
+      error: row.roleErr || '',
+      created_at: new Date().toISOString(),
+    });
+    if (error) console.error('[shop] sb role grant', error.message || error);
   }
 
   async function upsertProgressDb(uid, u) {
@@ -427,46 +450,83 @@ function create(dataDir, deps = {}) {
   }
 
   async function buy(uid, rewardId, guildId, name) {
-    const r = rewards.find((x) => x.id === rewardId && x.active !== false);
-    if (!r) throw new Error('Reward introuvable.');
-    if (r.stock != null && r.stock <= 0) throw new Error('Rupture de stock.');
-    const invites = deps.getInviteCount ? await deps.getInviteCount(uid, guildId) : 0;
-    const games = deps.getGamesPlayed ? await deps.getGamesPlayed(uid) : 0;
-    if ((r.minInvites || 0) > 0 && invites < r.minInvites) {
-      throw new Error(`Il te faut ${r.minInvites} invitation(s) (tu en as ${invites}).`);
+    const lockKey = `${uid}:${rewardId}`;
+    if (buying.has(lockKey)) throw new Error('Achats déjà en cours, réessaie dans un instant.');
+    buying.add(lockKey);
+    try {
+      const r = rewards.find((x) => x.id === rewardId && x.active !== false);
+      if (!r) throw new Error('Reward introuvable.');
+      if (r.stock != null && r.stock <= 0) throw new Error('Rupture de stock.');
+      const invites = deps.getInviteCount ? await deps.getInviteCount(uid, guildId) : 0;
+      const games = deps.getGamesPlayed ? await deps.getGamesPlayed(uid) : 0;
+      if ((r.minInvites || 0) > 0 && invites < r.minInvites) {
+        throw new Error(`Il te faut ${r.minInvites} invitation(s) (tu en as ${invites}).`);
+      }
+      if ((r.minGames || 0) > 0 && games < r.minGames) {
+        throw new Error(`Il te faut ${r.minGames} partie(s) jouée(s) (tu en as ${games}).`);
+      }
+      const bal = await deps.getBalance(uid);
+      if (bal < r.price) throw new Error(`Solde insuffisant (${bal} < ${r.price}).`);
+      await deps.debit(uid, r.price);
+      if (r.stock != null) {
+        r.stock = Math.max(0, r.stock - 1);
+        persistRewards();
+      }
+
+      const base = {
+        uid: String(uid),
+        name: name || '',
+        guildId: guildId ? String(guildId) : '',
+        rewardId: r.id,
+        rewardName: r.name,
+        type: r.type || 'custom',
+        roleId: r.roleId || '',
+        price: r.price,
+      };
+
+      // RÔLE : livraison directe, aucun code, aucun ticket, aucun doublon.
+      if (base.type === 'role' && base.roleId && deps.grantRole) {
+        let roleErr = '';
+        try {
+          await deps.grantRole(base.guildId, base.uid, base.roleId);
+        } catch (e) {
+          roleErr = String(e?.message || e).slice(0, 160);
+        }
+        const deliveredAt = new Date().toISOString();
+        const grant = { ...base, status: roleErr ? 'failed' : 'delivered', roleErr, deliveredAt, autoRole: true, roleAdded: !roleErr, code: null };
+        await recordRoleGrantDb(grant);
+        if (!roleErr && deps.notifyUser) {
+          try {
+            await deps.notifyUser(base.uid, '✅ **Role added**\nThe role **' + base.rewardName + '** has been added to your account. No order code is needed.');
+          } catch (e) { console.error('[shop] role notify', e?.message || e); }
+        }
+        grant.msg = roleErr
+          ? 'The role could not be added' + (roleErr ? ': ' + roleErr : '') + '.'
+          : 'Role added to your account.';
+        return grant;
+      }
+
+      // Autres récompenses : code classique (ticket Discord si besoin).
+      let code;
+      do {
+        code = makeCode();
+      } while (orders[code]);
+      const order = {
+        ...base,
+        code,
+        status: 'pending',
+        createdAt: new Date().toISOString(),
+        deliveredAt: null,
+        autoRole: false,
+      };
+      orders[code] = order;
+      persistOrders();
+      await upsertOrderDb(order); // row must exist in Supabase before the response is sent
+      order.msg = 'Purchase complete. Order code: ' + order.code;
+      return order;
+    } finally {
+      buying.delete(lockKey);
     }
-    if ((r.minGames || 0) > 0 && games < r.minGames) {
-      throw new Error(`Il te faut ${r.minGames} partie(s) jouée(s) (tu en as ${games}).`);
-    }
-    const bal = await deps.getBalance(uid);
-    if (bal < r.price) throw new Error(`Solde insuffisant (${bal} < ${r.price}).`);
-    await deps.debit(uid, r.price);
-    if (r.stock != null) {
-      r.stock = Math.max(0, r.stock - 1);
-      persistRewards();
-    }
-    let code;
-    do {
-      code = makeCode();
-    } while (orders[code]);
-    const order = {
-      code,
-      uid: String(uid),
-      name: name || '',
-      guildId: guildId ? String(guildId) : '',
-      rewardId: r.id,
-      rewardName: r.name,
-      type: r.type || 'custom',
-      roleId: r.roleId || '',
-      price: r.price,
-      status: 'pending',
-      createdAt: new Date().toISOString(),
-      deliveredAt: null,
-    };
-    orders[code] = order;
-    persistOrders();
-    await upsertOrderDb(order); // row must exist in Supabase before the response is sent
-    return order;
   }
 
   function getOrder(code) {

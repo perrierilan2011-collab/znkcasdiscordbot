@@ -65,6 +65,9 @@ class Room {
   constructor(guildId, deps) {
     this.guildId = guildId;
     this.deps = deps;
+    // Les tables classées utilisent des RR entiers ; les tables ZTKN gardent les centimes.
+    this.betStep = Number(deps.betStep) > 0 ? Number(deps.betStep) : 0.01;
+    this.minBet = Number(deps.minBet) > 0 ? Number(deps.minBet) : MIN_BET;
     this.seats = Array(SEATS).fill(null);
     this.phase = 'betting';
     this.deadline = 0;
@@ -241,9 +244,9 @@ class Room {
     const idx = this.findSeat(uid);
     if (idx < 0) throw new Error('Assieds-toi d’abord à une place.');
     const p = this.seats[idx];
-    let a = floor2(Number(amount));
+    let a = floor2(Math.floor(Number(amount) / this.betStep + 1e-9) * this.betStep);
     if (!Number.isFinite(a) || a < 0) throw new Error('Montant invalide.');
-    if (a > 0 && a < MIN_BET) throw new Error(`Mise minimale : ${MIN_BET}.`);
+    if (a > 0 && a < this.minBet) throw new Error(`Mise minimale : ${this.minBet}.`);
     if (a > MAX_BET) a = MAX_BET;
     const diff = floor2(a - p.bet);
     if (diff > 0) {
