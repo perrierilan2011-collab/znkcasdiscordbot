@@ -870,7 +870,6 @@ const GAME_NAMES = {
   coin2: '🪙 Double Heads',
 
   dice7: '🎲 Dice 7+',
-  lucky7: '7️⃣ Lucky 7',
 
   evenodd2: '🔢 Odd/Even 2',
 
@@ -899,13 +898,11 @@ const GAME_NAMES = {
   suitdi: '♦️ Diamonds',
 
   suitcl: '♣️ Clubs',
-  blast: '💥 Blast',
+
   freeze: '❄️ Freeze',
 
   shadow: '🌑 Shadow',
   pulse: '💓 Pulse',
-
-  orbit: '🪐 Orbit',
 
   spark: '✨ Spark',
 
@@ -4830,7 +4827,7 @@ function genericFrames(emoji, res) {
 
 // ---------- Bulk games (to reach ~100) ----------
 (function registerBulkGames() {
-  const bulk = [['coin2', 'Double heads', '🪙', 'Heads or tails again', 'pile', 'face', 2], ['dice7', 'Dice 7+', '🎲', 'Sum >= 7', 'over', 'under', 2], ['lucky7', 'Lucky 7', '7️⃣', 'Exactly 7', 'yes', 'no', 5], ['evenodd2', 'Even/Odd 2', '🔢', 'Even or odd die', 'even', 'odd', 2], ['redblack2', 'Red Black 2', '🔴', 'Red/black card', 'red', 'black', 2], ['highlow2', 'High Low', '⬆️', 'High or low card', 'high', 'low', 2], ['triple', 'Triple chance', '🎯', '1 in 3', 'a', 'b', 2.8], ['quad', 'Quad', '4️⃣', '1 in 4', 'a', 'b', 3.5], ['penta', 'Penta', '5️⃣', '1 in 5', 'a', 'b', 4.5], ['coin3', 'Triple heads', '🪙', "3 heads in a row", 'yes', 'no', 7], ['snake', 'Snake eyes', '🐍', 'Double 1', 'yes', 'no', 30], ['boxcars', 'Boxcars', '🎲', 'Double 6', 'yes', 'no', 30], ['anydouble', 'Any double', '🎲', 'Two matching dice', 'yes', 'no', 5.5], ['acehigh', 'High ace', '🃏', 'Ace drawn', 'yes', 'no', 12], ['facecard', 'Face card', '🃏', 'J, Q, or K', 'yes', 'no', 3.5], ['suitspade', 'Spades', '♠️', 'Spade suit', 'yes', 'no', 3.8], ['suithr', 'Hearts', '♥️', 'Heart suit', 'yes', 'no', 3.8], ['suitdi', 'Diamonds', '♦️', 'Diamond suit', 'yes', 'no', 3.8], ['suitcl', 'Clubs', '♣️', 'Club suit', 'yes', 'no', 3.8], ['blast', 'Blast', '💥', 'Explosion or not', 'safe', 'boom', 1.9], ['freeze', 'Freeze', '❄️', 'Ice or heat', 'ice', 'fire', 2], ['shadow', 'Shadow', '🌑', 'Shadow or light', 'shadow', 'light', 2], ['pulse', 'Pulse', '💓', 'Strong/weak pulse', 'high', 'low', 2], ['orbit', 'Orbit', '🪐', 'Stay in orbit', 'in', 'out', 2.2], ['spark', 'Spark', '✨', 'Spark lit', 'on', 'off', 2], ['wave', 'Wave', '🌊', 'High/low wave', 'high', 'low', 2], ['mirror', 'Mirror', '🪞', 'Mirror broken or not', 'ok', 'break', 1.95], ['portal', 'Portal', '🌀', 'Portal open', 'open', 'closed', 2.1], ['rune', 'Rune', '🔮', 'Good rune', 'yes', 'no', 3], ['totem', 'Totem', '🗿', 'Stable totem', 'yes', 'no', 2.4], ['cactus', 'Cactus', '🌵', 'Avoid the thorns', 'safe', 'ouch', 1.9], ['pearl', 'Pearl', '🦪', 'Find the pearl', 'yes', 'no', 4], ['compass', 'Compass', '🧭', 'Right direction', 'n', 's', 2], ['anchor', 'Anchor', '⚓', 'Anchor raised', 'up', 'down', 2], ['torch', 'Torch', '🔥', 'Torch lit', 'on', 'off', 2], ['keylock', 'Key', '🔑', 'Right key', 'yes', 'no', 3.5], ['hourglass', 'Hourglass', '⏳', 'Time remaining', 'ok', 'out', 2.2], ['balloon2', 'Ballon 2', '🎈', 'Inflated or popped', 'ok', 'pop', 2], ['dicehi', 'High die', '🎲', 'Die >= 4', 'yes', 'no', 1.9], ['dicelo', 'Low die', '🎲', 'Die <= 3', 'yes', 'no', 1.9], ['coinrush', 'Coin rush', '🪙', 'More heads', 'yes', 'no', 2.5], ['starfall', "Shower of stars", '🌟', 'Catch 1 star', 'yes', 'no', 3], ['meteor', 'Meteor', '☄️', 'Dodge the meteor', 'dodge', 'hit', 1.85], ['rainbow', 'Rainbow', '🌈', 'Lucky color', 'yes', 'no', 5], ['clover', 'Lucky clover', '🍀', 'Clover found', 'yes', 'no', 6]];
+  const bulk = [['coin2', 'Double heads', '🪙', 'Heads or tails again', 'pile', 'face', 2], ['dice7', 'Dice 7+', '🎲', 'Sum >= 7', 'over', 'under', 2], ['evenodd2', 'Even/Odd 2', '🔢', 'Even or odd die', 'even', 'odd', 2], ['redblack2', 'Red Black 2', '🔴', 'Red/black card', 'red', 'black', 2], ['highlow2', 'High Low', '⬆️', 'High or low card', 'high', 'low', 2], ['triple', 'Triple chance', '🎯', '1 in 3', 'a', 'b', 2.8], ['quad', 'Quad', '4️⃣', '1 in 4', 'a', 'b', 3.5], ['penta', 'Penta', '5️⃣', '1 in 5', 'a', 'b', 4.5], ['coin3', 'Triple heads', '🪙', "3 heads in a row", 'yes', 'no', 7], ['snake', 'Snake eyes', '🐍', 'Double 1', 'yes', 'no', 30], ['boxcars', 'Boxcars', '🎲', 'Double 6', 'yes', 'no', 30], ['anydouble', 'Any double', '🎲', 'Two matching dice', 'yes', 'no', 5.5], ['acehigh', 'High ace', '🃏', 'Ace drawn', 'yes', 'no', 12], ['facecard', 'Face card', '🃏', 'J, Q, or K', 'yes', 'no', 3.5], ['suitspade', 'Spades', '♠️', 'Spade suit', 'yes', 'no', 3.8], ['suithr', 'Hearts', '♥️', 'Heart suit', 'yes', 'no', 3.8], ['suitdi', 'Diamonds', '♦️', 'Diamond suit', 'yes', 'no', 3.8], ['suitcl', 'Clubs', '♣️', 'Club suit', 'yes', 'no', 3.8], ['freeze', 'Freeze', '❄️', 'Ice or heat', 'ice', 'fire', 2], ['shadow', 'Shadow', '🌑', 'Shadow or light', 'shadow', 'light', 2], ['pulse', 'Pulse', '💓', 'Strong/weak pulse', 'high', 'low', 2], ['spark', 'Spark', '✨', 'Spark lit', 'on', 'off', 2], ['wave', 'Wave', '🌊', 'High/low wave', 'high', 'low', 2], ['mirror', 'Mirror', '🪞', 'Mirror broken or not', 'ok', 'break', 1.95], ['portal', 'Portal', '🌀', 'Portal open', 'open', 'closed', 2.1], ['rune', 'Rune', '🔮', 'Good rune', 'yes', 'no', 3], ['totem', 'Totem', '🗿', 'Stable totem', 'yes', 'no', 2.4], ['cactus', 'Cactus', '🌵', 'Avoid the thorns', 'safe', 'ouch', 1.9], ['pearl', 'Pearl', '🦪', 'Find the pearl', 'yes', 'no', 4], ['compass', 'Compass', '🧭', 'Right direction', 'n', 's', 2], ['anchor', 'Anchor', '⚓', 'Anchor raised', 'up', 'down', 2], ['torch', 'Torch', '🔥', 'Torch lit', 'on', 'off', 2], ['keylock', 'Key', '🔑', 'Right key', 'yes', 'no', 3.5], ['hourglass', 'Hourglass', '⏳', 'Time remaining', 'ok', 'out', 2.2], ['balloon2', 'Ballon 2', '🎈', 'Inflated or popped', 'ok', 'pop', 2], ['dicehi', 'High die', '🎲', 'Die >= 4', 'yes', 'no', 1.9], ['dicelo', 'Low die', '🎲', 'Die <= 3', 'yes', 'no', 1.9], ['coinrush', 'Coin rush', '🪙', 'More heads', 'yes', 'no', 2.5], ['starfall', "Shower of stars", '🌟', 'Catch 1 star', 'yes', 'no', 3], ['meteor', 'Meteor', '☄️', 'Dodge the meteor', 'dodge', 'hit', 1.85], ['rainbow', 'Rainbow', '🌈', 'Lucky color', 'yes', 'no', 5], ['clover', 'Lucky clover', '🍀', 'Clover found', 'yes', 'no', 6]];
   for (const [key, name, emoji, desc, c1, c2, winMult] of bulk) {
     if (INSTANT[key]) continue;
     INSTANT[key] = {
@@ -5207,7 +5204,6 @@ const GAME_MENU = [
   ['spincolor', 'Color wheel', '🎨', '6-color wheel'],
   ['coin2', 'Double heads', '🪙', 'Heads or tails again'],
   ['dice7', 'Dice 7+', '🎲', 'Sum >= 7'],
-  ['lucky7', 'Lucky 7', '7️⃣', 'Exactly 7'],
   ['evenodd2', 'Even/Odd 2', '🔢', 'Even or odd die'],
   ['redblack2', 'Red Black 2', '🔴', 'Red/black card'],
   ['highlow2', 'High Low', '⬆️', 'High or low card'],
@@ -5224,11 +5220,9 @@ const GAME_MENU = [
   ['suithr', 'Hearts', '♥️', 'Heart suit'],
   ['suitdi', 'Diamonds', '♦️', 'Diamond suit'],
   ['suitcl', 'Clubs', '♣️', 'Club suit'],
-  ['blast', 'Blast', '💥', 'Explosion or not'],
   ['freeze', 'Freeze', '❄️', 'Ice or heat'],
   ['shadow', 'Shadow', '🌑', 'Shadow or light'],
   ['pulse', 'Pulse', '💓', 'Strong/weak pulse'],
-  ['orbit', 'Orbit', '🪐', 'Stay in orbit'],
   ['spark', 'Spark', '✨', 'Spark lit'],
   ['wave', 'Wave', '🌊', 'High/low wave'],
   ['mirror', 'Mirror', '🪞', 'Mirror broken or not'],
@@ -7158,6 +7152,7 @@ async function postOnlineRecap(guildId, r) {
     head = `${dot} Number: **${r.n}** (${r.color})\n`;
   } else if (r.game === 'mines') title = '💣 Mines — win';
   else if (r.game === 'fuse') title = '🚀 Fuse — win';
+  else if (r.game === 'rocket') title = '🚀 Rocket Race — win';
   else if (r.game === 'bj-solo') title = '🃏 Solo Blackjack — win';
   else if (r.game === 'coin') title = '🪙 Heads or Tails — win';
   else if (r.game === 'dice') title = '🎲 Dice — win';
@@ -8974,7 +8969,12 @@ async function handleTicketButton(i) {
       return i.reply({ content: 'Only staff (or the ticket creator) can close this ticket.', flags: EPH });
     }
     await i.reply({ content: 'Ticket closes in 3 seconds…' }).catch(() => {});
-    setTimeout(() => i.channel.delete('Ticket claim closed').catch(() => {}), 3000);
+    setTimeout(() => {
+      const topic = String(i.channel.topic || '');
+      const m = topic.match(/^Order\s+([A-Z0-9]+)\s+·/i);
+      if (m && webApp.shop?.clearTicketChannel) webApp.shop.clearTicketChannel(m[1]);
+      i.channel.delete('Ticket claim closed').catch(() => {});
+    }, 3000);
     return true;
   }
 
@@ -9079,10 +9079,21 @@ async function handleTicketModal(i) {
   ticketCreating.add(order.code);
   let ch;
   try {
+    // 1) Mémoire persistante : le salon créé la fois précédente (survit au redémarrage).
+    const saved = shop.getTicketChannel ? shop.getTicketChannel(order.code) : null;
+    if (saved?.channelId) {
+      const known = await i.guild.channels.fetch(saved.channelId).catch(() => null);
+      if (known) {
+        return i.reply({ content: `✅ Ticket already opened in #${known.name} — ${known}`, flags: EPH });
+      }
+      shop.clearTicketChannel ? shop.clearTicketChannel(order.code) : null;
+    }
+    // 2) Repli : recherche par topic ou par nom (tickets créés avant cette correction).
     const channels = await i.guild.channels.fetch().catch(() => i.guild.channels.cache);
     const existing = [...(channels?.values?.() || [])].find((c) => c && c.type === ChannelType.GuildText &&
       (String(c.topic || '').startsWith(topicTag) || c.name === base));
     if (existing) {
+      shop.setTicketChannel ? shop.setTicketChannel(order.code, existing.id, i.guild.id) : null;
       return i.reply({ content: `✅ Ticket already opened in #${existing.name} — ${existing}`, flags: EPH });
     }
     ch = await i.guild.channels.create({
@@ -9097,6 +9108,7 @@ async function handleTicketModal(i) {
       ],
       reason: `Claim reward ${order.code}`,
     });
+    shop.setTicketChannel ? shop.setTicketChannel(order.code, ch.id, i.guild.id) : null;
   } catch (e) {
     console.error('[ticket]', e);
     return i.reply({ content: 'Could not create the channel (bot needs Manage Channels).', flags: EPH });

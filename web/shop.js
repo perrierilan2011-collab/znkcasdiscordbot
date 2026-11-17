@@ -62,12 +62,16 @@ function create(dataDir, deps = {}) {
   const TASKS_FILE = path.join(dataDir, 'shop_tasks.json');
   const PROGRESS_FILE = path.join(dataDir, 'shop_task_progress.json');
   const TICKETS_FILE = path.join(dataDir, 'shop_ticket_cfg.json');
+  const TICKET_CH_FILE = path.join(dataDir, 'shop_ticket_channels.json');
 
   let rewards = load(REWARDS_FILE, []);
   let orders = load(ORDERS_FILE, {});
   let tasks = load(TASKS_FILE, []);
   let progress = load(PROGRESS_FILE, {});
   let ticketCfg = load(TICKETS_FILE, {});
+  // code de commande -> salon Discord créé : évite les doublons de tickets,
+  // même après un redémarrage du bot.
+  let ticketChannels = load(TICKET_CH_FILE, {});
 
   const persistRewards = () => {
     save(REWARDS_FILE, rewards);
@@ -677,6 +681,24 @@ function create(dataDir, deps = {}) {
     return ticketCfg[String(guildId)] || null;
   }
 
+  // ---------- anti-doublon des tickets : 1 code = 1 salon, mémorisé sur disque ----------
+  function getTicketChannel(code) {
+    const c = String(code || '').trim().toUpperCase();
+    return ticketChannels[c] || null;
+  }
+  function setTicketChannel(code, channelId, guildId) {
+    const c = String(code || '').trim().toUpperCase();
+    ticketChannels[c] = { channelId: String(channelId || ''), guildId: String(guildId || ''), at: new Date().toISOString() };
+    save(TICKET_CH_FILE, ticketChannels);
+    return ticketChannels[c];
+  }
+  function clearTicketChannel(code) {
+    const c = String(code || '').trim().toUpperCase();
+    if (!ticketChannels[c]) return;
+    delete ticketChannels[c];
+    save(TICKET_CH_FILE, ticketChannels);
+  }
+
   return {
     listRewards,
     adminUpsertReward,
@@ -697,6 +719,9 @@ function create(dataDir, deps = {}) {
     markLogin,
     setTicketCfg,
     getTicketCfg,
+    getTicketChannel,
+    setTicketChannel,
+    clearTicketChannel,
     dayKeyParis,
   };
 }

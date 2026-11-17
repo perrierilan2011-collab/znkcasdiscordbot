@@ -297,14 +297,8 @@ th{color:var(--mut);font-size:12px}
 .adfields label{display:flex;flex-direction:column;font-size:12px;color:var(--mut);font-weight:700}
 .adfields label.hide{display:none!important}
 @media(max-width:600px){#adminView{padding:16px 8px 64px}.adgrid,.adfields{grid-template-columns:1fr}}
-/* nouveaux jeux : scène cinématique */
-.nsc{position:relative;overflow:hidden;border-radius:16px;background:radial-gradient(700px 260px at 50% -20%,rgba(251,191,36,.16),transparent 70%),linear-gradient(180deg,#0b0b0d,#030303);border:1px solid #232323;box-shadow:inset 0 0 60px rgba(0,0,0,.9)}
-.nstage{position:relative;width:100%;height:330px}
-.nstage canvas{width:100%;height:100%;display:block}
-.nflash{position:absolute;inset:0;pointer-events:none;opacity:0;background:radial-gradient(circle at 50% 55%,rgba(255,255,255,.85),rgba(251,191,36,.35) 35%,transparent 70%);mix-blend-mode:screen}
-.npop{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%) scale(.6);opacity:0;pointer-events:none;font:900 54px system-ui,sans-serif;color:#fde68a;text-shadow:0 0 25px rgba(251,191,36,.8),0 8px 20px #000;white-space:nowrap}
-.nban{position:absolute;left:50%;top:12px;transform:translateX(-50%);font:800 13px ui-monospace,Menlo,monospace;letter-spacing:.18em;color:rgba(255,255,255,.6);pointer-events:none}
-.nsc.shake,.shake{animation:nshake .42s ease}
+/* animation des jeux « un coup » */
+.shake{animation:nshake .42s ease}
 @keyframes nshake{0%,100%{transform:translate(0,0)}20%{transform:translate(-7px,3px)}40%{transform:translate(6px,-3px)}60%{transform:translate(-4px,-2px)}80%{transform:translate(3px,2px)}}
 /* couche cinématique partagée */
 .fxburst{position:fixed;inset:0;pointer-events:none;z-index:18;overflow:hidden}
@@ -1897,6 +1891,7 @@ function showGate(t) { const gm = document.getElementById('gatemsg'); if (gm && 
 
 let es;
 let RK_INFO = { min: 1, max: 1e8, rockets: [], betSeconds: 15, houseEdge: .05 };
+const ROC = { st: null, joined: false, info: null, lastPhase: '', shownRound: -1, px: 0, g: null, stars: null, bound: false };
 function connect() {
   try { if (es) es.close(); } catch (e) {}
   es = new EventSource('/api/stream?t=' + encodeURIComponent(TOKEN));
@@ -2214,7 +2209,7 @@ const SET = { winOthers: '1', winMine: '1', chatNotif: 'silent' };
 try { Object.assign(SET, JSON.parse(localStorage.getItem('znk_set') || '{}')); } catch {}
 const cShow = (m) => m.sys !== 'win' || (me && m.uid === me.uid ? SET.winMine !== '0' : SET.winOthers !== '0');
 const CNAME = { hub: 'Accueil', bj: 'Blackjack', poker: 'Poker', roulette: 'Roulette', rocket: 'Rocket Race', 'off-bj': 'Blackjack solo', 'off-fuse': 'Fusé', 'off-mine': 'Mine', 'off-coin': 'Pile ou Face', 'off-dice': 'Dés', 'off-horses': 'Chevaux', 'off-russian': 'Roulette russe', 'off-slots': 'Slots', 'off-duel': 'Duel', 'off-scratch': 'Ticket à gratter', 'off-plinko': 'Plinko' };
-const GLAB = { blackjack: 'Blackjack', poker: 'Poker', roulette: 'Roulette', 'bj-solo': 'Blackjack solo', fuse: 'Fusé', mines: 'Mines', coin: 'Pile ou Face', dice: 'Dés', horses: 'Chevaux', russian: 'Roulette russe', slots: 'Slots', duel: 'Duel', scratch: 'Ticket à gratter', plinko: 'Plinko' };
+const GLAB = { blackjack: 'Blackjack', poker: 'Poker', roulette: 'Roulette', rocket: 'Rocket Race', 'bj-solo': 'Blackjack solo', fuse: 'Fusé', mines: 'Mines', coin: 'Pile ou Face', dice: 'Dés', horses: 'Chevaux', russian: 'Roulette russe', slots: 'Slots', duel: 'Duel', scratch: 'Ticket à gratter', plinko: 'Plinko' };
 const cRoom = () => (W.view === 'top' || W.view === 'rank' || W.view === 'admin' ? 'hub' : W.view);
 function cLine(m) {
   if (m.sys === 'win') { // annonce automatique d'une victoire (tous les jeux du site)
@@ -2957,6 +2952,8 @@ function updHub() {
   const plural = (n, a) => n + ' ' + a + (n > 1 ? 's' : '');
   const n = BJT.size ? [...BJT.values()].reduce((a, s) => a + s.seats.filter(Boolean).length, 0) : null;
   $('#gBjLive').textContent = n == null ? '' : n ? plural(n, 'joueur') + ' à table' : 'Table libre';
+  const rk = $('#gRocketLive');
+  if (rk) { const m = ROC.st ? ROC.st.present : null; rk.textContent = m == null ? '' : m ? plural(m, 'joueur') + ' en course' : 'Course ouverte'; }
   const w = $('#gRlLive');
   if (!W.info) { w.textContent = ''; return; }
   const m = W.S ? W.S.players.length : null;
@@ -2969,10 +2966,10 @@ if ($('#menuBtn') && $('#menu')) $('#menuBtn').onclick = (e) => { e.stopPropagat
 document.querySelectorAll('#menuPanel .mhead').forEach((b) => (b.onclick = (e) => { e.stopPropagation(); b.parentElement.classList.toggle('open'); }));
 document.addEventListener('click', (e) => { if (!e.target.closest('#menu')) menuClose(); });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') menuClose(); });
-const MENU_LBL = { hub: 'Menu', bj: 'Blackjack', poker: 'Poker', roulette: 'Roulette', 'off-bj': 'Blackjack solo', 'off-fuse': 'Fusé', 'off-mine': 'Mine', 'off-coin': 'Pile ou Face', 'off-dice': 'Dés', 'off-horses': 'Chevaux', 'off-russian': 'Roulette russe', 'off-slots': 'Slots', 'off-duel': 'Duel', 'off-scratch': 'Ticket à gratter', 'off-plinko': 'Plinko', top: 'Classement', rank: 'Rank', admin: 'Admin' };
+const MENU_LBL = { hub: 'Menu', bj: 'Blackjack', poker: 'Poker', roulette: 'Roulette', rocket: 'Rocket Race', 'off-bj': 'Blackjack solo', 'off-fuse': 'Fusé', 'off-mine': 'Mine', 'off-coin': 'Pile ou Face', 'off-dice': 'Dés', 'off-horses': 'Chevaux', 'off-russian': 'Roulette russe', 'off-slots': 'Slots', 'off-duel': 'Duel', 'off-scratch': 'Ticket à gratter', 'off-plinko': 'Plinko', top: 'Classement', rank: 'Rank', admin: 'Admin' };
 function menuSync(v) {
   const _l = $('#menuLbl'); if (_l) _l.textContent = MENU_LBL[v] || 'Menu';
-  const _on = $('#msOn'); if (_on) _on.classList.toggle('open', v === 'bj' || v === 'poker' || v === 'roulette');
+  const _on = $('#msOn'); if (_on) _on.classList.toggle('open', v === 'bj' || v === 'poker' || v === 'roulette' || v === 'rocket');
   const _off = $('#msOff'); if (_off) _off.classList.toggle('open', String(v).startsWith('off-'));
   document.querySelectorAll('#topNav .navl').forEach((n) => n.classList.toggle('on', n.getAttribute('data-g') === v));
 }
@@ -3183,7 +3180,7 @@ function pFit() {
 try { new MutationObserver(pFitSoon).observe(document.getElementById('pTable'), { childList: true, subtree: true }); } catch {}
 hubRoulette(true); hubPoker(true); setInterval(() => { updHub(); pHub(); }, 1000); updHub();
 document.querySelectorAll('.mitem[data-g]').forEach((t) => (t.onclick = () => { ac(); menuClose(); setView(t.dataset.g); }));
-$('#bRules').onclick = () => $(W.view === 'roulette' ? '#mRRules' : W.view === 'poker' ? '#mPRules' : '#mRules').classList.add('on');
+$('#bRules').onclick = () => $(W.view === 'roulette' ? '#mRRules' : W.view === 'rocket' ? '#mRocketRules' : W.view === 'poker' ? '#mPRules' : '#mRules').classList.add('on');
 function rOnHello(d) { W.info = d.roulette; W.joined = false; if (W.info) rBuild(); if (W.view === 'roulette') rEnter(); hubRoulette(!!W.info); updHub(); }
 
 // ---- rendu de l'état
@@ -3394,6 +3391,176 @@ function rLoop() {
 requestAnimationFrame(rLoop);
 { let v = null; try { v = params.get('t') ? params.get('g') : sessionStorage.getItem('znk_v'); } catch {} if (v === 'wheel') v = 'roulette'; if (v === 'roulette' || v === 'bj') setView(v); }
 
+// ============================================================= ROCKET RACE (course en ligne)
+const RK_TAU = Math.PI * 2;
+function rocBind() {
+  if (ROC.bound) return; ROC.bound = true;
+  $('#rocketJoin').onclick = async () => { ac(); if (!ROC.joined) { ROC.joined = true; await send('rzjoin'); } };
+  $('#rocketBet').onclick = async () => { ac(); const v = parseAmt($('#rocketAmt').value, rMe() ? rMe().bal : null); if (!v) return toast('Entre un montant.'); await send('rzbet', { amount: v }); };
+  $('#rocketClear').onclick = () => { ac(); send('rzclear'); };
+  $('#rocketGo').onclick = () => { ac(); send('rzgo'); };
+  $('#rocketLeave').onclick = async () => { ac(); await send('rzleave'); ROC.joined = false; };
+  $('#rocketAmt').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#rocketBet').click(); });
+  function fit() { const c = $('#rocketCanvas'); if (!c) return; const b = c.getBoundingClientRect(); ROC.px = 0; ROC._w = Math.max(1, Math.round(b.width)); ROC._h = Math.max(1, Math.round(b.height)); }
+  window.addEventListener('resize', fit); fit();
+}
+function rocOnHello(d) {
+  ROC.info = d.rocket || RK_INFO; RK_INFO = ROC.info || RK_INFO;
+  ROC.joined = false;
+  const amt = $('#rocketAmt'); if (!amt.value) amt.value = String(RK_INFO.min || 1);
+  $('#rocketCoin').textContent = COIN;
+  const sh = RK_INFO.shares || null;
+  $('#rocketOdds').textContent = 'Pot redistribué au classement · commission ' + Math.round((RK_INFO.houseEdge || .05) * 100) + ' % · mise ' + num(RK_INFO.min) + ' – ' + num(RK_INFO.max) + ' ' + COIN;
+  rocBind(); updHub();
+}
+function rocEnter() {
+  rocBind();
+  if (!ROC.joined) { ROC.joined = true; send('rzjoin'); }
+  const m = rocMe(); if (m) { setTxt($('#meBal'), num(m.bal) + ' ' + COIN); W.bal = m.bal; }
+}
+function rocMe() { return ROC.st && me ? ROC.st.players.find((p) => p.uid === me.uid) : null; }
+function rocRender(st) {
+  ROC.st = st; if (!ROC.info) return;
+  const ph = st.phase, mine = rocMe();
+  const betting = ph === 'betting';
+  const cd = betting && st.deadline ? Math.max(0, Math.ceil((st.deadline - nowS()) / 1000)) : 0;
+  const lead = st.track ? Math.max(0, Math.ceil((st.track.t0 - nowS()) / 300)) : 0;
+  let msg = '';
+  if (ph === 'betting') msg = st.deadline ? 'Mises ouvertes · départ dans ' + cd + ' s' : 'Mises ouvertes · le départ se lance à la 1ʳᵉ mise';
+  else if (ph === 'countdown') msg = 'Prêts, partez !';
+  else if (ph === 'racing') msg = 'Course en cours… le premier au tour du Soleil gagne !';
+  else msg = 'Course terminée · nouvelle manche dans ' + Math.max(0, Math.ceil((st.deadline - nowS()) / 1000)) + ' s';
+  setTxt($('#rocketMsg'), msg);
+  setTxt($('#rocketCd'), betting && cd ? String(cd) : '');
+  setTxt($('#rocketCount'), String(st.racers || 0));
+  setTxt($('#rocketPot'), st.pot > 0 ? 'Pot : ' + num(st.pot) + ' ' + COIN : '');
+  const box = $('#rocketPlayers'); box.textContent = '';
+  if (!st.players.length) box.append(el('div', 'lbnone', 'Personne à la course.'));
+  const order = [...st.players].sort((a, b) => (a.rank || 99) - (b.rank || 99) || b.bet - a.bet);
+  for (const p of order) {
+    const row = el('div', 'rpl' + (me && p.uid === me.uid ? ' me' : ''));
+    const av = el('div', 'av2'); setAvatar(av, p.avatar, p.name);
+    const mid = el('div', 'nm'); mid.append(document.createTextNode(p.name), el('small', '', p.bet > 0 ? num(p.bet) + ' ' + COIN : 'Observe'));
+    const rk = el('div', 'rk', p.rank ? '#' + p.rank : (p.bet > 0 ? '🟢' : '—'));
+    row.append(av, mid, rk); box.append(row);
+  }
+  $('#rocketFeed').replaceChildren(...(st.feed || []).slice(-4).map((f) => el('div', '', noEmo(f.text))));
+  $('#rocketJoin').disabled = ROC.joined;
+  $('#rocketBet').disabled = !betting || !ROC.joined;
+  $('#rocketClear').disabled = !betting || !ROC.joined || !(mine && mine.bet > 0);
+  $('#rocketGo').disabled = !betting || (st.racers || 0) < 2;
+  $('#rocketLeave').disabled = !ROC.joined;
+  if (mine) { setTxt($('#meBal'), num(mine.bal) + ' ' + COIN); W.bal = mine.bal; }
+  // décompte animé au-dessus de la scène
+  const cdEl = $('#rocketCountdown');
+  if (ph === 'countdown' && lead) {
+    if (ROC.cd !== lead) { ROC.cd = lead; cdEl.textContent = String(Math.min(3, lead)); cdEl.classList.remove('on'); void cdEl.offsetWidth; cdEl.classList.add('on'); }
+  } else { ROC.cd = 0; cdEl.classList.remove('on'); }
+  // bandeau du gagnant
+  const winEl = $('#rocketWinner');
+  if (ph === 'result' && st.result && ROC.shownRound !== st.round) {
+    ROC.shownRound = st.round;
+    const top = st.result.ranking[0]; const w = st.players.find((p) => p.uid === top);
+    winEl.replaceChildren(document.createTextNode('🏆 ' + (w ? w.name : 'Gagnant') + ' gagne !'));
+    if (w && w.net != null) winEl.append(el('small', '', (w.net > 0 ? '+' : '') + num(w.net) + ' ' + COIN));
+    winEl.classList.add('on'); if (mine && mine.net != null) mine.net > 0 ? SFX.win() : SFX.lose();
+  } else if (ph !== 'result') { winEl.classList.remove('on'); }
+}
+// --- trajectoire déterministe : départ Terre -> tour du Soleil entre les planètes -> retour Terre
+function rocPath(u, lane) {
+  u = Math.max(0, Math.min(1, u));
+  const a = Math.PI * .92 + u * RK_TAU * 1.32 + (lane.phase || 0) * .05;
+  const bulge = Math.sin(Math.PI * u);
+  const r = .66 + .23 * bulge + ((lane.orbit || 1) - 1) * .045 + Math.sin(u * RK_TAU * 3 + (lane.phase || 0)) * .018 * (lane.wobble || .6) * bulge;
+  return { x: Math.cos(a) * r, y: Math.sin(a) * r * .78, a };
+}
+function rocStars() {
+  if (ROC.stars) return ROC.stars;
+  let s = ''; try { s = String(me && me.uid || '') + '|'; } catch {}
+  let seed = 2166136261; for (let i = 0; i < s.length; i++) { seed ^= s.charCodeAt(i); seed = Math.imul(seed, 16777619); }
+  const rnd = () => { seed ^= seed << 13; seed ^= seed >>> 17; seed ^= seed << 5; return ((seed >>> 0) % 100000) / 100000; };
+  ROC.stars = Array.from({ length: 130 }, () => ({ x: rnd(), y: rnd(), r: .4 + rnd() * 1.5, a: .25 + rnd() * .75, tw: rnd() * RK_TAU }));
+  return ROC.stars;
+}
+function rocDraw() {
+  const cv = $('#rocketCanvas'); if (!cv) return;
+  const b = cv.getBoundingClientRect(), w = Math.max(1, Math.round(b.width)), h = Math.max(1, Math.round(b.height));
+  const dpr = Math.min(2, window.devicePixelRatio || 1), px = Math.round(w * dpr), py = Math.round(h * dpr);
+  if (ROC.px !== px || ROC._h !== h) { ROC.px = px; ROC._h = h; cv.width = px; cv.height = py; ROC.g = cv.getContext('2d'); }
+  const g = ROC.g; if (!g) return;
+  g.setTransform(px / w, 0, 0, py / h, 0, 0); g.clearRect(0, 0, w, h);
+  const t = nowS(), cx = w / 2, cy = h / 2, R = Math.min(w, h) * .43;
+  const P = (x, y) => [cx + x * R, cy + y * R];
+  // fond spatial : étoiles + nébuleuses
+  const neb = g.createRadialGradient(cx - R * .5, cy - R * .4, R * .05, cx, cy, R * 1.5);
+  neb.addColorStop(0, 'rgba(70,30,110,.22)'); neb.addColorStop(.5, 'rgba(20,20,60,.12)'); neb.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = neb; g.fillRect(0, 0, w, h);
+  for (const st of rocStars()) {
+    const a = st.a * (.6 + .4 * Math.sin(t / 900 + st.tw));
+    g.globalAlpha = a; g.fillStyle = '#fff'; g.beginPath(); g.arc(st.x * w, st.y * h, st.r, 0, RK_TAU); g.fill();
+  }
+  g.globalAlpha = 1;
+  // orbite
+  g.strokeStyle = 'rgba(255,255,255,.07)'; g.lineWidth = 1; g.beginPath(); g.ellipse(cx, cy, R * .89, R * .89 * .78, 0, 0, RK_TAU); g.stroke();
+  // planètes sur le trajet
+  const planets = [
+    { u: .12, r: 9, c1: '#9ca3af', c2: '#4b5563', n: '' },
+    { u: .28, r: 13, c1: '#fbbf24', c2: '#b45309', n: '' },
+    { u: .46, r: 11, c1: '#60a5fa', c2: '#1e40af', n: '' },
+    { u: .62, r: 18, c1: '#f59e0b', c2: '#92400e', n: '' },
+    { u: .8, r: 15, c1: '#93c5fd', c2: '#1e3a8a', n: '' },
+  ];
+  for (const pl of planets) {
+    const p = rocPath(pl.u, { orbit: 1, phase: 0, wobble: 0 }), [x, y] = P(p.x, p.y);
+    gr = g.createRadialGradient(x - pl.r * .35, y - pl.r * .35, pl.r * .1, x, y, pl.r);
+    gr.addColorStop(0, pl.c1); gr.addColorStop(1, pl.c2);
+    g.fillStyle = gr; g.beginPath(); g.arc(x, y, pl.r, 0, RK_TAU); g.fill();
+  }
+  // SOLEIL au centre
+  const pulse = 1 + .04 * Math.sin(t / 500);
+  gr = g.createRadialGradient(cx, cy, R * .02, cx, cy, R * .2 * pulse);
+  gr.addColorStop(0, '#fff7c2'); gr.addColorStop(.35, '#fbbf24'); gr.addColorStop(.7, 'rgba(249,115,22,.55)'); gr.addColorStop(1, 'rgba(249,115,22,0)');
+  g.fillStyle = gr; g.beginPath(); g.arc(cx, cy, R * .2 * pulse, 0, RK_TAU); g.fill();
+  g.fillStyle = '#fde68a'; g.beginPath(); g.arc(cx, cy, R * .07 * pulse, 0, RK_TAU); g.fill();
+  // TERRE (départ / arrivée)
+  const ep = rocPath(0, { orbit: 1, phase: 0, wobble: 0 }), [ex, ey] = P(ep.x, ep.y);
+  gr = g.createRadialGradient(ex - 7, ey - 7, 2, ex, ey, 26);
+  gr.addColorStop(0, '#86efac'); gr.addColorStop(.5, '#22c55e'); gr.addColorStop(1, 'rgba(12,74,110,.2)');
+  g.fillStyle = gr; g.beginPath(); g.arc(ex, ey, 24, 0, RK_TAU); g.fill();
+  g.fillStyle = 'rgba(59,130,246,.8)'; g.beginPath(); g.arc(ex + 8, ey - 6, 6, 0, RK_TAU); g.arc(ex - 9, ey + 7, 5, 0, RK_TAU); g.fill();
+  g.fillStyle = '#d4d4d4'; g.font = '700 11px system-ui,sans-serif'; g.textAlign = 'center'; g.fillText('TERRE', ex, ey + 40);
+  // FUSÉES
+  const st = ROC.st;
+  if (st && st.track) {
+    const lanes = st.track.lanes || [], start = st.track.t0;
+    for (let i = 0; i < lanes.length; i++) {
+      const ln = lanes[i];
+      const u = Math.max(0, Math.min(1, (t - start) / (ln.finishMs || 1)));
+      const p = rocPath(u, ln), [x, y] = P(p.x, p.y);
+      const ang = p.a + Math.PI / 2;
+      g.save(); g.translate(x, y); g.rotate(ang);
+      // flamme
+      const fl = 8 + 5 * Math.abs(Math.sin(t / 60 + i));
+      if (u < 1 && (st.phase === 'racing' || st.phase === 'countdown')) {
+        gr = g.createLinearGradient(-fl, 0, 0, 0); gr.addColorStop(0, 'rgba(251,146,60,0)'); gr.addColorStop(.6, '#f97316'); gr.addColorStop(1, '#fde68a');
+        g.fillStyle = gr; g.beginPath(); g.moveTo(-4, -3); g.lineTo(-fl, 0); g.lineTo(-4, 3); g.closePath(); g.fill();
+      }
+      // corps
+      g.fillStyle = ln.color || '#fff'; g.strokeStyle = ln.glow || '#fff'; g.lineWidth = 1.5;
+      g.beginPath(); g.moveTo(11, 0); g.lineTo(-5, -5); g.lineTo(-3, 0); g.lineTo(-5, 5); g.closePath(); g.fill(); g.stroke();
+      g.fillStyle = 'rgba(255,255,255,.85)'; g.beginPath(); g.arc(2, 0, 2.2, 0, RK_TAU); g.fill();
+      g.restore();
+      if (u >= 1) { g.strokeStyle = 'rgba(255,255,255,.35)'; g.lineWidth = 1; g.beginPath(); g.arc(x, y, 12 + Math.sin(t / 200) * 2, 0, RK_TAU); g.stroke(); }
+      // pseudo au-dessus
+      g.font = '700 11px system-ui,sans-serif'; g.textAlign = 'center'; g.fillStyle = '#fff';
+      g.shadowColor = '#000'; g.shadowBlur = 4; g.fillText(String(ln.name || '').slice(0, 16), x, y - 14); g.shadowBlur = 0;
+    }
+  }
+}
+let gr;
+function rocLoop() { if (W.view === 'rocket' && ROC.info) rocDraw(); requestAnimationFrame(rocLoop); }
+rocBind(); requestAnimationFrame(rocLoop);
+
 // ============================================================= SLOTS · DUEL · TICKET À GRATTER
 const JP = 400, SYMS = ['🍒', '🍋', '🔔', '💎', '7', 'Z'], symH = (n) => '<i class="sy s' + n + '">' + SYMS[n] + '</i>';
 const SL = { grid: [[1, 0, 2], [0, 3, 1], [2, 1, 0]] };
@@ -3548,12 +3715,8 @@ function scAuto() {
 // ============================================================= JEUX OFFLINE (solo, serveur : offline.js)
 const O = { game: null, st: null, bal: null, bet: '100', mines: 3, auto: '', hist: { fuse: [], mines: [], bj: [], coin: [], dice: [], horses: [], russian: [], slots: [], duel: [], scratch: [] }, timer: 0, pp: [], run: 0, anim: false, hold: false, pick: { coin: 'pile', dice: 'over', horses: '1', russian: '1', slots: '1', duel: '0' } };
 const OMAP = { 'off-bj': 'bj', 'off-fuse': 'fuse', 'off-mine': 'mines', 'off-coin': 'coin', 'off-dice': 'dice', 'off-horses': 'horses', 'off-russian': 'russian', 'off-slots': 'slots', 'off-duel': 'duel', 'off-scratch': 'scratch', 'off-plinko': 'plinko' };
-const NG_DEFAULT = { lucky7: '7', bubbles: 'safe', frozen: '0', candy: 'cherry', heist: '1', orbit: 'mid', cards: '♠', rocket: '0', cannon: 'center', jewels: '1' };
-const NEW_IDS = ['lucky7', 'bubbles', 'frozen', 'candy', 'heist', 'orbit', 'cards', 'rocket', 'cannon', 'jewels'];
-NEW_IDS.forEach((k) => { OMAP['off-' + k] = k; O.hist[k] = []; O.pick[k] = NG_DEFAULT[k]; });
 O.hist.plinko = []; O.pick.plinko = 'med'; O.balls = 1;
-const OT = { bj: 'BLACKJACK SOLO', fuse: 'FUSÉ', mines: 'MINES', coin: 'PILE OU FACE', dice: 'DÉS', horses: 'COURSE DE CHEVAUX', russian: 'ROULETTE RUSSE', slots: 'SLOTS', duel: 'DUEL', scratch: 'TICKET À GRATTER', plinko: 'PLINKO',
-  lucky7: 'LUCKY 7', bubbles: 'BUBBLE POP', frozen: 'ICE BREAKER', candy: 'CANDY RUSH', heist: 'BANK HEIST', orbit: 'ORBIT', cards: 'SPEED CARDS', rocket: 'ROCKET RACE', cannon: 'CANNON BLAST', jewels: 'JEWEL CASCADE' };
+const OT = { bj: 'BLACKJACK SOLO', fuse: 'FUSÉ', mines: 'MINES', coin: 'PILE OU FACE', dice: 'DÉS', horses: 'COURSE DE CHEVAUX', russian: 'ROULETTE RUSSE', slots: 'SLOTS', duel: 'DUEL', scratch: 'TICKET À GRATTER', plinko: 'PLINKO' };
 const GEM = '<svg viewBox="0 0 24 24"><path d="M6 3h12l4 6-10 12L2 9z" fill="#bbf7d0" stroke="#fff" stroke-width="1.2" stroke-linejoin="round"/><path d="M2 9h20M9 3l3 6 3-6M12 9v12" fill="none" stroke="#16a34a" stroke-width="1"/></svg>';
 const BOMB = '<svg viewBox="0 0 24 24"><circle cx="11" cy="14" r="7.5" fill="#1c1c1c" stroke="#fca5a5" stroke-width="1.4"/><path d="M16 8l3-3M18 3v3M17 4h3" stroke="#fbbf24" stroke-width="1.6" stroke-linecap="round"/><circle cx="8.5" cy="11.5" r="1.8" fill="#fff" opacity=".5"/></svg>';
 async function osend(action, extra = {}) {
@@ -3797,7 +3960,6 @@ function ofDock() {
 }
 // ---- jeux « un coup » : pile ou face, dés, chevaux, roulette russe (tirage côté serveur, animation côté site)
 const INST = { coin: 1, dice: 1, horses: 1, russian: 1, slots: 1, duel: 1, plinko: 1 };
-NEW_IDS.forEach((k) => { INST[k] = 1; });
 const FOES = [{ n: 'Recrue', p: 60, m: 1.6 }, { n: 'Pistolero', p: 45, m: 2.1 }, { n: 'Légende', p: 25, m: 3.8 }, { n: 'Fantôme', p: 10, m: 9.6 }];
 const HM = [2.4, 3.8, 5.3, 8.6, 15.8], HP = [40, 25, 18, 11, 6], HCOL = ['#ef4444', '#3b82f6', '#22c55e', '#f59e0b', '#a855f7'];
 const rusM = (k) => Math.floor(0.96 * 6 / (6 - k) * 100) / 100;
@@ -3809,20 +3971,9 @@ const CH = {
   plinko: [['low', 'Faible', 5.6, 'gain max'], ['med', 'Moyen', 26, 'gain max'], ['high', 'Élevé', 130, 'gain max']],
   duel: FOES.map((f, i) => [String(i), f.n, f.m, f.p + ' % de réussite']),
   russian: [1, 2, 3, 4, 5].map((k) => [String(k), k + ' balle' + (k > 1 ? 's' : ''), rusM(k), Math.round(k / 6 * 100) + ' % de risque']),
-  lucky7: Array.from({ length: 10 }, (_, i) => [String(i), 'Chiffre ' + i, i === 7 ? 9.2 : i === 0 ? 0 : 1.8, i === 7 ? 'jackpot' : '']),
-  bubbles: [['safe', 'Zone sûre', 3.6, 'peu de risque'], ['risky', 'Zone risquée', 7.4, 'gros gain']],
-  frozen: Array.from({ length: 6 }, (_, i) => [String(i), 'Tuile ' + (i + 1), [0, 0, 0.4, 1.1, 2.6, 6.2][i], '']),
-  candy: Object.entries({ cherry: ['Cerise', 2.1], lemon: ['Citron', 3.2], mint: ['Menthe', 5.1], berry: ['Framboise', 9.4], gold: ['Bonbon d’or', 22] }).map(([k, v]) => [k, v[0], v[1], '']),
-  heist: [1, 2, 3, 4].map((i) => [String(i), 'Coffre ' + i, [2.2, 3.8, 5.6, 12.5][i - 1], 'jackpot possible']),
-  orbit: [['inner', 'Orbite interne', 8.2, 'risqué'], ['mid', 'Orbite moyenne', 3.4, ''], ['outer', 'Orbite externe', 1.9, 'sûr']],
-  cards: [['♠', 'Pique', 2.4], ['♥', 'Cœur', 2.4], ['♦', 'Carreau', 3.6], ['♣', 'Trèfle', 4.8]].map((a) => [a[0], a[1], a[2], '3 cartes']),
-  rocket: [{ n: 'Rouge', m: 2.35 }, { n: 'Bleue', m: 3.5 }, { n: 'Verte', m: 4.7 }, { n: 'Or', m: 7.1 }].map((f, i) => [String(i), 'Fusée ' + f.n, f.m, '']),
-  cannon: [['center', 'Cœur de cible', 12, 'difficile'], ['ring', 'Couronne', 3.8, ''], ['edge', 'Bord', 1.7, 'facile']],
-  jewels: [1, 2, 3, 4, 5].map((i) => [String(i), 'Joyau ' + i, [0.2, 0.5, 1.4, 3.8, 11.5][i - 1], '']),
 };
 const IDLE = { coin: 'Choisis pile ou face, puis lance la pièce', dice: 'Choisis ton pari, puis lance les dés', horses: 'Clique sur ton cheval, puis lance la course', russian: 'Choisis le nombre de balles, puis tire', slots: 'Lance les rouleaux : trois Z violets = jackpot', duel: 'Choisis ton adversaire, puis dégaine', plinko: 'Choisis le risque et le nombre de billes, puis lâche-les' };
 const BUSY = { coin: 'La pièce tourne…', dice: 'Les dés roulent…', horses: 'La course est lancée…', russian: 'Le barillet tourne…', slots: 'Les rouleaux tournent…', duel: 'Le duel commence…', plinko: 'Les billes tombent…' };
-NEW_IDS.forEach((k) => { IDLE[k] = 'Choisis ton option puis lance l’animation'; BUSY[k] = 'Animation en cours…'; });
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 const alive = (tok) => O.run === tok;
 const flr2 = (x) => Math.floor(x * 100 + 1e-9) / 100;
@@ -3854,162 +4005,6 @@ function fxPulse(el, win) {
   el.animate([{ transform: 'scale(1)', filter: 'brightness(1)' }, { transform: 'scale(1.06)', filter: 'brightness(1.7)' }, { transform: 'scale(1)', filter: 'brightness(1)' }], { duration: win ? 620 : 400, iterations: win ? 2 : 1, easing: 'ease-out' });
 }
 
-// ---- moteur d'animation des 10 nouveaux jeux (même ADN visuel : charge, spin, lock, révélation)
-const NG_C = ['#fbbf24', '#22d3ee', '#a78bfa', '#34d399', '#fb7185', '#60a5fa', '#f472b6', '#facc15'];
-function ngRoundRect(x, X, Y, W, H, r) { x.beginPath(); x.roundRect(X, Y, W, H, r); }
-function ngText(x, t, X, Y, size, color, weight) { x.fillStyle = color || '#fff'; x.font = (weight || 900) + ' ' + size + 'px system-ui,sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(String(t), X, Y); }
-function ngGem(x, cx, cy, r, c) {
-  x.save(); x.translate(cx, cy); x.fillStyle = c; x.strokeStyle = 'rgba(255,255,255,.75)'; x.lineWidth = 1.4;
-  x.shadowColor = c; x.shadowBlur = 14;
-  x.beginPath(); x.moveTo(0, -r); x.lineTo(r * .8, -r * .25); x.lineTo(r * .55, r * .8); x.lineTo(-r * .55, r * .8); x.lineTo(-r * .8, -r * .25); x.closePath(); x.fill(); x.stroke();
-  x.shadowBlur = 0; x.fillStyle = 'rgba(255,255,255,.45)'; x.beginPath(); x.moveTo(0, -r * .8); x.lineTo(r * .35, -r * .1); x.lineTo(0, r * .2); x.closePath(); x.fill(); x.restore();
-}
-function ngDraw(x, w, h, st, t, spin) {
-  x.clearRect(0, 0, w, h);
-  const cx = w / 2, cy = h / 2 + 6;
-  // fond dynamique : grille + halo qui pulse
-  x.fillStyle = '#050506'; x.fillRect(0, 0, w, h);
-  x.strokeStyle = 'rgba(255,255,255,.035)'; x.lineWidth = 1;
-  for (let i = 0; i < w; i += 34) { x.beginPath(); x.moveTo(i, 0); x.lineTo(i, h); x.stroke(); }
-  for (let i = 0; i < h; i += 34) { x.beginPath(); x.moveTo(0, i); x.lineTo(w, i); x.stroke(); }
-  const pulse = 0.16 + Math.sin(t / 180) * 0.05;
-  const gl = x.createRadialGradient(cx, cy, 0, cx, cy, h * .75);
-  gl.addColorStop(0, `rgba(251,191,36,${pulse})`); gl.addColorStop(.55, 'rgba(124,58,237,.08)'); gl.addColorStop(1, 'rgba(0,0,0,0)');
-  x.fillStyle = gl; x.fillRect(0, 0, w, h);
-  // anneaux tournants
-  for (let k = 0; k < 3; k++) {
-    x.save(); x.translate(cx, cy); x.rotate(t / (900 + k * 600) * (k % 2 ? -1 : 1));
-    x.strokeStyle = `rgba(251,191,36,${.22 - k * .05})`; x.lineWidth = 2;
-    x.setLineDash([8 + k * 7, 16 + k * 10]); x.beginPath(); x.arc(0, 0, 92 + k * 42, 0, 7); x.stroke(); x.restore();
-  }
-  x.setLineDash([]);
-  const S = st || {}, rev = !spin && t > 2600;
-  if (S.type === 'lucky7') {
-    const vals = spin ? [0, 1, 2].map((k) => (Math.floor(t / 90 + k * 3) % 10)) : S.reel || [7, 7, 7];
-    vals.forEach((v, i) => {
-      const X = cx + (i - 1) * 118, Y = cy - 62, W = 102, H = 124;
-      ngRoundRect(x, X - W / 2, Y - H / 2, W, H, 14); x.fillStyle = i === 1 ? '#171205' : '#0d0d0d'; x.fill();
-      x.strokeStyle = v === 7 && rev ? '#fbbf24' : '#333'; x.lineWidth = v === 7 && rev ? 3 : 1.5; x.stroke();
-      ngText(x, v, X, Y, 74, v === 7 && rev ? '#fde68a' : '#fff');
-      if (v === 7 && rev) { x.shadowColor = '#fbbf24'; x.shadowBlur = 22; ngText(x, '7', X, Y, 74, '#fde68a'); x.shadowBlur = 0; }
-    });
-  } else if (S.type === 'bubbles') {
-    const hit = rev ? S.hit : Math.floor(t / 160) % 8;
-    for (let i = 0; i < 8; i++) {
-      const a = i * Math.PI / 4 + t / 2600, bx = cx + Math.cos(a) * 128, by = cy + Math.sin(a) * 96;
-      const r = i === hit && rev ? 34 + Math.sin(t / 90) * 3 : 25;
-      const g = x.createRadialGradient(bx - 8, by - 9, 2, bx, by, r);
-      g.addColorStop(0, 'rgba(255,255,255,.8)'); g.addColorStop(.35, i === hit && rev ? '#fbbf24' : '#22d3ee'); g.addColorStop(1, 'rgba(8,47,73,.85)');
-      x.fillStyle = g; x.beginPath(); x.arc(bx, by, r, 0, 7); x.fill();
-      x.strokeStyle = i === hit && rev ? '#fde68a' : 'rgba(255,255,255,.5)'; x.lineWidth = i === hit && rev ? 3 : 1.5; x.stroke();
-    }
-  } else if (S.type === 'frozen') {
-    const vals = spin ? Array.from({ length: 6 }, (_, i) => (Math.floor(t / 130 + i * 2) % 7)) : S.tiles || [];
-    vals.forEach((v, i) => {
-      const X = cx + (i % 3 - 1) * 104, Y = cy + (Math.floor(i / 3) - .5) * 132;
-      ngRoundRect(x, X - 46, Y - 56, 92, 112, 12);
-      x.fillStyle = i === S.pick && rev ? 'rgba(251,191,36,.2)' : 'rgba(190,227,248,.09)'; x.fill();
-      x.strokeStyle = i === S.pick && rev ? '#fbbf24' : 'rgba(224,242,254,.5)'; x.lineWidth = i === S.pick && rev ? 3 : 1.4; x.stroke();
-      ngText(x, rev && i === S.pick ? 'x' + v : '❄', X, Y, rev && i === S.pick ? 32 : 40, i === S.pick && rev ? '#fde68a' : '#e0f2fe');
-    });
-  } else if (S.type === 'candy') {
-    const keys = ['cherry', 'lemon', 'mint', 'berry', 'gold'];
-    const idx = rev ? Math.max(0, keys.indexOf(S.landed)) : Math.floor(t / 120) % 5;
-    for (let i = 0; i < 10; i++) {
-      const a = -Math.PI / 2 + i * Math.PI / 5, r = 118, X = cx + Math.cos(a) * r, Y = cy + Math.sin(a) * r;
-      x.fillStyle = NG_C[i % NG_C.length]; x.globalAlpha = i % 2 ? .35 : .75;
-      x.beginPath(); x.arc(X, Y, 25, 0, 7); x.fill(); x.globalAlpha = 1;
-    }
-    const a = -Math.PI / 2 + idx * Math.PI / 5;
-    x.strokeStyle = '#fde68a'; x.lineWidth = 3; x.beginPath(); x.arc(cx + Math.cos(a) * 118, cy + Math.sin(a) * 118, 31, 0, 7); x.stroke();
-    ngText(x, rev ? (S.landed === S.pick ? 'JACKPOT' : S.landed) : '???', cx, cy, rev ? 34 : 26, rev && S.landed === S.pick ? '#fde68a' : '#fff');
-  } else if (S.type === 'heist') {
-    for (let i = 0; i < 4; i++) {
-      const X = cx + (i % 2 - .5) * 180, Y = cy + (Math.floor(i / 2) - .5) * 150;
-      ngRoundRect(x, X - 76, Y - 60, 152, 120, 14); x.fillStyle = i === S.pick && rev ? 'rgba(251,191,36,.16)' : '#0c0c0c'; x.fill();
-      x.strokeStyle = i === S.pick && rev ? '#fbbf24' : '#333'; x.lineWidth = i === S.pick && rev ? 3 : 1.5; x.stroke();
-      x.beginPath(); x.arc(X, Y - 12, 24, 0, 7); x.stroke(); ngText(x, i + 1, X, Y - 12, 24, '#aaa');
-      ngText(x, rev && i === S.pick ? 'x' + S.value : '🔒', X, Y + 28, rev && i === S.pick ? 30 : 24, i === S.pick && rev ? '#fde68a' : '#666');
-    }
-  } else if (S.type === 'orbit') {
-    for (let k = 0; k < 3; k++) { x.strokeStyle = NG_C[k]; x.globalAlpha = .55; x.lineWidth = 2; x.beginPath(); x.arc(cx, cy, 52 + k * 52, 0, 7); x.stroke(); x.globalAlpha = 1; }
-    const ringN = { inner: 0, mid: 1, outer: 2 }[S.ring || 'mid'];
-    const a = t / 420, rr = rev ? 52 + (S.land || 0) * 20 + ringN * 52 : 52 + ringN * 52 + Math.sin(t / 200) * 10;
-    const bx = cx + Math.cos(a) * rr, by = cy + Math.sin(a) * rr;
-    x.shadowColor = '#fbbf24'; x.shadowBlur = 18; x.fillStyle = '#fde68a'; x.beginPath(); x.arc(bx, by, 9, 0, 7); x.fill(); x.shadowBlur = 0;
-    ngText(x, rev ? 'x' + S.mult : '…', cx, cy, rev ? 46 : 28, rev ? '#fde68a' : '#fff');
-  } else if (S.type === 'cards') {
-    const cs = spin ? ['♠', '♥', '♦', '♣'] : S.cards || ['♠', '♠', '♠'];
-    cs.forEach((c, i) => {
-      const X = cx + (i - 1) * 104, Y = cy + (i === 1 ? -16 : 10);
-      x.save(); x.translate(X, Y); x.rotate((i - 1) * .11 + (spin ? Math.sin(t / 160 + i) * .08 : 0));
-      ngRoundRect(x, -52, -72, 104, 144, 10); x.fillStyle = '#f5f5f4'; x.fill(); x.strokeStyle = '#d4d4d8'; x.lineWidth = 2; x.stroke();
-      ngText(x, c, 0, 0, 62, ['♥', '♦'].includes(c) ? '#dc2626' : '#111'); x.restore();
-    });
-  } else if (S.type === 'rocket') {
-    const prog = rev ? [1, .72, .55, .4] : Array.from({ length: 4 }, (_, i) => .35 + ((t / 1400 + i * .22) % .7));
-    for (let i = 0; i < 4; i++) {
-      const Y = cy - 66 + i * 44, X = cx - 120 + prog[i] * 250;
-      x.fillStyle = NG_C[i]; x.beginPath(); x.moveTo(X + 26, Y); x.lineTo(X - 14, Y - 11); x.lineTo(X - 8, Y); x.lineTo(X - 14, Y + 11); x.closePath(); x.fill();
-      x.fillStyle = 'rgba(255,255,255,.12)'; x.fillRect(cx - 130, Y + 17, 260, 4);
-      x.fillStyle = NG_C[i]; x.fillRect(cx - 130, Y + 17, 260 * prog[i], 4);
-      if (rev && i === S.winner) ngText(x, '🏆', X + 44, Y, 22, '#fde68a');
-    }
-  } else if (S.type === 'cannon') {
-    const rings = [128, 88, 46];
-    rings.forEach((r, i) => { x.strokeStyle = NG_C[i === 0 ? 2 : i === 1 ? 3 : 0]; x.lineWidth = 18; x.beginPath(); x.arc(cx, cy, r, 0, 7); x.stroke(); });
-    const idx = rev ? S.hit : Math.floor(t / 150) % 3, a = t / 320;
-    const bx = cx + Math.cos(a) * (idx === 0 ? 46 : idx === 1 ? 88 : 128), by = cy + Math.sin(a) * (idx === 0 ? 46 : idx === 1 ? 88 : 128);
-    x.shadowColor = '#fbbf24'; x.shadowBlur = 18; x.fillStyle = '#fde68a'; x.beginPath(); x.arc(bx, by, 10, 0, 7); x.fill(); x.shadowBlur = 0;
-    x.strokeStyle = '#fde68a'; x.lineWidth = 3; x.beginPath(); x.moveTo(cx, cy + 160); x.lineTo(bx, by); x.stroke();
-    ngText(x, rev ? 'x' + S.mult : '🎯', cx, cy - 4, rev ? 38 : 30, '#fff');
-  } else if (S.type === 'jewels') {
-    const cells = spin ? Array.from({ length: 25 }, (_, i) => (Math.floor(t / 110 + i * 3) % 5) + 1) : S.grid || [];
-    cells.forEach((v, i) => {
-      const X = cx + (i % 5 - 2) * 64, Y = cy - 70 + Math.floor(i / 5) * 36;
-      const on = rev && Number(v) === Number(S.pick);
-      ngGem(x, X, Y, on ? 22 : 17, NG_C[(Number(v) - 1) % NG_C.length]);
-      if (on) { x.strokeStyle = '#fde68a'; x.lineWidth = 2; x.beginPath(); x.arc(X, Y, 25, 0, 7); x.stroke(); }
-    });
-  }
-}
-async function aNewGame(st, tok) {
-  const cv = $('#oNewCv'), pop = $('#oNewPop'), ban = $('#oNewBan'), flash = $('#oNewFlash'), sc = cv && cv.closest('.nsc');
-  if (!cv) return;
-  const dpr = window.devicePixelRatio || 1, draw = () => {
-    const w = cv.clientWidth || 520, h = cv.clientHeight || 330;
-    if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
-    const x = cv.getContext('2d'); x.setTransform(dpr, 0, 0, dpr, 0, 0);
-    return { x, w, h };
-  };
-  SFX.wspin();
-  const t0 = performance.now(), D = 3900;
-  let beep = 0;
-  await new Promise((res) => {
-    const step = (now) => {
-      if (!alive(tok)) return res();
-      const t = now - t0;
-      const { x, w, h } = draw();
-      ngDraw(x, w, h, st, t, t < 2600);
-      if (ban) ban.textContent = t < 900 ? 'CHARGEMENT…' : t < 2600 ? 'SPIN…' : t < 3150 ? 'LOCK !' : (st.win > 0 ? 'GAGNÉ !' : 'PERDU');
-      if (t > 2600 && !pop.dataset.on) {
-        pop.dataset.on = '1';
-        pop.textContent = st.win > 0 ? '+' + num(st.win) + ' ' + COIN : '×' + (st.mult || 0);
-        pop.animate([{ opacity: 0, transform: 'translate(-50%,-50%) scale(.4) rotate(-8deg)' }, { opacity: 1, transform: 'translate(-50%,-50%) scale(1.12) rotate(2deg)', offset: .55 }, { opacity: 1, transform: 'translate(-50%,-50%) scale(1)' }], { duration: 620, easing: 'cubic-bezier(.2,.9,.25,1)', fill: 'forwards' });
-        if (flash) flash.animate([{ opacity: 0 }, { opacity: st.win > 0 ? 1 : .38, offset: .2 }, { opacity: 0 }], { duration: 700 });
-        fxPulse(sc, st.win > 0);
-        if (st.win > 0) { fxStart(true, '#fde68a'); SFX.win(); }
-        else tone(160, .12, 'sawtooth', .05);
-      }
-      if (t > 600 && t - beep > 190 && t < 2600) { beep = t; tone(700 + Math.random() * 500, .02, 'square', .018); }
-      if (t >= D) return res();
-      requestAnimationFrame(step);
-    };
-    requestAnimationFrame(step);
-  });
-  if (!alive(tok)) return;
-  if (ban) ban.textContent = st.win > 0 ? 'GAGNÉ !' : 'PERDU';
-}
 function ofRelease() { O.anim = false; if (O.hold) { O.hold = false; if (O.bal != null) $('#meBal').textContent = num(O.bal) + ' ' + COIN; } }
 function ofGoLabel() {
   const b = $('#oGo'); if (!b || !INST[O.game]) return;
@@ -4039,8 +4034,7 @@ function rInst(s) {
   else if (!s) msg.replaceChildren(el('span', '', IDLE[O.game]));
   else {
     const net = Math.round((s.win - s.bet) * 100) / 100;
-    let head = s.type === 'plinko' ? (s.n + ' bille' + (s.n > 1 ? 's' : '') + ' · x' + s.mult) : s.type === 'slots' ? (s.mult ? 'x' + s.mult : 'Pas de ligne') : s.type === 'duel' ? (s.win > 0 ? 'Tu dégaines le premier !' : 'Trop lent…') : s.type === 'coin' ? (s.side === 'pile' ? 'PILE' : 'FACE') : s.type === 'dice' ? s.a + ' + ' + s.b + ' = ' + s.sum : s.type === 'horses' ? 'Cheval n°' + (s.winner + 1) + ' vainqueur' : s.dead ? 'BANG !' : 'Clic… tu survis';
-    if (NEW_IDS.includes(s.type)) head = s.type === 'lucky7' ? 'Rouleaux ' + (s.reel || []).join(' · ') : s.type === 'bubbles' ? 'Bulle ' + (s.hit + 1) : s.type === 'frozen' ? 'Tuile ' + (s.pick + 1) + ' · x' + s.value : s.type === 'candy' ? 'Roue : ' + s.landed : s.type === 'heist' ? 'Coffre ' + (s.pick + 1) + ' · x' + s.value : s.type === 'orbit' ? 'Orbite ' + s.ring : s.type === 'cards' ? (s.cards || []).join(' ') : s.type === 'rocket' ? 'Fusée ' + (s.winner + 1) : s.type === 'cannon' ? 'Zone ' + s.hit : 'Joyaux ' + s.count + ' trouvés';
+    const head = s.type === 'plinko' ? (s.n + ' bille' + (s.n > 1 ? 's' : '') + ' · x' + s.mult) : s.type === 'slots' ? (s.mult ? 'x' + s.mult : 'Pas de ligne') : s.type === 'duel' ? (s.win > 0 ? 'Tu dégaines le premier !' : 'Trop lent…') : s.type === 'coin' ? (s.side === 'pile' ? 'PILE' : 'FACE') : s.type === 'dice' ? s.a + ' + ' + s.b + ' = ' + s.sum : s.type === 'horses' ? 'Cheval n°' + (s.winner + 1) + ' vainqueur' : s.dead ? 'BANG !' : 'Clic… tu survis';
     msg.replaceChildren(el('span', s.win > 0 ? 'win' : 'lose', head + ' · ' + (net > 0 ? '+' : '') + num(net) + ' ' + COIN));
   }
   ofStatsInst();
@@ -4049,18 +4043,14 @@ async function ofInstant(st) {
   const tok = ++O.run; O.anim = true; O.st = null; ofRender();
   try {
     const anims = { coin: aCoin, dice: aDice, horses: aHorses, russian: aRussian, slots: aSlots, duel: aDuel, plinko: aPlinko };
-    NEW_IDS.forEach((k) => { anims[k] = aNewGame; });
-    const fn = anims[st.type] || aNewGame;
-    await fn(st, tok);
+    const fn = anims[st.type]; if (fn) await fn(st, tok);
   } catch (e) { console.error(e); }
   if (!alive(tok)) return;
-  if (!NEW_IDS.includes(st.type)) {
-    // refonte des animations : impact lumineux + particules + pulsation sur TOUS les jeux non protégés
-    const col = st.type === 'dice' || st.type === 'plinko' ? '#93c5fd' : st.type === 'horses' || st.type === 'fuse' ? '#f97316' : st.type === 'slots' ? '#c4b5fd' : st.type === 'duel' ? '#fca5a5' : '#fde68a';
-    fxStart(st.win > 0, col);
-    fxPulse($('#ofTable'), st.win > 0);
-    const sc = $('#ofTable'); if (sc && st.win > 0) { sc.classList.add('shake'); setTimeout(() => sc.classList.remove('shake'), 450); }
-  }
+  // impact lumineux + particules + pulsation sur tous les jeux « un coup »
+  const col = st.type === 'dice' || st.type === 'plinko' ? '#93c5fd' : st.type === 'horses' || st.type === 'fuse' ? '#f97316' : st.type === 'slots' ? '#c4b5fd' : st.type === 'duel' ? '#fca5a5' : '#fde68a';
+  fxStart(st.win > 0, col);
+  fxPulse($('#ofTable'), st.win > 0);
+  const sc = $('#ofTable'); if (sc && st.win > 0) { sc.classList.add('shake'); setTimeout(() => sc.classList.remove('shake'), 450); }
   ofRelease(); O.st = st; ofDone(null, st); ofRender();
 }
 function dieFace(d, n) {
@@ -4095,8 +4085,6 @@ function ofBuildInst(b) {
   } else if (g === 'slots') { b.innerHTML = '<div class="sc"><div class="slm" id="oSlm"><div class="slj">JACKPOT <b>x' + JP + '</b></div><div class="slr" id="oSlr"></div><div class="jpf" id="oJpf"></div></div></div>' + foot; slInit();
   } else if (g === 'plinko') { b.innerHTML = '<div class="sc plk" id="oPlkBox"><canvas id="oPlk"></canvas><div class="jpf" id="oJpf"></div></div>' + foot; plkReset();
   } else if (g === 'duel') { b.innerHTML = '<div class="sc"><div class="arena"><div class="sun"></div><div class="dnm" id="oFoeN"></div><div class="dban" id="oDban"></div><div class="fgt fme" id="oMe">' + FIGHTER('#1d4ed8', '#1e40af') + '</div><div class="fgt ffoe" id="oFoe">' + FIGHTER('#991b1b', '#7f1d1d') + '</div><div class="gnd"></div><div class="dms" id="oDms"></div></div></div>' + foot; duelPre();
-  } else if (NEW_IDS.includes(g)) {
-    b.innerHTML = '<div class="sc nsc"><div class="nstage"><canvas id="oNewCv"></canvas><div class="nflash" id="oNewFlash"></div><div class="npop" id="oNewPop"></div></div><div class="nban" id="oNewBan">PRÊT ?</div></div>' + foot;
   } else { b.innerHTML = '<div class="sc"><div class="rus"><div class="hmr"></div>' + cylSVG() + '</div><div class="flash" id="oFlash"></div></div>' + foot; rusPre(); }
 }
 // ---- animations (le résultat vient du serveur : l'animation ne fait que le révéler)

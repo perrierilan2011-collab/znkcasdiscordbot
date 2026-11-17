@@ -55,8 +55,8 @@ function sharesFor(n) {
   for (const v of w) tot.push(v / sum);
   return tot;
 }
-/** Multiplicateur appliqué à la mise d'un joueur selon son rang et le nombre de partants. */
-const multFor = (rank, n) => floor2((sharesFor(n)[rank] || 0) * n / (1 - HOUSE_EDGE));
+/** Multiplicateur indicatif (mises égales) : part du pot APRÈS commission / part d'un partant. */
+const multFor = (rank, n) => floor2((sharesFor(n)[rank] || 0) * n * (1 - HOUSE_EDGE));
 
 const INFO = { min: MIN_BET, max: MAX_BET, rockets: ROCKETS, betSeconds: BET_TIME_MS / 1000, houseEdge: HOUSE_EDGE };
 
@@ -308,14 +308,22 @@ class RocketRaceRoom {
     const ranking = this.track.ranking;
     const byUid = new Map(this.players.values().map((p) => [p.uid, p]));
     const recapPlayers = [];
+    // Le POT est redistribué au classement : la maison prélève HOUSE_EDGE,
+    // le reste est réparti selon sharesFor(rang), quelles que soient les mises.
+    const pot = floor2(ranking.reduce((a, uid) => a + (byUid.get(uid)?.bet || 0), 0));
+    const spendable = floor2(pot * (1 - HOUSE_EDGE));
     const shares = sharesFor(ranking.length);
-    const multipliers = ranking.map((_, i) => floor2(shares[i] * ranking.length / (1 - HOUSE_EDGE)));
+    const wins = ranking.map((_, i) => floor2(spendable * shares[i]));
+    const multipliers = ranking.map((_, i) => {
+      const stake = byUid.get(ranking[i])?.bet || 0;
+      return stake > 0 ? floor2(wins[i] / stake) : 0;
+    });
     for (let i = 0; i < ranking.length; i++) {
       const uid = ranking[i];
       const p = byUid.get(uid);
       if (!p) continue;
       const stake = p.bet;
-      const win = floor2(stake * multipliers[i]);
+      const win = wins[i];
       let paid = true;
       if (win > 0) {
         try { p.bal = await this.deps.credit(p.uid, win); }
@@ -328,7 +336,7 @@ class RocketRaceRoom {
       recapPlayers.push({ uid: p.uid, name: p.name, bet: stake, win, net: p.net, mult: multipliers[i], rank: i + 1, detail: `arrivé n°${i + 1}/${ranking.length}` });
       this.say(`🏁 ${p.name} arrivé n°${i + 1} · ${p.net >= 0 ? '+' : ''}${p.net}`);
     }
-    this.result = { ranking, multipliers, pot: floor2(ranking.reduce((a, uid) => a + (byUid.get(uid)?.bet || 0), 0)) };
+    this.result = { ranking, multipliers, pot };
     this.history.unshift(ranking[0]);
     if (this.history.length > 12) this.history.pop();
     this.phase = 'result';
