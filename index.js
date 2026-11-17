@@ -30,7 +30,7 @@ const { createClient } = require('@supabase/supabase-js');
 const fs = require('fs');
 const path = require('path');
 
-// Images de fond : dossier ./images à côté de index.js (les variables Railway *_BG_URL restent prioritaires)
+// Background images: ./images folder next to index.js (Railway *_BG_URL variables take priority)
 const IMG_DIR = path.join(__dirname, 'images');
 const localImg = (file) => {
   try {
@@ -40,36 +40,25 @@ const localImg = (file) => {
     return '';
   }
 };
-// Bannière de fond (image sans texte) au-dessus d'un panneau : images/panel_*.png (ignorée si le fichier n'existe pas)
-// CARD_GIF=off : retour aux images fixes PNG (aucune animation)
+// Background banner (image without text) above a panel: images/panel_*.png (ignored if file does not exist)
+// CARD_GIF=off: fall back to static PNG images (no animation)
 const CARD_GIF = false; // disabled — no GIF/image cards
-// Image/GIF system disabled except for the ONLINE panel banner (panel_online.png)
+// Image system removed: panels, cards, banners and GIFs are text embeds only.
 function withBanner(payload, file) {
-  try {
-    // Only keep the ONLINE panel image — no GIFs, no other banners
-    if (String(file) !== 'panel_online.png') return payload;
-    const p = localImg('panel_online.png');
-    const e = payload.embeds?.[0];
-    if (!p || !e) return payload;
-    e.setImage('attachment://panel_online.png');
-    payload.files = [...(payload.files || []), new AttachmentBuilder(p, { name: 'panel_online.png' })];
-  } catch {
-    /* optional */
-  }
   return payload;
 }
-// Panneau / menu sans image : bannière générique (images/generic_text_card) AVEC le texte du panneau écrit dessus
-// (titre, sous-titre, quelques lignes). Avant, le fond vide était envoyé tel quel : on ne voyait rien dessus.
-// - la 1re fois : image fixe avec le texte (instantanée) ; le GIF animé est calculé en arrière-plan puis réutilisé.
-// - si tout le texte tient sur l'image (pas de bloc de code, <= 5 lignes), le titre/description de l'embed sont retirés
-//   pour ne pas afficher deux fois la même chose ; sinon l'embed garde son texte.
-// attachments: [] retire l'ancienne bannière quand le panneau est mis à jour (sinon elle s'afficherait en double).
+// Panel / menu without image: generic banner (images/generic_text_card) WITH the panel text written on it
+// (title, subtitle, a few lines). Before, the empty background was sent as-is: nothing was visible on it.
+// - first time: static image with text (instant); the animated GIF is computed in the background then reused.
+// - if all text fits on the image (no code block, <= 5 lines), the embed title/description are removed
+//   to avoid showing the same thing twice; otherwise the embed keeps its text.
+// attachments: [] removes the old banner when the panel is updated (otherwise it would show twice).
 const BANNER_FILE = 'generic_text_card.png';
-const bannerCache = new Map(); // clé texte -> { png, gif, complete }
+const bannerCache = new Map(); // key text -> { png, gif, complete }
 const bannerPending = new Set();
 let bannerBg = null;
 let bannerBgLoading = false;
-// Chargement ASYNCHRONE du fond (un décodage synchrone dessinerait une image vide). Tant qu'il n'est pas prêt : pas de bannière.
+// ASYNC background loading (synchronous decoding would draw an empty image). Until ready: no banner.
 function getBannerBg() {
   if (bannerBg || bannerBgLoading || !canvasLib) return bannerBg;
   const p = localImg(BANNER_FILE);
@@ -80,7 +69,7 @@ function getBannerBg() {
     .then((img) => {
       bannerBg = img;
     })
-    .catch((e) => console.error('[bannière] fond illisible :', e?.message || e))
+    .catch((e) => console.error('[banner] unreadable background:', e?.message || e))
     .finally(() => {
       bannerBgLoading = false;
     });
@@ -93,7 +82,7 @@ const bannerPlain = (s) =>
       .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
       .replace(/[*_~`|]/g, '')
       .replace(/^\s*[>#-]+\s*/, '')
-      .replace(/[\u2190-\u21FF\u25A0-\u25FF\u2600-\u27BF\u2B00-\u2BFF]/g, '') // ✦ ★ ▶ ➜ ... (pas dans la police du bot)
+      .replace(/[\u2190-\u21FF\u25A0-\u25FF\u2600-\u27BF\u2B00-\u2BFF]/g, '') // ✦ ★ ▶ ➜ ... (not in the bot font)
   );
 function bannerInfo(embed) {
   const d = embed.data || {};
@@ -118,7 +107,7 @@ function wrapLines(g, text, maxW) {
   if (cur) out.push(cur);
   return out;
 }
-// Dessine le texte sur le fond vide. Renvoie { cv, complete } (complete = rien n'a été tronqué)
+// Draws text on the empty background. Returns { cv, complete } (complete = nothing was truncated)
 function drawPanelBanner(info, bg) {
   const W = 800, H = 400, SC = 1.25;
   const cv = canvasLib.createCanvas(W * SC, H * SC);
@@ -128,7 +117,7 @@ function drawPanelBanner(info, bg) {
   const sw = W / k, sh = H / k;
   g.drawImage(bg, (bg.width - sw) / 2, (bg.height - sh) / 2, sw, sh, 0, 0, W, H);
   const FONT = STATS_FONT;
-  // avatar : étoile blanche dans le cercle du gabarit
+  // avatar: white star in the template circle
   g.fillStyle = 'rgba(255,255,255,0.85)';
   drawStar(g, CARD_L.av.cx, CARD_L.av.cy, CARD_L.av.d * 0.3);
   const tx = CARD_L.tx;
@@ -152,7 +141,7 @@ function drawPanelBanner(info, bg) {
   g.font = `15px ${FONT}`;
   const hasSub = !!info.lines[0] && g.measureText(info.lines[0]).width <= tmax;
   if (hasSub) g.fillText(info.lines[0], tx, 145);
-  // grand cadre : les autres lignes (retour à la ligne automatique)
+  // main frame: the other lines (automatic line wrapping)
   g.font = `17px ${FONT}`;
   const body = info.lines.slice(hasSub ? 1 : 0).flatMap((l) => wrapLines(g, l, 600));
   const MAXL = 4;
@@ -165,7 +154,7 @@ function drawPanelBanner(info, bg) {
     g.fillStyle = 'rgba(255,255,255,0.92)';
     shown.forEach((l, n) => g.fillText(shown.length === MAXL && n === MAXL - 1 && body.length > MAXL ? fitText(g, `${l}…`, 600) : l, 386, y0 + n * lh));
   } else {
-    // rien d'autre à dire : le titre en grand dans le cadre
+    // nothing else to say: title in large text in the frame
     g.fillStyle = '#FFFFFF';
     g.font = `bold 30px ${FONT}`;
     g.fillText(fitText(g, info.title || 'ZNK CASINO', 600), 386, 258);
@@ -179,7 +168,7 @@ function panelBanner(embed) {
 function animPanel(payload) {
   return payload;
 }
-// Prépare les GIF des panneaux principaux au démarrage (le 1er clic sur « Jouer » est alors déjà animé)
+// Prepares main panel GIFs at startup (the first "Play" click is then already animated)
 function warmPanelBanners() {
   if (!canvasLib) return;
   for (const f of [() => buildGameMenuPayload(null, 0, 'all'), () => buildSettingsPayload(null), () => buildRulesPayload(null)]) {
@@ -191,7 +180,7 @@ function warmPanelBanners() {
   }
 }
 const bgSource = (envName, file) => String(process.env[envName] || '').trim() || localImg(file);
-// Charge une image depuis une URL http(s) ou un fichier local
+// Loads an image from an http(s) URL or a local file
 async function readImageSource(src, loadImage, timeoutMs = 8000) {
   if (!/^https?:\/\//i.test(src)) return loadImage(fs.readFileSync(src));
   const ctl = new AbortController();
@@ -205,28 +194,28 @@ async function readImageSource(src, loadImage, timeoutMs = 8000) {
   }
 }
 
-// Bannière de stats : npm i @napi-rs/canvas  (optionnel, sinon repli en embed texte)
+// Stats banner: npm i @napi-rs/canvas  (optional, otherwise falls back to text embed)
 let canvasLib = null;
 try {
   canvasLib = require('@napi-rs/canvas');
 } catch {
-  console.warn('[stats] @napi-rs/canvas absent : la bannière de stats sera remplacée par un embed texte (npm i @napi-rs/canvas).');
+  console.warn('[stats] @napi-rs/canvas missing: stats banner will be replaced by a text embed (npm i @napi-rs/canvas).');
 }
 
-// Cartes animées : le décor (étoiles, halo, reflets) bouge en douceur, le texte reste fixe.
-// Renvoie un GIF en boucle, ou le PNG classique si l'animation est coupée / impossible.
+// Animated cards: the decor (stars, halo, reflections) moves smoothly, the text stays fixed.
+// Returns a looping GIF, or the classic PNG if animation is off / impossible.
 const fxAnim = require('./games/fx');
 const imgExt = (b) => (b && b[0] === 0x47 && b[1] === 0x49 && b[2] === 0x46 ? 'gif' : 'png');
 async function animOrPng(cv, file, src) {
   if (!CARD_GIF) return cv.toBuffer('image/png');
   if (!canvasLib || !file) return cv.toBuffer('image/png');
-  // src = fond réellement utilisé (fichier local OU lien *_BG_URL) : on anime dans les deux cas
+  // src = actually used background (local file OR *_BG_URL link): animation is applied in both cases
   const gif = await fxAnim.animateCard(canvasLib, cv, file, IMG_DIR, { src: src || localImg(file) });
   if (gif) return gif;
   return cv.toBuffer('image/png');
 }
 
-// Police embarquée (dossier ./fonts) : indispensable sur les serveurs sans polices système (Railway...)
+// Embedded font (./fonts folder): essential on servers without system fonts (Railway...)
 let STATS_FONT = 'sans-serif';
 if (canvasLib && canvasLib.GlobalFonts) {
   try {
@@ -238,12 +227,12 @@ if (canvasLib && canvasLib.GlobalFonts) {
     }
     if (loaded) {
       STATS_FONT = 'ZNKSans';
-      console.log(`[stats] ${loaded} police(s) chargée(s) depuis ${dir} : ${files.join(', ')}`);
+      console.log(`[stats] ${loaded} font(s) loaded from ${dir}: ${files.join(', ')}`);
     } else {
-      console.warn(`[stats] aucune police valide dans ${dir} (fichiers trouvés : ${files.join(', ') || 'aucun'}) : le texte de la bannière sera invisible.`);
+      console.warn(`[stats] no valid font in ${dir} (files found: ${files.join(', ') || 'none'}) : banner text will be invisible.`);
     }
   } catch (e) {
-    console.warn('[stats] enregistrement de la police impossible :', e?.message || e);
+    console.warn('[stats] could not save font:', e?.message || e);
   }
 }
 
@@ -253,13 +242,13 @@ if (canvasLib && canvasLib.GlobalFonts) {
 const PREFIX = '!';
 
 // ---- MONNAIE (modifiable depuis Railway > Variables) ----
-//  COIN_EMOJI : ce qui s'affiche partout à côté des montants (défaut : 🪙)
-//  COIN_TEXT  : version texte pour les endroits sans emoji (image canvas, pop-ups)
-//               si absente, on réutilise COIN_EMOJI
+//  COIN_EMOJI: what appears everywhere next to amounts (default: 🪙)
+//  COIN_TEXT  : text version for places without emoji (canvas image, pop-ups)
+//               if absent, COIN_EMOJI is reused
 const COIN = String(process.env.COIN_EMOJI || '🪙').trim() || '🪙';
 const COIN_PLAIN = String(process.env.COIN_TEXT || COIN).trim() || COIN;
 const plain = (s) => String(s).split(COIN).join(COIN_PLAIN);
-console.log(`[coin] ${COIN} (texte : ${COIN_PLAIN})`);
+console.log(`[coin] ${COIN} (text: ${COIN_PLAIN})`);
 
 const DAILY_AMOUNT = 30;
 const INVITE_REWARD = Math.max(1, Number(process.env.INVITE_REWARD) || 10);
@@ -271,14 +260,15 @@ const EPH = MessageFlags.Ephemeral;
 const { DISCORD_TOKEN, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } = process.env;
 if (!DISCORD_TOKEN || !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
   console.error(
-    '❌ Variables manquantes : DISCORD_TOKEN, SUPABASE_URL et SUPABASE_SERVICE_ROLE_KEY sont obligatoires.'
+    '❌ Missing environment variables: DISCORD_TOKEN, SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required.'
   );
   process.exit(1);
 }
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
-  // Node < 22 n'a pas de WebSocket natif : on fournit "ws" (sinon crash au démarrage)
+
+  // Node < 22 has no native WebSocket: provide "ws" (otherwise it crashes on startup)
   realtime: { transport: require('ws') },
 });
 
@@ -294,9 +284,9 @@ const client = new Client({
 });
 
 const COLORS = {
-  green: 0xA81CFD, // victoire = violet ZNK
-  red: 0x2B0A3D, // défaite = violet très sombre
-  grey: 0x6B5B7B, // égalité / neutre
+  green: 0xA81CFD, // win = ZNK violet
+  red: 0x2B0A3D, // loss = very dark violet
+  grey: 0x6B5B7B, // tie / neutral
   blue: 0x7C3AED,
   gold: 0xD946EF,
   violet: 0xA81CFD,
@@ -304,14 +294,16 @@ const COLORS = {
 };
 
 // ============================================================
-//  PRÉFÉRENCES JOUEUR : langue + ping des victoires
+
+//  PLAYER PREFS: language + win pings
 // ============================================================
 const LANG_FILE = path.join(__dirname, 'data', 'lang.json');
 const PING_FILE = path.join(__dirname, 'data', 'winping.json');
 const FAV_FILE = path.join(__dirname, 'data', 'favorites.json');
 const SKIP_FILE = path.join(__dirname, 'data', 'skipanim.json');
 const userLang = new Map(); // userId -> 'fr' | 'en'
-const winPingOff = new Set(); // userIds qui ne veulent plus être ping dans le salon wins
+
+const winPingOff = new Set(); // userIds who don't want pings in the wins channel
 const userFavs = new Map(); // userId -> Set of game keys
 const skipAnimUsers = new Set(); // userIds who skip animations
 
@@ -320,13 +312,15 @@ function loadPrefs() {
     const raw = JSON.parse(fs.readFileSync(LANG_FILE, 'utf8'));
     for (const [id, lang] of Object.entries(raw)) if (lang === 'fr' || lang === 'en') userLang.set(id, lang);
   } catch {
-    /* premier lancement */
+
+    /* first launch */
   }
   try {
     const raw = JSON.parse(fs.readFileSync(PING_FILE, 'utf8'));
     if (Array.isArray(raw)) for (const id of raw) winPingOff.add(String(id));
   } catch {
-    /* premier lancement */
+
+    /* first launch */
   }
   try {
     const raw = JSON.parse(fs.readFileSync(FAV_FILE, 'utf8'));
@@ -334,13 +328,15 @@ function loadPrefs() {
       if (Array.isArray(arr)) userFavs.set(id, new Set(arr.map(String)));
     }
   } catch {
-    /* premier lancement */
+
+    /* first launch */
   }
   try {
     const raw = JSON.parse(fs.readFileSync(SKIP_FILE, 'utf8'));
     if (Array.isArray(raw)) for (const id of raw) skipAnimUsers.add(String(id));
   } catch {
-    /* premier lancement */
+
+    /* first launch */
   }
 }
 function saveJson(file, data) {
@@ -351,7 +347,9 @@ function saveJson(file, data) {
     console.error('[prefs]', e?.message || e);
   }
 }
-const getLang = (userId) => userLang.get(userId) || 'fr';
+// The bot is English-only: ignore stored user language for all outgoing bot text.
+// LANG_FILE / userLang are kept for backwards compatibility but never affect replies.
+const getLang = (userId) => 'en';
 function setLang(userId, lang) {
   userLang.set(userId, lang === 'en' ? 'en' : 'fr');
   saveJson(LANG_FILE, Object.fromEntries(userLang));
@@ -386,17 +384,17 @@ const L = (uid, fr, en) => (getLang(uid) === 'en' ? en : fr);
 
 const I18N = {
   fr: {
-    yourBalance: 'Ton solde',
-    dailyOk: 'Tu as reçu',
-    dailyAlready: 'Tu as déjà pris ton daily aujourd’hui. Reviens après minuit (Paris).',
-    newBalance: 'Nouveau solde',
-    lobbyTitle: '✦ Choisis ta table',
+    yourBalance: 'Your balance',
+    dailyOk: 'You received',
+    dailyAlready: 'You already claimed your daily today. Come back after midnight (Paris time).',
+    newBalance: 'New balance',
+    lobbyTitle: '✦ Choose your table',
     lobbyDesc:
-      'Sélectionne un jeu dans le **menu ci-dessous**.\nUne fenêtre s’ouvre pour ta mise (ton solde est affiché).',
-    lobbyPlaceholder: '🎮 Choisir un jeu...',
-    lobbyFooter: 'Menu privé · visible uniquement par toi',
-    sendPick: `💸 À qui veux-tu envoyer des ${COIN} depuis ton solde ?`,
-    insufficient: `Tu n’as pas assez de ${COIN} pour cette mise.`,
+      'Select a game from the **menu below**.\nA window opens for your bet (your balance is shown).',
+    lobbyPlaceholder: '🎮 Choose a game...',
+    lobbyFooter: 'Private menu · only visible to you',
+    sendPick: `💸 Who do you want to send ${COIN} from your balance to?`,
+    insufficient: `You don\'t have enough ${COIN} for this bet.`,
   },
   en: {
     yourBalance: 'Your balance',
@@ -416,7 +414,7 @@ const t = (userId, key) => I18N[getLang(userId)][key] ?? I18N.fr[key] ?? key;
 
 loadPrefs();
 
-/** Dernier serveur d’où le joueur a lancé Start (pour les parties en MP). */
+/** Last server from which the player launched Start (for DM games). */
 const userHomeGuild = new Map();
 function resolveGuildId(i) {
   if (i.guild?.id) return i.guild.id;
@@ -427,21 +425,21 @@ function resolveGuildId(i) {
 //  OUTILS
 // ============================================================
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-// Abandonne une opération trop lente (ex. génération d'image) pour ne jamais bloquer une réponse Discord
+// Aborts an overly slow operation (e.g. image generation) to never block a Discord response
 const withTimeout = (p, ms, fallback = null) =>
   Promise.race([Promise.resolve(p).catch(() => fallback), new Promise((r) => setTimeout(() => r(fallback), ms))]);
 const range = (n) => Array.from({ length: n }, (_, i) => i);
 const round2 = (n) => Math.round(n * 100) / 100;
 const floor2 = (n) => Math.floor(n * 100 + 1e-9) / 100;
-const num = (n) => Number(n).toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+const num = (n) => Number(n).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 const fmt = (n) => `${num(n)} ${COIN}`;
-const fx = (m) => `x${Number(m).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const fx = (m) => `x${Number(m).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const signed = (n) => `${n > 0 ? '+' : ''}${fmt(n)}`;
 const padL = (s, n) => String(s).padStart(n, ' ');
 const padR = (s, n) => String(s).padEnd(n, ' ');
 const code = (lines) => '```\n' + (Array.isArray(lines) ? lines.join('\n') : lines) + '\n```';
 const sideBySide = (blocks, gap = '  ') => blocks[0].map((_, r) => blocks.map((b) => b[r]).join(gap));
-const short = (m) => String(round2(m)); // multiplicateur compact pour les animations
+const short = (m) => String(round2(m)); // compact multiplier for animations
 
 function shuffle(arr) {
   for (let i = arr.length - 1; i > 0; i--) {
@@ -468,9 +466,9 @@ function parseUserId(str) {
 }
 
 const MSG = {
-  busy: '⏳ Tu as déjà une partie en cours, termine-la d’abord (elle se règle toute seule après 90 s d’inactivité).',
-  noMoney: `Tu n’as pas de ${COIN}. Clique sur **🎁 Daily** dans le panneau pour récupérer ta récompense du jour.`,
-  insufficient: `Tu n’as pas assez de ${COIN} pour cette mise.`,
+  busy: '⏳ You already have a game in progress. Finish it first (it settles automatically after 90 s of inactivity).',
+  noMoney: `You don't have any ${COIN}. Click **🎁 Daily** in the panel to claim today's reward.`,
+  insufficient: `You don't have enough ${COIN} for this bet.`,
 };
 
 const isCrown = (msg) => {
@@ -479,11 +477,11 @@ const isCrown = (msg) => {
   if (String(process.env.ADMIN_IDS || '').split(',').map((x) => x.trim()).filter(Boolean).includes(String(msg.author.id))) return true;
   return false;
 };
-const CROWN_ONLY = '👑 Seul le propriétaire du serveur (celui qui a la couronne) peut faire ça.';
+const CROWN_ONLY = '👑 Only the server owner (the one with the crown) can do this.';
 
 // ============================================================
 //  MOTEUR D'ANIMATION
-//  Une frame = { art, caption, ms }. Tout est dessiné en caractères (bloc de code).
+//  A frame = { art, caption, ms }. Everything is drawn with characters (code block).
 // ============================================================
 const ANIM_PALETTE = [0x1A0B2E, 0x3B0F66, 0x6D28D9, 0x8B1FE0, 0xA81CFD, 0xC026D3, 0xD946EF];
 const gradientColor = (idx, n) =>
@@ -500,11 +498,11 @@ async function animate(i, frames, title, head = '', key = null) {
     if (key && gameIcon(key)) e.setThumbnail(gameIcon(key));
     return e;
   };
-  // Animations désactivées par le joueur : résultat direct
+  // Animations disabled by the player: direct result
   if (i.user && wantsSkipAnim(i.user.id)) {
     const last = frames[frames.length - 1];
     const f = typeof last === 'string' ? { art: last } : last;
-    await i.editReply({ embeds: [mk(f, frames.length - 1, frames.length, 'ZNK Casino  •  Animations désactivées')], components: [] }).catch(() => {});
+    await i.editReply({ embeds: [mk(f, frames.length - 1, frames.length, 'ZNK Casino  •  Animations disabled')], components: [] }).catch(() => {});
     return;
   }
   const n = frames.length;
@@ -525,10 +523,10 @@ function receipt(rows) {
 }
 
 // ============================================================
-//  ANIMATIONS EN IMAGES  (dossier ./games : style néon violet)
-//  GIF animés : bj, roulette, wheel, plinko, horses, crash (la fusée). Couper les GIF : GAME_GIF=off
-//  Images fixes : mines, coinflip, dice, slots, duel, suit, zone.
-//  Les autres jeux gardent l'animation texte. Tout désactiver : variable GAME_IMAGES=off
+//  IMAGE ANIMATIONS  (./games folder: purple neon style)
+//  Animated GIFs: bj, roulette, wheel, plinko, horses, crash (the rocket). Disable GIFs: GAME_GIF=off
+//  Fixed images: mines, coinflip, dice, slots, duel, suit, zone.
+//  Other games keep text animation. Disable everything: GAME_IMAGES=off variable
 // ============================================================
 let gameAnimator = null;
 let gameAnimatorFailed = false;
@@ -553,23 +551,24 @@ function getGameAnimator() {
       ButtonStyle,
       color: gradientColor,
     });
-    console.log(`[games] animations en images prêtes : ${gameAnimator.keys().join(', ')}`);
+    console.log(`[games] image animations ready: ${gameAnimator.keys().join(', ')}`);
   } catch (e) {
     gameAnimatorFailed = true;
-    console.warn('[games] dossier ./games introuvable ou invalide, animations texte conservées :', e?.message || e);
+    console.warn('[games] ./games folder missing or invalid, text animations kept:', e?.message || e);
   }
   return gameAnimator;
 }
-// true = animation image jouée (ou sautée par choix du joueur) ; false = repli sur l'animation texte
+// true = image animation played (or skipped by player choice); false = fallback to text animation
 async function playGameImages(i, key, res, ctx = {}) {
+  return false; // image/GIF system removed — text animations only
   if (String(process.env.GAME_IMAGES || 'on').toLowerCase() === 'off') return false;
   const a = getGameAnimator();
   if (!a || !a.has(key)) return false;
   return a.play(i, key, res, ctx);
 }
-const animResultText = (kind, mult) => (kind === 'win' ? `VICTOIRE ${fx(mult)}` : kind === 'lose' ? 'PERDU' : 'ÉGALITÉ');
+const animResultText = (kind, mult) => (kind === 'win' ? `WIN ${fx(mult)}` : kind === 'lose' ? 'LOST' : 'TIE');
 
-// ---------- Dés ASCII ----------
+// ---------- ASCII Dice ----------
 const PIPS = { 1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] };
 function dieLines(n) {
   const on = new Set(PIPS[Math.max(1, Math.min(6, n))]);
@@ -585,7 +584,7 @@ function dieLines(n) {
 const DICE_FACES = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
 const dieFace = (n) => DICE_FACES[Math.max(1, Math.min(6, n)) - 1];
 
-// ---------- Cartes ASCII ----------
+// ---------- ASCII cards ----------
 const SUITS = ['♠', '♥', '♦', '♣'];
 const RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
 const newDeck = () => shuffle(SUITS.flatMap((s) => RANKS.map((r) => ({ r, s }))));
@@ -601,7 +600,7 @@ function handArt(cards, hiddenExtra = 0) {
   return sideBySide(blocks, ' ');
 }
 
-// ---------- Bande qui défile (roulette, roue, ...) ----------
+// ---------- Scrolling band (roulette, wheel, ...) ----------
 function stripArt(list, pos, cellFn, size = 5) {
   const half = (size - 1) / 2;
   const n = list.length;
@@ -616,7 +615,7 @@ function stripArt(list, pos, cellFn, size = 5) {
     "'" + '-'.repeat(mid) + '^' + '-'.repeat(w - mid - 1) + "'",
   ];
 }
-// positions successives d'une bande qui ralentit et finit exactement sur `finalIdx`
+// successive positions of a band that slows down and ends exactly on `finalIdx`
 function stripPositions(finalIdx, steps) {
   const total = steps.reduce((a, b) => a + b, 0);
   const out = [];
@@ -630,7 +629,7 @@ function stripPositions(finalIdx, steps) {
 }
 
 // ============================================================
-//  BASE DE DONNÉES (Supabase)
+//  DATABASE (Supabase)
 // ============================================================
 async function rpc(name, args) {
   const { data, error } = await supabase.rpc(name, args);
@@ -640,7 +639,7 @@ async function rpc(name, args) {
 
 const getBalance = async (id) => Number(await rpc('get_balance', { p_user_id: id }));
 
-// ---------- Pics de solde (classement all-time) ----------
+// ---------- Peak balances (all-time leaderboard) ----------
 const PEAK_FILE = path.join(__dirname, 'data', 'peaks.json');
 const peaks = new Map();
 
@@ -649,7 +648,8 @@ async function loadPeaks() {
     const raw = JSON.parse(fs.readFileSync(PEAK_FILE, 'utf8'));
     for (const [id, v] of Object.entries(raw)) if (Number(v) > 0) peaks.set(id, Number(v));
   } catch {
-    /* premier lancement */
+
+    /* first launch */
   }
   try {
     const { data, error } = await supabase.from('player_peaks').select('user_id, peak');
@@ -660,7 +660,7 @@ async function loadPeaks() {
       }
     }
   } catch (e) {
-    console.error('[peaks] table player_peaks illisible (optionnelle) :', e?.message || e);
+    console.error('[peaks] unreadable player_peaks table (optional):', e?.message || e);
   }
 }
 
@@ -710,7 +710,7 @@ async function takeBet(uid, bet) {
 }
 
 // ============================================================
-//  RÉPONSES PRIVÉES (éphémères)
+//  PRIVATE REPLIES (ephemeral)
 // ============================================================
 function fromEphemeral(i) {
   const f = i.message?.flags;
@@ -727,16 +727,16 @@ async function respond(i, payload) {
   return i.reply({ ...payload, flags: EPH });
 }
 
-// Chaque partie s'ouvre dans son propre message privé (popup éphémère) : le lobby reste intact
-// et plusieurs parties successives ne s'écrasent plus entre elles.
+// Each game opens in its own private message (ephemeral popup): the lobby stays intact
+// and multiple successive games no longer overwrite each other.
 const openGame = (i, payload) => i.reply({ ...payload, flags: EPH });
 
 const respondText = (i, text) => i.reply({ content: text, flags: EPH });
 
-/** Boutons de fin de partie : Rejouer + retour au panneau */
+/** End-of-game buttons: Replay + back to panel */
 function endGameRow(replayCustomId) {
   return new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId(replayCustomId).setLabel('Rejouer').setEmoji('🔁').setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId(replayCustomId).setLabel('Replay').setEmoji('🔁').setStyle(ButtonStyle.Success),
     new ButtonBuilder().setCustomId('panel_home').setLabel('Menu ZNK').setEmoji('💜').setStyle(ButtonStyle.Primary)
   );
 }
@@ -758,124 +758,205 @@ function armTimer(game) {
 }
 
 // ============================================================
-//  HISTORIQUE + SALON DES VICTOIRES
+//  HISTORY + WINS CHANNEL
 // ============================================================
 const GAME_NAMES = {
   mines: '💣 Mines',
   bj: '🃏 Blackjack',
   roulette: '🎡 Roulette',
-  coinflip: '🪙 Pile ou Face',
-  dice: '🎲 Dés',
-  slots: '🎰 Machine à sous',
-  wheel: '🎡 Roue de la fortune',
-  duel: '⚔️ Duel de cartes',
-  suit: '🃏 Enseigne',
+
+  coinflip: '🪙 Heads or Tails',
+
+  dice: '🎲 Dice',
+
+  slots: '🎰 Slot Machine',
+
+  wheel: '🎡 Wheel of Fortune',
+
+  duel: '⚔️ Card Duel',
+
+  suit: '🃏 Card Suit',
   zone: '🎯 Zone',
   plinko: '🎱 Plinko',
   crash: '🚀 Crash',
-  scratch: '🎟️ Ticket à gratter',
-  die: '🎲 Dé exact',
-  chest: '📦 Coffre mystère',
-  russian: '🔫 Roulette russe',
-  horses: '🏇 Course de chevaux',
+
+  scratch: '🎟️ Scratch Ticket',
+
+  die: '🎲 Exact Die',
+
+  chest: '📦 Mystery Chest',
+
+  russian: '🔫 Russian Roulette',
+
+  horses: '🏇 Horse Race',
   limbo: '📈 Limbo',
   higher: '⬆️ Higher / Lower',
-  rps: '✊ Pierre-Papier-Ciseaux',
-  colorpick: '🎨 Couleur',
-  ladder: '🪜 Échelle',
+
+  rps: '✊ Rock-Paper-Scissors',
+
+  colorpick: '🎨 Color',
+
+  ladder: '🪜 Ladder',
   keno: '🎱 Keno',
-  war: '⚔️ Guerre',
+
+  war: '⚔️ War',
   hilo: '🃏 Hi-Lo',
   bingo: '🅱️ Bingo',
   jackpot: '💎 Jackpot',
-  // 30 nouveaux jeux
-  dicewar: '🎲 Guerre de dés',
-  coinladder: '🪙 Échelle de pièces',
-  cardmatch: '🃏 Match de cartes',
-  numguess: '🔢 Devine le nombre',
-  bombdefuse: '💣 Désamorçage',
-  treasure: '🗺️ Carte au trésor',
-  highcard: '🃏 Carte haute',
-  lowcard: '🃏 Carte basse',
-  pairmatch: '🃏 Paire',
-  freefall: '🪂 Chute libre',
-  balloon: '🎈 Ballon',
-  target: '🎯 Cible',
-  sequence: '🔢 Séquence',
-  animalrace: '🐾 Course d\'animaux',
+
+  // 30 new games
+
+  dicewar: '🎲 Dice War',
+
+  coinladder: '🪙 Coin Ladder',
+
+  cardmatch: '🃏 Card Match',
+
+  numguess: '🔢 Guess the Number',
+
+  bombdefuse: '💣 Bomb Defusal',
+
+  treasure: '🗺️ Treasure Map',
+
+  highcard: '🃏 High Card',
+
+  lowcard: '🃏 Low Card',
+
+  pairmatch: '🃏 Pair',
+
+  freefall: '🪂 Free Fall',
+
+  balloon: '🎈 Balloon',
+
+  target: '🎯 Target',
+
+  sequence: '🔢 Sequence',
+
+  animalrace: '🐾 Animal Race',
+
   fruitmatch: '🍎 Fruits',
-  gemhunt: '💎 Chasse aux gemmes',
-  stardrop: '⭐ Étoile filante',
-  moonshot: '🌙 Tir lunaire',
-  volcano: '🌋 Volcan',
-  lightning: '⚡ Éclair',
-  pokerhand: '🃏 Poker express',
-  redblack: '🔴 Noir ou Rouge',
-  oddseven: '🔢 Pair ou Impair+',
-  multiplier: '✖️ Multiplicateur',
-  memory: '🧠 Mémoire',
-  colorswipe: '🌈 Arc-en-ciel',
-  rocket2: '🚀 Fusée 2',
-  diceexact2: '🎲 Double dé',
-  chest2: '📦 Triple coffre',
-  spincolor: '🎨 Roue couleur',
+
+  gemhunt: '💎 Gem Hunt',
+
+  stardrop: '⭐ Shooting Star',
+
+  moonshot: '🌙 Moon Shot',
+
+  volcano: '🌋 Volcano',
+
+  lightning: '⚡ Lightning',
+
+  pokerhand: '🃏 Express Poker',
+
+  redblack: '🔴 Red or Black',
+
+  oddseven: '🔢 Odd or Even+',
+
+  multiplier: '✖️ Multiplier',
+
+  memory: '🧠 Memory',
+
+  colorswipe: '🌈 Rainbow',
+
+  rocket2: '🚀 Rocket 2',
+
+  diceexact2: '🎲 Double Die',
+
+  chest2: '📦 Triple Chest',
+
+  spincolor: '🎨 Color Wheel',
   poker: '🃏 Poker',
-  coin2: '🪙 Double pile',
-  dice7: '🎲 Dés 7+',
+
+  coin2: '🪙 Double Heads',
+
+  dice7: '🎲 Dice 7+',
   lucky7: '7️⃣ Lucky 7',
-  evenodd2: '🔢 Pair/Impair 2',
-  redblack2: '🔴 Rouge Noir 2',
-  highlow2: '⬆️ Haut Bas',
-  triple: '🎯 Triple chance',
+
+  evenodd2: '🔢 Odd/Even 2',
+
+  redblack2: '🔴 Red Black 2',
+
+  highlow2: '⬆️ High Low',
+
+  triple: '🎯 Triple Chance',
   quad: '4️⃣ Quad',
   penta: '5️⃣ Penta',
-  coin3: '🪙 Triple pile',
+
+  coin3: '🪙 Triple Heads',
   snake: '🐍 Snake eyes',
   boxcars: '🎲 Boxcars',
-  anydouble: '🎲 Double quelconque',
-  acehigh: '🃏 As haut',
-  facecard: '🃏 Figure',
-  suitspade: '♠️ Pique',
-  suithr: '♥️ Coeur',
-  suitdi: '♦️ Carreau',
-  suitcl: '♣️ Trèfle',
+
+  anydouble: '🎲 Any Double',
+
+  acehigh: '🃏 High Ace',
+
+  facecard: '🃏 Face Card',
+
+  suitspade: '♠️ Spades',
+
+  suithr: '♥️ Hearts',
+
+  suitdi: '♦️ Diamonds',
+
+  suitcl: '♣️ Clubs',
   blast: '💥 Blast',
   freeze: '❄️ Freeze',
-  shadow: '🌑 Ombre',
+
+  shadow: '🌑 Shadow',
   pulse: '💓 Pulse',
-  orbit: '🪐 Orbite',
-  spark: '✨ Étincelle',
-  wave: '🌊 Vague',
-  mirror: '🪞 Miroir',
-  portal: '🌀 Portail',
+
+  orbit: '🪐 Orbit',
+
+  spark: '✨ Spark',
+
+  wave: '🌊 Wave',
+
+  mirror: '🪞 Mirror',
+
+  portal: '🌀 Portal',
   rune: '🔮 Rune',
   totem: '🗿 Totem',
   cactus: '🌵 Cactus',
-  pearl: '🦪 Perle',
-  compass: '🧭 Boussole',
-  anchor: '⚓ Ancre',
-  torch: '🔥 Torche',
-  keylock: '🔑 Clé',
-  hourglass: '⏳ Sablier',
-  balloon2: '🎈 Ballon 2',
-  dicehi: '🎲 Dé haut',
-  dicelo: '🎲 Dé bas',
-  coinrush: '🪙 Ruée pièces',
-  starfall: '🌟 Pluie d\'étoiles',
-  meteor: '☄️ Météore',
-  rainbow: '🌈 Arc',
-  clover: '🍀 Trèfle chance',
+
+  pearl: '🦪 Pearl',
+
+  compass: '🧭 Compass',
+
+  anchor: '⚓ Anchor',
+
+  torch: '🔥 Torch',
+
+  keylock: '🔑 Key',
+
+  hourglass: '⏳ Hourglass',
+
+  balloon2: '🎈 Balloon 2',
+
+  dicehi: '🎲 High Die',
+
+  dicelo: '🎲 Low Die',
+
+  coinrush: '🪙 Coin Rush',
+
+  starfall: '🌟 Starfall',
+
+  meteor: '☄️ Meteor',
+
+  rainbow: '🌈 Rainbow',
+
+  clover: '🍀 Lucky Clover',
 };
-// Nom du jeu sans l'emoji (pour l'image canvas qui n'affiche pas les emojis)
+
+// Game name without the emoji (for canvas images, which don't render emojis)
 const gameNamePlain = (g) => (GAME_NAMES[g] ? GAME_NAMES[g].replace(/^\S+\s/, '') : g);
 
 // ============================================================
-//  IDENTITÉ VISUELLE ZNK
+//  ZNK VISUAL IDENTITY
 // ============================================================
 const ZNK_LOGO = process.env.ZNK_LOGO_URL || undefined; // optionnel (Railway > Variables)
 const emojiCode = (e) =>
   [...String(e)].map((c) => c.codePointAt(0)).filter((cp) => cp !== 0xfe0f).map((cp) => cp.toString(16)).join('-');
-// Illustration de chaque jeu = son emoji en grand (Twemoji) : aucune image à héberger
+// Illustration for each game = its large emoji (Twemoji): no image to host
 const gameIcon = (key) => {
   const n = GAME_NAMES[key];
   if (!n) return null;
@@ -886,22 +967,22 @@ function brand(embed, key, footer) {
   embed.setAuthor({ name: `ZNK CASINO  •  ${gameNamePlain(key).toUpperCase()}`, iconURL: ZNK_LOGO });
   const ic = gameIcon(key);
   if (ic) embed.setThumbnail(ic);
-  embed.setFooter({ text: footer || 'ZNK Casino  •  Partie privée' });
+  embed.setFooter({ text: footer || 'ZNK Casino  •  Private game' });
   return embed;
 }
 
 const LINE = '▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰';
 function outcomeBanner(kind, amount) {
   const amt = Number.isFinite(amount) ? `**${signed(amount)}**` : '';
-  if (kind === 'win') return `### 🏆 ━━  VICTOIRE  ━━ 🏆\n💜✨ ${amt || 'Bien joué !'} ✨💜\n${LINE}\n`;
-  if (kind === 'lose') return `### 💀 ━━  DÉFAITE  ━━ 💀\n🖤 ${amt || 'Pas de chance…'} 🖤\n${LINE}\n`;
-  return `### 🤝 ━━  ÉGALITÉ  ━━ 🤝\n💜 Mise récupérée\n${LINE}\n`;
+  if (kind === 'win') return `### 🏆 ━━  WIN  ━━ 🏆\n💜✨ ${amt || 'Well played!'} ✨💜\n${LINE}\n`;
+  if (kind === 'lose') return `### 💀 ━━  LOSS  ━━ 💀\n🖤 ${amt || 'Better luck next time…'} 🖤\n${LINE}\n`;
+  return `### 🤝 ━━  TIE  ━━ 🤝\n💜 Bet refunded\n${LINE}\n`;
 }
 const outcomeColor = (kind) => (kind === 'win' ? COLORS.violet : kind === 'lose' ? COLORS.red : COLORS.grey);
 const launchBanner = (txt) => `### ✦ ${txt}\n\`${'▱'.repeat(16)}\`\n`;
 
 // ============================================================
-//  MULTIPLICATEURS RÉGLABLES
+//  ADJUSTABLE MULTIPLIERS
 // ============================================================
 const MULT_MIN = 0.5;
 const MULT_MAX = 10;
@@ -914,14 +995,15 @@ async function loadMultipliers() {
     const raw = JSON.parse(fs.readFileSync(MULT_FILE, 'utf8'));
     for (const [g, v] of Object.entries(raw)) if (GAME_NAMES[g] && Number(v) > 0) multipliers.set(g, Number(v));
   } catch {
-    /* premier lancement */
+
+    /* first launch */
   }
   try {
     const { data, error } = await supabase.from('game_settings').select('game, multiplier');
     if (error) throw error;
     for (const r of data) if (GAME_NAMES[r.game] && Number(r.multiplier) > 0) multipliers.set(r.game, Number(r.multiplier));
   } catch (e) {
-    console.error('[multiplicateurs] table game_settings introuvable ou illisible (lance schema_v3.sql) :', e?.message || e);
+    console.error('[multipliers] game_settings table not found or unreadable (run schema_v3.sql):', e?.message || e);
   }
 }
 
@@ -942,22 +1024,22 @@ async function saveMultiplier(game, value, guildId = null, actorId = null) {
     try {
       const guild = await client.guilds.fetch(guildId).catch(() => null);
       if (guild) {
-        const who = actorId ? `👤 Par <@${actorId}>\n` : '';
+        const who = actorId ? `👤 By <@${actorId}>\n` : '';
         await dmGuildEveryone(guild, {
           embeds: [
             new EmbedBuilder()
-              .setTitle('🎚️ Multiplicateur modifié')
+              .setTitle('🎚️ Multiplier updated')
               .setColor(COLORS.violet)
               .setDescription(
-                `${who}**${GAME_NAMES[game] || game}** : coefficient réglé sur **${fx(value)}**.\n` +
-                  `Tous les gains de ce jeu sont maintenant multipliés par ce coefficient.`
+                `${who}**${GAME_NAMES[game] || game}**: multiplier set to **${fx(value)}**.\n` +
+                  `All winnings from this game are now multiplied by this multiplier.`
               )
               .setTimestamp(),
           ],
         });
       }
     } catch (e) {
-      console.error('[multiplicateurs] annonce', e?.message || e);
+      console.error('[multipliers] announcement', e?.message || e);
     }
   }
   return { db };
@@ -985,7 +1067,7 @@ async function startBoost(guildId, { winMult, loseMult, label, minutes }) {
   if (expiresAt) {
     entry.timer = setTimeout(() => {
       activeBoosts.delete(guildId);
-      webEvent(guildId, { kind: 'boost_end', title: '⏰ Boost terminé', text: `L’événement ${label} est terminé. Retour aux gains normaux.` });
+      webEvent(guildId, { kind: 'boost_end', title: '⏰ Boost ended', text: `Event ${label} has ended. Back to normal winnings.` });
     }, expiresAt - Date.now());
   }
   activeBoosts.set(guildId, entry);
@@ -1004,16 +1086,16 @@ async function recordResult({ guildId, user, game, bet, mult, payout, detail }) 
       profit,
       detail: detail || null,
     });
-    if (error) console.error('[historique]', error.message);
+    if (error) console.error('[history]', error.message);
   } catch (e) {
-    console.error('[historique]', e?.message || e);
+    console.error('[history]', e?.message || e);
   }
 
   if (profit <= 0) return;
   try {
     const ch = await findWinsChannel(guildId);
     if (!ch) {
-      console.warn('[wins] aucun salon "wins" trouvé pour ce serveur : lance !wins (ou !setup) dans le serveur.');
+      console.warn('[wins] no "wins" channel found for this server: run !wins (or !setup) in the server.');
       return;
     }
     const ping = wantsWinPing(user.id);
@@ -1021,12 +1103,12 @@ async function recordResult({ guildId, user, game, bet, mult, payout, detail }) 
     const mention = ping ? `<@${user.id}>` : undefined;
     const allowedMentions = ping ? { users: [user.id] } : { parse: [] };
 
-    // 1) Image du profit (carte "victoire" : avatar, jeu, mise, multiplicateur, gain, profit)
+    // 1) Profit image ("win" card: avatar, game, bet, multiplier, win, profit)
     let buf = null;
     try {
       buf = await withTimeout(renderWinNotif(user, game, bet, mult, profit, detail), 12000, null);
     } catch (e) {
-      console.error('[wins] rendu de l\'image :', e?.message || e);
+      console.error('[wins] image render:', e?.message || e);
     }
     if (buf) {
       try {
@@ -1040,25 +1122,25 @@ async function recordResult({ guildId, user, game, bet, mult, payout, detail }) 
         });
         return;
       } catch (e) {
-        console.error('[wins] envoi de l\'image refusé (droits "Joindre des fichiers" / "Intégrer des liens" ?), repli sur le texte :', e?.message || e);
+        console.error('[wins] image send denied ("Attach files" / "Embed links" permissions?), falling back to text:', e?.message || e);
       }
     } else {
-      console.warn('[wins] image non générée (@napi-rs/canvas ou images/win_notification.png manquant ?), repli sur le texte.');
+      console.warn('[wins] image not generated (@napi-rs/canvas or images/win_notification.png missing?), falling back to text.');
     }
 
-    // 2) Repli texte (jamais silencieux)
+    // 2) Text fallback (never silent)
     const embed = new EmbedBuilder()
       .setColor(COLORS.violet)
-      .setAuthor({ name: `${display} a gagné !`, iconURL: user.displayAvatarURL() })
+      .setAuthor({ name: `${display} won!`, iconURL: user.displayAvatarURL() })
       .setThumbnail(gameIcon(game) || user.displayAvatarURL())
       .setDescription(`### 🏆 ${ping ? `<@${user.id}>` : `**${display}**`} remporte **${fmt(profit)}** !\n${LINE}`)
       .addFields(
-        { name: '🎮 Jeu', value: GAME_NAMES[game] || game, inline: true },
-        { name: '💰 Mise', value: fmt(bet), inline: true },
+        { name: '🎮 Game', value: GAME_NAMES[game] || game, inline: true },
+        { name: '💰 Bet', value: fmt(bet), inline: true },
         { name: '✖️ Multi', value: fx(mult), inline: true },
-        { name: '💜 Gain', value: `**${signed(profit)}**`, inline: true }
+        { name: '💜 Profit', value: `**${signed(profit)}**`, inline: true }
       )
-      .setFooter({ text: 'ZNK Casino  •  Salon des victoires' })
+      .setFooter({ text: 'ZNK Casino  •  Wins channel' })
       .setTimestamp();
     await ch.send({ content: mention, embeds: [embed], allowedMentions });
   } catch (e) {
@@ -1066,7 +1148,7 @@ async function recordResult({ guildId, user, game, bet, mult, payout, detail }) 
   }
 }
 
-// Salon des victoires : mémorisé, sinon retrouvé par son nom (#wins). Partie en MP sans serveur connu : seul serveur du bot.
+// Wins channel: remembered, otherwise found by its name (#wins). DM game with no known server: bot's only server.
 async function findWinsChannel(guildId) {
   let gid = guildId;
   if (!gid) {
@@ -1088,23 +1170,23 @@ async function historyEmbed(uid) {
     .limit(15);
   if (error) throw error;
 
-  const e = new EmbedBuilder().setTitle('📜 Historique de tes parties').setColor(COLORS.blue);
-  if (!data.length) return e.setDescription('Tu n’as pas encore joué. Lance une partie depuis le panneau !');
+  const e = new EmbedBuilder().setTitle('📜 Your game history').setColor(COLORS.blue);
+  if (!data.length) return e.setDescription('You haven\'t played yet. Start a game from the panel!');
 
   const net = round2(data.reduce((s, r) => s + Number(r.profit), 0));
   const lines = data.map((r) => {
     const p = Number(r.profit);
     const icon = p > 0 ? '🟢' : p < 0 ? '🔴' : '⚪';
     const ts = Math.floor(new Date(r.created_at).getTime() / 1000);
-    return `${icon} ${GAME_NAMES[r.game] || r.game} · mise ${fmt(r.bet)} · ${fx(r.multiplier)} · **${signed(p)}** · <t:${ts}:R>`;
+    return `${icon} ${GAME_NAMES[r.game] || r.game} · bet ${fmt(r.bet)} · ${fx(r.multiplier)} · **${signed(p)}** · <t:${ts}:R>`;
   });
   return e
-    .setDescription(`Bilan des ${data.length} dernières parties : **${signed(net)}**\n\n${lines.join('\n')}`)
-    .setFooter({ text: 'Visible uniquement par toi' });
+    .setDescription(`Summary of your last ${data.length} games: **${signed(net)}**\n\n${lines.join('\n')}`)
+    .setFooter({ text: 'Only visible to you' });
 }
 
 // ============================================================
-//  STATS + BANNIÈRE (680x240, fond #A81CFD)
+//  STATS + BANNER (680x240, background #A81CFD)
 // ============================================================
 async function getPlayerStats(uid) {
   const st = { games: 0, wagered: 0, won: 0, lost: 0, net: 0, wins: 0, best: 0, favorite: null };
@@ -1162,7 +1244,7 @@ function roundRect(g, x, y, w, h, r) {
   g.closePath();
 }
 
-// Charge l'avatar Discord : PNG statique (gère GIF/WebP animés), puis avatar par défaut, jamais d'exception.
+// Loads the Discord avatar: static PNG (handles animated GIF/WebP), then default avatar, never throws.
 async function loadAvatarImage(user, loadImage) {
   const urls = [];
   try { urls.push(user.displayAvatarURL({ extension: 'png', size: 256, forceStatic: true })); } catch { /* ignore */ }
@@ -1180,13 +1262,13 @@ async function loadAvatarImage(user, loadImage) {
       if (!res.ok) continue;
       return await loadImage(Buffer.from(await res.arrayBuffer()));
     } catch {
-      /* essaie la source suivante */
+      /* try the next source */
     }
   }
   return null;
 }
 
-// Tronque un texte avec « … » pour qu'il tienne dans maxW pixels.
+// Truncates text with "…" so it fits in maxW pixels.
 function fitText(g, text, maxW) {
   if (g.measureText(text).width <= maxW) return text;
   let t = Array.from(text);
@@ -1194,13 +1276,13 @@ function fitText(g, text, maxW) {
   return `${t.join('')}…`;
 }
 
-// Image de fond des stats (variable Railway STATS_BG_URL). Chargée une fois puis gardée en cache.
+// Stats background image (Railway STATS_BG_URL variable). Loaded once then cached.
 const STATS_BG_URL = bgSource('STATS_BG_URL', 'stats_card.png');
-// STATS_BG_MODE=template : l'image contient déjà les cartes (le bot n'écrit que le texte dedans)
+// STATS_BG_MODE=template: the image already contains the cards (the bot only writes text in it)
 const STATS_BG_MODE = String(process.env.STATS_BG_MODE || (STATS_BG_URL && !String(process.env.STATS_BG_URL || '').trim() ? 'template' : '')).trim().toLowerCase();
-// Mises en page calées sur les images template (1774x887 -> 800x400). STATS_BG_MODE = nom du preset.
+// Layouts aligned to template images (1774x887 -> 800x400). STATS_BG_MODE = preset name.
 const STATS_PRESETS = {
-  // Avatar à gauche, logo Z à droite
+  // Avatar on the left, Z logo on the right
   template: {
     head: { x: 155, y: 77, w: 448, h: 88 },
     av: { cx: 103, cy: 114.5, d: 84, halo: false },
@@ -1209,7 +1291,7 @@ const STATS_PRESETS = {
     cols: [[64, 198], [271, 199], [480, 230]],
     rows: [[220, 45], [271, 45]],
   },
-  // Logo Z à gauche, avatar dans le cadre du haut
+  // Z logo on the left, avatar in the top frame
   'template-logo-left': {
     head: { x: 210, y: 79, w: 545, h: 95 },
     av: { cx: 257, cy: 126.5, d: 66, halo: true },
@@ -1224,8 +1306,8 @@ function getStatsBg(loadImage) {
   if (!STATS_BG_URL) return Promise.resolve(null);
   if (!statsBgPromise) {
     statsBgPromise = readImageSource(STATS_BG_URL, loadImage).catch((e) => {
-      console.warn('[stats] STATS_BG_URL illisible (utilise un lien direct png/jpg) :', e?.message || e);
-      statsBgPromise = null; // réessaie au prochain affichage
+      console.warn('[stats] STATS_BG_URL unreadable (use a direct png/jpg link):', e?.message || e);
+      statsBgPromise = null; // retry on next display
       return null;
     });
   }
@@ -1235,7 +1317,7 @@ function getStatsBg(loadImage) {
 async function renderStatsBanner(user, st, balance, lang) {
   if (!canvasLib) return null;
   const { createCanvas, loadImage } = canvasLib;
-  // Format 2:1 fixe (800x400) : Discord le met à l'échelle sans rogner, net sur mobile comme sur PC.
+  // Fixed 2:1 format (800x400): Discord scales it without cropping, sharp on mobile and PC.
   const W = 800;
   const H = 400;
   const SCALE = 1.25;
@@ -1245,7 +1327,7 @@ async function renderStatsBanner(user, st, balance, lang) {
   const FONT = STATS_FONT;
   const en = lang === 'en';
 
-  // fond dégradé violet ZNK
+  // ZNK purple gradient background
   const bg = g.createLinearGradient(0, 0, W, H);
   bg.addColorStop(0, '#2B0A3D');
   bg.addColorStop(0.5, '#5B1A9E');
@@ -1253,17 +1335,17 @@ async function renderStatsBanner(user, st, balance, lang) {
   g.fillStyle = bg;
   g.fillRect(0, 0, W, H);
   const bgImg = await getStatsBg(loadImage);
-  // Mode "template" : l'image contient déjà les cartes, on n'écrit que le texte dedans.
+  // "Template" mode: the image already contains the cards, only text is written in it.
   const P = bgImg ? STATS_PRESETS[STATS_BG_MODE] || null : null;
   const T = !!P;
   if (bgImg) {
-    // recadrage "cover" centré (aucune déformation)
+    // centered "cover" crop (no distortion)
     const k = Math.max(W / bgImg.width, H / bgImg.height);
     const sw = W / k;
     const sh = H / k;
     g.drawImage(bgImg, (bgImg.width - sw) / 2, (bgImg.height - sh) / 2, sw, sh, 0, 0, W, H);
     if (!T) {
-      g.fillStyle = 'rgba(15,4,30,0.45)'; // voile sombre pour garder le texte lisible
+      g.fillStyle = 'rgba(15,4,30,0.45)'; // dark veil to keep text readable
       g.fillRect(0, 0, W, H);
     }
   }
@@ -1275,7 +1357,7 @@ async function renderStatsBanner(user, st, balance, lang) {
     g.beginPath(); g.arc(W - 200, H + 50, 150, 0, Math.PI * 2); g.fill();
   }
 
-  // ---- mise en page : standard ou calée sur l'image template (1774x887 -> 800x400) ----
+  // ---- layout: standard or aligned to template image (1774x887 -> 800x400) ----
   const PAD = 28;
   const head = T ? P.head : { x: PAD, y: PAD, w: W - PAD * 2, h: 128 };
   const bar = T ? P.bar : { x: PAD, y: PAD + 128 + 14, w: W - PAD * 2, h: 44 };
@@ -1295,7 +1377,7 @@ async function renderStatsBanner(user, st, balance, lang) {
     g.fill();
   }
 
-  // avatar rond, ratio carré respecté (aucune déformation), halo lumineux
+  // round avatar, square ratio respected (no distortion), glowing halo
   const AV = T ? P.av.d : 96;
   const ax = T ? P.av.cx - AV / 2 : head.x + 20;
   const ay = T ? P.av.cy - AV / 2 : head.y + (head.h - AV) / 2;
@@ -1316,7 +1398,7 @@ async function renderStatsBanner(user, st, balance, lang) {
   g.clip();
   const img = await loadAvatarImage(user, loadImage);
   if (img) {
-    const s = Math.min(img.width, img.height); // recadrage carré centré
+    const s = Math.min(img.width, img.height); // centered square crop
     g.drawImage(img, (img.width - s) / 2, (img.height - s) / 2, s, s, ax, ay, AV, AV);
   } else {
     g.fillStyle = '#5865F2';
@@ -1331,11 +1413,11 @@ async function renderStatsBanner(user, st, balance, lang) {
   }
   g.restore();
 
-  // pseudo juste à droite de l'avatar + sous-titre
+  // username just right of the avatar + subtitle
   const tx = T ? P.tx : ax + AV + 22;
   const tmax = (T ? P.textRight : head.x + head.w - 20) - tx;
   const clean = (s) => String(s || '').replace(/[\u0000-\u001F\u007F]/g, '').trim();
-  const display = clean(user.globalName || user.username) || 'Joueur';
+  const display = clean(user.globalName || user.username) || 'Player';
   const handle = clean(user.username);
   const fav = st.favorite ? gameNamePlain(st.favorite) : '-';
   g.textAlign = 'left';
@@ -1349,9 +1431,9 @@ async function renderStatsBanner(user, st, balance, lang) {
   g.fillText(fitText(g, handle && handle !== display ? `@${handle}` : 'ZNK CASINO', tmax), tx, nameY + (T ? 22 : 26));
   g.fillStyle = 'rgba(255,255,255,0.6)';
   g.font = `${T ? 13 : 15}px ${FONT}`;
-  g.fillText(fitText(g, `${en ? 'Favorite' : 'Jeu favori'} : ${fav}`, tmax), tx, nameY + (T ? 42 : 50));
+  g.fillText(fitText(g, `Favorite game: ${fav}`, tmax), tx, nameY + (T ? 42 : 50));
 
-  // solde (ligne dédiée, pas de chevauchement avec le pseudo)
+  // balance (dedicated line, no overlap with the username)
   if (!T) {
     g.fillStyle = 'rgba(255,255,255,0.14)';
     roundRect(g, bar.x, bar.y, bar.w, bar.h, 14);
@@ -1360,21 +1442,21 @@ async function renderStatsBanner(user, st, balance, lang) {
   const barPad = T ? 16 : 18;
   g.fillStyle = T ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.75)';
   g.font = `bold ${T ? 14 : 15}px ${FONT}`;
-  g.fillText(en ? 'BALANCE' : 'SOLDE', bar.x + barPad, bar.y + bar.h / 2 + 5);
+  g.fillText(en ? 'BALANCE' : 'BALANCE', bar.x + barPad, bar.y + bar.h / 2 + 5);
   g.textAlign = 'right';
   g.fillStyle = '#FFFFFF';
   g.font = `bold ${T ? P.balFont : 24}px ${FONT}`;
   g.fillText(`${compact(balance)} ${COIN_PLAIN}`, bar.x + bar.w - barPad, bar.y + bar.h / 2 + (T ? P.balFont * 0.36 : 9));
   g.textAlign = 'left';
 
-  // 6 cartes de stats (grille 3x2)
+  // 6 stat cards (3x2 grid)
   const cells = [
-    [en ? 'GAMES PLAYED' : 'PARTIES JOUÉES', String(st.games), '#FFFFFF'],
-    [en ? 'TOTAL WAGERED' : 'TOTAL MISÉ', `${compact(st.wagered)} ${COIN_PLAIN}`, '#FFFFFF'],
-    [en ? 'TOTAL WON' : 'TOTAL GAGNÉ', `${compact(st.won)} ${COIN_PLAIN}`, '#86EFAC'],
-    [en ? 'TOTAL LOST' : 'TOTAL PERDU', `${compact(st.lost)} ${COIN_PLAIN}`, '#FCA5A5'],
+    [en ? 'GAMES PLAYED' : 'GAMES PLAYED', String(st.games), '#FFFFFF'],
+    [en ? 'TOTAL WAGERED' : 'TOTAL WAGERED', `${compact(st.wagered)} ${COIN_PLAIN}`, '#FFFFFF'],
+    [en ? 'TOTAL WON' : 'TOTAL WON', `${compact(st.won)} ${COIN_PLAIN}`, '#86EFAC'],
+    [en ? 'TOTAL LOST' : 'TOTAL LOST', `${compact(st.lost)} ${COIN_PLAIN}`, '#FCA5A5'],
     [en ? 'NET PROFIT' : 'PROFIT NET', `${st.net > 0 ? '+' : ''}${compact(st.net)} ${COIN_PLAIN}`, st.net >= 0 ? '#86EFAC' : '#FCA5A5'],
-    [en ? 'WIN RATE' : 'TAUX DE VICTOIRE', `${st.rate} %`, '#F0ABFC'],
+    [en ? 'WIN RATE' : 'WIN RATE', `${st.rate} %`, '#F0ABFC'],
   ];
   cells.forEach(([label, value, color], k) => {
     const b = boxes[k];
@@ -1397,12 +1479,7 @@ async function renderStatsBanner(user, st, balance, lang) {
 
 async function buildStatsPayload(user, lang, viewerNote = '') {
   const [st, bal] = await Promise.all([getPlayerStats(user.id), getBalance(user.id)]);
-  let buf = null;
-  try {
-    buf = await renderStatsBanner(user, st, bal, lang);
-  } catch (e) {
-    console.error('[stats] bannière', e?.message || e);
-  }
+  let buf = null; // image cards removed — always use the text embed
   if (buf) {
     const sName = `stats.${imgExt(buf)}`;
     const attachment = new AttachmentBuilder(buf, { name: sName });
@@ -1419,23 +1496,23 @@ function statsFallbackEmbed(user, st, balance, lang) {
   const en = lang === 'en';
   return new EmbedBuilder()
     .setColor(0xA81CFD)
-    .setTitle(`📊 ${en ? 'Stats' : 'Statistiques'} · ${user.globalName || user.username}`)
+    .setTitle(`📊 Stats · ${user.globalName || user.username}`)
     .setDescription(
       code([
-        `${padR(en ? 'Balance' : 'Solde', 18)}${padL(plain(fmt(balance)), 16)}`,
-        `${padR(en ? 'Games played' : 'Parties jouées', 18)}${padL(st.games, 16)}`,
-        `${padR(en ? 'Total wagered' : 'Total misé', 18)}${padL(plain(fmt(st.wagered)), 16)}`,
-        `${padR(en ? 'Total won' : 'Total gagné', 18)}${padL(plain(fmt(st.won)), 16)}`,
-        `${padR(en ? 'Total lost' : 'Total perdu', 18)}${padL(plain(fmt(st.lost)), 16)}`,
+        `${padR(en ? 'Balance' : 'Balance', 18)}${padL(plain(fmt(balance)), 16)}`,
+        `${padR(en ? 'Games played' : 'Games played', 18)}${padL(st.games, 16)}`,
+        `${padR(en ? 'Total wagered' : 'Total wagered', 18)}${padL(plain(fmt(st.wagered)), 16)}`,
+        `${padR(en ? 'Total won' : 'Total won', 18)}${padL(plain(fmt(st.won)), 16)}`,
+        `${padR(en ? 'Total lost' : 'Total lost', 18)}${padL(plain(fmt(st.lost)), 16)}`,
         `${padR(en ? 'Net profit' : 'Profit net', 18)}${padL(plain(signed(st.net)), 16)}`,
         `${padR(en ? 'Win rate' : 'Victoires', 18)}${padL(`${st.rate} %`, 16)}`,
       ])
     )
-    .setFooter({ text: 'Installe @napi-rs/canvas pour la bannière image' });
+    .setFooter({ text: 'Install @napi-rs/canvas for the image banner' });
 }
 
 // ============================================================
-//  MINES  (grille de 24 cases, 4 difficultés)
+//  MINES  (24-cell grid, 4 difficulties)
 // ============================================================
 const MINES_CELLS = 24;
 const MINES_EDGE = 0.96;
@@ -1460,10 +1537,10 @@ function minesPickerPayload() {
       `${Lv.emoji} **${Lv.name}** : ${Lv.mines} 💣 · ${MINES_CELLS - Lv.mines} 💎 · 1er diamant **${fx(minesMultiplier(1, Lv.mines))}**`
   );
   const embed = new EmbedBuilder()
-    .setTitle('💣 Mines : choisis ta difficulté')
+    .setTitle('💣 Mines: choose your difficulty')
     .setColor(COLORS.blue)
     .setDescription(
-      `${lines.join('\n')}\n\nPlus il y a de mines, plus le multiplicateur grimpe vite (max ${fx(MINES_MAX_MULT)}).`
+      `${lines.join('\n')}\n\nThe more mines, the faster the multiplier climbs (max ${fx(MINES_MAX_MULT)}).`
     );
   const row = new ActionRowBuilder().addComponents(
     ...Object.entries(LEVELS).map(([key, Lv]) =>
@@ -1499,7 +1576,7 @@ function minesRows(game, over) {
         row.addComponents(
           new ButtonBuilder()
             .setCustomId(`replay|mines|${game.bet}|${game.level}`)
-            .setLabel('Rejouer')
+            .setLabel('Replay')
             .setEmoji('🔁')
             .setStyle(ButtonStyle.Success),
           new ButtonBuilder()
@@ -1513,7 +1590,7 @@ function minesRows(game, over) {
         row.addComponents(
           new ButtonBuilder()
             .setCustomId('mines_cash')
-            .setLabel(`Encaisser ${num(gain)}`)
+            .setLabel(`Cash out ${num(gain)}`)
             .setEmoji('💰')
             .setStyle(ButtonStyle.Success)
             .setDisabled(game.revealed.size === 0)
@@ -1534,18 +1611,18 @@ function minesEmbed(game, end) {
   const e = new EmbedBuilder()
     .setTitle(`💣 Mines · ${Lv.emoji} ${Lv.name}`)
     .addFields(
-      { name: 'Mise', value: fmt(game.bet), inline: true },
+      { name: 'Bet', value: fmt(game.bet), inline: true },
       { name: 'Mines', value: String(game.mines), inline: true },
-      { name: 'Multiplicateur', value: fx(mult), inline: true },
-      { name: 'Gain actuel', value: fmt(floor2(game.bet * mult)), inline: true }
+      { name: 'Multiplier', value: fx(mult), inline: true },
+      { name: 'Current win', value: fmt(floor2(game.bet * mult)), inline: true }
     );
   if (end) {
     const kind = end.color === COLORS.green ? 'win' : end.color === COLORS.red ? 'lose' : 'push';
     e.setColor(outcomeColor(kind)).setDescription(`${outcomeBanner(kind)}${code([track])}${end.text}`);
-    e.addFields({ name: '👛 Solde', value: fmt(end.balance), inline: true });
+    e.addFields({ name: '👛 Balance', value: fmt(end.balance), inline: true });
   } else {
     e.setColor(COLORS.violet).setDescription(
-      `${code([track])}Clique sur les cases. Évite les 💣 et encaisse quand tu veux !`
+      `${code([track])}Click the cells. Avoid 💣 and cash out whenever you want!`
     );
     if (picks < safeTotal) {
       e.addFields({ name: '💎 Prochain', value: fx(minesMultiplier(picks + 1, game.mines)), inline: true });
@@ -1556,7 +1633,7 @@ function minesEmbed(game, end) {
 
 async function startMines(i, level, bet) {
   const Lv = LEVELS[level];
-  if (!Lv) return respondText(i, 'Difficulté inconnue.');
+  if (!Lv) return respondText(i, 'Unknown difficulty.');
   const uid = i.user.id;
   if (!tryLock(uid)) return respondText(i, MSG.busy);
 
@@ -1605,7 +1682,7 @@ async function settleMines(game, kind, i) {
   const t0 = Date.now();
   let held = false;
   try {
-    // 1) On répond à Discord IMMÉDIATEMENT (3 s max), sinon « l'application n'a pas répondu ».
+    // 1) Reply to Discord IMMEDIATELY (3s max), otherwise "the application did not respond".
     if (i && !i.deferred && !i.replied) {
       if (kind === 'lose') {
         const rows = minesRows(game, false);
@@ -1613,15 +1690,15 @@ async function settleMines(game, kind, i) {
         const hold = new EmbedBuilder()
           .setTitle(`💣 Mines · ${LEVELS[game.level].emoji} ${LEVELS[game.level].name}`)
           .setColor(COLORS.gold)
-          .setDescription(code(['  La case s\'ouvre...', '', '      . . .']))
-          .setFooter({ text: 'Verdict dans un instant' });
+          .setDescription(code(['  The cell opens...', '', '      . . .']))
+          .setFooter({ text: 'Verdict in a moment' });
         await i.update({ embeds: [hold], components: rows });
         held = true;
       } else {
         await i.deferUpdate();
       }
     }
-    // 2) Ensuite seulement : calcul, base de données, image
+    // 2) Only then: calculation, database, image
     const picks = game.revealed.size;
     let payout = 0;
     let mult = 0;
@@ -1630,13 +1707,13 @@ async function settleMines(game, kind, i) {
     let counted = true;
 
     if (kind === 'lose') {
-      text = '💥 **Boom !** Tu as touché une mine, la mise est perdue.';
+      text = '💥 **Boom!** You hit a mine, bet lost.';
       color = COLORS.red;
     } else if (picks === 0) {
       payout = game.bet;
       mult = 1;
       counted = false;
-      text = '⏱️ Partie abandonnée, mise remboursée.';
+      text = '⏱️ Game abandoned, bet refunded.';
       color = COLORS.grey;
     } else {
       mult = minesMultiplier(picks, game.mines);
@@ -1646,10 +1723,10 @@ async function settleMines(game, kind, i) {
       color = payout > game.bet ? COLORS.green : COLORS.grey;
       text =
         kind === 'timeout'
-          ? `⏱️ Temps écoulé, encaissement automatique : **${fmt(payout)}** (${fx(mult)})`
+          ? `⏱️ Time up, automatic cashout: **${fmt(payout)}** (${fx(mult)})`
           : payout > game.bet
-            ? `✅ Bien joué ! Tu encaisses **${fmt(payout)}** (${fx(mult)}), profit : **${signed(round2(payout - game.bet))}**.`
-            : `💰 Tu encaisses : **${fmt(payout)}** (${fx(mult)}), ${signed(round2(payout - game.bet))}.`;
+            ? `✅ Well played! You cash out **${fmt(payout)}** (${fx(mult)}), profit: **${signed(round2(payout - game.bet))}**.`
+            : `💰 You cash out: **${fmt(payout)}** (${fx(mult)}), ${signed(round2(payout - game.bet))}.`;
       if (boost.label) text += `\n⚡ Boost **${boost.label}**`;
     }
 
@@ -1658,7 +1735,7 @@ async function settleMines(game, kind, i) {
       if ((boost.loseMult || 1) > 1) {
         const extra = floor2(game.bet * ((boost.loseMult || 1) - 1));
         if (extra > 0) await debit(game.userId, extra).catch(() => {});
-        text += `\n⚡ Boost **${boost.label}** : perte ×${boost.loseMult}`;
+        text += `\n⚡ Boost **${boost.label}**: loss ×${boost.loseMult}`;
       }
     }
 
@@ -1686,14 +1763,14 @@ async function settleMines(game, kind, i) {
         bet: game.bet,
         outcome: mKind,
         resultText: animResultText(mKind, mult),
-        sub: `Mise ${coinTxt(game.bet)} · ${LEVELS[game.level].name}`,
+        sub: `Bet ${coinTxt(game.bet)} · ${LEVELS[game.level].name}`,
         data: { revealed: [...game.revealed], mines: [...game.mineSet], hit: kind === 'lose' ? game.hit : null },
       });
     }
 
     if (i) {
       if (held && !minesImgDone) {
-        const wait = 900 - (Date.now() - t0); // suspense : la case s'ouvre avant le verdict
+        const wait = 900 - (Date.now() - t0); // suspense: the cell opens before the verdict
         if (wait > 0) await sleep(wait);
       }
       await editWithCard(i, payload);
@@ -1706,7 +1783,7 @@ async function settleMines(game, kind, i) {
       const target = i || game.lastI;
       const bal = await getBalance(game.userId).catch(() => 0);
       await target.editReply({
-        embeds: [minesEmbed(game, { text: '⚠️ Petit souci d’affichage, ta partie est bien terminée.', color: COLORS.grey, balance: bal })],
+        embeds: [minesEmbed(game, { text: '⚠️ Minor display issue, your game is finished.', color: COLORS.grey, balance: bal })],
         components: minesRows(game, true),
       });
     } catch {
@@ -1720,7 +1797,7 @@ async function settleMines(game, kind, i) {
 async function handleMinesButton(i) {
   const game = games.get(i.user.id);
   if (!game || game.starting || game.type !== 'mines' || game.messageId !== i.message?.id) {
-    return respondText(i, 'Cette partie n’est plus active. Lance-en une nouvelle depuis le panneau.');
+    return respondText(i, 'This game is no longer active. Start a new one from the panel.');
   }
   if (game.finished) return i.deferUpdate().catch(() => {});
   game.lastI = i;
@@ -1779,7 +1856,7 @@ function bjTable(player, dealer, dealerHidden) {
   const p = handArt(player);
   const dv = dealer.length ? (dealerHidden ? handInfo(dealer).label + ' + ?' : handInfo(dealer).label) : '-';
   const pv = player.length ? handInfo(player).label : '-';
-  return code([`CROUPIER  [${dv}]`, ...d, '', `TOI  [${pv}]`, ...p]);
+  return code([`DEALER  [${dv}]`, ...d, '', `YOU  [${pv}]`, ...p]);
 }
 
 function bjEmbed(g, end) {
@@ -1791,16 +1868,16 @@ function bjEmbed(g, end) {
   if (end && end.balance != null) {
     const kind = end.color === COLORS.green ? 'win' : end.color === COLORS.red ? 'lose' : 'push';
     e.setColor(outcomeColor(kind)).setDescription(`${outcomeBanner(kind)}${table}${end.text}`);
-    e.addFields({ name: 'Mise', value: fmt(g.bet), inline: true }, { name: 'Solde', value: fmt(end.balance), inline: true });
+    e.addFields({ name: 'Bet', value: fmt(g.bet), inline: true }, { name: 'Balance', value: fmt(end.balance), inline: true });
   } else if (end?.revealing) {
-    e.setColor(COLORS.violet).setDescription(`${table}${end.text || '🃏 Tour du croupier...'}`);
-    e.addFields({ name: 'Mise', value: fmt(g.bet), inline: true });
+    e.setColor(COLORS.violet).setDescription(`${table}${end.text || '🃏 Dealer\'s turn...'}`);
+    e.addFields({ name: 'Bet', value: fmt(g.bet), inline: true });
   } else {
     e.setColor(COLORS.violet).setDescription(
-      `${table}À toi : **Tirer**, **Rester** ou **Doubler**.` +
-        (pInfo.isSoft ? `\n💡 Ton As te donne **${pInfo.low}** ou **${pInfo.total}**.` : '')
+      `${table}Your turn: **Hit**, **Stand** or **Double**.` +
+        (pInfo.isSoft ? `\n💡 Your Ace gives you **${pInfo.low}** or **${pInfo.total}**.` : '')
     );
-    e.addFields({ name: 'Mise', value: fmt(g.bet), inline: true });
+    e.addFields({ name: 'Bet', value: fmt(g.bet), inline: true });
   }
   return e;
 }
@@ -1809,7 +1886,7 @@ function bjRows(g, over) {
   if (over) {
     return [
       new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId(`replay|bj|${g.baseBet}`).setLabel('Rejouer').setEmoji('🔁').setStyle(ButtonStyle.Success),
+        new ButtonBuilder().setCustomId(`replay|bj|${g.baseBet}`).setLabel('Replay').setEmoji('🔁').setStyle(ButtonStyle.Success),
         new ButtonBuilder().setCustomId('panel_home').setLabel('Menu ZNK').setEmoji('💜').setStyle(ButtonStyle.Primary)
       ),
     ];
@@ -1831,63 +1908,63 @@ function bjOutcome(g, kind) {
   if (kind === 'natural') {
     const pBJ = pv === 21 && g.player.length === 2;
     const dBJ = dv === 21 && g.dealer.length === 2;
-    if (pBJ && dBJ) return { payout: bet, text: '🤝 Double blackjack : égalité, mise remboursée.', color: COLORS.grey };
+    if (pBJ && dBJ) return { payout: bet, text: '🤝 Double blackjack: tie, bet refunded.', color: COLORS.grey };
     if (pBJ) {
       const payout = floor2(bet * 2.5 * coef('bj'));
       return {
         payout,
-        text: `🎉 **Blackjack !** Tu gagnes **${fmt(round2(payout - bet))}** (${fx(2.5 * coef('bj'))}).`,
+        text: `🎉 **Blackjack!** You win **${fmt(round2(payout - bet))}** (${fx(2.5 * coef('bj'))}).`,
         color: COLORS.green,
       };
     }
-    return { payout: 0, text: '😬 Le croupier a un blackjack, mise perdue.', color: COLORS.red };
+    return { payout: 0, text: '😬 Dealer has blackjack, bet lost.', color: COLORS.red };
   }
   if (kind === 'bust')
     return {
       payout: 0,
-      text: `💥 Tu dépasses 21 (**${handInfo(g.player).label}**), mise perdue.`,
+      text: `💥 You went over 21 (**${handInfo(g.player).label}**), bet lost.`,
       color: COLORS.red,
     };
   const winPayout = floor2(bet * 2 * coef('bj'));
   const winProfit = fmt(round2(winPayout - bet));
-  if (dv > 21) return { payout: winPayout, text: `🎉 Le croupier dépasse 21 ! Tu gagnes **${winProfit}**.`, color: COLORS.green };
-  if (pv > dv) return { payout: winPayout, text: `🎉 ${pv} contre ${dv} : tu gagnes **${winProfit}**.`, color: COLORS.green };
-  if (pv === dv) return { payout: bet, text: `🤝 Égalité à ${pv}, mise remboursée.`, color: COLORS.grey };
-  return { payout: 0, text: `😬 ${pv} contre ${dv} : tu perds ta mise.`, color: COLORS.red };
+  if (dv > 21) return { payout: winPayout, text: `🎉 Dealer went over 21! You win **${winProfit}**.`, color: COLORS.green };
+  if (pv > dv) return { payout: winPayout, text: `🎉 ${pv} vs ${dv}: you win **${winProfit}**.`, color: COLORS.green };
+  if (pv === dv) return { payout: bet, text: `🤝 Tie at ${pv}, bet refunded.`, color: COLORS.grey };
+  return { payout: 0, text: `😬 ${pv} vs ${dv}: you lose your bet.`, color: COLORS.red };
 }
 
-// --- Blackjack : tout reste dans le GIF (distribution, tirage, tour du croupier, résultat) ---
-// d = main complète du croupier ; si hidden, seule sa 1re carte est visible (la 2e est face cachée)
+// --- Blackjack: everything stays in the GIF (deal, draw, dealer turn, result) ---
+// d = dealer's full hand; if hidden, only their 1st card is visible (2nd is face down)
 const bjState = (p, d, hidden, cap) => {
   const vis = hidden ? d.slice(0, 1) : d.slice();
   return { p: p.slice(), d: vis, hidden, cap, ms: 850, pv: p.length ? handValue(p) : null, dv: vis.length ? handValue(vis) : null };
 };
-// Mains écrites SOUS l'image (le pied d'une intégration s'affiche sous l'image, la description au-dessus)
+// Hands written BELOW the image (embed footer shows below the image, description above)
 const bjCards = (cards) => cards.map((c) => `${c.r}${c.s}`).join(' ');
 function bjHandFooter(game, revealDealer = false) {
-  const p = `Ta main : ${bjCards(game.player)} (${handInfo(game.player).label})`;
+  const p = `Your hand: ${bjCards(game.player)} (${handInfo(game.player).label})`;
   if (!game.dealer.length) return p;
-  const d = revealDealer ? `Croupier : ${bjCards(game.dealer)} (${handInfo(game.dealer).label})` : `Croupier : ${bjCards(game.dealer.slice(0, 1))} ?`;
+  const d = revealDealer ? `Dealer: ${bjCards(game.dealer)} (${handInfo(game.dealer).label})` : `Dealer: ${bjCards(game.dealer.slice(0, 1))} ?`;
   return `${p}   ·   ${d}`;
 }
-// Texte au-dessus du GIF + mains en dessous
+// Text above the GIF + hands below
 const bjLiveEmbed = (game, text, revealDealer = false) =>
   new EmbedBuilder()
     .setColor(COLORS.violet)
     .setImage(`attachment://${game.gifName}`)
     .setDescription(text)
-    .addFields({ name: 'Mise', value: fmt(game.bet), inline: true })
+    .addFields({ name: 'Bet', value: fmt(game.bet), inline: true })
     .setFooter({ text: bjHandFooter(game, revealDealer) });
 const bjTurnText = (game) => {
   const pInfo = handInfo(game.player);
-  return `À toi : **Tirer**, **Rester**${game.player.length === 2 ? ' ou **Doubler**' : ''}.` + (pInfo.isSoft ? `\n💡 Ton As te donne **${pInfo.low}** ou **${pInfo.total}**.` : '');
+  return `Your turn: **Hit**, **Stand**${game.player.length === 2 ? ' or **Double**' : ''}.` + (pInfo.isSoft ? `\n💡 Your Ace gives you **${pInfo.low}** or **${pInfo.total}**.` : '');
 };
-// Joue un GIF de blackjack. deliver(p) = envoi ; renvoie le ctx (gifName/gifUrl) si le GIF est passé, sinon null
+// Plays a blackjack GIF. deliver(p) = send; returns ctx (gifName/gifUrl) if GIF played, otherwise null
 async function bjAnimate(game, deliver, steps, o = {}) {
   const ctx = {
     user: game.user,
     bet: game.bet,
-    sub: `Mise ${coinTxt(game.bet)}`,
+    sub: `Bet ${coinTxt(game.bet)}`,
     data: { steps, noShuffle: !!o.noShuffle },
     components: o.components || [],
     deliver,
@@ -1897,12 +1974,12 @@ async function bjAnimate(game, deliver, steps, o = {}) {
     decorate: o.decorate,
   };
   const ok = await playGameImages(game.lastI, 'bj', null, ctx);
-  ctx.played = !!ok; // true aussi si le joueur a sauté l'animation ou si des images fixes ont été jouées
+  ctx.played = !!ok; // true also if the player skipped the animation or still images were played
   if (ok && ctx.gifName) {
     game.gifName = ctx.gifName;
     game.gifUrl = ctx.gifUrl;
   } else {
-    game.gifName = null; // plus de GIF à l'écran : les mises à jour repassent par le texte
+    game.gifName = null; // no more GIF on screen: updates go back through text
     game.gifUrl = null;
   }
   return ctx;
@@ -1912,11 +1989,11 @@ async function dealAnimation(i, game, natural = null) {
   const [p1, p2] = game.player;
   const [d1, d2] = game.dealer;
   const steps = [
-    { p: [], d: [], hidden: false, cap: 'Le croupier bat les cartes...' },
-    { p: [p1], d: [], hidden: false, cap: 'Première carte pour toi' },
-    { p: [p1], d: [d1], hidden: false, cap: 'Première carte du croupier' },
-    { p: [p1, p2], d: [d1], hidden: false, cap: 'Deuxième carte pour toi' },
-    { p: [p1, p2], d: [d1], hidden: true, cap: 'Le croupier garde la sienne cachée' },
+    { p: [], d: [], hidden: false, cap: 'Dealer shuffles the cards...' },
+    { p: [p1], d: [], hidden: false, cap: 'First card for you' },
+    { p: [p1], d: [d1], hidden: false, cap: 'Dealer\'s first card' },
+    { p: [p1, p2], d: [d1], hidden: false, cap: 'Second card for you' },
+    { p: [p1, p2], d: [d1], hidden: true, cap: 'Dealer keeps one face down' },
   ];
   if (natural) steps.push({ p: [p1, p2], d: [d1, d2], hidden: false, cap: 'Blackjack !' });
   const frames = steps.slice(0, 5).map((s) => ({
@@ -1938,9 +2015,9 @@ async function dealAnimation(i, game, natural = null) {
     components: [],
     outcome: natural ? natural.kind : undefined,
     resultText: natural ? natural.text : undefined,
-    decorate: (e) => e.setDescription(`Mise **${fmt(game.bet)}** · distribution...`),
+    decorate: (e) => e.setDescription(`Bet **${fmt(game.bet)}** · dealing...`),
   });
-  if (!done.played) await animate(i, frames, '🃏 Blackjack', '', 'bj'); // ni GIF ni images : animation texte d'avant
+  if (!done.played) await animate(i, frames, '🃏 Blackjack', '', 'bj'); // no GIF or images: old text animation
 }
 
 async function startBlackjack(i, bet) {
@@ -1997,7 +2074,7 @@ async function startBlackjack(i, bet) {
           new EmbedBuilder()
             .setTitle('🃏 Blackjack')
             .setColor(COLORS.violet)
-            .setDescription(`Mise **${fmt(bet)}** · distribution en cours...`),
+            .setDescription(`Bet **${fmt(bet)}** · dealing...`),
         ],
         components: [],
       });
@@ -2022,9 +2099,9 @@ async function startBlackjack(i, bet) {
         components: bjRows(game, true),
       };
       if (game.gifName) {
-        // le GIF reste affiché : on ajoute seulement le résultat sous l'image
+        // GIF stays on screen: only the result is added below the image
         const kindN = out.color === COLORS.green ? 'win' : out.color === COLORS.red ? 'lose' : 'push';
-        const e = bjLiveEmbed(game, `${outcomeBanner(kindN)}${out.text}`, true).setColor(outcomeColor(kindN)).addFields({ name: 'Solde', value: fmt(balance), inline: true });
+        const e = bjLiveEmbed(game, `${outcomeBanner(kindN)}${out.text}`, true).setColor(outcomeColor(kindN)).addFields({ name: 'Balance', value: fmt(balance), inline: true });
         await i.editReply({ embeds: [e], components: bjRows(game, true) }).catch(() => {});
         return;
       }
@@ -2062,39 +2139,39 @@ async function settleBlackjack(game, kind, i) {
 
   try {
     const useGif = !!game.gifName && String(process.env.GAME_GIF || 'on').toLowerCase() !== 'off';
-    const preP = game.preP || null; // main du joueur avant la dernière carte (tirage / double)
+    const preP = game.preP || null; // player hand before the last card (hit / double)
     game.preP = null;
 
-    // ----- le croupier joue (tirages calculés d'avance ; affichés ensuite dans le GIF)
+    // ----- dealer plays (draws computed in advance; then shown in the GIF)
     const steps = [];
-    if (preP) steps.push(bjState(preP, game.dealer, true, 'Ton tour...'));
-    steps.push(bjState(game.player, game.dealer, true, preP ? 'Tu tires une carte' : 'Tu restes'));
+    if (preP) steps.push(bjState(preP, game.dealer, true, 'Your turn...'));
+    steps.push(bjState(game.player, game.dealer, true, preP ? 'You draw a card' : 'You stand'));
     const textDraws = [];
     if (kind === 'stand') {
-      steps.push(bjState(game.player, game.dealer, false, 'Le croupier retourne sa carte'));
+      steps.push(bjState(game.player, game.dealer, false, 'Dealer reveals their card'));
       while (handValue(game.dealer) < 17) {
         game.dealer.push(game.deck.pop());
         const d = handInfo(game.dealer);
         textDraws.push(d);
-        steps.push(bjState(game.player, game.dealer, false, `Le croupier tire... total ${d.label}`));
+        steps.push(bjState(game.player, game.dealer, false, `Dealer draws... total ${d.label}`));
       }
       const dFinal = handInfo(game.dealer);
-      steps[steps.length - 1].cap = dFinal.total > 21 ? `Le croupier dépasse (${dFinal.label})` : `Le croupier s'arrête à ${dFinal.label}`;
+      steps[steps.length - 1].cap = dFinal.total > 21 ? `Dealer busts (${dFinal.label})` : `Dealer stands at ${dFinal.label}`;
     } else {
-      steps.push(bjState(game.player, game.dealer, false, `Tu dépasses 21 (${handInfo(game.player).label})`));
+      steps.push(bjState(game.player, game.dealer, false, `You bust 21 (${handInfo(game.player).label})`));
     }
 
-    // ----- résultat, boost, paiement
+    // ----- result, boost, payout
     const out = bjOutcome(game, kind);
     const boost = getBoost(game.guildId);
     if (out.payout > game.bet && (boost.winMult || 1) !== 1) {
       const profit = out.payout - game.bet;
       out.payout = floor2(game.bet + profit * (boost.winMult || 1));
-      out.text += `\n⚡ Boost **${boost.label}** appliqué !`;
+      out.text += `\n⚡ Boost **${boost.label}** applied!`;
     } else if (out.payout === 0 && (boost.loseMult || 1) > 1) {
       const extra = floor2(game.bet * ((boost.loseMult || 1) - 1));
       if (extra > 0) await debit(game.userId, extra).catch(() => {});
-      out.text += `\n⚡ Boost **${boost.label}** : perte ×${boost.loseMult}`;
+      out.text += `\n⚡ Boost **${boost.label}**: loss ×${boost.loseMult}`;
     }
     const balance = out.payout > 0 ? await credit(game.userId, out.payout) : await getBalance(game.userId);
     const pL = handInfo(game.player).label;
@@ -2111,7 +2188,7 @@ async function settleBlackjack(game, kind, i) {
     });
     const rk = outKind(out);
 
-    // ----- affichage : GIF (reste à l'écran) ou, à défaut, texte
+    // ----- display: GIF (stays on screen) or, failing that, text
     let played = null;
     if (useGif) {
       if (i && !i.replied && !i.deferred) await i.deferUpdate().catch(() => {});
@@ -2120,33 +2197,33 @@ async function settleBlackjack(game, kind, i) {
         components: [],
         outcome: rk,
         resultText: animResultText(rk, mult),
-        decorate: (e) => e.setDescription(kind === 'stand' ? '🃏 Le croupier joue...' : '🃏 Tu dépasses...').setFooter({ text: `Ta main : ${bjCards(game.player)} (${handInfo(game.player).label})` }),
+        decorate: (e) => e.setDescription(kind === 'stand' ? '🃏 Dealer plays...' : '🃏 You bust...').setFooter({ text: `Your hand: ${bjCards(game.player)} (${handInfo(game.player).label})` }),
       });
     }
 
     if (played && game.gifName) {
       const e = bjLiveEmbed(game, `${outcomeBanner(rk)}${out.text}`, true)
         .setColor(outcomeColor(rk))
-        .addFields({ name: 'Solde', value: fmt(balance), inline: true });
+        .addFields({ name: 'Balance', value: fmt(balance), inline: true });
       await game.lastI.editReply({ embeds: [e], components: bjRows(game, true) });
       return;
     }
 
-    // repli texte (pas de GIF) : même déroulé qu'avant
+    // text fallback (no GIF): same sequence as before
     if (kind === 'stand') {
-      await pushBoard({ embeds: [bjEmbed(game, { revealing: true, text: '🃏 Le croupier **retourne** sa deuxième carte...' })], components: [], attachments: [] }, i);
+      await pushBoard({ embeds: [bjEmbed(game, { revealing: true, text: '🃏 Dealer **reveals** their second card...' })], components: [], attachments: [] }, i);
       i = null;
       await sleep(1100);
       const dFinal = handInfo(game.dealer);
       for (const d of textDraws) {
         await game.lastI.editReply({
-          embeds: [bjEmbed(game, { revealing: true, text: `🃏 Le croupier tire une carte... total **${d.label}**${d.isSoft ? ' (As soft)' : ''}` })],
+          embeds: [bjEmbed(game, { revealing: true, text: `🃏 Dealer draws a card... total **${d.label}**${d.isSoft ? ' (soft Ace)' : ''}` })],
           components: [],
         });
         await sleep(1100);
       }
       await game.lastI.editReply({
-        embeds: [bjEmbed(game, { revealing: true, text: dFinal.total > 21 ? `💥 Le croupier dépasse (**${dFinal.label}**) !` : `🛑 Le croupier s’arrête à **${dFinal.label}**.` })],
+        embeds: [bjEmbed(game, { revealing: true, text: dFinal.total > 21 ? `💥 Dealer busts (**${dFinal.label}**)!` : `🛑 Dealer stands at **${dFinal.label}**.` })],
         components: [],
       });
       await sleep(900);
@@ -2169,10 +2246,10 @@ async function settleBlackjack(game, kind, i) {
 async function handleBlackjackButton(i) {
   const game = games.get(i.user.id);
   if (!game || game.starting || game.type !== 'bj' || game.messageId !== i.message?.id) {
-    return respondText(i, 'Cette partie n’est plus active. Lance-en une nouvelle depuis le panneau.');
+    return respondText(i, 'This game is no longer active. Start a new one from the panel.');
   }
   if (game.finished) return i.deferUpdate().catch(() => {});
-  if (game.busy) return i.deferUpdate().catch(() => {}); // une carte est en train d'être distribuée
+  if (game.busy) return i.deferUpdate().catch(() => {}); // a card is being dealt
   game.lastI = i;
   armTimer(game);
 
@@ -2185,24 +2262,24 @@ async function handleBlackjackButton(i) {
     if (v === 21) return settleBlackjack(game, 'stand', i);
     game.preP = null;
 
-    // le GIF reste à l'écran : la nouvelle carte glisse du sabot jusqu'à ta main, les boutons restent actifs
+    // GIF stays on screen: the new card slides from the deck to your hand, buttons stay active
     if (game.gifName && String(process.env.GAME_GIF || 'on').toLowerCase() !== 'off' && !wantsSkipAnim(game.userId)) {
       game.busy = true;
       try {
         await i.deferUpdate();
-        const steps = [bjState(before, game.dealer, true, 'À toi de jouer'), bjState(game.player, game.dealer, true, 'Tu tires une carte')];
+        const steps = [bjState(before, game.dealer, true, 'Your turn'), bjState(game.player, game.dealer, true, 'You draw a card')];
         const ctx = await bjAnimate(game, (p) => i.editReply(p), steps, {
           noShuffle: true,
           noWait: true,
           components: bjRows(game, false),
-          decorate: (e) => e.setDescription(bjTurnText(game)).addFields({ name: 'Mise', value: fmt(game.bet), inline: true }).setFooter({ text: bjHandFooter(game) }),
+          decorate: (e) => e.setDescription(bjTurnText(game)).addFields({ name: 'Bet', value: fmt(game.bet), inline: true }).setFooter({ text: bjHandFooter(game) }),
         });
         if (!ctx.played || !game.gifName) {
-          // GIF impossible : retour à l'affichage texte
+          // GIF impossible: back to text display
           await i.editReply({ embeds: [bjEmbed(game)], components: bjRows(game, false), attachments: [] });
         }
       } catch (e) {
-        console.error('[blackjack] tirage', e?.message || e);
+        console.error('[blackjack] draw', e?.message || e);
         game.gifName = null;
         await i.editReply({ embeds: [bjEmbed(game)], components: bjRows(game, false), attachments: [] }).catch(() => {});
       } finally {
@@ -2212,7 +2289,7 @@ async function handleBlackjackButton(i) {
     }
     const upd = { embeds: [bjEmbed(game)], components: bjRows(game, false) };
     if (game.gifName) {
-      // animation sautée : on garde quand même l'image du GIF précédent
+      // animation skipped: still keep the previous GIF image
       upd.embeds = [bjLiveEmbed(game, bjTurnText(game))];
     }
     return i.update(upd);
@@ -2223,7 +2300,7 @@ async function handleBlackjackButton(i) {
   if (i.customId === 'bj_double') {
     if (game.player.length !== 2) return i.deferUpdate();
     if ((await debit(game.userId, game.bet)) === null) {
-      return respondText(i, `Pas assez de ${COIN} pour doubler.`);
+      return respondText(i, `Not enough ${COIN} to double.`);
     }
     game.bet = round2(game.bet * 2);
     game.preP = game.player.slice();
@@ -2234,47 +2311,47 @@ async function handleBlackjackButton(i) {
 }
 
 // ============================================================
-//  ROULETTE (européenne, 0 à 36)
+//  ROULETTE (European, 0 to 36)
 // ============================================================
 const REDS = new Set([1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36]);
-const colorOf = (n) => (n === 0 ? 'vert' : REDS.has(n) ? 'rouge' : 'noir');
+const colorOf = (n) => (n === 0 ? 'green' : REDS.has(n) ? 'red' : 'black');
 const colorTag = (n) => (n === 0 ? 'V' : REDS.has(n) ? 'R' : 'N');
-const colorEmoji = { vert: '🟢', rouge: '🔴', noir: '⚫' };
-// Ordre réel des numéros sur une roue européenne
+const colorEmoji = { green: '🟢', red: '🔴', black: '⚫' };
+// Actual number order on a European wheel
 const WHEEL_ORDER = [0, 32, 15, 19, 4, 21, 2, 25, 17, 34, 6, 27, 13, 36, 11, 30, 8, 23, 10, 5, 24, 16, 33, 1, 20, 14, 31, 9, 22, 18, 29, 7, 28, 12, 35, 3, 26];
 
 function parseRouletteBet(str) {
   if (!str) return null;
   const s = String(str).trim().toLowerCase();
-  if (['rouge', 'red', 'r'].includes(s)) return { key: 'rouge', label: 'Rouge 🔴', mult: 2, win: (n) => n !== 0 && REDS.has(n) };
-  if (['noir', 'black', 'n'].includes(s)) return { key: 'noir', label: 'Noir ⚫', mult: 2, win: (n) => n !== 0 && !REDS.has(n) };
-  if (['pair', 'even', 'p'].includes(s)) return { key: 'pair', label: 'Pair', mult: 2, win: (n) => n !== 0 && n % 2 === 0 };
-  if (['impair', 'odd', 'i'].includes(s)) return { key: 'impair', label: 'Impair', mult: 2, win: (n) => n % 2 === 1 };
-  if (['vert', 'green', 'v'].includes(s)) return { key: 'vert', label: 'Vert 🟢 (0)', mult: 36, win: (n) => n === 0 };
+  if (['rouge', 'red', 'r'].includes(s)) return { key: 'rouge', label: 'Red 🔴', mult: 2, win: (n) => n !== 0 && REDS.has(n) };
+  if (['noir', 'black', 'n'].includes(s)) return { key: 'noir', label: 'Black ⚫', mult: 2, win: (n) => n !== 0 && !REDS.has(n) };
+  if (['pair', 'even', 'p'].includes(s)) return { key: 'pair', label: 'Even', mult: 2, win: (n) => n !== 0 && n % 2 === 0 };
+  if (['impair', 'odd', 'i'].includes(s)) return { key: 'impair', label: 'Odd', mult: 2, win: (n) => n % 2 === 1 };
+  if (['vert', 'green', 'v'].includes(s)) return { key: 'vert', label: 'Green 🟢 (0)', mult: 36, win: (n) => n === 0 };
   if (/^\d{1,2}$/.test(s) && Number(s) >= 0 && Number(s) <= 36) {
     const target = Number(s);
-    return { key: String(target), label: `Numéro ${target}`, mult: 36, win: (n) => n === target };
+    return { key: String(target), label: `Number ${target}`, mult: 36, win: (n) => n === target };
   }
   return null;
 }
 
 function roulettePickerPayload() {
   const embed = new EmbedBuilder()
-    .setTitle('🎡 Roulette : choisis ton pari')
+    .setTitle('🎡 Roulette: choose your bet')
     .setColor(COLORS.blue)
     .setDescription(
-      `🔴 Rouge · ⚫ Noir · Pair · Impair : paient **${fx(2 * coef('roulette'))}**\n` +
-        `🟢 Vert (0) ou un **numéro** précis (0 à 36) : paient **${fx(36 * coef('roulette'))}**`
+      `🔴 Red · ⚫ Black · Even · Odd: pay **${fx(2 * coef('roulette'))}**\n` +
+        `🟢 Green (0) or a specific **number** (0 to 36): pay **${fx(36 * coef('roulette'))}**`
     );
   const row1 = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('rl_rouge').setLabel('Rouge').setEmoji('🔴').setStyle(ButtonStyle.Danger),
-    new ButtonBuilder().setCustomId('rl_noir').setLabel('Noir').setEmoji('⚫').setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId('rl_pair').setLabel('Pair').setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId('rl_impair').setLabel('Impair').setStyle(ButtonStyle.Primary)
+    new ButtonBuilder().setCustomId('rl_rouge').setLabel('Red').setEmoji('🔴').setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId('rl_noir').setLabel('Black').setEmoji('⚫').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('rl_pair').setLabel('Even').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId('rl_impair').setLabel('Odd').setStyle(ButtonStyle.Primary)
   );
   const row2 = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('rl_vert').setLabel('Vert (0)').setEmoji('🟢').setStyle(ButtonStyle.Success),
-    new ButtonBuilder().setCustomId('rl_num').setLabel('Un numéro').setEmoji('🔢').setStyle(ButtonStyle.Secondary)
+    new ButtonBuilder().setCustomId('rl_vert').setLabel('Green (0)').setEmoji('🟢').setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId('rl_num').setLabel('A number').setEmoji('🔢').setStyle(ButtonStyle.Secondary)
   );
   return animPanel({ embeds: [embed], components: [row1, row2] });
 }
@@ -2288,20 +2365,20 @@ function rouletteFrames(result, choice) {
   const steps = [8, 7, 6, 5, 4, 3, 2, 1, 1]; // 37 crans = 1 tour complet
   const pos = stripPositions(finalIdx, steps);
   const caps = [
-    'La bille est lancée',
-    'La roue prend de la vitesse',
+    'The ball is launched',
+    'The wheel speeds up',
     'Pleine vitesse',
-    'La bille tourne...',
-    'Elle commence à ralentir',
-    'Elle saute de case en case',
-    'Presque arrêtée',
+    'The ball is spinning...',
+    'It starts slowing down',
+    'It hops from cell to cell',
+    'Almost stopped',
     'Dernier saut...',
-    'Elle hésite...',
-    `La bille s'arrête sur le ${result} ${colorOf(result)}`,
+    'It hesitates...',
+    `The ball lands on ${result} ${colorOf(result)}`,
   ];
-  const legend = 'R rouge · N noir · V vert';
+  const legend = 'R red · N black · V green';
   return pos.map((p, k) => ({
-    art: code([...stripArt(WHEEL_ORDER, p, rcell, 5), '', legend, `Ton pari : ${choice.label}`]),
+    art: code([...stripArt(WHEEL_ORDER, p, rcell, 5), '', legend, `Your bet: ${choice.label}`]),
     caption: caps[k],
     ms: 700 + k * 110,
   }));
@@ -2309,7 +2386,7 @@ function rouletteFrames(result, choice) {
 
 async function playRoulette(i, bet, choiceStr) {
   const choice = parseRouletteBet(choiceStr);
-  if (!choice) return respondText(i, 'Pari invalide : rouge, noir, pair, impair, vert ou un numéro de 0 à 36.');
+  if (!choice) return respondText(i, 'Invalid bet: red, black, even, odd, green or a number from 0 to 36.');
   const uid = i.user.id;
   if (!tryLock(uid)) return respondText(i, MSG.busy);
 
@@ -2333,7 +2410,7 @@ async function playRoulette(i, bet, choiceStr) {
           new EmbedBuilder()
             .setTitle('🎡 Roulette')
             .setColor(COLORS.violet)
-            .setDescription(`🎡 Les jeux sont faits. Mise **${fmt(bet)}** sur **${choice.label}**`),
+            .setDescription(`🎡 Place your bets. Bet **${fmt(bet)}** on **${choice.label}**`),
         ],
         components: [],
       });
@@ -2352,11 +2429,11 @@ async function playRoulette(i, bet, choiceStr) {
       outcome: kind,
       resultText: animResultText(kind, rlMult),
       pickLabel: noEmoji(choice.label),
-      sub: `Mise ${coinTxt(bet)} · ${noEmoji(choice.label)}`,
+      sub: `Bet ${coinTxt(bet)} · ${noEmoji(choice.label)}`,
       data: { order: WHEEL_ORDER, reds: [...REDS], result },
     };
     const rlImgDone = await playGameImages(i, 'roulette', null, rlCtx);
-    if (!rlImgDone) await animate(i, rouletteFrames(result, choice), '🎡 Roulette', `Mise **${fmt(bet)}**\n`, 'roulette');
+    if (!rlImgDone) await animate(i, rouletteFrames(result, choice), '🎡 Roulette', `Bet **${fmt(bet)}**\n`, 'roulette');
 
     const embed = brand(
       new EmbedBuilder()
@@ -2365,26 +2442,26 @@ async function playRoulette(i, bet, choiceStr) {
         .setDescription(
           outcomeBanner(kind, profit) +
             code([
-              `  Numéro sorti :  ${result}  (${colorOf(result)}) ${colorEmoji[colorOf(result)]}`,
-              `  Ton pari     :  ${choice.label}`,
+              `  Number:  ${result}  (${colorOf(result)}) ${colorEmoji[colorOf(result)]}`,
+              `  Your bet     :  ${choice.label}`,
             ]) +
-            (won ? `Tu empoches **${fmt(payout)}** (${fx(rlMult)}).` : `Tu laisses **${fmt(bet)}**.`)
+            (won ? `You win **${fmt(payout)}** (${fx(rlMult)}).` : `You lose **${fmt(bet)}**.`)
         )
         .addFields(
-          { name: '🎯 Ton pari', value: choice.label, inline: true },
-          { name: '💰 Mise', value: fmt(bet), inline: true },
-          { name: '👛 Solde', value: fmt(balance), inline: true }
+          { name: '🎯 Your bet', value: choice.label, inline: true },
+          { name: '💰 Bet', value: fmt(bet), inline: true },
+          { name: '👛 Balance', value: fmt(balance), inline: true }
         ),
       'roulette'
     );
 
     const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId(`replay|rl|${bet}|${choice.key}`).setLabel('Rejouer').setEmoji('🔁').setStyle(ButtonStyle.Success),
+      new ButtonBuilder().setCustomId(`replay|rl|${bet}|${choice.key}`).setLabel('Replay').setEmoji('🔁').setStyle(ButtonStyle.Success),
       new ButtonBuilder().setCustomId('panel_home').setLabel('Menu ZNK').setEmoji('💜').setStyle(ButtonStyle.Primary)
     );
     const rlPayload = { embeds: [embed], components: [row] };
     if (rlCtx.gifName) {
-      // le GIF reste affiché (sa dernière image montre le résultat)
+      // GIF stays on screen (its last frame shows the result)
       embed.setImage(`attachment://${rlCtx.gifName}`);
       await i.editReply(rlPayload);
     } else {
@@ -2407,7 +2484,7 @@ async function playRoulette(i, bet, choiceStr) {
 }
 
 // ============================================================
-//  JEUX INSTANTANÉS
+//  INSTANT GAMES
 // ============================================================
 const COIN_MULT = 1.95;
 const DICE_MULT = { under: 2.3, over: 2.3, seven: 5.8 };
@@ -2431,7 +2508,7 @@ function spinReel() {
   return SLOT_SYMBOLS[0];
 }
 
-// 24 cases dans l'ordre d'affichage de la roue
+// 24 cells in the wheel's display order
 const WHEEL = [0, 0.5, 0, 1.5, 0, 0, 2, 0, 0.5, 0, 1.5, 0, 0, 3, 0, 0.5, 1.5, 0, 0.5, 0, 1.5, 0, 10, 0];
 const wheelSummary = (c) => {
   const counts = new Map();
@@ -2462,16 +2539,16 @@ const DUEL_MULT = 2.1;
 const SUIT_MULT = 3.8;
 const SUIT_CHOICES = { s: '♠', h: '♥', d: '♦', c: '♣' };
 const SUIT_EMOJI = { s: '♠️', h: '♥️', d: '♦️', c: '♣️' };
-const SUIT_NAMES = { s: 'Pique', h: 'Coeur', d: 'Carreau', c: 'Trèfle' };
+const SUIT_NAMES = { s: 'Spades', h: 'Hearts', d: 'Diamonds', c: 'Clubs' };
 const ZONES = {
-  low: { label: 'Bas (1-3)', mult: 3.2, win: (n) => n <= 3 },
-  mid: { label: 'Milieu (4-7)', mult: 2.4, win: (n) => n >= 4 && n <= 7 },
-  high: { label: 'Haut (8-10)', mult: 3.2, win: (n) => n >= 8 },
+  low: { label: 'Low (1-3)', mult: 3.2, win: (n) => n <= 3 },
+  mid: { label: 'Mid (4-7)', mult: 2.4, win: (n) => n >= 4 && n <= 7 },
+  high: { label: 'High (8-10)', mult: 3.2, win: (n) => n >= 8 },
 };
 const PLINKO = {
-  low: { label: 'Faible', emoji: '🟢', mults: [2, 1.4, 1.1, 0.95, 0.8, 0.95, 1.1, 1.4, 2] },
-  med: { label: 'Moyen', emoji: '🟡', mults: [6, 3, 1.4, 0.7, 0.4, 0.7, 1.4, 3, 6] },
-  high: { label: 'Élevé', emoji: '🔴', mults: [18, 4, 1.5, 0.4, 0.2, 0.4, 1.5, 4, 18] },
+  low: { label: 'Low', emoji: '🟢', mults: [2, 1.4, 1.1, 0.95, 0.8, 0.95, 1.1, 1.4, 2] },
+  med: { label: 'Medium', emoji: '🟡', mults: [6, 3, 1.4, 0.7, 0.4, 0.7, 1.4, 3, 6] },
+  high: { label: 'High', emoji: '🔴', mults: [18, 4, 1.5, 0.4, 0.2, 0.4, 1.5, 4, 18] },
 };
 const CRASH_TARGETS = { x15: 1.5, x2: 2, x5: 5, x10: 10 };
 const SCRATCH = [[1.5, 1900, 'TREF'], [2, 900, 'ETOI'], [5, 400, 'CLOC'], [20, 80, 'DIAM'], [100, 12, 'COUR']];
@@ -2511,22 +2588,22 @@ function coinScene(face, y) {
 
 Object.assign(INSTANT, {
   coinflip: {
-    title: '🪙 Pile ou Face',
+    title: '🪙 Heads or Tails',
     choices: ['pile', 'face'],
-    spinText: 'La pièce tourne...',
-    info: (c) => `victoire ${fx(COIN_MULT * c)}`,
+    spinText: 'The coin is spinning...',
+    info: (c) => `win ${fx(COIN_MULT * c)}`,
     picker(c) {
       return {
         embeds: [
           new EmbedBuilder()
-            .setTitle('🪙 Pile ou Face : choisis ton côté')
+            .setTitle('🪙 Heads or Tails: pick your side')
             .setColor(COLORS.blue)
-            .setDescription(`Devine le bon côté : tu gagnes **${fx(COIN_MULT * c)}** ta mise. 1 chance sur 2 !`),
+            .setDescription(`Guess the right side: you win **${fx(COIN_MULT * c)}** your bet. 1 in 2 chance!`),
         ],
         components: [
           new ActionRowBuilder().addComponents(
-            igButton('coinflip', 'pile', 'Pile', '🪙', ButtonStyle.Primary),
-            igButton('coinflip', 'face', 'Face', '🪙', ButtonStyle.Secondary)
+            igButton('coinflip', 'pile', 'Heads', '🪙', ButtonStyle.Primary),
+            igButton('coinflip', 'face', 'Tails', '🪙', ButtonStyle.Secondary)
           ),
         ],
       };
@@ -2535,8 +2612,8 @@ Object.assign(INSTANT, {
       const side = randomInt(0, 2) === 0 ? 'pile' : 'face';
       return {
         base: side === choice ? COIN_MULT : 0,
-        pick: choice === 'pile' ? 'Pile' : 'Face',
-        headline: `La pièce retombe sur **🪙 ${side === 'pile' ? 'Pile' : 'Face'}**.`,
+        pick: choice === 'pile' ? 'Heads' : 'Tails',
+        headline: `The coin lands on **🪙 ${side === 'pile' ? 'Heads' : 'Tails'}**`,
         detail: `${choice} -> ${side}`,
         side,
       };
@@ -2544,27 +2621,27 @@ Object.assign(INSTANT, {
   },
 
   dice: {
-    title: '🎲 Dés',
+    title: '🎲 Dice',
     choices: ['under', 'over', 'seven'],
-    spinText: 'Les dés roulent...',
-    info: (c) => `moins/plus de 7 ${fx(DICE_MULT.under * c)} · exactement 7 ${fx(DICE_MULT.seven * c)}`,
+    spinText: 'The dice are rolling...',
+    info: (c) => `under/over 7 ${fx(DICE_MULT.under * c)} · exactly 7 ${fx(DICE_MULT.seven * c)}`,
     picker(c) {
       return {
         embeds: [
           new EmbedBuilder()
-            .setTitle('🎲 Dés : parie sur la somme de 2 dés')
+            .setTitle('🎲 Dice: bet on the sum of 2 dice')
             .setColor(COLORS.blue)
             .setDescription(
-              `⬇️ **Moins de 7** (2 à 6) : **${fx(DICE_MULT.under * c)}**\n` +
-                `⬆️ **Plus de 7** (8 à 12) : **${fx(DICE_MULT.over * c)}**\n` +
+              `⬇️ **Under 7** (2 to 6): **${fx(DICE_MULT.under * c)}**\n` +
+                `⬆️ **Over 7** (8 to 12): **${fx(DICE_MULT.over * c)}**\n` +
                 `🎯 **Exactement 7** : **${fx(DICE_MULT.seven * c)}**`
             ),
         ],
         components: [
           new ActionRowBuilder().addComponents(
-            igButton('dice', 'under', 'Moins de 7', '⬇️', ButtonStyle.Primary),
+            igButton('dice', 'under', 'Under 7', '⬇️', ButtonStyle.Primary),
             igButton('dice', 'seven', 'Exactement 7', '🎯', ButtonStyle.Success),
-            igButton('dice', 'over', 'Plus de 7', '⬆️', ButtonStyle.Primary)
+            igButton('dice', 'over', 'Over 7', '⬆️', ButtonStyle.Primary)
           ),
         ],
       };
@@ -2576,7 +2653,7 @@ Object.assign(INSTANT, {
       const outcome = sum < 7 ? 'under' : sum > 7 ? 'over' : 'seven';
       return {
         base: outcome === choice ? DICE_MULT[choice] : 0,
-        pick: { under: 'Moins de 7', over: 'Plus de 7', seven: 'Exactement 7' }[choice],
+        pick: { under: 'Under 7', over: 'Over 7', seven: 'Exactly 7' }[choice],
         headline: code(sideBySide([dieLines(a), dieLines(b)], '   ')) + `${dieFace(a)} **${a}** + ${dieFace(b)} **${b}** = **${sum}**`,
         detail: `${a}+${b}=${sum}`,
         a,
@@ -2587,16 +2664,16 @@ Object.assign(INSTANT, {
   },
 
   slots: {
-    title: '🎰 Machine à sous',
+    title: '🎰 Slot Machine',
     choices: ['go'],
-    spinText: 'Les rouleaux tournent...',
+    spinText: 'The reels are spinning...',
     info: (c) => `3 cerises ${fx(5 * c)} · jackpot 7️⃣ ${fx(250 * c)}`,
     picker(c) {
       const table = SLOT_SYMBOLS.map((x) => `${x.e}${x.e}${x.e}  ->  **${fx(x.pay * c)}**`).join('\n');
       return {
         embeds: [
           new EmbedBuilder()
-            .setTitle('🎰 Machine à sous')
+            .setTitle('🎰 Slot Machine')
             .setColor(COLORS.blue)
             .setDescription(`${table}\n🍒🍒 (2 cerises)  ->  **${fx(SLOT_TWO_CHERRIES * c)}**`),
         ],
@@ -2614,19 +2691,19 @@ Object.assign(INSTANT, {
   },
 
   wheel: {
-    title: '🎡 Roue de la fortune',
+    title: '🎡 Wheel of Fortune',
     choices: ['go'],
-    spinText: 'La roue tourne...',
-    info: (c) => `de ${fx(0.5 * c)} à ${fx(10 * c)}`,
+    spinText: 'The wheel is spinning...',
+    info: (c) => `from ${fx(0.5 * c)} to ${fx(10 * c)}`,
     picker(c) {
       return {
         embeds: [
           new EmbedBuilder()
-            .setTitle('🎡 Roue de la fortune')
+            .setTitle('🎡 Wheel of Fortune')
             .setColor(COLORS.blue)
-            .setDescription(`24 cases : ${wheelSummary(c)}\n\nLance la roue et vois où elle s'arrête !`),
+            .setDescription(`24 cells: ${wheelSummary(c)}\n\nSpin the wheel and see where it stops!`),
         ],
-        components: [new ActionRowBuilder().addComponents(igButton('wheel', 'go', 'Lancer la roue', '🎡', ButtonStyle.Success))],
+        components: [new ActionRowBuilder().addComponents(igButton('wheel', 'go', 'Spin the wheel', '🎡', ButtonStyle.Success))],
       };
     },
     resolve(choice, c) {
@@ -2634,8 +2711,8 @@ Object.assign(INSTANT, {
       const base = WHEEL[idx];
       return {
         base,
-        pick: 'Roue',
-        headline: `La roue s'arrête sur **${base === 0 ? '💀 x0' : fx(base * c)}**`,
+        pick: 'Wheel',
+        headline: `The wheel stops on **${base === 0 ? '💀 x0' : fx(base * c)}**`,
         detail: base === 0 ? 'x0' : fx(base * c),
         idx,
       };
@@ -2643,16 +2720,16 @@ Object.assign(INSTANT, {
   },
 
   duel: {
-    title: '⚔️ Duel de cartes',
+    title: '⚔️ Card duel',
     choices: ['go'],
-    spinText: 'Les cartes sont distribuées...',
-    info: (c) => `victoire ${fx(DUEL_MULT * c)}`,
+    spinText: 'Cards are being dealt...',
+    info: (c) => `win ${fx(DUEL_MULT * c)}`,
     picker: (c) =>
       choicePicker(
         'duel',
-        '⚔️ Duel de cartes',
-        `Tu tires une carte contre le croupier : la plus haute gagne (l’As est la plus faible, égalité = perdu).\nVictoire : **${fx(DUEL_MULT * c)}**`,
-        [['go', 'Tirer ma carte', '⚔️', ButtonStyle.Success]]
+        '⚔️ Card duel',
+        `You draw a card against the dealer: highest wins (Ace is lowest, tie = loss).\nWin: **${fx(DUEL_MULT * c)}**`,
+        [['go', 'Draw my card', '⚔️', ButtonStyle.Success]]
       ),
     resolve() {
       const me = randCard();
@@ -2660,7 +2737,7 @@ Object.assign(INSTANT, {
       return {
         base: me.v > dealer.v ? DUEL_MULT : 0,
         pick: 'Duel',
-        headline: `Toi : ${cardStr(me)}  ·  Croupier : ${cardStr(dealer)}`,
+        headline: `You: ${cardStr(me)}  ·  Dealer: ${cardStr(dealer)}`,
         detail: `${me.r} vs ${dealer.r}`,
         me,
         dealer,
@@ -2669,15 +2746,15 @@ Object.assign(INSTANT, {
   },
 
   suit: {
-    title: '🃏 Enseigne',
+    title: '🃏 Suit',
     choices: Object.keys(SUIT_CHOICES),
-    spinText: 'Le croupier tire une carte...',
-    info: (c) => `victoire ${fx(SUIT_MULT * c)}`,
+    spinText: 'Dealer draws a card...',
+    info: (c) => `win ${fx(SUIT_MULT * c)}`,
     picker: (c) =>
       choicePicker(
         'suit',
-        '🃏 Enseigne : devine la couleur de la carte',
-        `Choisis ♠️ ♥️ ♦️ ou ♣️ : si la carte tirée a cette enseigne, tu gagnes **${fx(SUIT_MULT * c)}** (1 chance sur 4).`,
+        '🃏 Suit: guess the suit of the card',
+        `Choose ♠️ ♥️ ♦️ or ♣️: if the drawn card has that suit, you win **${fx(SUIT_MULT * c)}** (1 in 4 chance).`,
         Object.keys(SUIT_CHOICES).map((id) => [id, SUIT_NAMES[id], SUIT_EMOJI[id]])
       ),
     resolve(choice) {
@@ -2685,7 +2762,7 @@ Object.assign(INSTANT, {
       return {
         base: card.s === SUIT_CHOICES[choice] ? SUIT_MULT : 0,
         pick: `${SUIT_NAMES[choice]} ${SUIT_EMOJI[choice]}`,
-        headline: `La carte tirée : ${cardStr(card)}`,
+        headline: `Card drawn: ${cardStr(card)}`,
         detail: `${SUIT_CHOICES[choice]} -> ${card.s}`,
         card,
       };
@@ -2695,30 +2772,30 @@ Object.assign(INSTANT, {
   zone: {
     title: '🎯 Zone',
     choices: Object.keys(ZONES),
-    spinText: 'Tirage d’un nombre de 1 à 10...',
+    spinText: 'Drawing a number from 1 to 10...',
     info: (c) => `zones ${fx(ZONES.low.mult * c)} / ${fx(ZONES.mid.mult * c)}`,
     picker: (c) =>
       choicePicker(
         'zone',
-        '🎯 Zone : où tombera le nombre (1 à 10) ?',
+        '🎯 Zone: where will the number land (1 to 10)?',
         Object.values(ZONES).map((z) => `**${z.label}** : ${fx(z.mult * c)}`).join('\n'),
         Object.entries(ZONES).map(([id, z]) => [id, z.label, '🎯'])
       ),
     resolve(choice) {
       const n = randomInt(1, 11);
-      return { base: ZONES[choice].win(n) ? ZONES[choice].mult : 0, pick: ZONES[choice].label, headline: `Le nombre tiré est **${n}**`, detail: `${n}`, n };
+      return { base: ZONES[choice].win(n) ? ZONES[choice].mult : 0, pick: ZONES[choice].label, headline: `Number drawn: **${n}**`, detail: `${n}`, n };
     },
   },
 
   plinko: {
     title: '🎱 Plinko',
     choices: Object.keys(PLINKO),
-    spinText: 'La bille descend...',
-    info: (c) => `de ${fx(0.2 * c)} à ${fx(18 * c)}`,
+    spinText: 'The ball drops...',
+    info: (c) => `from ${fx(0.2 * c)} to ${fx(18 * c)}`,
     picker: (c) =>
       choicePicker(
         'plinko',
-        '🎱 Plinko : choisis le risque',
+        '🎱 Plinko: choose the risk',
         Object.values(PLINKO)
           .map((r) => `${r.emoji} **${r.label}** : ${r.mults.map((m) => fx(m * c).replace('x', '')).join(' · ')}`)
           .join('\n'),
@@ -2737,8 +2814,8 @@ Object.assign(INSTANT, {
       return {
         base: mults[bin],
         pick: PLINKO[choice].label,
-        headline: `🎱 La bille atterrit en case **${bin + 1}/9**\n${board}`,
-        detail: `case ${bin + 1}`,
+        headline: `🎱 The ball lands in cell **${bin + 1}/9**\n${board}`,
+        detail: `cell ${bin + 1}`,
         path: pathArr,
         bin,
         mults,
@@ -2749,13 +2826,13 @@ Object.assign(INSTANT, {
   crash: {
     title: '🚀 Crash',
     choices: Object.keys(CRASH_TARGETS),
-    spinText: 'La fusée décolle...',
-    info: (c) => `cibles de ${fx(1.5 * c)} à ${fx(10 * c)}`,
+    spinText: 'The rocket takes off...',
+    info: (c) => `targets from ${fx(1.5 * c)} to ${fx(10 * c)}`,
     picker: () =>
       choicePicker(
         'crash',
-        '🚀 Crash : choisis ton multiplicateur cible',
-        'La fusée monte puis explose à un moment aléatoire. Si elle atteint ta cible, tu gagnes ! Plus la cible est haute, plus c’est risqué.',
+        '🚀 Crash: choose your target multiplier',
+        'The rocket climbs then crashes at a random moment. If it reaches your target, you win! The higher the target, the riskier it is.',
         Object.entries(CRASH_TARGETS).map(([id, tg]) => [id, `x${tg}`, '🚀'])
       ),
     resolve(choice) {
@@ -2764,9 +2841,9 @@ Object.assign(INSTANT, {
       const target = CRASH_TARGETS[choice];
       return {
         base: crash >= target ? target : 0,
-        pick: `Cible x${target}`,
-        headline: `🚀 La fusée explose à **${fx(Math.min(crash, 1000))}**${crash >= target ? ' : cible atteinte !' : ' : trop tôt !'}`,
-        detail: `cible x${target} / crash x${Math.min(crash, 1000)}`,
+        pick: `Target x${target}`,
+        headline: `🚀 The rocket crashes at **${fx(Math.min(crash, 1000))}**${crash >= target ? ' : target reached!' : ' : too early!'}`,
+        detail: `target x${target} / crash x${Math.min(crash, 1000)}`,
         crash,
         target,
       };
@@ -2774,16 +2851,16 @@ Object.assign(INSTANT, {
   },
 
   scratch: {
-    title: '🎟️ Ticket à gratter',
+    title: '🎟️ Scratch ticket',
     choices: ['go'],
-    spinText: 'Tu grattes le ticket...',
-    info: (c) => `de ${fx(1.5 * c)} à ${fx(100 * c)}`,
+    spinText: 'You scratch the ticket...',
+    info: (c) => `from ${fx(1.5 * c)} to ${fx(100 * c)}`,
     picker: (c) =>
       choicePicker(
         'scratch',
-        '🎟️ Ticket à gratter',
-        `Trois symboles identiques = gagné !\n${SCRATCH.map(([m, , s]) => `${SCRATCH_EMOJI[s]}${SCRATCH_EMOJI[s]}${SCRATCH_EMOJI[s]}  ->  **${fx(m * c)}**`).join('\n')}`,
-        [['go', 'Gratter', '🎟️', ButtonStyle.Success]]
+        '🎟️ Scratch ticket',
+        `Three matching symbols = win!\n${SCRATCH.map(([m, , s]) => `${SCRATCH_EMOJI[s]}${SCRATCH_EMOJI[s]}${SCRATCH_EMOJI[s]}  ->  **${fx(m * c)}**`).join('\n')}`,
+        [['go', 'Scratch', '🎟️', ButtonStyle.Success]]
       ),
     resolve() {
       let r = randomInt(0, 10000);
@@ -2812,15 +2889,15 @@ Object.assign(INSTANT, {
   },
 
   die: {
-    title: '🎲 Dé exact',
+    title: '🎲 Exact die',
     choices: ['n1', 'n2', 'n3', 'n4', 'n5', 'n6'],
-    spinText: 'Le dé roule...',
-    info: (c) => `victoire ${fx(DIE_MULT * c)}`,
+    spinText: 'The die rolls...',
+    info: (c) => `win ${fx(DIE_MULT * c)}`,
     picker: (c) =>
       choicePicker(
         'die',
-        '🎲 Dé exact : devine le chiffre',
-        `Un dé à 6 faces : trouve le bon chiffre et gagne **${fx(DIE_MULT * c)}** (1 chance sur 6).`,
+        '🎲 Exact die: guess the number',
+        `A six-sided die: guess the right number and win **${fx(DIE_MULT * c)}** (1 in 6 chance).`,
         ['n1', 'n2', 'n3', 'n4', 'n5', 'n6'].map((id) => [id, id.slice(1), '🎲'])
       ),
     resolve(choice) {
@@ -2828,8 +2905,8 @@ Object.assign(INSTANT, {
       const want = Number(choice.slice(1));
       return {
         base: n === want ? DIE_MULT : 0,
-        pick: `Chiffre ${want}`,
-        headline: code(dieLines(n)) + `Le dé s'arrête sur **${dieFace(n)} ${n}**`,
+        pick: `Number ${want}`,
+        headline: code(dieLines(n)) + `The die lands on **${dieFace(n)} ${n}**`,
         detail: `${want} -> ${n}`,
         n,
         want,
@@ -2838,51 +2915,51 @@ Object.assign(INSTANT, {
   },
 
   chest: {
-    title: '📦 Coffre mystère',
+    title: '📦 Mystery chest',
     choices: ['c1', 'c2', 'c3'],
-    spinText: 'Tu ouvres le coffre...',
-    info: (c) => `victoire ${fx(CHEST_MULT * c)}`,
+    spinText: 'You open the chest...',
+    info: (c) => `win ${fx(CHEST_MULT * c)}`,
     picker: (c) =>
       choicePicker(
         'chest',
-        '📦 Coffre mystère : 1 trésor, 3 coffres',
-        `Un seul coffre contient le trésor : trouve-le et gagne **${fx(CHEST_MULT * c)}**.`,
-        ['c1', 'c2', 'c3'].map((id) => [id, `Coffre ${id.slice(1)}`, '📦'])
+        '📦 Mystery chest: 1 treasure, 3 chests',
+        `Only one chest holds the treasure: find it and win **${fx(CHEST_MULT * c)}**.`,
+        ['c1', 'c2', 'c3'].map((id) => [id, `Chest ${id.slice(1)}`, '📦'])
       ),
     resolve(choice) {
       const win = randomInt(1, 4);
       const want = Number(choice.slice(1));
       const view = [1, 2, 3].map((k) => (k === win ? '💎' : '💨')).join('  ');
-      return { base: win === want ? CHEST_MULT : 0, pick: `Coffre ${want}`, headline: `Contenu des coffres : ${view}`, detail: `${want} -> ${win}`, win, want };
+      return { base: win === want ? CHEST_MULT : 0, pick: `Chest ${want}`, headline: `Chest contents: ${view}`, detail: `${want} -> ${win}`, win, want };
     },
   },
 
   russian: {
-    title: '🔫 Roulette russe',
+    title: '🔫 Russian roulette',
     choices: ['b1', 'b2', 'b3', 'b4', 'b5'],
-    spinText: 'Le barillet tourne...',
-    info: (c) => `de ${fx(russianMult(1) * c)} à ${fx(russianMult(5) * c)}`,
+    spinText: 'The cylinder spins...',
+    info: (c) => `from ${fx(russianMult(1) * c)} to ${fx(russianMult(5) * c)}`,
     picker: (c) =>
       choicePicker(
         'russian',
-        '🔫 Roulette russe : combien de balles ?',
-        `Barillet de 6 chambres. Survis et gagne ! Plus il y a de balles, plus le gain est gros.\n${[1, 2, 3, 4, 5]
-          .map((k) => `**${k}** balle${k > 1 ? 's' : ''} : ${fx(russianMult(k) * c)}`)
+        '🔫 Russian roulette: how many bullets?',
+        `Six-chamber cylinder. Survive and win! The more bullets, the bigger the payout.\n${[1, 2, 3, 4, 5]
+          .map((k) => `**${k}** bullet${k > 1 ? 's' : ''} : ${fx(russianMult(k) * c)}`)
           .join(' · ')}`,
-        [1, 2, 3, 4, 5].map((k) => [`b${k}`, `${k} balle${k > 1 ? 's' : ''}`, '🔫'])
+        [1, 2, 3, 4, 5].map((k) => [`b${k}`, `${k} bullet${k > 1 ? 's' : ''}`, '🔫'])
       ),
     resolve(choice) {
       const k = Number(choice.slice(1));
       const dead = randomInt(0, 6) < k;
-      // chambre 0 = celle qui se trouve sous le percuteur
+      // chamber 0 = the one under the firing pin
       const others = shuffle([1, 2, 3, 4, 5]);
       const loaded = new Set(dead ? [0, ...others.slice(0, k - 1)] : others.slice(0, k));
       const chambers = range(6).map((n) => loaded.has(n));
       return {
         base: dead ? 0 : russianMult(k),
-        pick: `${k} balle${k > 1 ? 's' : ''}`,
-        headline: dead ? '💥 **BANG !** Tu as perdu.' : '😮‍💨 *clic*... Tu survis !',
-        detail: dead ? 'bang' : 'clic',
+        pick: `${k} bullet${k > 1 ? 's' : ''}`,
+        headline: dead ? '💥 **BANG!** You lost.' : '😮‍💨 *click*... You survive!',
+        detail: dead ? 'bang' : 'click',
         chambers,
         dead,
         k,
@@ -2891,16 +2968,16 @@ Object.assign(INSTANT, {
   },
 
   horses: {
-    title: '🏇 Course de chevaux',
+    title: '🏇 Horse race',
     choices: ['h1', 'h2', 'h3', 'h4', 'h5'],
-    spinText: 'Les chevaux s’élancent...',
-    info: (c) => `de ${fx(HORSES[0].mult * c)} à ${fx(HORSES[4].mult * c)}`,
+    spinText: 'The horses are off...',
+    info: (c) => `from ${fx(HORSES[0].mult * c)} to ${fx(HORSES[4].mult * c)}`,
     picker: (c) =>
       choicePicker(
         'horses',
-        '🏇 Course de chevaux : mise sur ton cheval',
-        HORSES.map((h, k) => `🐎 **n°${k + 1}** : ${fx(h.mult * c)} (${Math.round(h.p * 100)} % de chances)`).join('\n'),
-        HORSES.map((h, k) => [`h${k + 1}`, `Cheval ${k + 1}`, '🐎'])
+        '🏇 Horse race: bet on your horse',
+        HORSES.map((h, k) => `🐎 **#${k + 1}** : ${fx(h.mult * c)} (${Math.round(h.p * 100)}% chance)`).join('\n'),
+        HORSES.map((h, k) => [`h${k + 1}`, `Horse ${k + 1}`, '🐎'])
       ),
     resolve(choice) {
       let r = Math.random();
@@ -2915,8 +2992,8 @@ Object.assign(INSTANT, {
       const want = Number(choice.slice(1)) - 1;
       return {
         base: winner === want ? HORSES[want].mult : 0,
-        pick: `Cheval ${want + 1}`,
-        headline: `🏁 Le cheval **n°${winner + 1}** remporte la course !`,
+        pick: `Horse ${want + 1}`,
+        headline: `🏁 Horse **#${winner + 1}** wins the race!`,
         detail: `${want + 1} -> ${winner + 1}`,
         winner,
         want,
@@ -2924,17 +3001,17 @@ Object.assign(INSTANT, {
     },
   },
 
-  // ---------- 10 nouveaux jeux ----------
+  // ---------- 10 new games ----------
   limbo: {
     title: '📈 Limbo',
     choices: ['x15', 'x2', 'x3', 'x5', 'x10'],
-    spinText: 'Le multiplicateur monte...',
-    info: (c) => `cibles x1.5 à x10`,
+    spinText: 'The multiplier climbs...',
+    info: (c) => `targets x1.5 to x10`,
     picker: (c) =>
       choicePicker(
         'limbo',
-        '📈 Limbo : choisis ta cible',
-        'Le multiplicateur monte de façon aléatoire. S’il dépasse ta cible, tu gagnes x cible.',
+        '📈 Limbo: choose your target',
+        'The multiplier climbs randomly. If it exceeds your target, you win x target.',
         [
           ['x15', 'x1.5', '📈'],
           ['x2', 'x2', '📈'],
@@ -2949,9 +3026,9 @@ Object.assign(INSTANT, {
       const peak = Math.max(1, Math.floor((0.97 / u) * 100) / 100);
       return {
         base: peak >= target ? target : 0,
-        pick: `Cible x${target}`,
-        headline: `📈 Pic atteint : **${fx(Math.min(peak, 1000))}**${peak >= target ? ' · cible validée !' : ' · trop bas'}`,
-        detail: `cible ${target} / pic ${Math.min(peak, 1000)}`,
+        pick: `Target x${target}`,
+        headline: `📈 Peak reached: **${fx(Math.min(peak, 1000))}**${peak >= target ? ' · target cleared!' : ' · too low'}`,
+        detail: `target ${target} / peak ${Math.min(peak, 1000)}`,
         peak,
         target,
       };
@@ -2961,16 +3038,16 @@ Object.assign(INSTANT, {
   higher: {
     title: '⬆️ Higher / Lower',
     choices: ['higher', 'lower'],
-    spinText: 'La carte se retourne...',
-    info: (c) => `victoire ${fx(1.9 * c)}`,
+    spinText: 'The card is flipped...',
+    info: (c) => `win ${fx(1.9 * c)}`,
     picker: (c) =>
       choicePicker(
         'higher',
         '⬆️ Higher / Lower',
-        `Une carte de référence est tirée. Devine si la suivante est **plus haute** ou **plus basse** (As = 1). Victoire : **${fx(1.9 * c)}**`,
+        `A reference card is drawn. Guess whether the next is **higher** or **lower** (Ace = 1). Win: **${fx(1.9 * c)}**`,
         [
-          ['higher', 'Plus haute', '⬆️'],
-          ['lower', 'Plus basse', '⬇️'],
+          ['higher', 'Higher', '⬆️'],
+          ['lower', 'Lower', '⬇️'],
         ]
       ),
     resolve(choice) {
@@ -2980,8 +3057,8 @@ Object.assign(INSTANT, {
       const won = choice === 'higher' ? b > a : b < a;
       return {
         base: won ? 1.9 : 0,
-        pick: choice === 'higher' ? 'Plus haute' : 'Plus basse',
-        headline: `Référence **${ranks[a]}** → suivante **${ranks[b]}**`,
+        pick: choice === 'higher' ? 'Higher' : 'Lower',
+        headline: `Reference **${ranks[a]}** → next **${ranks[b]}**`,
         detail: `${ranks[a]} -> ${ranks[b]}`,
         a,
         b,
@@ -2990,25 +3067,25 @@ Object.assign(INSTANT, {
   },
 
   rps: {
-    title: '✊ Pierre-Papier-Ciseaux',
+    title: '✊ Rock-Paper-Scissors',
     choices: ['rock', 'paper', 'scissors'],
     spinText: '1... 2... 3...',
-    info: (c) => `victoire ${fx(2.8 * c)}`,
+    info: (c) => `win ${fx(2.8 * c)}`,
     picker: (c) =>
       choicePicker(
         'rps',
-        '✊ Pierre · Papier · Ciseaux',
-        `Bat le bot. Victoire : **${fx(2.8 * c)}** · Égalité = mise remboursée.`,
+        '✊ Rock · Paper · Scissors',
+        `Beat the bot. Win: **${fx(2.8 * c)}** · Draw = bet refunded.`,
         [
-          ['rock', 'Pierre', '✊'],
-          ['paper', 'Papier', '✋'],
-          ['scissors', 'Ciseaux', '✌️'],
+          ['rock', 'Rock', '✊'],
+          ['paper', 'Paper', '✋'],
+          ['scissors', 'Scissors', '✌️'],
         ]
       ),
     resolve(choice) {
       const opts = ['rock', 'paper', 'scissors'];
       const bot = opts[randomInt(0, 3)];
-      const names = { rock: 'Pierre ✊', paper: 'Papier ✋', scissors: 'Ciseaux ✌️' };
+      const names = { rock: 'Rock ✊', paper: 'Paper ✋', scissors: 'Scissors ✌️' };
       let base = 0;
       if (choice === bot) base = 1;
       else if (
@@ -3020,7 +3097,7 @@ Object.assign(INSTANT, {
       return {
         base,
         pick: names[choice],
-        headline: `Toi : **${names[choice]}** · Bot : **${names[bot]}**`,
+        headline: `You: **${names[choice]}** · Bot: **${names[bot]}**`,
         detail: `${choice} vs ${bot}`,
         bot,
       };
@@ -3028,31 +3105,31 @@ Object.assign(INSTANT, {
   },
 
   colorpick: {
-    title: '🎨 Couleur',
+    title: '🎨 Color',
     choices: ['red', 'blue', 'green', 'yellow'],
-    spinText: 'La couleur se révèle...',
-    info: (c) => `victoire ${fx(3.6 * c)}`,
+    spinText: 'The color is revealed...',
+    info: (c) => `win ${fx(3.6 * c)}`,
     picker: (c) =>
       choicePicker(
         'colorpick',
-        '🎨 Devine la couleur',
-        `4 couleurs possibles. Victoire : **${fx(3.6 * c)}** (1 chance sur 4).`,
+        '🎨 Guess the color',
+        `4 possible colors. Win: **${fx(3.6 * c)}** (1 in 4 chance).`,
         [
-          ['red', 'Rouge', '🔴'],
-          ['blue', 'Bleu', '🔵'],
-          ['green', 'Vert', '🟢'],
-          ['yellow', 'Jaune', '🟡'],
+          ['red', 'Red', '🔴'],
+          ['blue', 'Blue', '🔵'],
+          ['green', 'Green', '🟢'],
+          ['yellow', 'Yellow', '🟡'],
         ]
       ),
     resolve(choice) {
       const cols = ['red', 'blue', 'green', 'yellow'];
       const em = { red: '🔴', blue: '🔵', green: '🟢', yellow: '🟡' };
-      const names = { red: 'Rouge', blue: 'Bleu', green: 'Vert', yellow: 'Jaune' };
+      const names = { red: 'Red', blue: 'Blue', green: 'Green', yellow: 'Yellow' };
       const out = cols[randomInt(0, 4)];
       return {
         base: out === choice ? 3.6 : 0,
         pick: names[choice],
-        headline: `Couleur tirée : **${em[out]} ${names[out]}**`,
+        headline: `Color drawn: **${em[out]} ${names[out]}**`,
         detail: `${choice} -> ${out}`,
         out,
       };
@@ -3060,34 +3137,34 @@ Object.assign(INSTANT, {
   },
 
   ladder: {
-    title: '🪜 Échelle',
+    title: '🪜 Ladder',
     choices: ['s1', 's2', 's3', 's4', 's5'],
-    spinText: 'Tu montes les échelons...',
-    info: (c) => `x1.5 à x8`,
+    spinText: 'You climb the rungs...',
+    info: (c) => `x1.5 to x8`,
     picker: (c) =>
       choicePicker(
         'ladder',
-        '🪜 Échelle : jusqu’où montes-tu ?',
-        'Chaque échelon est plus risqué et plus rémunérateur. Tu gagnes si tu atteins ton niveau.',
+        '🪜 Ladder: how high can you climb?',
+        'Each step is riskier and pays more. You win if you reach your chosen step.',
         [
-          ['s1', 'Palier 1 (x1.5)', '🪜'],
-          ['s2', 'Palier 2 (x2.2)', '🪜'],
-          ['s3', 'Palier 3 (x3.5)', '🪜'],
-          ['s4', 'Palier 4 (x5)', '🪜'],
-          ['s5', 'Palier 5 (x8)', '🪜'],
+          ['s1', 'Step 1 (x1.5)', '🪜'],
+          ['s2', 'Step 2 (x2.2)', '🪜'],
+          ['s3', 'Step 3 (x3.5)', '🪜'],
+          ['s4', 'Step 4 (x5)', '🪜'],
+          ['s5', 'Step 5 (x8)', '🪜'],
         ]
       ),
     resolve(choice) {
       const levels = [1.5, 2.2, 3.5, 5, 8];
       const want = Number(choice.slice(1));
-      // probabilité de réussir jusqu'au palier n
+      // probability of success up to step n
       const probs = [0.7, 0.5, 0.35, 0.22, 0.12];
       const reached = randomInt(0, 1000) / 1000 < probs[want - 1] ? want : randomInt(0, want);
       return {
         base: reached >= want ? levels[want - 1] : 0,
-        pick: `Palier ${want}`,
-        headline: `Tu as atteint le **palier ${reached}**${reached >= want ? ' · objectif réussi !' : ' · trop tôt'}`,
-        detail: `cible ${want} / atteint ${reached}`,
+        pick: `Step ${want}`,
+        headline: `You reached **step ${reached}**${reached >= want ? ' · goal reached!' : ' · too early'}`,
+        detail: `target ${want} / reached ${reached}`,
         reached,
         want,
       };
@@ -3097,13 +3174,13 @@ Object.assign(INSTANT, {
   keno: {
     title: '🎱 Keno',
     choices: ['n1', 'n2', 'n3', 'n4', 'n5', 'n6', 'n7', 'n8', 'n9', 'n10'],
-    spinText: 'Tirage du numéro...',
-    info: (c) => `victoire ${fx(9.5 * c)}`,
+    spinText: 'Drawing the number...',
+    info: (c) => `win ${fx(9.5 * c)}`,
     picker: (c) =>
       choicePicker(
         'keno',
-        '🎱 Keno : choisis un numéro (1-10)',
-        `1 numéro tiré sur 10. Victoire : **${fx(9.5 * c)}**.`,
+        '🎱 Keno: choose a number (1-10)',
+        `1 number drawn out of 10. Win: **${fx(9.5 * c)}**.`,
         [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => [`n${n}`, String(n), '🎱'])
       ),
     resolve(choice) {
@@ -3111,8 +3188,8 @@ Object.assign(INSTANT, {
       const want = Number(choice.slice(1));
       return {
         base: n === want ? 9.5 : 0,
-        pick: `N° ${want}`,
-        headline: `Numéro tiré : **${n}**`,
+        pick: `No. ${want}`,
+        headline: `Number drawn: **${n}**`,
         detail: `${want} -> ${n}`,
         n,
         want,
@@ -3121,16 +3198,16 @@ Object.assign(INSTANT, {
   },
 
   war: {
-    title: '⚔️ Guerre',
+    title: '⚔️ War',
     choices: ['go'],
-    spinText: 'Les cartes sont posées...',
-    info: (c) => `victoire ${fx(1.95 * c)}`,
+    spinText: 'The cards are dealt...',
+    info: (c) => `win ${fx(1.95 * c)}`,
     picker: (c) =>
       choicePicker(
         'war',
-        '⚔️ Guerre de cartes',
-        `Toi vs le croupier : une carte chacun. La plus haute gagne (**${fx(1.95 * c)}**). Égalité = perdu.`,
-        [['go', 'Jouer', '⚔️', ButtonStyle.Success]]
+        '⚔️ Card War',
+        `You vs the dealer: one card each. The higher card wins (**${fx(1.95 * c)}**). Ties lose.`,
+        [['go', 'Play', '⚔️', ButtonStyle.Success]]
       ),
     resolve() {
       const me = randomInt(1, 14);
@@ -3138,8 +3215,8 @@ Object.assign(INSTANT, {
       const ranks = ['', 'A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
       return {
         base: me > dealer ? 1.95 : 0,
-        pick: 'Guerre',
-        headline: `Toi **${ranks[me]}** · Croupier **${ranks[dealer]}**`,
+        pick: 'War',
+        headline: `You **${ranks[me]}** · Dealer **${ranks[dealer]}**`,
         detail: `${ranks[me]} vs ${ranks[dealer]}`,
         me,
         dealer,
@@ -3150,14 +3227,14 @@ Object.assign(INSTANT, {
   hilo: {
     title: '🃏 Hi-Lo',
     choices: ['go'],
-    spinText: 'Suite de 3 cartes...',
-    info: (c) => `3 hautes ou 3 basses ${fx(4 * c)}`,
+    spinText: 'Sequence of 3 cards...',
+    info: (c) => `3 high or 3 low ${fx(4 * c)}`,
     picker: (c) =>
       choicePicker(
         'hilo',
         '🃏 Hi-Lo',
-        `3 cartes tirées. Si les 3 sont hautes (8+) ou les 3 basses (7-), tu gagnes **${fx(4 * c)}**.`,
-        [['go', 'Tirer', '🃏', ButtonStyle.Success]]
+        `3 cards drawn. If all 3 are high (8+) or all 3 are low (7-), you win **${fx(4 * c)}**.`,
+        [['go', 'Draw', '🃏', ButtonStyle.Success]]
       ),
     resolve() {
       const cards = [randomInt(1, 14), randomInt(1, 14), randomInt(1, 14)];
@@ -3167,7 +3244,7 @@ Object.assign(INSTANT, {
       return {
         base: high || low ? 4 : 0,
         pick: 'Hi-Lo',
-        headline: `Cartes : **${cards.map((c) => ranks[c]).join(' · ')}**${high ? ' · 3 HAUTES !' : low ? ' · 3 BASSES !' : ''}`,
+        headline: `Cards: **${cards.map((c) => ranks[c]).join(' · ')}**${high ? ' · 3 HIGH!' : low ? ' · 3 LOW!' : ''}`,
         detail: cards.map((c) => ranks[c]).join('-'),
         cards,
       };
@@ -3177,22 +3254,22 @@ Object.assign(INSTANT, {
   bingo: {
     title: '🅱️ Bingo',
     choices: ['b1', 'b2', 'b3', 'b4', 'b5'],
-    spinText: 'La bille sort...',
-    info: (c) => `victoire ${fx(4.5 * c)}`,
+    spinText: 'The ball comes out...',
+    info: (c) => `win ${fx(4.5 * c)}`,
     picker: (c) =>
       choicePicker(
         'bingo',
-        '🅱️ Bingo : choisis ta case',
-        `5 cases. Une bille sort. Victoire : **${fx(4.5 * c)}**.`,
-        [1, 2, 3, 4, 5].map((n) => [`b${n}`, `Case ${n}`, '🅱️'])
+        '🅱️ Bingo: choose your spot',
+        `5 spots. One ball is drawn. Win: **${fx(4.5 * c)}**.`,
+        [1, 2, 3, 4, 5].map((n) => [`b${n}`, `Spot ${n}`, '🅱️'])
       ),
     resolve(choice) {
       const n = randomInt(1, 6);
       const want = Number(choice.slice(1));
       return {
         base: n === want ? 4.5 : 0,
-        pick: `Case ${want}`,
-        headline: `Bille dans la **case ${n}**`,
+        pick: `Spot ${want}`,
+        headline: `Ball in **spot ${n}**`,
         detail: `${want} -> ${n}`,
         n,
         want,
@@ -3203,14 +3280,14 @@ Object.assign(INSTANT, {
   jackpot: {
     title: '💎 Jackpot',
     choices: ['go'],
-    spinText: 'Les symboles tournent...',
-    info: (c) => `jackpot ${fx(50 * c)} · 2 identiques ${fx(3 * c)}`,
+    spinText: 'The symbols are spinning...',
+    info: (c) => `jackpot ${fx(50 * c)} · 2 matching ${fx(3 * c)}`,
     picker: (c) =>
       choicePicker(
         'jackpot',
         '💎 Jackpot',
-        `3 symboles. 3 identiques = **${fx(50 * c)}**. 2 identiques = **${fx(3 * c)}**.`,
-        [['go', 'Lancer', '💎', ButtonStyle.Success]]
+        `3 symbols. 3 matching = **${fx(50 * c)}**. 2 matching = **${fx(3 * c)}**.`,
+        [['go', 'Spin', '💎', ButtonStyle.Success]]
       ),
     resolve() {
       const syms = ['🍒', '🍋', '💎', '7️⃣', '⭐'];
@@ -3234,22 +3311,22 @@ Object.assign(INSTANT, {
 
   // ========== 30 NOUVEAUX JEUX ==========
   dicewar: {
-    title: '🎲 Guerre de dés',
+    title: '🎲 Dice War',
     choices: ['go'],
-    spinText: 'Les dés s\'affrontent...',
-    info: (c) => `victoire ${fx(1.95 * c)}`,
-    picker: (c) => choicePicker('dicewar', '🎲 Guerre de dés', `Ton dé contre celui du croupier. Le plus haut gagne (**${fx(1.95 * c)}**). Égalité = perdu.`, [['go', 'Lancer', '🎲', ButtonStyle.Success]]),
+    spinText: 'The dice clash...',
+    info: (c) => `win ${fx(1.95 * c)}`,
+    picker: (c) => choicePicker('dicewar', '🎲 Dice War', `Your die vs the dealer's. The higher die wins (**${fx(1.95 * c)}**). Ties lose.`, [['go', 'Spin', '🎲', ButtonStyle.Success]]),
     resolve() {
       const me = randomInt(1, 7), dealer = randomInt(1, 7);
-      return { base: me > dealer ? 1.95 : 0, pick: 'Guerre', headline: code(sideBySide([dieLines(me), dieLines(dealer)], '   ')) + `Toi **${me}** · Croupier **${dealer}**`, detail: `${me} vs ${dealer}`, me, dealer };
+      return { base: me > dealer ? 1.95 : 0, pick: 'War', headline: code(sideBySide([dieLines(me), dieLines(dealer)], '   ')) + `You **${me}** · Dealer **${dealer}**`, detail: `${me} vs ${dealer}`, me, dealer };
     },
   },
   coinladder: {
-    title: '🪙 Échelle de pièces',
+    title: '🪙 Coin Ladder',
     choices: ['s1', 's2', 's3', 's4'],
-    spinText: 'La pièce tourne encore...',
-    info: (c) => `x1.8 à x8`,
-    picker: (c) => choicePicker('coinladder', '🪙 Échelle de pièces', 'Gagne plusieurs pile/face d\'affilée. Plus tu vises haut, plus c\'est risqué.', [['s1', '1 face (x1.8)', '🪙'], ['s2', '2 faces (x3)', '🪙'], ['s3', '3 faces (x5)', '🪙'], ['s4', '4 faces (x8)', '🪙']]),
+    spinText: 'The coin spins again...',
+    info: (c) => `x1.8 to x8`,
+    picker: (c) => choicePicker('coinladder', '🪙 Coin Ladder', 'Win several heads in a row. The higher you aim, the riskier it gets.', [['s1', '1 heads (x1.8)', '🪙'], ['s2', '2 heads (x3)', '🪙'], ['s3', '3 heads (x5)', '🪙'], ['s4', '4 heads (x8)', '🪙']]),
     resolve(choice) {
       const need = Number(choice.slice(1));
       const mults = [0, 1.8, 3, 5, 8];
@@ -3257,168 +3334,168 @@ Object.assign(INSTANT, {
       const flips = [];
       for (let k = 0; k < need; k++) {
         const ok = randomInt(0, 2) === 0;
-        flips.push(ok ? 'P' : 'F');
+        flips.push(ok ? 'H' : 'T');
         if (ok) streak++;
         else break;
       }
-      return { base: streak >= need ? mults[need] : 0, pick: `${need} face(s)`, headline: `Résultats : **${flips.join(' · ')}** (${streak}/${need})`, detail: flips.join(''), streak, need };
+      return { base: streak >= need ? mults[need] : 0, pick: `${need} heads`, headline: `Results: **${flips.join(' · ')}** (${streak}/${need})`, detail: flips.join(''), streak, need };
     },
   },
   cardmatch: {
-    title: '🃏 Match de cartes',
+    title: '🃏 Card Match',
     choices: ['go'],
-    spinText: 'Mélange des cartes...',
-    info: (c) => `victoire ${fx(3.8 * c)}`,
-    picker: (c) => choicePicker('cardmatch', '🃏 Match de cartes', `Une carte secrète est tirée parmi 4. Retrouve-la : **${fx(3.8 * c)}**.`, [['go', 'Révéler', '🃏', ButtonStyle.Success]]),
+    spinText: 'Shuffling the cards...',
+    info: (c) => `win ${fx(3.8 * c)}`,
+    picker: (c) => choicePicker('cardmatch', '🃏 Card Match', `A secret card is drawn from 4. Find it: **${fx(3.8 * c)}**.`, [['go', 'Reveal', '🃏', ButtonStyle.Success]]),
     resolve() {
       const cards = shuffle([{ r: 'A', s: '♠' }, { r: 'K', s: '♥' }, { r: 'Q', s: '♦' }, { r: 'J', s: '♣' }]);
       const secret = cards[0];
       const pick = cards[randomInt(0, 4)];
-      return { base: pick.r === secret.r && pick.s === secret.s ? 3.8 : 0, pick: 'Match', headline: `Secrète : ${cardStr(secret)} · Tirée : ${cardStr(pick)}`, detail: `${secret.r}${secret.s}`, secret, pickCard: pick };
+      return { base: pick.r === secret.r && pick.s === secret.s ? 3.8 : 0, pick: 'Match', headline: `Secret: ${cardStr(secret)} · Drawn: ${cardStr(pick)}`, detail: `${secret.r}${secret.s}`, secret, pickCard: pick };
     },
   },
   numguess: {
-    title: '🔢 Devine le nombre',
+    title: '🔢 Guess the number',
     choices: Array.from({ length: 10 }, (_, i) => `n${i + 1}`),
-    spinText: 'Tirage entre 1 et 10...',
-    info: (c) => `victoire ${fx(9.5 * c)}`,
-    picker: (c) => choicePicker('numguess', '🔢 Devine le nombre (1-10)', `1 chance sur 10 · **${fx(9.5 * c)}**`, Array.from({ length: 10 }, (_, i) => [`n${i + 1}`, String(i + 1), '🔢'])),
+    spinText: 'Drawing from 1 to 10...',
+    info: (c) => `win ${fx(9.5 * c)}`,
+    picker: (c) => choicePicker('numguess', '🔢 Guess the number (1-10)', `1 in 10 chance · **${fx(9.5 * c)}**`, Array.from({ length: 10 }, (_, i) => [`n${i + 1}`, String(i + 1), '🔢'])),
     resolve(choice) {
       const n = randomInt(1, 11), want = Number(choice.slice(1));
-      return { base: n === want ? 9.5 : 0, pick: `N° ${want}`, headline: `Nombre tiré : **${n}**`, detail: `${want}->${n}`, n, want };
+      return { base: n === want ? 9.5 : 0, pick: `No. ${want}`, headline: `Number drawn: **${n}**`, detail: `${want}->${n}`, n, want };
     },
   },
   bombdefuse: {
-    title: '💣 Désamorçage',
+    title: '💣 Defusal',
     choices: ['w1', 'w2', 'w3', 'w4'],
-    spinText: 'Le compteur tourne...',
-    info: (c) => `victoire ${fx(3.6 * c)}`,
-    picker: (c) => choicePicker('bombdefuse', '💣 Désamorçage : coupe un fil', `4 fils, 1 seul désamorce. **${fx(3.6 * c)}** si tu trouves le bon.`, [['w1', 'Fil rouge', '🔴'], ['w2', 'Fil bleu', '🔵'], ['w3', 'Fil vert', '🟢'], ['w4', 'Fil jaune', '🟡']]),
+    spinText: 'The timer is ticking...',
+    info: (c) => `win ${fx(3.6 * c)}`,
+    picker: (c) => choicePicker('bombdefuse', '💣 Defusal: cut a wire', `4 wires, only one defuses. **${fx(3.6 * c)}** if you pick the right one.`, [['w1', 'Red wire', '🔴'], ['w2', 'Blue wire', '🔵'], ['w3', 'Green wire', '🟢'], ['w4', 'Yellow wire', '🟡']]),
     resolve(choice) {
       const good = randomInt(1, 5), want = Number(choice.slice(1));
-      return { base: good === want ? 3.6 : 0, pick: `Fil ${want}`, headline: good === want ? '✅ Bombe désamorcée !' : `💥 Mauvais fil (c\'était le n°${good})`, detail: `${want}->${good}`, good, want };
+      return { base: good === want ? 3.6 : 0, pick: `Wire ${want}`, headline: good === want ? '✅ Bomb defused!' : `💥 Wrong wire (it was #${good})`, detail: `${want}->${good}`, good, want };
     },
   },
   treasure: {
-    title: '🗺️ Carte au trésor',
+    title: '🗺️ Treasure map',
     choices: ['c1', 'c2', 'c3', 'c4', 'c5'],
-    spinText: 'Tu creuses...',
-    info: (c) => `victoire ${fx(4.5 * c)}`,
-    picker: (c) => choicePicker('treasure', '🗺️ Carte au trésor', `5 cases, 1 trésor. **${fx(4.5 * c)}**`, [1, 2, 3, 4, 5].map((n) => [`c${n}`, `Case ${n}`, '🗺️'])),
+    spinText: 'You dig...',
+    info: (c) => `win ${fx(4.5 * c)}`,
+    picker: (c) => choicePicker('treasure', '🗺️ Treasure map', `5 spots, 1 treasure. **${fx(4.5 * c)}**`, [1, 2, 3, 4, 5].map((n) => [`c${n}`, `Spot ${n}`, '🗺️'])),
     resolve(choice) {
       const win = randomInt(1, 6), want = Number(choice.slice(1));
-      return { base: win === want ? 4.5 : 0, pick: `Case ${want}`, headline: `Trésor en case **${win}**`, detail: `${want}->${win}`, win, want };
+      return { base: win === want ? 4.5 : 0, pick: `Spot ${want}`, headline: `Treasure in **spot ${win}**`, detail: `${want}->${win}`, win, want };
     },
   },
   highcard: {
-    title: '🃏 Carte haute',
+    title: '🃏 High card',
     choices: ['go'],
-    spinText: 'Tirage de la carte...',
+    spinText: 'Drawing the card...',
     info: (c) => `≥ 8 → ${fx(1.9 * c)}`,
-    picker: (c) => choicePicker('highcard', '🃏 Carte haute', `Carte ≥ 8 (8,9,10,J,Q,K) gagne **${fx(1.9 * c)}**. As = 1.`, [['go', 'Tirer', '🃏', ButtonStyle.Success]]),
+    picker: (c) => choicePicker('highcard', '🃏 High card', `Card ≥ 8 (8,9,10,J,Q,K) wins **${fx(1.9 * c)}**. Ace = 1.`, [['go', 'Draw', '🃏', ButtonStyle.Success]]),
     resolve() {
       const v = randomInt(1, 14);
       const ranks = ['', 'A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
-      return { base: v >= 8 ? 1.9 : 0, pick: 'Haute', headline: `Carte : **${ranks[v]}**`, detail: ranks[v], v };
+      return { base: v >= 8 ? 1.9 : 0, pick: 'High', headline: `Card: **${ranks[v]}**`, detail: ranks[v], v };
     },
   },
   lowcard: {
-    title: '🃏 Carte basse',
+    title: '🃏 Low card',
     choices: ['go'],
-    spinText: 'Tirage de la carte...',
+    spinText: 'Drawing the card...',
     info: (c) => `≤ 7 → ${fx(1.9 * c)}`,
-    picker: (c) => choicePicker('lowcard', '🃏 Carte basse', `Carte ≤ 7 gagne **${fx(1.9 * c)}**. As = 1.`, [['go', 'Tirer', '🃏', ButtonStyle.Success]]),
+    picker: (c) => choicePicker('lowcard', '🃏 Low card', `Card ≤ 7 wins **${fx(1.9 * c)}**. Ace = 1.`, [['go', 'Draw', '🃏', ButtonStyle.Success]]),
     resolve() {
       const v = randomInt(1, 14);
       const ranks = ['', 'A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
-      return { base: v <= 7 ? 1.9 : 0, pick: 'Basse', headline: `Carte : **${ranks[v]}**`, detail: ranks[v], v };
+      return { base: v <= 7 ? 1.9 : 0, pick: 'Low', headline: `Card: **${ranks[v]}**`, detail: ranks[v], v };
     },
   },
   pairmatch: {
-    title: '🃏 Paire',
+    title: '🃏 Pair',
     choices: ['go'],
-    spinText: 'Deux cartes...',
-    info: (c) => `paire ${fx(5.5 * c)}`,
-    picker: (c) => choicePicker('pairmatch', '🃏 Paire', `Deux cartes. Même rang = **${fx(5.5 * c)}**.`, [['go', 'Tirer', '🃏', ButtonStyle.Success]]),
+    spinText: 'Two cards...',
+    info: (c) => `pair ${fx(5.5 * c)}`,
+    picker: (c) => choicePicker('pairmatch', '🃏 Pair', `Two cards. Same rank = **${fx(5.5 * c)}**.`, [['go', 'Draw', '🃏', ButtonStyle.Success]]),
     resolve() {
       const a = randomInt(1, 14), b = randomInt(1, 14);
       const ranks = ['', 'A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
-      return { base: a === b ? 5.5 : 0, pick: 'Paire', headline: `**${ranks[a]}** · **${ranks[b]}**`, detail: `${ranks[a]}-${ranks[b]}`, a, b };
+      return { base: a === b ? 5.5 : 0, pick: 'Pair', headline: `**${ranks[a]}** · **${ranks[b]}**`, detail: `${ranks[a]}-${ranks[b]}`, a, b };
     },
   },
   freefall: {
-    title: '🪂 Chute libre',
+    title: '🪂 Free fall',
     choices: ['safe', 'mid', 'risk'],
-    spinText: 'Tu sautes...',
+    spinText: 'You jump...',
     info: (c) => `x1.5 / x2.5 / x5`,
-    picker: (c) => choicePicker('freefall', '🪂 Chute libre', 'Choisis ta zone d\'atterrissage.', [['safe', 'Zone sûre (x1.5)', '🟢'], ['mid', 'Zone moyenne (x2.5)', '🟡'], ['risk', 'Zone risquée (x5)', '🔴']]),
+    picker: (c) => choicePicker('freefall', '🪂 Free fall', 'Choose your landing zone.', [['safe', 'Safe zone (x1.5)', '🟢'], ['mid', 'Medium zone (x2.5)', '🟡'], ['risk', 'Risky zone (x5)', '🔴']]),
     resolve(choice) {
       const zones = { safe: { mult: 1.5, p: 0.65 }, mid: { mult: 2.5, p: 0.38 }, risk: { mult: 5, p: 0.18 } };
       const z = zones[choice];
       const ok = Math.random() < z.p;
-      return { base: ok ? z.mult : 0, pick: choice, headline: ok ? '✅ Atterrissage parfait !' : '💥 Tu rates la zone...', detail: choice, ok };
+      return { base: ok ? z.mult : 0, pick: choice, headline: ok ? '✅ Perfect landing!' : '💥 You missed the zone...', detail: choice, ok };
     },
   },
   balloon: {
-    title: '🎈 Ballon',
+    title: '🎈 Balloon',
     choices: ['s1', 's2', 's3', 's4', 's5'],
-    spinText: 'Le ballon gonfle...',
-    info: (c) => `x1.4 à x7`,
-    picker: (c) => choicePicker('balloon', '🎈 Ballon', 'Gonfle le ballon. Plus tu vas loin, plus tu gagnes — mais il peut éclater.', [['s1', 'Niveau 1 (x1.4)', '🎈'], ['s2', 'Niveau 2 (x2)', '🎈'], ['s3', 'Niveau 3 (x3)', '🎈'], ['s4', 'Niveau 4 (x4.5)', '🎈'], ['s5', 'Niveau 5 (x7)', '🎈']]),
+    spinText: 'The balloon inflates...',
+    info: (c) => `x1.4 to x7`,
+    picker: (c) => choicePicker('balloon', '🎈 Balloon', 'Inflate the balloon. The further you go, the more you win — but it can pop.', [['s1', 'Level 1 (x1.4)', '🎈'], ['s2', 'Level 2 (x2)', '🎈'], ['s3', 'Level 3 (x3)', '🎈'], ['s4', 'Level 4 (x4.5)', '🎈'], ['s5', 'Level 5 (x7)', '🎈']]),
     resolve(choice) {
       const need = Number(choice.slice(1));
       const mults = [0, 1.4, 2, 3, 4.5, 7];
       const probs = [0, 0.8, 0.6, 0.42, 0.28, 0.15];
       const ok = Math.random() < probs[need];
-      return { base: ok ? mults[need] : 0, pick: `Niv. ${need}`, headline: ok ? `🎈 Ballon intact au niveau ${need} !` : `💥 Le ballon a éclaté au niveau ${need}`, detail: `${need}:${ok}`, need, ok };
+      return { base: ok ? mults[need] : 0, pick: `Level ${need}`, headline: ok ? `🎈 Balloon intact at level ${need}!` : `💥 The balloon popped at level ${need}`, detail: `${need}:${ok}`, need, ok };
     },
   },
   target: {
-    title: '🎯 Cible',
+    title: '🎯 Target',
     choices: ['center', 'inner', 'outer'],
-    spinText: 'La fléchette vole...',
-    info: (c) => `centre ${fx(5 * c)} · intérieur ${fx(2.5 * c)} · extérieur ${fx(1.5 * c)}`,
-    picker: (c) => choicePicker('target', '🎯 Cible', 'Vise le centre, l\'intérieur ou l\'extérieur.', [['center', 'Centre (x5)', '🔴'], ['inner', 'Intérieur (x2.5)', '🟡'], ['outer', 'Extérieur (x1.5)', '🟢']]),
+    spinText: 'The dart flies...',
+    info: (c) => `center ${fx(5 * c)} · inner ${fx(2.5 * c)} · outer ${fx(1.5 * c)}`,
+    picker: (c) => choicePicker('target', '🎯 Target', 'Aim for the center, inner, or outer ring.', [['center', 'Center (x5)', '🔴'], ['inner', 'Inner (x2.5)', '🟡'], ['outer', 'Outer (x1.5)', '🟢']]),
     resolve(choice) {
       const r = Math.random();
       const hit = r < 0.12 ? 'center' : r < 0.4 ? 'inner' : 'outer';
       const mults = { center: 5, inner: 2.5, outer: 1.5 };
-      return { base: hit === choice ? mults[choice] : 0, pick: choice, headline: `Impact : **${hit}**`, detail: `${choice}->${hit}`, hit };
+      return { base: hit === choice ? mults[choice] : 0, pick: choice, headline: `Impact: **${hit}**`, detail: `${choice}->${hit}`, hit };
     },
   },
   sequence: {
-    title: '🔢 Séquence',
+    title: '🔢 Sequence',
     choices: ['go'],
-    spinText: 'Suite de 3 chiffres...',
-    info: (c) => `suite ${fx(6 * c)}`,
-    picker: (c) => choicePicker('sequence', '🔢 Séquence', `3 chiffres. S\'ils forment une suite (ex 3-4-5), **${fx(6 * c)}**.`, [['go', 'Tirer', '🔢', ButtonStyle.Success]]),
+    spinText: 'Sequence of 3 numbers...',
+    info: (c) => `sequence ${fx(6 * c)}`,
+    picker: (c) => choicePicker('sequence', '🔢 Sequence', `3 numbers. If they form a sequence (e.g. 3-4-5), **${fx(6 * c)}**.`, [['go', 'Draw', '🔢', ButtonStyle.Success]]),
     resolve() {
       const a = randomInt(1, 9), b = randomInt(1, 9), c = randomInt(1, 9);
       const sorted = [a, b, c].sort((x, y) => x - y);
       const ok = sorted[1] === sorted[0] + 1 && sorted[2] === sorted[1] + 1;
-      return { base: ok ? 6 : 0, pick: 'Séquence', headline: `**${a} · ${b} · ${c}**${ok ? ' · SUITE !' : ''}`, detail: `${a}-${b}-${c}`, a, b, c, ok };
+      return { base: ok ? 6 : 0, pick: 'Sequence', headline: `**${a} · ${b} · ${c}**${ok ? ' · SEQUENCE!' : ''}`, detail: `${a}-${b}-${c}`, a, b, c, ok };
     },
   },
   animalrace: {
-    title: '🐾 Course d\'animaux',
+    title: '🐾 Animal race',
     choices: ['a1', 'a2', 'a3', 'a4'],
-    spinText: 'Les animaux s\'élancent...',
-    info: (c) => `x2 à x6`,
-    picker: (c) => choicePicker('animalrace', '🐾 Course d\'animaux', 'Parie sur un animal.', [['a1', 'Lapin (x2)', '🐰'], ['a2', 'Renard (x3)', '🦊'], ['a3', 'Loup (x4)', '🐺'], ['a4', 'Aigle (x6)', '🦅']]),
+    spinText: 'The animals are off...',
+    info: (c) => `x2 to x6`,
+    picker: (c) => choicePicker('animalrace', '🐾 Animal race', 'Bet on an animal.', [['a1', 'Rabbit (x2)', '🐰'], ['a2', 'Fox (x3)', '🦊'], ['a3', 'Wolf (x4)', '🐺'], ['a4', 'Eagle (x6)', '🦅']]),
     resolve(choice) {
-      const animals = [{ id: 'a1', name: 'Lapin', mult: 2, p: 0.42 }, { id: 'a2', name: 'Renard', mult: 3, p: 0.28 }, { id: 'a3', name: 'Loup', mult: 4, p: 0.18 }, { id: 'a4', name: 'Aigle', mult: 6, p: 0.12 }];
+      const animals = [{ id: 'a1', name: 'Rabbit', mult: 2, p: 0.42 }, { id: 'a2', name: 'Fox', mult: 3, p: 0.28 }, { id: 'a3', name: 'Wolf', mult: 4, p: 0.18 }, { id: 'a4', name: 'Eagle', mult: 6, p: 0.12 }];
       let r = Math.random(), winner = animals[animals.length - 1];
       for (const a of animals) { if (r < a.p) { winner = a; break; } r -= a.p; }
       const want = animals.find((a) => a.id === choice);
-      return { base: winner.id === choice ? want.mult : 0, pick: want.name, headline: `🏆 Gagnant : **${winner.name}**`, detail: `${choice}->${winner.id}`, winner };
+      return { base: winner.id === choice ? want.mult : 0, pick: want.name, headline: `🏆 Winner: **${winner.name}**`, detail: `${choice}->${winner.id}`, winner };
     },
   },
   fruitmatch: {
     title: '🍎 Fruits',
     choices: ['go'],
-    spinText: 'Les fruits tournent...',
-    info: (c) => `3 identiques ${fx(12 * c)} · 2 ${fx(2.5 * c)}`,
-    picker: (c) => choicePicker('fruitmatch', '🍎 Fruits', `3 fruits. 3 identiques = **${fx(12 * c)}**, 2 = **${fx(2.5 * c)}**.`, [['go', 'Lancer', '🍎', ButtonStyle.Success]]),
+    spinText: 'The fruits spin...',
+    info: (c) => `3 matching ${fx(12 * c)} · 2 ${fx(2.5 * c)}`,
+    picker: (c) => choicePicker('fruitmatch', '🍎 Fruits', `3 fruits. 3 matching = **${fx(12 * c)}**, 2 = **${fx(2.5 * c)}**.`, [['go', 'Spin', '🍎', ButtonStyle.Success]]),
     resolve() {
       const fruits = ['🍎', '🍌', '🍇', '🍊', '🍓'];
       const a = fruits[randomInt(0, 5)], b = fruits[randomInt(0, 5)], c = fruits[randomInt(0, 5)];
@@ -3429,74 +3506,74 @@ Object.assign(INSTANT, {
     },
   },
   gemhunt: {
-    title: '💎 Chasse aux gemmes',
+    title: '💎 Gem hunt',
     choices: ['g1', 'g2', 'g3', 'g4', 'g5', 'g6'],
-    spinText: 'Tu fouilles...',
-    info: (c) => `victoire ${fx(5.5 * c)}`,
-    picker: (c) => choicePicker('gemhunt', '💎 Chasse aux gemmes', `6 roches, 1 gemme. **${fx(5.5 * c)}**`, [1, 2, 3, 4, 5, 6].map((n) => [`g${n}`, `Roche ${n}`, '🪨'])),
+    spinText: 'You dig...',
+    info: (c) => `win ${fx(5.5 * c)}`,
+    picker: (c) => choicePicker('gemhunt', '💎 Gem hunt', `6 rocks, 1 gem. **${fx(5.5 * c)}**`, [1, 2, 3, 4, 5, 6].map((n) => [`g${n}`, `Rock ${n}`, '🪨'])),
     resolve(choice) {
       const win = randomInt(1, 7), want = Number(choice.slice(1));
-      return { base: win === want ? 5.5 : 0, pick: `Roche ${want}`, headline: win === want ? '💎 Gemme trouvée !' : `Rien dans la roche ${want} (c\'était la n°${win})`, detail: `${want}->${win}`, win, want };
+      return { base: win === want ? 5.5 : 0, pick: `Rock ${want}`, headline: win === want ? '💎 Gem found!' : `Nothing in rock ${want} (it was #${win})`, detail: `${want}->${win}`, win, want };
     },
   },
   stardrop: {
-    title: '⭐ Étoile filante',
+    title: '⭐ Shooting star',
     choices: ['catch', 'miss'],
-    spinText: 'L\'étoile traverse le ciel...',
-    info: (c) => `attraper ${fx(2.2 * c)}`,
-    picker: (c) => choicePicker('stardrop', '⭐ Étoile filante', `Essaie d\'attraper l\'étoile (**${fx(2.2 * c)}**) ou laisse passer (mise remboursée si elle passe vraiment).`, [['catch', 'Attraper', '⭐'], ['miss', 'Laisser passer', '🌑']]),
+    spinText: 'The star crosses the sky...',
+    info: (c) => `catch ${fx(2.2 * c)}`,
+    picker: (c) => choicePicker('stardrop', '⭐ Shooting star', `Try to catch the star (**${fx(2.2 * c)}**) or let it pass (bet refunded if it truly falls).`, [['catch', 'Catch', '⭐'], ['miss', 'Let pass', '🌑']]),
     resolve(choice) {
       const falls = Math.random() < 0.55;
-      if (choice === 'catch') return { base: falls ? 2.2 : 0, pick: 'Attraper', headline: falls ? '⭐ Tu l\'as eue !' : 'Elle est passée trop vite...', detail: 'catch', falls };
-      return { base: falls ? 0 : 1, pick: 'Laisser', headline: falls ? '⭐ Elle est tombée (tu l\'as ratée)' : 'Elle a continué sa route, mise rendue.', detail: 'miss', falls };
+      if (choice === 'catch') return { base: falls ? 2.2 : 0, pick: 'Catch', headline: falls ? '⭐ You caught it!' : 'It passed too quickly...', detail: 'catch', falls };
+      return { base: falls ? 0 : 1, pick: 'Let pass', headline: falls ? '⭐ It fell (you missed it)' : 'It went on its way; bet refunded.', detail: 'miss', falls };
     },
   },
   moonshot: {
-    title: '🌙 Tir lunaire',
+    title: '🌙 Moon shot',
     choices: ['x2', 'x4', 'x8'],
-    spinText: 'La fusée décolle vers la lune...',
+    spinText: 'The rocket lifts off toward the Moon...',
     info: (c) => `x2 / x4 / x8`,
-    picker: (c) => choicePicker('moonshot', '🌙 Tir lunaire', 'Atteins la distance choisie.', [['x2', 'Orbite (x2)', '🌍'], ['x4', 'Lune (x4)', '🌙'], ['x8', 'Au-delà (x8)', '🚀']]),
+    picker: (c) => choicePicker('moonshot', '🌙 Moon shot', 'Reach the chosen distance.', [['x2', 'Orbit (x2)', '🌍'], ['x4', 'Moon (x4)', '🌙'], ['x8', 'Beyond (x8)', '🚀']]),
     resolve(choice) {
       const targets = { x2: 2, x4: 4, x8: 8 };
       const probs = { x2: 0.48, x4: 0.24, x8: 0.11 };
       const t = targets[choice];
       const ok = Math.random() < probs[choice];
-      return { base: ok ? t : 0, pick: choice, headline: ok ? `🌙 Distance ${choice} atteinte !` : `💥 Échec avant ${choice}`, detail: choice, ok };
+      return { base: ok ? t : 0, pick: choice, headline: ok ? `🌙 Distance ${choice} reached!` : `💥 Failed before ${choice}`, detail: choice, ok };
     },
   },
   volcano: {
-    title: '🌋 Volcan',
+    title: '🌋 Volcano',
     choices: ['close', 'mid', 'far'],
-    spinText: 'Le volcan gronde...',
-    info: (c) => `proche ${fx(4 * c)} · moyen ${fx(2.2 * c)} · loin ${fx(1.4 * c)}`,
-    picker: (c) => choicePicker('volcano', '🌋 Volcan', 'Où te places-tu ? Plus près = plus risqué.', [['close', 'Proche (x4)', '🔴'], ['mid', 'Moyen (x2.2)', '🟡'], ['far', 'Loin (x1.4)', '🟢']]),
+    spinText: 'The volcano rumbles...',
+    info: (c) => `near ${fx(4 * c)} · mid ${fx(2.2 * c)} · far ${fx(1.4 * c)}`,
+    picker: (c) => choicePicker('volcano', '🌋 Volcano', 'Where do you stand? Closer = riskier.', [['close', 'Near (x4)', '🔴'], ['mid', 'Mid (x2.2)', '🟡'], ['far', 'Far (x1.4)', '🟢']]),
     resolve(choice) {
       const r = Math.random();
       const eruption = r < 0.35 ? 'close' : r < 0.7 ? 'mid' : 'far';
-      // tu gagnes si tu n'es PAS dans la zone d'éruption... non: on gagne si on a deviné la zone
+      // you win if you are NOT in the eruption zone... actually: you win if you guessed the zone
       const mults = { close: 4, mid: 2.2, far: 1.4 };
-      return { base: eruption === choice ? mults[choice] : 0, pick: choice, headline: `Éruption zone **${eruption}**`, detail: `${choice}->${eruption}`, eruption };
+      return { base: eruption === choice ? mults[choice] : 0, pick: choice, headline: `Eruption zone **${eruption}**`, detail: `${choice}->${eruption}`, eruption };
     },
   },
   lightning: {
-    title: '⚡ Éclair',
+    title: '⚡ Lightning',
     choices: ['stay', 'run'],
-    spinText: 'L\'orage arrive...',
-    info: (c) => `rester ${fx(2.5 * c)} · fuir (remboursé si éclair)`,
-    picker: (c) => choicePicker('lightning', '⚡ Éclair', `Rester sous l’orage (**${fx(2.5 * c)}**) si tu survis, ou fuir.`, [['stay', 'Rester', '⚡'], ['run', 'Fuir', '🏃']]),
+    spinText: 'The storm is coming...',
+    info: (c) => `stay ${fx(2.5 * c)} · run (refunded if lightning strikes)`,
+    picker: (c) => choicePicker('lightning', '⚡ Lightning', `Stay in the storm (**${fx(2.5 * c)}**) if you survive, or run.`, [['stay', 'Stay', '⚡'], ['run', 'Run', '🏃']]),
     resolve(choice) {
       const strike = Math.random() < 0.4;
-      if (choice === 'stay') return { base: strike ? 0 : 2.5, pick: 'Rester', headline: strike ? '⚡ Foudroyé !' : 'Tu as survécu à l\'orage !', detail: 'stay', strike };
-      return { base: strike ? 1 : 0, pick: 'Fuir', headline: strike ? 'Tu as bien fait de fuir (mise rendue).' : 'Pas d\'éclair... tu as fui pour rien.', detail: 'run', strike };
+      if (choice === 'stay') return { base: strike ? 0 : 2.5, pick: 'Stay', headline: strike ? '⚡ Struck by lightning!' : 'You survived the storm!', detail: 'stay', strike };
+      return { base: strike ? 1 : 0, pick: 'Run', headline: strike ? 'You were right to run (bet refunded).' : 'No lightning... you ran for nothing.', detail: 'run', strike };
     },
   },
   pokerhand: {
-    title: '🃏 Poker express',
+    title: '🃏 Express poker',
     choices: ['go'],
-    spinText: 'Distribution...',
-    info: (c) => `paire+ ${fx(2 * c)} · brelan ${fx(8 * c)}`,
-    picker: (c) => choicePicker('pokerhand', '🃏 Poker express', `3 cartes. Paire = **${fx(2 * c)}**, brelan = **${fx(8 * c)}**.`, [['go', 'Distribuer', '🃏', ButtonStyle.Success]]),
+    spinText: 'Dealing...',
+    info: (c) => `pair+ ${fx(2 * c)} · three of a kind ${fx(8 * c)}`,
+    picker: (c) => choicePicker('pokerhand', '🃏 Express poker', `3 cards. Pair = **${fx(2 * c)}**, three of a kind = **${fx(8 * c)}**.`, [['go', 'Deal', '🃏', ButtonStyle.Success]]),
     resolve() {
       const ranks = [randomInt(1, 14), randomInt(1, 14), randomInt(1, 14)];
       const names = ['', 'A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
@@ -3506,140 +3583,140 @@ Object.assign(INSTANT, {
       let base = 0;
       if (max >= 3) base = 8;
       else if (max >= 2) base = 2;
-      return { base, pick: 'Poker', headline: `**${ranks.map((r) => names[r]).join(' · ')}**${max >= 3 ? ' · BRELAN !' : max >= 2 ? ' · Paire' : ''}`, detail: ranks.join('-'), ranks, max };
+      return { base, pick: 'Poker', headline: `**${ranks.map((r) => names[r]).join(' · ')}**${max >= 3 ? ' · THREE OF A KIND!' : max >= 2 ? ' · Pair' : ''}`, detail: ranks.join('-'), ranks, max };
     },
   },
   redblack: {
-    title: '🔴 Noir ou Rouge',
+    title: '🔴 Black or Red',
     choices: ['red', 'black'],
-    spinText: 'La carte se retourne...',
-    info: (c) => `victoire ${fx(1.95 * c)}`,
-    picker: (c) => choicePicker('redblack', '🔴 Noir ou Rouge', `Devine la couleur. **${fx(1.95 * c)}**.`, [['red', 'Rouge', '🔴'], ['black', 'Noir', '⚫']]),
+    spinText: 'The card is flipped...',
+    info: (c) => `win ${fx(1.95 * c)}`,
+    picker: (c) => choicePicker('redblack', '🔴 Black or Red', `Guess the color. **${fx(1.95 * c)}**.`, [['red', 'Red', '🔴'], ['black', 'Black', '⚫']]),
     resolve(choice) {
       const col = randomInt(0, 2) === 0 ? 'red' : 'black';
-      return { base: col === choice ? 1.95 : 0, pick: choice === 'red' ? 'Rouge' : 'Noir', headline: `Couleur : **${col === 'red' ? '🔴 Rouge' : '⚫ Noir'}**`, detail: `${choice}->${col}`, col };
+      return { base: col === choice ? 1.95 : 0, pick: choice === 'red' ? 'Red' : 'Black', headline: `Color: **${col === 'red' ? '🔴 Red' : '⚫ Black'}**`, detail: `${choice}->${col}`, col };
     },
   },
   oddseven: {
-    title: '🔢 Pair ou Impair+',
+    title: '🔢 Even or Odd+',
     choices: ['even', 'odd'],
-    spinText: 'Le dé roule...',
-    info: (c) => `victoire ${fx(1.95 * c)}`,
-    picker: (c) => choicePicker('oddseven', '🔢 Pair ou Impair', `Un dé. Pair ou impair : **${fx(1.95 * c)}**.`, [['even', 'Pair', '🔵'], ['odd', 'Impair', '🔴']]),
+    spinText: 'The die rolls...',
+    info: (c) => `win ${fx(1.95 * c)}`,
+    picker: (c) => choicePicker('oddseven', '🔢 Even or Odd', `One die. Even or odd: **${fx(1.95 * c)}**.`, [['even', 'Even', '🔵'], ['odd', 'Odd', '🔴']]),
     resolve(choice) {
       const n = randomInt(1, 7);
       const isEven = n % 2 === 0;
       const ok = (choice === 'even' && isEven) || (choice === 'odd' && !isEven);
-      return { base: ok ? 1.95 : 0, pick: choice === 'even' ? 'Pair' : 'Impair', headline: code(dieLines(n)) + `**${n}** (${isEven ? 'pair' : 'impair'})`, detail: `${choice}->${n}`, n };
+      return { base: ok ? 1.95 : 0, pick: choice === 'even' ? 'Even' : 'Odd', headline: code(dieLines(n)) + `**${n}** (${isEven ? 'even' : 'odd'})`, detail: `${choice}->${n}`, n };
     },
   },
   multiplier: {
-    title: '✖️ Multiplicateur',
+    title: '✖️ Multiplier',
     choices: ['m15', 'm2', 'm3', 'm5'],
-    spinText: 'Le multiplicateur tourne...',
-    info: (c) => `x1.5 à x5`,
-    picker: (c) => choicePicker('multiplier', '✖️ Multiplicateur', 'Choisis ta cible. Un tirage aléatoire décide.', [['m15', 'x1.5', '✖️'], ['m2', 'x2', '✖️'], ['m3', 'x3', '✖️'], ['m5', 'x5', '✖️']]),
+    spinText: 'The multiplier is spinning...',
+    info: (c) => `x1.5 to x5`,
+    picker: (c) => choicePicker('multiplier', '✖️ Multiplier', 'Choose your target. A random draw decides.', [['m15', 'x1.5', '✖️'], ['m2', 'x2', '✖️'], ['m3', 'x3', '✖️'], ['m5', 'x5', '✖️']]),
     resolve(choice) {
       const targets = { m15: 1.5, m2: 2, m3: 3, m5: 5 };
       const probs = { m15: 0.62, m2: 0.45, m3: 0.3, m5: 0.18 };
       const t = targets[choice];
       const ok = Math.random() < probs[choice];
-      return { base: ok ? t : 0, pick: `x${t}`, headline: ok ? `✅ Multiplicateur x${t} validé !` : `❌ Pas cette fois (cible x${t})`, detail: choice, ok };
+      return { base: ok ? t : 0, pick: `x${t}`, headline: ok ? `✅ Multiplier x${t} cleared!` : `❌ Not this time (target x${t})`, detail: choice, ok };
     },
   },
   memory: {
-    title: '🧠 Mémoire',
+    title: '🧠 Memory',
     choices: ['go'],
-    spinText: 'Les cartes se retournent...',
-    info: (c) => `paire ${fx(3.5 * c)}`,
-    picker: (c) => choicePicker('memory', '🧠 Mémoire', `4 cartes face cachée, 2 paires. Tu en retournes 2 : si paire **${fx(3.5 * c)}**.`, [['go', 'Retourner', '🧠', ButtonStyle.Success]]),
+    spinText: 'Cards are flipping...',
+    info: (c) => `pair ${fx(3.5 * c)}`,
+    picker: (c) => choicePicker('memory', '🧠 Memory', `4 face-down cards, 2 pairs. Flip 2: if they match, **${fx(3.5 * c)}**.`, [['go', 'Flip', '🧠', ButtonStyle.Success]]),
     resolve() {
       const vals = shuffle([1, 1, 2, 2]);
       const i1 = randomInt(0, 4), i2 = (i1 + 1 + randomInt(0, 3)) % 4;
       const ok = vals[i1] === vals[i2];
-      return { base: ok ? 3.5 : 0, pick: 'Mémoire', headline: `Cartes retournées : **${vals[i1]}** et **${vals[i2]}**${ok ? ' · Paire !' : ''}`, detail: `${vals[i1]}-${vals[i2]}`, ok };
+      return { base: ok ? 3.5 : 0, pick: 'Memory', headline: `Cards flipped: **${vals[i1]}** and **${vals[i2]}**${ok ? ' · Pair!' : ''}`, detail: `${vals[i1]}-${vals[i2]}`, ok };
     },
   },
   colorswipe: {
-    title: '🌈 Arc-en-ciel',
+    title: '🌈 Rainbow',
     choices: ['red', 'orange', 'yellow', 'green', 'blue', 'purple'],
-    spinText: 'L\'arc-en-ciel tourne...',
-    info: (c) => `victoire ${fx(5.5 * c)}`,
-    picker: (c) => choicePicker('colorswipe', '🌈 Arc-en-ciel', `6 couleurs. **${fx(5.5 * c)}**.`, [['red', 'Rouge', '🔴'], ['orange', 'Orange', '🟠'], ['yellow', 'Jaune', '🟡'], ['green', 'Vert', '🟢'], ['blue', 'Bleu', '🔵'], ['purple', 'Violet', '🟣']]),
+    spinText: 'The rainbow spins...',
+    info: (c) => `win ${fx(5.5 * c)}`,
+    picker: (c) => choicePicker('colorswipe', '🌈 Rainbow', `6 colors. **${fx(5.5 * c)}**.`, [['red', 'Red', '🔴'], ['orange', 'Orange', '🟠'], ['yellow', 'Yellow', '🟡'], ['green', 'Green', '🟢'], ['blue', 'Blue', '🔵'], ['purple', 'Purple', '🟣']]),
     resolve(choice) {
       const cols = ['red', 'orange', 'yellow', 'green', 'blue', 'purple'];
       const em = { red: '🔴', orange: '🟠', yellow: '🟡', green: '🟢', blue: '🔵', purple: '🟣' };
       const out = cols[randomInt(0, 6)];
-      return { base: out === choice ? 5.5 : 0, pick: choice, headline: `Couleur : **${em[out]}**`, detail: `${choice}->${out}`, out };
+      return { base: out === choice ? 5.5 : 0, pick: choice, headline: `Color: **${em[out]}**`, detail: `${choice}->${out}`, out };
     },
   },
   rocket2: {
-    title: '🚀 Fusée 2',
+    title: '🚀 Rocket 2',
     choices: ['x2', 'x5', 'x10', 'x20'],
-    spinText: 'Décollage...',
-    info: (c) => `x2 à x20`,
-    picker: (c) => choicePicker('rocket2', '🚀 Fusée 2', 'Choisis ta cible de multiplicateur.', [['x2', 'x2', '🚀'], ['x5', 'x5', '🚀'], ['x10', 'x10', '🚀'], ['x20', 'x20', '🚀']]),
+    spinText: 'Liftoff...',
+    info: (c) => `x2 to x20`,
+    picker: (c) => choicePicker('rocket2', '🚀 Rocket 2', 'Choose your multiplier target.', [['x2', 'x2', '🚀'], ['x5', 'x5', '🚀'], ['x10', 'x10', '🚀'], ['x20', 'x20', '🚀']]),
     resolve(choice) {
       const targets = { x2: 2, x5: 5, x10: 10, x20: 20 };
       const u = randomInt(1, 1_000_001) / 1_000_000;
       const peak = Math.max(1, Math.floor((0.96 / u) * 100) / 100);
       const t = targets[choice];
-      return { base: peak >= t ? t : 0, pick: choice, headline: `Pic **${fx(Math.min(peak, 500))}** · cible ${choice}`, detail: `${choice}/${peak}`, peak, t };
+      return { base: peak >= t ? t : 0, pick: choice, headline: `Peak **${fx(Math.min(peak, 500))}** · target ${choice}`, detail: `${choice}/${peak}`, peak, t };
     },
   },
   diceexact2: {
-    title: '🎲 Double dé',
+    title: '🎲 Double die',
     choices: ['s7', 's8', 's9', 's10', 's11', 's12'],
-    spinText: 'Deux dés roulent...',
-    info: (c) => `somme exacte ${fx(6 * c)}`,
-    picker: (c) => choicePicker('diceexact2', '🎲 Double dé : somme exacte', `Devine la somme (7 à 12). **${fx(6 * c)}**.`, [7, 8, 9, 10, 11, 12].map((n) => [`s${n}`, String(n), '🎲'])),
+    spinText: 'Two dice roll...',
+    info: (c) => `exact sum ${fx(6 * c)}`,
+    picker: (c) => choicePicker('diceexact2', '🎲 Double die: exact sum', `Guess the sum (7 to 12). **${fx(6 * c)}**.`, [7, 8, 9, 10, 11, 12].map((n) => [`s${n}`, String(n), '🎲'])),
     resolve(choice) {
       const a = randomInt(1, 7), b = randomInt(1, 7), sum = a + b, want = Number(choice.slice(1));
-      return { base: sum === want ? 6 : 0, pick: `Somme ${want}`, headline: code(sideBySide([dieLines(a), dieLines(b)], '   ')) + `**${a}+${b}=${sum}**`, detail: `${want}->${sum}`, a, b, sum };
+      return { base: sum === want ? 6 : 0, pick: `Sum ${want}`, headline: code(sideBySide([dieLines(a), dieLines(b)], '   ')) + `**${a}+${b}=${sum}**`, detail: `${want}->${sum}`, a, b, sum };
     },
   },
   chest2: {
-    title: '📦 Triple coffre',
+    title: '📦 Triple chest',
     choices: ['c1', 'c2', 'c3'],
-    spinText: 'Ouverture...',
-    info: (c) => `victoire ${fx(2.85 * c)}`,
-    picker: (c) => choicePicker('chest2', '📦 Triple coffre', `1 trésor sur 3. **${fx(2.85 * c)}**.`, [['c1', 'Coffre 1', '📦'], ['c2', 'Coffre 2', '📦'], ['c3', 'Coffre 3', '📦']]),
+    spinText: 'Opening...',
+    info: (c) => `win ${fx(2.85 * c)}`,
+    picker: (c) => choicePicker('chest2', '📦 Triple chest', `1 treasure in 3. **${fx(2.85 * c)}**.`, [['c1', 'Chest 1', '📦'], ['c2', 'Chest 2', '📦'], ['c3', 'Chest 3', '📦']]),
     resolve(choice) {
       const win = randomInt(1, 4), want = Number(choice.slice(1));
       const view = [1, 2, 3].map((k) => (k === win ? '💎' : '💨')).join('  ');
-      return { base: win === want ? 2.85 : 0, pick: `Coffre ${want}`, headline: `Contenu : ${view}`, detail: `${want}->${win}`, win, want };
+      return { base: win === want ? 2.85 : 0, pick: `Chest ${want}`, headline: `Contents: ${view}`, detail: `${want}->${win}`, win, want };
     },
   },
   spincolor: {
-    title: '🎨 Roue couleur',
+    title: '🎨 Color wheel',
     choices: ['red', 'blue', 'green', 'yellow', 'purple', 'orange'],
-    spinText: 'La roue tourne...',
-    info: (c) => `victoire ${fx(5.5 * c)}`,
-    picker: (c) => choicePicker('spincolor', '🎨 Roue couleur', `6 segments. **${fx(5.5 * c)}**.`, [['red', 'Rouge', '🔴'], ['blue', 'Bleu', '🔵'], ['green', 'Vert', '🟢'], ['yellow', 'Jaune', '🟡'], ['purple', 'Violet', '🟣'], ['orange', 'Orange', '🟠']]),
+    spinText: 'The wheel spins...',
+    info: (c) => `win ${fx(5.5 * c)}`,
+    picker: (c) => choicePicker('spincolor', '🎨 Color wheel', `6 segments. **${fx(5.5 * c)}**.`, [['red', 'Red', '🔴'], ['blue', 'Blue', '🔵'], ['green', 'Green', '🟢'], ['yellow', 'Yellow', '🟡'], ['purple', 'Purple', '🟣'], ['orange', 'Orange', '🟠']]),
     resolve(choice) {
       const cols = ['red', 'blue', 'green', 'yellow', 'purple', 'orange'];
       const em = { red: '🔴', blue: '🔵', green: '🟢', yellow: '🟡', purple: '🟣', orange: '🟠' };
       const out = cols[randomInt(0, 6)];
-      return { base: out === choice ? 5.5 : 0, pick: choice, headline: `La roue s'arrête sur **${em[out]}**`, detail: `${choice}->${out}`, out };
+      return { base: out === choice ? 5.5 : 0, pick: choice, headline: `The wheel stops on **${em[out]}**`, detail: `${choice}->${out}`, out };
     },
   },
 });
 
 // ============================================================
-//  ANIMATIONS DE CHAQUE JEU  (res = résultat déjà tiré, ctx = { c, bet, choice })
+//  ANIMATIONS FOR EACH GAME  (res = already-drawn result, ctx = { c, bet, choice })
 // ============================================================
 ANIMS.coinflip = (res) => {
   const forms = [
     ['PILE', 5], ['MID', 4], ['EDGE', 2], ['MID', 1], ['FACE', 0], ['MID', 0], ['EDGE', 1], ['MID', 2],
   ];
   const caps = [
-    'La pièce est lancée', 'Elle monte...', 'Elle tourne sur la tranche', 'Elle prend de la hauteur',
-    'Sommet du lancer', 'Elle commence à retomber', 'Elle tourne encore', 'Elle redescend',
+    'The coin is tossed', 'It rises...', 'It spins on its edge', 'It gains height',
+    'Top of the toss', 'It starts falling', 'It spins again', 'It comes back down',
   ];
   const frames = forms.map(([f, y], k) => ({ art: coinScene(f, y), caption: caps[k], ms: 800 }));
   frames.push({
     art: coinScene(res.side === 'pile' ? 'PILE' : 'FACE', 4),
-    caption: `La pièce se pose : ${res.side === 'pile' ? 'PILE' : 'FACE'}`,
+    caption: `The coin lands: ${res.side === 'pile' ? 'PILE' : 'FACE'}`,
     ms: 900,
   });
   return frames;
@@ -3649,12 +3726,12 @@ ANIMS.dice = (res) => {
   const r = () => randomInt(1, 7);
   const show = (a, b, cap, ms) => ({ art: code(sideBySide([dieLines(a), dieLines(b)], '   ')), caption: cap, ms });
   return [
-    show(r(), r(), 'Les dés quittent ta main', 800),
-    show(r(), r(), 'Ils rebondissent sur le tapis', 800),
+    show(r(), r(), 'Dice leave your hand', 800),
+    show(r(), r(), 'They bounce on the felt', 800),
     show(r(), r(), 'Ils roulent...', 850),
     show(r(), r(), 'Ils ralentissent', 900),
-    show(res.a, r(), `Premier dé : ${res.a}`, 1000),
-    show(res.a, res.b, `Total : ${res.a} + ${res.b} = ${res.sum}`, 1100),
+    show(res.a, r(), `First die: ${res.a}`, 1000),
+    show(res.a, res.b, `Total: ${res.a} + ${res.b} = ${res.sum}`, 1100),
   ];
 };
 
@@ -3662,12 +3739,12 @@ ANIMS.die = (res) => {
   const r = () => randomInt(1, 7);
   const show = (n, cap, ms) => ({ art: code(dieLines(n)), caption: cap, ms });
   return [
-    show(r(), 'Le dé est lancé', 800),
+    show(r(), 'The die is rolled', 800),
     show(r(), 'Il rebondit', 800),
     show(r(), 'Il roule...', 850),
-    show(r(), 'Il ralentit', 900),
-    show(r(), 'Presque arrêté', 950),
-    show(res.n, `Le dé s'arrête sur ${res.n}`, 1000),
+    show(r(), 'It slows down', 900),
+    show(r(), 'Almost stopped', 950),
+    show(res.n, `The die stops on ${res.n}`, 1000),
   ];
 };
 
@@ -3679,8 +3756,8 @@ ANIMS.slots = (res) => {
   const stopAt = [3, 5, 7];
   const frames = [];
   const caps = {
-    1: 'Les rouleaux démarrent', 2: 'Ils tournent à pleine vitesse', 3: 'Rouleau 1 verrouillé',
-    4: 'Les deux autres tournent encore', 5: 'Rouleau 2 verrouillé', 6: 'Dernier rouleau...', 7: 'Rouleau 3 verrouillé',
+    1: 'Reels start', 2: 'They spin at full speed', 3: 'Reel 1 locked',
+    4: 'The other two still spin', 5: 'Reel 2 locked', 6: 'Last reel...', 7: 'Reel 3 locked',
   };
   const board = (cols, mark) => {
     const row = (r) => '| ' + cols.map((c) => c[r]).join(' | ') + ' |';
@@ -3701,8 +3778,8 @@ ANIMS.slots = (res) => {
   const triple = finals[0] === finals[1] && finals[1] === finals[2];
   const two = finals.filter((s) => s === 'CER').length === 2;
   frames.push({
-    art: board(cols, triple ? '   *** TROIS IDENTIQUES ***' : two ? '   * DEUX CERISES *' : '       aucun gain'),
-    caption: triple ? (finals[0] === ' 7 ' ? 'JACKPOT !' : 'Combinaison gagnante !') : two ? 'Deux cerises !' : 'Pas de combinaison',
+    art: board(cols, triple ? '   *** THREE MATCHING ***' : two ? '   * TWO CHERRIES *' : '       no win'),
+    caption: triple ? (finals[0] === ' 7 ' ? 'JACKPOT!' : 'Winning combination!') : two ? 'Two cherries!' : 'No combination',
     ms: 1100,
   });
   return frames;
@@ -3715,33 +3792,33 @@ ANIMS.wheel = (res, ctx) => {
     const inner = lab.length >= 4 ? lab.slice(0, 4) : lab.padStart(Math.floor((4 + lab.length) / 2)).padEnd(4);
     return center ? `[${inner}]` : ` ${inner} `;
   };
-  const steps = [6, 5, 4, 3, 2, 2, 1, 1]; // 24 = un tour complet
+  const steps = [6, 5, 4, 3, 2, 2, 1, 1]; // 24 = one full turn
   const pos = stripPositions(res.idx, steps);
   const caps = [
-    'La roue est lancée', 'Elle accélère', 'Pleine vitesse', 'Les cases défilent', 'Elle ralentit',
-    'Plus que quelques cases', 'Le pointeur hésite', 'Dernière case...', `La roue s'arrête sur ${res.base === 0 ? 'x0' : fx(res.base * c)}`,
+    'The wheel is spun', 'It speeds up', 'Full speed', 'The slots flash by', 'It slows down',
+    'Only a few slots left', 'The pointer hesitates', 'Last slot...', `The wheel stops on ${res.base === 0 ? 'x0' : fx(res.base * c)}`,
   ];
   return pos.map((p, k) => ({
-    art: code([...stripArt(WHEEL, p, cell, 5), '', `  24 cases · pointeur au centre`]),
+    art: code([...stripArt(WHEEL, p, cell, 5), '', `  24 cells · pointer in the center`]),
     caption: caps[k],
     ms: 700 + k * 100,
   }));
 };
 
 ANIMS.duel = (res) => {
-  const lab = () => `${padR('     TOI', 12)}${'  CROUPIER'}`;
+  const lab = () => `${padR('     YOU', 12)}${'  DEALER'}`;
   const scene = (meHidden, dHidden, cap, ms) => ({
     art: code([lab(), ...sideBySide([cardLines(res.me, meHidden), cardLines(res.dealer, dHidden)], '     ')]),
     caption: cap,
     ms,
   });
-  const verdict = res.me.v > res.dealer.v ? 'Ta carte est plus haute : VICTOIRE' : res.me.v === res.dealer.v ? 'Égalité : perdu' : 'La carte du croupier est plus haute : DÉFAITE';
+  const verdict = res.me.v > res.dealer.v ? 'Your card is higher: WIN' : res.me.v === res.dealer.v ? 'Tie: lost' : 'The dealer card is higher: LOSS';
   return [
-    scene(true, true, 'Le croupier bat les cartes', 850),
-    scene(true, true, 'Les cartes sont posées', 900),
-    scene(true, true, 'Tu retournes ta carte...', 1000),
-    scene(false, true, `Ta carte : ${res.me.r}${res.me.s}`, 1100),
-    scene(false, true, 'Le croupier retourne la sienne...', 1000),
+    scene(true, true, 'Dealer shuffles the cards', 850),
+    scene(true, true, 'Cards are dealt', 900),
+    scene(true, true, 'You flip your card...', 1000),
+    scene(false, true, `Your card: ${res.me.r}${res.me.s}`, 1100),
+    scene(false, true, 'Dealer flips theirs...', 1000),
     scene(false, false, verdict, 1200),
   ];
 };
@@ -3753,12 +3830,12 @@ ANIMS.suit = (res, ctx) => {
   const pos = stripPositions(finalIdx, [4, 3, 3, 2, 1, 1]);
   const want = SUIT_CHOICES[ctx.choice];
   const frames = pos.map((p, k) => ({
-    art: code([...stripArt(order, p, cell, 3), '', `Ton choix : ${want}`]),
-    caption: ['Le croupier mélange le jeu', 'Les enseignes défilent', 'Ça ralentit', 'Presque...', 'Encore un cran', `L'enseigne tirée : ${res.card.s}`][k] || '...',
+    art: code([...stripArt(order, p, cell, 3), '', `Your pick: ${want}`]),
+    caption: ['Dealer shuffles the deck', 'Suits flash by', 'Slowing down', 'Almost...', 'One more notch', `Suit drawn: ${res.card.s}`][k] || '...',
     ms: 800 + k * 80,
   }));
-  frames.push({ art: code([...cardLines(null, true), '', `Ton choix : ${want}`]), caption: 'La carte est posée face cachée', ms: 900 });
-  frames.push({ art: code([...cardLines(res.card, false), '', `Ton choix : ${want}`]), caption: `Carte retournée : ${res.card.r}${res.card.s}`, ms: 1100 });
+  frames.push({ art: code([...cardLines(null, true), '', `Your pick: ${want}`]), caption: 'Card is placed face down', ms: 900 });
+  frames.push({ art: code([...cardLines(res.card, false), '', `Your pick: ${want}`]), caption: `Card flipped: ${res.card.r}${res.card.s}`, ms: 1100 });
   return frames;
 };
 
@@ -3779,9 +3856,9 @@ ANIMS.zone = (res, ctx) => {
   }
   if (seq[seq.length - 1] === res.n) seq[seq.length - 1] = res.n === 1 ? 2 : res.n - 1;
   seq.push(res.n);
-  const caps = ['Le curseur démarre', 'Il saute de case en case', 'Il accélère', 'Il ralentit', 'Il hésite', 'Plus que quelques sauts', 'Presque...', `Le nombre tiré : ${res.n}`];
+  const caps = ['The cursor starts', 'It hops from tile to tile', 'It speeds up', 'It slows down', 'It hesitates', 'Only a few hops left', 'Almost...', `Number drawn: ${res.n}`];
   return seq.map((cur, k) => ({
-    art: code([...grid(cur), '', `Ton pari : ${zone.label}`, 'Bas 1-3 · Milieu 4-7 · Haut 8-10']),
+    art: code([...grid(cur), '', `Your bet: ${zone.label}`, 'Low 1-3 · Middle 4-7 · High 8-10']),
     caption: caps[k],
     ms: 750 + k * 70,
   }));
@@ -3799,7 +3876,7 @@ ANIMS.plinko = (res, ctx) => {
         line += isBall ? '@' : '.';
         if (s < r) line += ' ';
       }
-      // décale pour que les rangées se centrent : chaque piquet est séparé d'un espace
+      // shift so rows are centered: each post is separated by a space
       lines.push(line);
     }
     const slots = range(9).map((s) => (ending && s === col ? '^' : ' ')).join(' ');
@@ -3807,16 +3884,16 @@ ANIMS.plinko = (res, ctx) => {
     lines.push(slots);
     return code(lines);
   };
-  const frames = [{ art: board(0, 0, false), caption: 'La bille est lâchée', ms: 800 }];
+  const frames = [{ art: board(0, 0, false), caption: 'The ball is dropped', ms: 800 }];
   let col = 0;
   path.forEach((p, k) => {
     col += p;
-    frames.push({ art: board(k + 1, col, false), caption: `Rebond ${k + 1}/8 ${p ? 'vers la droite' : 'vers la gauche'}`, ms: 750 });
+    frames.push({ art: board(k + 1, col, false), caption: `Bounce ${k + 1}/8 ${p ? 'to the right' : 'to the left'}`, ms: 750 });
   });
   const mult = res.mults[res.bin];
   frames.push({
-    art: board(8, res.bin, true) + `Case **${res.bin + 1}** : ${fx(mult * c)}`,
-    caption: `Elle tombe dans la case ${res.bin + 1}`,
+    art: board(8, res.bin, true) + `Cell **${res.bin + 1}**: ${fx(mult * c)}`,
+    caption: `It falls into cell ${res.bin + 1}`,
     ms: 1100,
   });
   return frames;
@@ -3842,23 +3919,23 @@ ANIMS.crash = (res) => {
     grid[H - 1 - last][Math.max(1, k * 2) + 1] = boom ? 'X' : '>';
     const lines = grid.map((r) => '|' + r.join(''));
     lines.push('+' + '-'.repeat(N * 2 + 2));
-    lines.push(`cible x${target} (ligne -)`);
+    lines.push(`target x${target} (line -)`);
     return code(lines);
   };
-  const frames = [{ art: chart(0, false) + 'Décollage dans 3... 2... 1...', caption: 'Compte à rebours', ms: 1000 }];
+  const frames = [{ art: chart(0, false) + 'Liftoff in 3... 2... 1...', caption: 'Countdown', ms: 1000 }];
   let hit = false;
   for (let k = 1; k <= N; k++) {
     const m = mAt(k);
-    let cap = `Multiplicateur : ${fx(m)}`;
+    let cap = `Multiplier: ${fx(m)}`;
     if (!hit && m >= target && crash >= target) {
       hit = true;
-      cap = `Cible x${target} atteinte ! (${fx(m)})`;
+      cap = `Target x${target} reached! (${fx(m)})`;
     }
     frames.push({ art: chart(k, false) + `**${fx(m)}**`, caption: cap, ms: 800 });
   }
   frames.push({
-    art: chart(N, true) + `**CRASH à ${fx(crash)}**`,
-    caption: res.crash >= target ? `Explosion à ${fx(crash)} : tu avais encaissé x${target}` : `Explosion à ${fx(crash)} : trop tôt pour ta cible`,
+    art: chart(N, true) + `**CRASH at ${fx(crash)}**`,
+    caption: res.crash >= target ? `Explosion at ${fx(crash)} : you had taken x${target}` : `Explosion at ${fx(crash)} : too early for your target`,
     ms: 1200,
   });
   return frames;
@@ -3871,16 +3948,16 @@ ANIMS.scratch = (res) => {
       '.------.------.------.',
       '|' + [0, 1, 2].map((k) => cell(states[k], res.cells[k])).join('|') + '|',
       "'------'------'------'",
-      '  Gratte les 3 cases',
+      '  Scratch the 3 cells',
     ]);
   const steps = [
-    [[0, 0, 0], 'Le ticket est prêt'],
-    [[1, 0, 0], 'Tu grattes la première case...'],
-    [[2, 0, 0], `Première case : ${res.cells[0]}`],
-    [[2, 1, 0], 'Tu grattes la deuxième case...'],
-    [[2, 2, 0], `Deuxième case : ${res.cells[1]}`],
-    [[2, 2, 1], 'Dernière case...'],
-    [[2, 2, 2], res.cells[0] === res.cells[1] && res.cells[1] === res.cells[2] ? 'Trois identiques : GAGNÉ !' : 'Pas de trio : perdu'],
+    [[0, 0, 0], 'The ticket is ready'],
+    [[1, 0, 0], 'You scratch the first cell...'],
+    [[2, 0, 0], `First cell: ${res.cells[0]}`],
+    [[2, 1, 0], 'You scratch the second cell...'],
+    [[2, 2, 0], `Second cell: ${res.cells[1]}`],
+    [[2, 2, 1], 'Last slot...'],
+    [[2, 2, 2], res.cells[0] === res.cells[1] && res.cells[1] === res.cells[2] ? 'Three matching: WON!' : 'No triple: lost'],
   ];
   return steps.map(([st, cap], k) => ({ art: ticket(st), caption: cap, ms: 800 + (k >= 4 ? 200 : 0) }));
 };
@@ -3897,18 +3974,18 @@ ANIMS.chest = (res) => {
   const withOpen = c3.map((cl, k) => (k === chosen ? open(sym(k)) : cl));
   const all = c3.map((_, k) => open(sym(k)));
   return [
-    { art: scene(c3, -1), caption: 'Trois coffres, un seul trésor', ms: 900 },
-    { art: scene(c3, chosen), caption: `Tu désignes le coffre ${res.want}`, ms: 900 },
-    { art: scene(c3, chosen), caption: 'La serrure grince...', ms: 900 },
-    { art: scene(withOpen, chosen), caption: res.win === res.want ? 'Le couvercle se soulève : un trésor !' : 'Le couvercle se soulève : vide...', ms: 1100 },
-    { art: scene(all, res.win - 1), caption: `Le trésor était dans le coffre ${res.win}`, ms: 1200 },
+    { art: scene(c3, -1), caption: 'Three chests, one treasure', ms: 900 },
+    { art: scene(c3, chosen), caption: `You pick chest ${res.want}`, ms: 900 },
+    { art: scene(c3, chosen), caption: 'The lock creaks...', ms: 900 },
+    { art: scene(withOpen, chosen), caption: res.win === res.want ? 'The lid opens: treasure!' : 'The lid opens: empty...', ms: 1100 },
+    { art: scene(all, res.win - 1), caption: `The treasure was in chest ${res.win}`, ms: 1200 },
   ];
 };
 
 ANIMS.russian = (res) => {
   const cyl = (rot, firing) => {
     const ch = range(6).map((p) => (res.chambers[(p + rot) % 6] ? '@' : 'o'));
-    // positions : haut, haut-droite, bas-droite, bas, bas-gauche, haut-gauche
+    // positions: top, top-right, bottom-right, bottom, bottom-left, top-left
     return code([
       '           v',
       `          (${ch[0]})`,
@@ -3916,16 +3993,16 @@ ANIMS.russian = (res) => {
       `     (${ch[4]})       (${ch[2]})`,
       `          (${ch[3]})`,
       '',
-      firing || '   @ = balle   o = vide',
+      firing || '   @ = ball   o = empty',
     ]);
   };
   const rots = [0, 2, 4, 1, 3, 5, 2, 4];
-  const caps = ['Le barillet est chargé', 'Tu le fais tourner', 'Il tourne vite', 'Plus vite encore', 'Il ralentit', 'Il ralentit encore', 'Presque arrêté', 'Il s\'arrête'];
+  const caps = ['The cylinder is loaded', 'You spin it', 'It spins fast', 'Even faster', 'It slows down', 'It slows further', 'Almost stopped', 'It stops'];
   const frames = rots.map((r, k) => ({ art: cyl(r), caption: caps[k], ms: 750 + k * 60 }));
-  frames.push({ art: cyl(0, '   Le percuteur est armé...'), caption: 'Tu appuies sur la détente', ms: 1300 });
+  frames.push({ art: cyl(0, '   The hammer is cocked...'), caption: 'You pull the trigger', ms: 1300 });
   frames.push({
     art: cyl(0, res.dead ? '   >>> BANG <<<' : '   ...clic.'),
-    caption: res.dead ? 'BANG ! La balle était là' : 'Clic : la chambre était vide',
+    caption: res.dead ? 'BANG! The bullet was there' : 'Click: the chamber was empty',
     ms: 1200,
   });
   return frames;
@@ -3952,15 +4029,15 @@ ANIMS.horses = (res) => {
     const after = ' '.repeat(Math.max(0, Ln - p));
     return `${k + 1}${mark}|${before}=>${after}|`;
   };
-  const track = (pos, flag) => code([...pos.map((p, k) => lane(k, p)), '', flag || `* = ton cheval (n°${res.want + 1})`]);
-  const caps = ['Les chevaux sont aux boîtes', 'Départ !', 'Le peloton se forme', 'Ça se bat en tête', 'Dans la ligne droite', 'Sprint final', 'Photo-finish...'];
-  const frames = [{ art: track(Array(5).fill(0), 'Sous les ordres du starter...'), caption: 'Les chevaux sont aux boîtes', ms: 900 }];
+  const track = (pos, flag) => code([...pos.map((p, k) => lane(k, p)), '', flag || `* = your horse (#${res.want + 1})`]);
+  const caps = ['Horses are in the gates', 'They are off!', 'The pack forms', 'A battle up front', 'Down the home stretch', 'Final sprint', 'Photo finish...'];
+  const frames = [{ art: track(Array(5).fill(0), "At the starter's command..."), caption: 'Horses are in the gates', ms: 900 }];
   positions.forEach((pos, k) => frames.push({ art: track(pos), caption: caps[Math.min(k + 1, caps.length - 1)], ms: 800 }));
-  frames.push({ art: track(finals, `Vainqueur : cheval n°${res.winner + 1}`), caption: `Le cheval n°${res.winner + 1} franchit la ligne en premier`, ms: 1200 });
+  frames.push({ art: track(finals, `Winner: horse #${res.winner + 1}`), caption: `Horse #${res.winner + 1} crosses the line first`, ms: 1200 });
   return frames;
 };
 
-// Animations simples pour les nouveaux jeux
+// Simple animations for the new games
 ANIMS.limbo = (res) => {
   const steps = 8;
   const frames = [];
@@ -3968,14 +4045,14 @@ ANIMS.limbo = (res) => {
     const m = Math.max(1, Math.round(Math.pow(res.peak, k / steps) * 100) / 100);
     const bar = '█'.repeat(Math.min(20, Math.floor(m * 2))) + '░'.repeat(Math.max(0, 20 - Math.floor(m * 2)));
     frames.push({
-      art: code([`  ${bar}`, `  x${m.toFixed(2)}`, '', `  Cible : x${res.target}`]),
-      caption: m >= res.target ? 'Cible dépassée !' : 'Ça monte...',
+      art: code([`  ${bar}`, `  x${m.toFixed(2)}`, '', `  Target: x${res.target}`]),
+      caption: m >= res.target ? 'Target exceeded!' : 'Climbing...',
       ms: 700,
     });
   }
   frames.push({
-    art: code([`  PIC : x${Math.min(res.peak, 1000).toFixed(2)}`, `  Cible : x${res.target}`]),
-    caption: res.peak >= res.target ? 'Cible validée !' : 'Trop bas',
+    art: code([`  PEAK: x${Math.min(res.peak, 1000).toFixed(2)}`, `  Target: x${res.target}`]),
+    caption: res.peak >= res.target ? 'Target cleared!' : 'Too low',
     ms: 1100,
   });
   return frames;
@@ -3984,10 +4061,10 @@ ANIMS.limbo = (res) => {
 ANIMS.higher = (res) => {
   const ranks = ['', 'A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
   return [
-    { art: code(['  [?]', '', '  Carte de référence...']), caption: 'Tirage de la référence', ms: 900 },
-    { art: code([`  [${ranks[res.a]}]`, '', '  Référence posée']), caption: `Référence : ${ranks[res.a]}`, ms: 1000 },
-    { art: code([`  [${ranks[res.a]}]  →  [?]`, '', '  La suivante se retourne...']), caption: 'Suspense', ms: 1000 },
-    { art: code([`  [${ranks[res.a]}]  →  [${ranks[res.b]}]`]), caption: `Suivante : ${ranks[res.b]}`, ms: 1100 },
+    { art: code(['  [?]', '', '  Reference card...']), caption: 'Drawing the reference', ms: 900 },
+    { art: code([`  [${ranks[res.a]}]`, '', '  Reference placed']), caption: `Reference: ${ranks[res.a]}`, ms: 1000 },
+    { art: code([`  [${ranks[res.a]}]  →  [?]`, '', '  The next one flips...']), caption: 'Suspense', ms: 1000 },
+    { art: code([`  [${ranks[res.a]}]  →  [${ranks[res.b]}]`]), caption: `Next: ${ranks[res.b]}`, ms: 1100 },
   ];
 };
 
@@ -3997,7 +4074,7 @@ ANIMS.rps = (res) => {
     { art: code(['  1...']), caption: 'Pierre', ms: 700 },
     { art: code(['  2...']), caption: 'Papier', ms: 700 },
     { art: code(['  3...']), caption: 'Ciseaux', ms: 700 },
-    { art: code([`  Toi ${names[res.detail.split(' vs ')[0]]}  ·  Bot ${names[res.bot]}`]), caption: 'Résultat', ms: 1200 },
+    { art: code([`  You ${names[res.detail.split(' vs ')[0]]}  ·  Bot ${names[res.bot]}`]), caption: 'Result', ms: 1200 },
   ];
 };
 
@@ -4005,11 +4082,11 @@ ANIMS.colorpick = (res) => {
   const em = { red: '🔴', blue: '🔵', green: '🟢', yellow: '🟡' };
   const order = ['red', 'blue', 'green', 'yellow'];
   return order.map((c, k) => ({
-    art: code([`  ${em[c]}`, '', '  Les couleurs tournent...']),
-    caption: 'Mélange',
+    art: code([`  ${em[c]}`, '', '  The colors spin...']),
+    caption: 'Shuffle',
     ms: 600 + k * 50,
   })).concat([
-    { art: code([`  ${em[res.out]}`, '', `  Couleur tirée`]), caption: 'Résultat', ms: 1100 },
+    { art: code([`  ${em[res.out]}`, '', `  Color drawn`]), caption: 'Result', ms: 1100 },
   ]);
 };
 
@@ -4018,14 +4095,14 @@ ANIMS.ladder = (res) => {
   for (let k = 0; k <= res.reached; k++) {
     const steps = Array.from({ length: 5 }, (_, i) => (i < k ? '▓▓' : i === k ? '██' : '░░')).reverse();
     frames.push({
-      art: code(['  ÉCHELLE', ...steps.map((s, i) => `  ${5 - i} ${s}`)]),
-      caption: k === 0 ? 'Départ' : `Palier ${k}`,
+      art: code(['  LADDER', ...steps.map((s, i) => `  ${5 - i} ${s}`)]),
+      caption: k === 0 ? 'Start' : `Step ${k}`,
       ms: 750,
     });
   }
   frames.push({
-    art: code([`  Atteint : palier ${res.reached}`, `  Objectif : palier ${res.want}`]),
-    caption: res.reached >= res.want ? 'Objectif réussi !' : 'Chute',
+    art: code([`  Reached: tier ${res.reached}`, `  Target: tier ${res.want}`]),
+    caption: res.reached >= res.want ? 'Goal reached!' : 'Fall',
     ms: 1100,
   });
   return frames;
@@ -4035,18 +4112,18 @@ ANIMS.keno = (res) => {
   const frames = [];
   for (let k = 0; k < 6; k++) {
     const n = randomInt(1, 11);
-    frames.push({ art: code([`  [ ${n} ]`]), caption: 'Les numéros défilent', ms: 600 });
+    frames.push({ art: code([`  [ ${n} ]`]), caption: 'Numbers rolling', ms: 600 });
   }
-  frames.push({ art: code([`  [ ${res.n} ]`]), caption: `Numéro tiré : ${res.n}`, ms: 1100 });
+  frames.push({ art: code([`  [ ${res.n} ]`]), caption: `Number drawn: ${res.n}`, ms: 1100 });
   return frames;
 };
 
 ANIMS.war = (res) => {
   const ranks = ['', 'A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
   return [
-    { art: code(['  [?]     [?]']), caption: 'Cartes posées', ms: 900 },
-    { art: code([`  [${ranks[res.me]}]     [?]`]), caption: 'Ta carte', ms: 1000 },
-    { art: code([`  [${ranks[res.me]}]     [${ranks[res.dealer]}]`]), caption: 'Carte du croupier', ms: 1100 },
+    { art: code(['  [?]     [?]']), caption: 'Cards dealt', ms: 900 },
+    { art: code([`  [${ranks[res.me]}]     [?]`]), caption: 'Your card', ms: 1000 },
+    { art: code([`  [${ranks[res.me]}]     [${ranks[res.dealer]}]`]), caption: 'Dealer card', ms: 1100 },
   ];
 };
 
@@ -4056,7 +4133,7 @@ ANIMS.hilo = (res) => {
   for (let k = 1; k <= 3; k++) {
     frames.push({
       art: code([`  ${res.cards.slice(0, k).map((c) => ranks[c]).join(' · ')}`]),
-      caption: `Carte ${k}/3`,
+      caption: `Card ${k}/3`,
       ms: 900,
     });
   }
@@ -4066,9 +4143,9 @@ ANIMS.hilo = (res) => {
 ANIMS.bingo = (res) => {
   const frames = [];
   for (let k = 0; k < 5; k++) {
-    frames.push({ art: code([`  Case ${randomInt(1, 6)}`]), caption: 'La bille tourne...', ms: 600 });
+    frames.push({ art: code([`  Cell ${randomInt(1, 6)}`]), caption: 'The ball is spinning...', ms: 600 });
   }
-  frames.push({ art: code([`  Case ${res.n}`]), caption: `Bille dans la case ${res.n}`, ms: 1100 });
+  frames.push({ art: code([`  Cell ${res.n}`]), caption: `Ball in cell ${res.n}`, ms: 1100 });
   return frames;
 };
 
@@ -4078,69 +4155,69 @@ ANIMS.jackpot = (res) => {
   for (let k = 0; k < 5; k++) {
     frames.push({
       art: code([`  [ ${syms[randomInt(0, 5)]} | ${syms[randomInt(0, 5)]} | ${syms[randomInt(0, 5)]} ]`]),
-      caption: 'Les rouleaux tournent',
+      caption: 'The reels spin',
       ms: 700,
     });
   }
   frames.push({
     art: code([`  [ ${res.a} | ${res.b} | ${res.c} ]`]),
-    caption: 'Résultat',
+    caption: 'Result',
     ms: 1200,
   });
   return frames;
 };
 
-// Animations des 30 nouveaux jeux
+// Animations for the 30 new games
 ANIMS.dicewar = (res) => {
   const r = () => randomInt(1, 7);
   return [
-    { art: code(sideBySide([dieLines(r()), dieLines(r())], '   ')), caption: 'Les dés roulent', ms: 700 },
+    { art: code(sideBySide([dieLines(r()), dieLines(r())], '   ')), caption: 'Dice roll', ms: 700 },
     { art: code(sideBySide([dieLines(r()), dieLines(r())], '   ')), caption: 'Rebond', ms: 700 },
-    { art: code(sideBySide([dieLines(res.me), dieLines(r())], '   ')), caption: `Ton dé : ${res.me}`, ms: 900 },
-    { art: code(sideBySide([dieLines(res.me), dieLines(res.dealer)], '   ')), caption: `Croupier : ${res.dealer}`, ms: 1100 },
+    { art: code(sideBySide([dieLines(res.me), dieLines(r())], '   ')), caption: `Your die: ${res.me}`, ms: 900 },
+    { art: code(sideBySide([dieLines(res.me), dieLines(res.dealer)], '   ')), caption: `Dealer: ${res.dealer}`, ms: 1100 },
   ];
 };
 ANIMS.coinladder = (res) => {
-  const frames = [{ art: code(['  Pièce prête...']), caption: 'Début de l\'échelle', ms: 700 }];
+  const frames = [{ art: code(['  Coin ready...']), caption: 'Ladder start', ms: 700 }];
   const flips = (res.detail || '').split('');
   flips.forEach((f, k) => {
-    frames.push({ art: code([`  ${f === 'P' ? 'PILE' : 'FACE'}`, '', `  Série : ${k + 1}/${res.need}`]), caption: f === 'P' ? 'Pile !' : 'Face...', ms: 800 });
+    frames.push({ art: code([`  ${f === 'P' ? 'PILE' : 'FACE'}`, '', `  Streak: ${k + 1}/${res.need}`]), caption: f === 'P' ? 'Heads!' : 'Tails...', ms: 800 });
   });
-  frames.push({ art: code([`  Résultat : ${flips.join(' · ')}`]), caption: res.streak >= res.need ? 'Échelle réussie !' : 'Échelle cassée', ms: 1100 });
+  frames.push({ art: code([`  Result: ${flips.join(' · ')}`]), caption: res.streak >= res.need ? 'Ladder cleared!' : 'Ladder broken', ms: 1100 });
   return frames;
 };
 ANIMS.cardmatch = (res) => [
-  { art: code(['  [?] [?] [?] [?]']), caption: 'Cartes mélangées', ms: 800 },
-  { art: code(['  Les cartes se mélangent...']), caption: 'Mélange', ms: 900 },
-  { art: code([`  Secrète révélée : ${res.secret.r}${res.secret.s}`]), caption: 'Carte secrète', ms: 1000 },
-  { art: code([`  Tirée : ${res.pickCard.r}${res.pickCard.s}`]), caption: 'Ta carte', ms: 1100 },
+  { art: code(['  [?] [?] [?] [?]']), caption: 'Cards shuffled', ms: 800 },
+  { art: code(['  Cards are shuffling...']), caption: 'Shuffle', ms: 900 },
+  { art: code([`  Secret revealed: ${res.secret.r}${res.secret.s}`]), caption: 'Secret card', ms: 1000 },
+  { art: code([`  Drawn: ${res.pickCard.r}${res.pickCard.s}`]), caption: 'Your card', ms: 1100 },
 ];
 ANIMS.numguess = (res) => {
   const frames = [];
-  for (let k = 0; k < 6; k++) frames.push({ art: code([`  [ ${randomInt(1, 11)} ]`]), caption: 'Les nombres défilent', ms: 550 });
-  frames.push({ art: code([`  [ ${res.n} ]`]), caption: `Tirage : ${res.n}`, ms: 1100 });
+  for (let k = 0; k < 6; k++) frames.push({ art: code([`  [ ${randomInt(1, 11)} ]`]), caption: 'Numbers rolling', ms: 550 });
+  frames.push({ art: code([`  [ ${res.n} ]`]), caption: `Draw: ${res.n}`, ms: 1100 });
   return frames;
 };
 ANIMS.bombdefuse = (res) => [
-  { art: code(['  💣  3...']), caption: 'Compte à rebours', ms: 800 },
-  { art: code(['  💣  2...']), caption: 'Compte à rebours', ms: 800 },
-  { art: code(['  💣  1...']), caption: 'Compte à rebours', ms: 800 },
-  { art: code([res.good === res.want ? '  ✅ Désamorcé' : '  💥 BOOM']), caption: res.good === res.want ? 'Bon fil !' : `Mauvais fil (bon = ${res.good})`, ms: 1200 },
+  { art: code(['  💣  3...']), caption: 'Countdown', ms: 800 },
+  { art: code(['  💣  2...']), caption: 'Countdown', ms: 800 },
+  { art: code(['  💣  1...']), caption: 'Countdown', ms: 800 },
+  { art: code([res.good === res.want ? '  ✅ Defused' : '  💥 BOOM']), caption: res.good === res.want ? 'Right wire!' : `Wrong wire (right = ${res.good})`, ms: 1200 },
 ];
 ANIMS.treasure = (res) => {
   const frames = [];
   for (let k = 1; k <= 5; k++) {
-    frames.push({ art: code([`  Case ${k} : ${k === res.win ? '💎' : '🕳️'}`]), caption: 'Fouille', ms: 600 });
+    frames.push({ art: code([`  Cell ${k}: ${k === res.win ? '💎' : '🕳️'}`]), caption: 'Dig', ms: 600 });
   }
-  frames.push({ art: code([`  Trésor en case ${res.win}`]), caption: 'Résultat', ms: 1100 });
+  frames.push({ art: code([`  Treasure in spot ${res.win}`]), caption: 'Result', ms: 1100 });
   return frames;
 };
 ANIMS.highcard = (res) => {
   const ranks = ['', 'A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
   return [
-    { art: code(['  [?]']), caption: 'Carte face cachée', ms: 800 },
-    { art: code(['  [...]']), caption: 'Retournement...', ms: 900 },
-    { art: code([`  [${ranks[res.v]}]`]), caption: `Carte : ${ranks[res.v]}`, ms: 1100 },
+    { art: code(['  [?]']), caption: 'Face-down card', ms: 800 },
+    { art: code(['  [...]']), caption: 'Flipping...', ms: 900 },
+    { art: code([`  [${ranks[res.v]}]`]), caption: `Card: ${ranks[res.v]}`, ms: 1100 },
   ];
 };
 ANIMS.lowcard = ANIMS.highcard;
@@ -4148,34 +4225,34 @@ ANIMS.pairmatch = (res) => {
   const ranks = ['', 'A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
   return [
     { art: code(['  [?]  [?]' ]), caption: 'Deux cartes', ms: 800 },
-    { art: code([`  [${ranks[res.a]}]  [?]`]), caption: 'Première carte', ms: 900 },
-    { art: code([`  [${ranks[res.a]}]  [${ranks[res.b]}]`]), caption: 'Deuxième carte', ms: 1100 },
+    { art: code([`  [${ranks[res.a]}]  [?]`]), caption: 'First card', ms: 900 },
+    { art: code([`  [${ranks[res.a]}]  [${ranks[res.b]}]`]), caption: 'Second card', ms: 1100 },
   ];
 };
 ANIMS.freefall = (res) => [
   { art: code(['  🪂', '  |', '  |', '  v']), caption: 'Saut !', ms: 800 },
-  { art: code(['  🪂', '  |', '  v']), caption: 'Chute...', ms: 800 },
-  { art: code(['  🪂', '  v']), caption: 'Approche du sol', ms: 800 },
-  { art: code([res.ok ? '  ✅ Atterri' : '  💥 Crash']), caption: res.ok ? 'Zone atteinte' : 'Raté', ms: 1100 },
+  { art: code(['  🪂', '  |', '  v']), caption: 'Fall...', ms: 800 },
+  { art: code(['  🪂', '  v']), caption: 'Approaching the ground', ms: 800 },
+  { art: code([res.ok ? '  ✅ Landed' : '  💥 Crash']), caption: res.ok ? 'Zone reached' : 'Missed', ms: 1100 },
 ];
 ANIMS.balloon = (res) => {
   const frames = [];
   for (let k = 1; k <= res.need; k++) {
-    frames.push({ art: code([`  ${'O'.repeat(k + 2)}`, `  Niveau ${k}`]), caption: 'Gonflage...', ms: 700 });
+    frames.push({ art: code([`  ${'O'.repeat(k + 2)}`, `  Level ${k}`]), caption: 'Inflating...', ms: 700 });
   }
-  frames.push({ art: code([res.ok ? '  🎈 Intact' : '  💥 Éclaté']), caption: res.ok ? 'Succès' : 'Trop gonflé', ms: 1100 });
+  frames.push({ art: code([res.ok ? '  🎈 Intact' : '  💥 Popped']), caption: res.ok ? 'Success' : 'Overinflated', ms: 1100 });
   return frames;
 };
 ANIMS.target = (res) => [
-  { art: code(['  →']), caption: 'Visée', ms: 700 },
+  { art: code(['  →']), caption: 'Aiming', ms: 700 },
   { art: code(['    →']), caption: 'Lancer', ms: 700 },
-  { art: code(['      →']), caption: 'Vol', ms: 700 },
-  { art: code([`  Impact : ${res.hit}`]), caption: 'Résultat', ms: 1100 },
+  { art: code(['      →']), caption: 'Flight', ms: 700 },
+  { art: code([`  Impact: ${res.hit}`]), caption: 'Result', ms: 1100 },
 ];
 ANIMS.sequence = (res) => [
   { art: code([`  ${res.a}  ?  ?`]), caption: 'Premier chiffre', ms: 800 },
-  { art: code([`  ${res.a}  ${res.b}  ?`]), caption: 'Deuxième', ms: 800 },
-  { art: code([`  ${res.a}  ${res.b}  ${res.c}`]), caption: res.ok ? 'SUITE !' : 'Pas de suite', ms: 1100 },
+  { art: code([`  ${res.a}  ${res.b}  ?`]), caption: 'Second', ms: 800 },
+  { art: code([`  ${res.a}  ${res.b}  ${res.c}`]), caption: res.ok ? 'STRAIGHT!' : 'No straight', ms: 1100 },
 ];
 ANIMS.animalrace = (res) => {
   const names = { a1: '🐰', a2: '🦊', a3: '🐺', a4: '🦅' };
@@ -4183,7 +4260,7 @@ ANIMS.animalrace = (res) => {
   for (let k = 0; k < 5; k++) {
     frames.push({ art: code(Object.values(names).map((e, i) => `${e} ${'.'.repeat(randomInt(1, 8))}`)), caption: 'Course en cours', ms: 700 });
   }
-  frames.push({ art: code([`  Gagnant : ${res.winner.name}`]), caption: 'Arrivée', ms: 1200 });
+  frames.push({ art: code([`  Winner: ${res.winner.name}`]), caption: 'Finish', ms: 1200 });
   return frames;
 };
 ANIMS.fruitmatch = (res) => {
@@ -4192,7 +4269,7 @@ ANIMS.fruitmatch = (res) => {
   for (let k = 0; k < 5; k++) {
     frames.push({ art: code([`  [ ${fruits[randomInt(0, 5)]} | ${fruits[randomInt(0, 5)]} | ${fruits[randomInt(0, 5)]} ]`]), caption: 'Rouleaux', ms: 650 });
   }
-  frames.push({ art: code([`  [ ${res.a} | ${res.b} | ${res.c} ]`]), caption: 'Résultat', ms: 1100 });
+  frames.push({ art: code([`  [ ${res.a} | ${res.b} | ${res.c} ]`]), caption: 'Result', ms: 1100 });
   return frames;
 };
 ANIMS.gemhunt = (res) => {
@@ -4200,71 +4277,71 @@ ANIMS.gemhunt = (res) => {
   for (let k = 1; k <= 6; k++) {
     frames.push({ art: code([`  Roche ${k} ${k === res.win ? '💎' : '🪨'}`]), caption: 'Fouille', ms: 550 });
   }
-  frames.push({ art: code([`  Gemme en roche ${res.win}`]), caption: 'Trouvée', ms: 1100 });
+  frames.push({ art: code([`  Gem in rock ${res.win}`]), caption: 'Found', ms: 1100 });
   return frames;
 };
 ANIMS.stardrop = (res) => [
-  { art: code(['  ⭐', '    \\', '     \\']), caption: 'Étoile filante', ms: 800 },
-  { art: code(['     ⭐', '    /', '   /']), caption: 'Elle traverse', ms: 800 },
-  { art: code([res.falls ? '  ⭐ au sol' : '  ⭐ disparue']), caption: res.falls ? 'Elle est tombée' : 'Elle continue', ms: 1100 },
+  { art: code(['  ⭐', '    \\', '     \\']), caption: 'Shooting star', ms: 800 },
+  { art: code(['     ⭐', '    /', '   /']), caption: 'It crosses', ms: 800 },
+  { art: code([res.falls ? '  ⭐ on the ground' : '  ⭐ vanished']), caption: res.falls ? 'It fell' : 'It keeps going', ms: 1100 },
 ];
 ANIMS.moonshot = (res) => [
-  { art: code(['  🚀', '  |', '  |']), caption: 'Décollage', ms: 800 },
-  { art: code(['  🚀', '  |']), caption: 'Montée', ms: 800 },
+  { art: code(['  🚀', '  |', '  |']), caption: 'Liftoff', ms: 800 },
+  { art: code(['  🚀', '  |']), caption: 'Climb', ms: 800 },
   { art: code(['  🚀']), caption: 'Espace', ms: 800 },
-  { art: code([res.ok ? '  🌙 Objectif atteint' : '  💥 Échec']), caption: res.ok ? 'Succès' : 'Retour', ms: 1100 },
+  { art: code([res.ok ? '  🌙 Target reached' : '  💥 Failure']), caption: res.ok ? 'Success' : 'Return', ms: 1100 },
 ];
 ANIMS.volcano = (res) => [
-  { art: code(['  🌋', '  ~ ~']), caption: 'Le volcan gronde', ms: 800 },
-  { art: code(['  🌋', '  ~~~']), caption: 'Ça chauffe', ms: 800 },
-  { art: code(['  🌋💥', '  ~~~~']), caption: `Éruption zone ${res.eruption}`, ms: 1100 },
+  { art: code(['  🌋', '  ~ ~']), caption: 'The volcano rumbles', ms: 800 },
+  { art: code(['  🌋', '  ~~~']), caption: 'Heating up', ms: 800 },
+  { art: code(['  🌋💥', '  ~~~~']), caption: `Eruption zone ${res.eruption}`, ms: 1100 },
 ];
 ANIMS.lightning = (res) => [
   { art: code(['  ☁️ ☁️', '   ~']), caption: 'Nuages', ms: 800 },
-  { art: code(['  ☁️☁️☁️', '  ~ ~']), caption: 'Orage proche', ms: 800 },
-  { art: code([res.strike ? '  ⚡ BOOM' : '  ☁️ ...']), caption: res.strike ? 'Éclair !' : 'L\'orage passe', ms: 1100 },
+  { art: code(['  ☁️☁️☁️', '  ~ ~']), caption: 'Storm approaching', ms: 800 },
+  { art: code([res.strike ? '  ⚡ BOOM' : '  ☁️ ...']), caption: res.strike ? 'Lightning!' : 'Storm passes', ms: 1100 },
 ];
 ANIMS.pokerhand = (res) => {
   const names = ['', 'A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
   return [
     { art: code(['  [?] [?] [?]' ]), caption: 'Distribution', ms: 800 },
-    { art: code([`  [${names[res.ranks[0]]}] [?] [?]`]), caption: 'Carte 1', ms: 800 },
-    { art: code([`  [${names[res.ranks[0]]}] [${names[res.ranks[1]]}] [?]`]), caption: 'Carte 2', ms: 800 },
-    { art: code([`  [${names[res.ranks[0]]}] [${names[res.ranks[1]]}] [${names[res.ranks[2]]}]`]), caption: res.max >= 3 ? 'Brelan !' : res.max >= 2 ? 'Paire' : 'Rien', ms: 1100 },
+    { art: code([`  [${names[res.ranks[0]]}] [?] [?]`]), caption: 'Card 1', ms: 800 },
+    { art: code([`  [${names[res.ranks[0]]}] [${names[res.ranks[1]]}] [?]`]), caption: 'Card 2', ms: 800 },
+    { art: code([`  [${names[res.ranks[0]]}] [${names[res.ranks[1]]}] [${names[res.ranks[2]]}]`]), caption: res.max >= 3 ? 'Three of a kind!' : res.max >= 2 ? 'Pair' : 'Nothing', ms: 1100 },
   ];
 };
 ANIMS.redblack = (res) => [
-  { art: code(['  [?]']), caption: 'Carte cachée', ms: 800 },
-  { art: code(['  [...]']), caption: 'Retournement', ms: 900 },
-  { art: code([`  ${res.col === 'red' ? '🔴 ROUGE' : '⚫ NOIR'}`]), caption: 'Couleur', ms: 1100 },
+  { art: code(['  [?]']), caption: 'Hidden card', ms: 800 },
+  { art: code(['  [...]']), caption: 'Returnnement', ms: 900 },
+  { art: code([`  ${res.col === 'red' ? '🔴 RED' : '⚫ BLACK'}`]), caption: 'Color', ms: 1100 },
 ];
 ANIMS.oddseven = (res) => {
   const r = () => randomInt(1, 7);
   return [
-    { art: code(dieLines(r())), caption: 'Le dé roule', ms: 700 },
+    { art: code(dieLines(r())), caption: 'The die rolls', ms: 700 },
     { art: code(dieLines(r())), caption: 'Rebond', ms: 700 },
-    { art: code(dieLines(res.n)), caption: `Résultat : ${res.n}`, ms: 1100 },
+    { art: code(dieLines(res.n)), caption: `Result: ${res.n}`, ms: 1100 },
   ];
 };
 ANIMS.multiplier = (res) => {
   const frames = [];
   for (let k = 0; k < 6; k++) {
     const m = [1.5, 2, 3, 5][randomInt(0, 4)];
-    frames.push({ art: code([`  x${m}`]), caption: 'Multiplicateurs', ms: 600 });
+    frames.push({ art: code([`  x${m}`]), caption: 'Multipliers', ms: 600 });
   }
-  frames.push({ art: code([`  Cible ${res.pick}`]), caption: res.ok ? 'Validé !' : 'Raté', ms: 1100 });
+  frames.push({ art: code([`  Target ${res.pick}`]), caption: res.ok ? 'Cleared!' : 'Missed', ms: 1100 });
   return frames;
 };
 ANIMS.memory = (res) => [
-  { art: code(['  [?] [?] [?] [?]' ]), caption: 'Cartes cachées', ms: 800 },
-  { art: code(['  Retournement...']), caption: 'Mémoire', ms: 900 },
-  { art: code([`  ${res.detail.replace('-', ' et ')}`]), caption: res.ok ? 'Paire !' : 'Pas de paire', ms: 1100 },
+  { art: code(['  [?] [?] [?] [?]' ]), caption: 'Hidden cards', ms: 800 },
+  { art: code(['  Flipping...']), caption: 'Memory', ms: 900 },
+  { art: code([`  ${res.detail.replace('-', ' and ')}`]), caption: res.ok ? 'Pair!' : 'No pair', ms: 1100 },
 ];
 ANIMS.colorswipe = (res) => {
   const cols = ['🔴', '🟠', '🟡', '🟢', '🔵', '🟣'];
-  const frames = cols.map((e) => ({ art: code([`  ${e}`]), caption: 'Arc-en-ciel', ms: 500 }));
+  const frames = cols.map((e) => ({ art: code([`  ${e}`]), caption: 'Rainbow', ms: 500 }));
   const em = { red: '🔴', orange: '🟠', yellow: '🟡', green: '🟢', blue: '🔵', purple: '🟣' };
-  frames.push({ art: code([`  ${em[res.out]}`]), caption: 'Couleur tirée', ms: 1100 });
+  frames.push({ art: code([`  ${em[res.out]}`]), caption: 'Color drawn', ms: 1100 });
   return frames;
 };
 ANIMS.rocket2 = (res) => {
@@ -4272,9 +4349,9 @@ ANIMS.rocket2 = (res) => {
   const frames = [];
   for (let k = 1; k <= steps; k++) {
     const m = Math.max(1, Math.round(Math.pow(Math.min(res.peak, 100), k / steps) * 100) / 100);
-    frames.push({ art: code([`  🚀 x${m.toFixed(2)}`, `  Cible ${res.pick}`]), caption: 'Montée', ms: 650 });
+    frames.push({ art: code([`  🚀 x${m.toFixed(2)}`, `  Target ${res.pick}`]), caption: 'Climb', ms: 650 });
   }
-  frames.push({ art: code([`  Pic x${Math.min(res.peak, 500).toFixed(2)}`]), caption: res.peak >= res.t ? 'Cible OK' : 'Trop bas', ms: 1100 });
+  frames.push({ art: code([`  Peak x${Math.min(res.peak, 500).toFixed(2)}`]), caption: res.peak >= res.t ? 'Target cleared!' : 'Too low', ms: 1100 });
   return frames;
 };
 ANIMS.diceexact2 = (res) => {
@@ -4294,18 +4371,18 @@ ANIMS.spincolor = (res) => {
   const cols = ['🔴', '🔵', '🟢', '🟡', '🟣', '🟠'];
   const frames = [];
   for (let k = 0; k < 8; k++) {
-    frames.push({ art: code([`  ${cols[k % 6]}`]), caption: 'La roue tourne', ms: 500 });
+    frames.push({ art: code([`  ${cols[k % 6]}`]), caption: 'The wheel spins', ms: 500 });
   }
   const em = { red: '🔴', blue: '🔵', green: '🟢', yellow: '🟡', purple: '🟣', orange: '🟠' };
-  frames.push({ art: code([`  ${em[res.out]}`]), caption: 'Arrêt', ms: 1100 });
+  frames.push({ art: code([`  ${em[res.out]}`]), caption: 'Stop', ms: 1100 });
   return frames;
 };
 
 
 // ============================================================
-//  ZNK VISUELS v2  (affichage uniquement : aucune proba, aucun gain, aucun Z-Token touché)
-//  Scènes immersives en emojis / blocs de code. Les anciennes ANIMS ci-dessus
-//  sont remplacées ici par des versions illustrées (mêmes champs `res` lus).
+//  ZNK VISUELS v2  (display only: no odds, no payout, no Z-Tokens touched)
+//  Immersive scenes in emojis / code blocks. The old ANIMS above
+//  are replaced here with illustrated versions (same `res` fields).
 // ============================================================
 const vhash = (a, b) => (((a | 0) * 73856093) ^ ((b | 0) * 19349663)) >>> 0;
 const vBG = '⬛';
@@ -4316,7 +4393,7 @@ const vBar = (ratio, n = 10) => {
   return '▰'.repeat(f) + '▱'.repeat(n - f);
 };
 
-// ---------- Espace : décor étoilé, planètes, fusée, flammes, traînée ----------
+// ---------- Space: starry backdrop, planets, rocket, flames, trail ----------
 function spaceScene({ cols = 9, rows = 7, scroll = 0, rocket = null, planets = [], ground = false, boom = false, smoke = false, flame = false, sparks = false }) {
   const g = range(rows).map(() => Array(cols).fill(vBG));
   for (let r = 0; r < rows; r++) {
@@ -4362,7 +4439,7 @@ const V_PLANETS = [
   { e: '🌍', c: 2, y: -10 }, { e: '🪐', c: 0, y: -13 }, { e: '🌠', c: 7, y: -16 },
 ];
 
-// Montée d'une fusée avec multiplicateur. Purement visuel : les valeurs viennent de `res`.
+// Rocket climb with multiplier. Visual only: values come from `res`.
 function rocketFrames({ peak, target = null, N = 8, endTitle, endCap, success, finalMoon = false }) {
   const COLS = 9, ROWS = 7;
   const P = Math.max(1.01, Math.min(Number(peak) || 1.01, 1000));
@@ -4375,29 +4452,29 @@ function rocketFrames({ peak, target = null, N = 8, endTitle, endCap, success, f
   const targetLine = (m) => {
     if (!T) return '';
     const ok = m >= T;
-    return `\n${ok ? '✅' : '🎯'} Cible **x${T}**  ${vBar(Math.log(Math.max(1, m)) / Math.log(T))}`;
+    return `\n${ok ? '✅' : '🎯'} Target **x${T}**  ${vBar(Math.log(Math.max(1, m)) / Math.log(T))}`;
   };
   const frames = [];
   const pad = { r: ROWS - 2, c: 1 };
   ['3️⃣', '2️⃣', '1️⃣'].forEach((n, i) => {
     frames.push({
       art: spaceScene({ cols: COLS, rows: ROWS, rocket: pad, ground: true, smoke: i >= 1 }) + `## ${n} …${targetLine(1)}`,
-      caption: i === 0 ? 'Compte à rebours' : i === 1 ? 'Les moteurs s’allument' : 'Allumage',
+      caption: i === 0 ? 'Countdown' : i === 1 ? 'Engines ignite' : 'Ignition',
       ms: 900,
     });
   });
   frames.push({
-    art: spaceScene({ cols: COLS, rows: ROWS, rocket: pad, ground: true, smoke: true, flame: true }) + `## 🔥 DÉCOLLAGE !${targetLine(1)}`,
-    caption: 'Décollage',
+    art: spaceScene({ cols: COLS, rows: ROWS, rocket: pad, ground: true, smoke: true, flame: true }) + `## 🔥 LIFTOFF!${targetLine(1)}`,
+    caption: 'Liftoff',
     ms: 850,
   });
   let hit = false;
   for (let k = 1; k <= N; k++) {
     const m = mAt(k);
-    let cap = `Multiplicateur : x${m.toFixed(2)}`;
+    let cap = `Multiplier: x${m.toFixed(2)}`;
     if (!hit && T && m >= T && P >= T) {
       hit = true;
-      cap = `Cible x${T} atteinte ! (x${m.toFixed(2)})`;
+      cap = `Target x${T} reached! (x${m.toFixed(2)})`;
     }
     const last = k === N;
     if (last && finalMoon) break;
@@ -4410,7 +4487,7 @@ function rocketFrames({ peak, target = null, N = 8, endTitle, endCap, success, f
   const end = pos(finalMoon ? N - 1 : N);
   if (finalMoon) {
     const g = spaceScene({ cols: COLS, rows: ROWS, scroll: N, rocket: { r: 1, c: COLS - 3 }, planets: [{ e: '🌕', c: COLS - 2, y: -N }], flame: true, boom: !success, sparks: !success });
-    frames.push({ art: g + `## ${success ? '🌙 ATTERRISSAGE !' : '💥 ÉCHEC'}`, caption: endCap, ms: 1300 });
+    frames.push({ art: g + `## ${success ? '🌙 LANDING!' : '💥 FAILURE'}`, caption: endCap, ms: 1300 });
     return frames;
   }
   frames.push({ art: spaceScene({ cols: COLS, rows: ROWS, scroll: N, rocket: end, planets: V_PLANETS, boom: true }) + `## 💥 BOOM x${P.toFixed(2)}${targetLine(P)}`, caption: 'Explosion !', ms: 900 });
@@ -4422,29 +4499,29 @@ ANIMS.crash = (res) =>
   rocketFrames({
     peak: res.crash,
     target: res.target,
-    endTitle: `💀 CRASH à ${fx(Math.min(res.crash, 1000))}`,
-    endCap: res.crash >= res.target ? `Explosion à ${fx(Math.min(res.crash, 1000))} : tu avais encaissé x${res.target}` : `Explosion à ${fx(Math.min(res.crash, 1000))} : trop tôt pour ta cible`,
+    endTitle: `💀 CRASH at ${fx(Math.min(res.crash, 1000))}`,
+    endCap: res.crash >= res.target ? `Explosion at ${fx(Math.min(res.crash, 1000))} : you had taken x${res.target}` : `Explosion at ${fx(Math.min(res.crash, 1000))} : too early for your target`,
   });
 ANIMS.limbo = (res) =>
   rocketFrames({
     peak: res.peak,
     target: res.target,
     N: 8,
-    endTitle: `PIC x${Math.min(res.peak, 1000).toFixed(2)}`,
-    endCap: res.peak >= res.target ? 'Cible validée !' : 'Trop bas',
+    endTitle: `PEAK x${Math.min(res.peak, 1000).toFixed(2)}`,
+    endCap: res.peak >= res.target ? 'Target cleared!' : 'Too low',
   });
 ANIMS.rocket2 = (res) =>
   rocketFrames({
     peak: Math.min(res.peak, 100),
     target: res.t,
     N: 8,
-    endTitle: `PIC x${Math.min(res.peak, 500).toFixed(2)}`,
-    endCap: res.peak >= res.t ? 'Cible OK' : 'Trop bas',
+    endTitle: `PEAK x${Math.min(res.peak, 500).toFixed(2)}`,
+    endCap: res.peak >= res.t ? 'Target cleared!' : 'Too low',
   });
 ANIMS.moonshot = (res) =>
-  rocketFrames({ peak: 12, N: 7, finalMoon: true, success: !!res.ok, endCap: res.ok ? 'Objectif atteint : la Lune !' : 'La fusée n’a pas tenu' });
+  rocketFrames({ peak: 12, N: 7, finalMoon: true, success: !!res.ok, endCap: res.ok ? 'Target reached: the Moon!' : "The rocket didn't hold" });
 
-// ---------- Machines à sous : rouleaux colorés, lumières clignotantes ----------
+// ---------- Slot machines: colorful reels, flashing lights ----------
 const slotEmoji = (s) => (SLOT_SYMBOLS.find((x) => x.s === s) || {}).e || '❔';
 function slotBoard({ cols, locked, f, lights = null, text = '' }) {
   const lamp = (n) => {
@@ -4461,7 +4538,7 @@ function slotFrames(finals, pool, kind) {
   const rnd = () => pool[randomInt(0, pool.length)];
   const around = finals.map(() => [rnd(), rnd()]);
   const stopAt = [3, 5, 7];
-  const caps = { 1: 'Les rouleaux démarrent', 2: 'Ils tournent à pleine vitesse', 3: 'Rouleau 1 verrouillé', 4: 'Les deux autres tournent encore', 5: 'Rouleau 2 verrouillé', 6: 'Dernier rouleau...', 7: 'Rouleau 3 verrouillé' };
+  const caps = { 1: 'Reels start', 2: 'They spin at full speed', 3: 'Reel 1 locked', 4: 'The other two still spin', 5: 'Reel 2 locked', 6: 'Last reel...', 7: 'Reel 3 locked' };
   const frames = [];
   for (let f = 1; f <= 7; f++) {
     const locked = [0, 1, 2].map((k) => f >= stopAt[k]);
@@ -4481,102 +4558,102 @@ ANIMS.slots = (res) => {
   const jack = triple && raw[0] === ' 7 ';
   return slotFrames(finals, pool, {
     lights: triple || two ? '🟡' : '🟣',
-    text: jack ? '## 🎆 JACKPOT 7️⃣7️⃣7️⃣ 🎆' : triple ? '## 🎉 TROIS IDENTIQUES 🎉' : two ? '## 🍒🍒 DEUX CERISES' : '## 🌑 Aucun gain',
-    cap: triple ? (jack ? 'JACKPOT !' : 'Combinaison gagnante !') : two ? 'Deux cerises !' : 'Pas de combinaison',
+    text: jack ? '## 🎆 JACKPOT 7️⃣7️⃣7️⃣ 🎆' : triple ? '## 🎉 THREE MATCHING 🎉' : two ? '## 🍒🍒 TWO CHERRIES' : '## 🌑 No win',
+    cap: triple ? (jack ? 'JACKPOT!' : 'Winning combination!') : two ? 'Two cherries!' : 'No combination',
   });
 };
 ANIMS.jackpot = (res) => {
   const pool = ['🍒', '🍋', '💎', '7️⃣', '⭐'];
   const f = [res.a, res.b, res.c];
   const win = f[0] === f[1] && f[1] === f[2];
-  return slotFrames(f, pool, { lights: win ? '🟡' : '🟣', text: win ? '## 🎆 JACKPOT 🎆' : '## 🌑 Rien cette fois', cap: win ? 'Jackpot !' : 'Résultat' });
+  return slotFrames(f, pool, { lights: win ? '🟡' : '🟣', text: win ? '## 🎆 JACKPOT 🎆' : '## 🌑 Nothing this time', cap: win ? 'Jackpot!' : 'Result' });
 };
 ANIMS.fruitmatch = (res) => {
   const pool = ['🍎', '🍌', '🍇', '🍊', '🍓'];
   const f = [res.a, res.b, res.c];
   const win = new Set(f).size < 3;
-  return slotFrames(f, pool, { lights: win ? '🟡' : '🟣', text: win ? '## 🍓 FRUITS ASSORTIS 🍓' : '## 🌑 Pas d’assortiment', cap: win ? 'Fruits assortis !' : 'Résultat' });
+  return slotFrames(f, pool, { lights: win ? '🟡' : '🟣', text: win ? '## 🍓 MIXED FRUITS 🍓' : '## 🌑 No mix', cap: win ? 'Mixed fruits!' : 'Result' });
 };
 
-// ---------- Cartes illustrées + distribution ----------
+// ---------- Illustrated cards + dealing ----------
 const vFlip = () => ['  ╭─╮  ', '  │▒│  ', '  │▒│  ', '  │▒│  ', '  ╰─╯  '];
 const vPad = (lines, n) => lines.map((l) => ' '.repeat(n) + l);
-// states : tableau de 'hidden' | 'flip' | carte {r,s}
+// states: array of 'hidden' | 'flip' | card {r,s}
 function cardRow(states, gap = ' ') {
   const blocks = states.map((s) => (s === 'hidden' ? cardLines(null, true) : s === 'flip' ? vFlip() : cardLines(s, false)));
   return sideBySide(blocks, gap);
 }
-// Distribution (glisse depuis la droite) puis retournement des cartes une à une.
+// Deal (slides in from the right) then flip the cards one by one.
 function dealAndReveal(cards, { labels = null, caps = {}, endCap = '', gap = ' ', extra = [] } = {}) {
   const n = cards.length;
   const label = labels ? [labels.map((l) => padR(l, 7)).join(gap)] : [];
   const frame = (states, cap, ms, pad = 0) => ({ art: code([...vPad([...label, ...cardRow(states, gap)], pad), ...extra]), caption: cap, ms });
   const frames = [
-    frame(range(n).map(() => 'hidden'), caps.shuffle || 'Le croupier bat le jeu', 800, 14),
-    frame(range(n).map(() => 'hidden'), caps.deal || 'Distribution des cartes', 800, 7),
-    frame(range(n).map(() => 'hidden'), caps.table || 'Les cartes sont posées', 850, 0),
+    frame(range(n).map(() => 'hidden'), caps.shuffle || 'Dealer shuffles the deck', 800, 14),
+    frame(range(n).map(() => 'hidden'), caps.deal || 'Dealing cards', 800, 7),
+    frame(range(n).map(() => 'hidden'), caps.table || 'Cards are dealt', 850, 0),
   ];
   const st = range(n).map(() => 'hidden');
   for (let k = 0; k < n; k++) {
     st[k] = 'flip';
-    frames.push(frame([...st], caps.flip || 'Retournement...', 700));
+    frames.push(frame([...st], caps.flip || 'Flipping...', 700));
     st[k] = cards[k];
     const last = k === n - 1;
-    frames.push(frame([...st], last ? endCap : (caps.reveal ? caps.reveal(k, cards[k]) : `Carte ${k + 1} : ${cards[k].r}${cards[k].s}`), last ? 1200 : 900));
+    frames.push(frame([...st], last ? endCap : (caps.reveal ? caps.reveal(k, cards[k]) : `Card ${k + 1}: ${cards[k].r}${cards[k].s}`), last ? 1200 : 900));
   }
   return frames;
 }
 
 ANIMS.duel = (res) => {
   const f = dealAndReveal([res.me, res.dealer], {
-    labels: ['  TOI  ', ' BANQUE'],
+    labels: ['  YOU  ', ' BANK'],
     gap: '     ',
-    caps: { reveal: (k, c) => (k === 0 ? `Ta carte : ${c.r}${c.s}` : '') },
-    endCap: res.me.v > res.dealer.v ? 'Ta carte est plus haute : VICTOIRE' : res.me.v === res.dealer.v ? 'Égalité : perdu' : 'La carte du croupier est plus haute : DÉFAITE',
+    caps: { reveal: (k, c) => (k === 0 ? `Your card: ${c.r}${c.s}` : '') },
+    endCap: res.me.v > res.dealer.v ? 'Your card is higher: WIN' : res.me.v === res.dealer.v ? 'Tie: lost' : 'The dealer card is higher: LOSS',
   });
   return f;
 };
 ANIMS.war = (res) =>
   dealAndReveal([vCard(res.me, 1), vCard(res.dealer, 2)], {
-    labels: ['  TOI  ', ' BANQUE'],
+    labels: ['  YOU  ', ' BANK'],
     gap: '     ',
-    caps: { reveal: (k, c) => (k === 0 ? `Ta carte : ${c.r}` : '') },
-    endCap: res.me > res.dealer ? 'Ta carte l’emporte' : res.me === res.dealer ? 'Bataille : égalité' : 'La carte du croupier l’emporte',
+    caps: { reveal: (k, c) => (k === 0 ? `Your card: ${c.r}` : '') },
+    endCap: res.me > res.dealer ? 'Your card wins' : res.me === res.dealer ? 'War: tie' : 'The dealer card wins',
   });
 ANIMS.higher = (res) =>
   dealAndReveal([vCard(res.a, 0), vCard(res.b, 2)], {
     labels: [' REF   ', ' SUIV. '],
     gap: '  ',
-    caps: { reveal: (k, c) => `Référence : ${c.r}` },
-    endCap: `Suivante : ${vRank(res.b)}`,
+    caps: { reveal: (k, c) => `Reference: ${c.r}` },
+    endCap: `Next: ${vRank(res.b)}`,
   });
 ANIMS.hilo = (res) =>
   dealAndReveal(res.cards.slice(0, 3).map((v, k) => vCard(v, k)), {
-    caps: { reveal: (k, c) => `Carte ${k + 1}/3 : ${c.r}` },
-    endCap: 'Les 3 cartes sont retournées',
+    caps: { reveal: (k, c) => `Card ${k + 1}/3: ${c.r}` },
+    endCap: 'All 3 cards are flipped',
   });
-ANIMS.highcard = (res) => dealAndReveal([vCard(res.v, 1)], { endCap: `Carte : ${vRank(res.v)}` });
+ANIMS.highcard = (res) => dealAndReveal([vCard(res.v, 1)], { endCap: `Card: ${vRank(res.v)}` });
 ANIMS.lowcard = ANIMS.highcard;
 ANIMS.pairmatch = (res) =>
   dealAndReveal([vCard(res.a, 0), vCard(res.b, 1)], {
-    caps: { reveal: () => 'Première carte' },
-    endCap: res.a === res.b ? 'Une paire !' : 'Deuxième carte',
+    caps: { reveal: () => 'First card' },
+    endCap: res.a === res.b ? 'A pair!' : 'Second card',
   });
 ANIMS.pokerhand = (res) =>
   dealAndReveal(res.ranks.slice(0, 3).map((v, k) => vCard(v, k)), {
-    caps: { reveal: (k, c) => `Carte ${k + 1} : ${c.r}` },
-    endCap: res.max >= 3 ? 'Brelan !' : res.max >= 2 ? 'Paire' : 'Rien',
+    caps: { reveal: (k, c) => `Card ${k + 1}: ${c.r}` },
+    endCap: res.max >= 3 ? 'Three of a kind!' : res.max >= 2 ? 'Pair' : 'Nothing',
   });
 ANIMS.redblack = (res) => {
   const card = res.col === 'red' ? { r: RANKS[randomInt(0, 13)], s: randomInt(0, 2) ? '♥' : '♦' } : { r: RANKS[randomInt(0, 13)], s: randomInt(0, 2) ? '♠' : '♣' };
-  return dealAndReveal([card], { extra: [], endCap: res.col === 'red' ? '🔴 ROUGE' : '⚫ NOIR' });
+  return dealAndReveal([card], { extra: [], endCap: res.col === 'red' ? '🔴 RED' : '⚫ BLACK' });
 };
 ANIMS.cardmatch = (res) =>
   dealAndReveal([res.secret, res.pickCard], {
     labels: ['SECRETE', ' TIREE '],
     gap: '  ',
-    caps: { reveal: (k, c) => `Carte secrète : ${c.r}${c.s}` },
-    endCap: `Ta carte : ${res.pickCard.r}${res.pickCard.s}`,
+    caps: { reveal: (k, c) => `Secret card: ${c.r}${c.s}` },
+    endCap: `Your card : ${res.pickCard.r}${res.pickCard.s}`,
   });
 ANIMS.memory = (res) => {
   const [a, b] = String(res.detail).split('-').map((x) => (Number(x) === 1 ? { r: 'A', s: '♥' } : { r: 'K', s: '♠' }));
@@ -4584,10 +4661,10 @@ ANIMS.memory = (res) => {
   const mk = (states, cap, ms) => ({ art: code(cardRow(states, ' ')), caption: cap, ms });
   return [
     mk(hid, 'Quatre cartes, deux paires', 850),
-    mk(['flip', 'hidden', 'hidden', 'hidden'], 'Tu retournes la première...', 750),
-    mk([a, 'hidden', 'hidden', 'hidden'], `Première carte : ${a.r}`, 900),
-    mk([a, 'flip', 'hidden', 'hidden'], 'Puis la seconde...', 750),
-    mk([a, b, 'hidden', 'hidden'], res.ok ? 'Paire !' : 'Pas de paire', 1200),
+    mk(['flip', 'hidden', 'hidden', 'hidden'], 'You flip the first...', 750),
+    mk([a, 'hidden', 'hidden', 'hidden'], `First card: ${a.r}`, 900),
+    mk([a, 'flip', 'hidden', 'hidden'], 'Then the second...', 750),
+    mk([a, b, 'hidden', 'hidden'], res.ok ? 'Pair!' : 'No pair', 1200),
   ];
 };
 ANIMS.suit = (res, ctx) => {
@@ -4596,72 +4673,72 @@ ANIMS.suit = (res, ctx) => {
   const pos = stripPositions(order.indexOf(res.card.s), [4, 3, 3, 2, 1, 1]);
   const want = SUIT_CHOICES[ctx.choice];
   const frames = pos.map((p, k) => ({
-    art: code([...stripArt(order, p, cell, 3), '', `Ton choix : ${want}`]),
-    caption: ['Le croupier mélange le jeu', 'Les enseignes défilent', 'Ça ralentit', 'Presque...', 'Encore un cran', `L'enseigne tirée : ${res.card.s}`][k] || '...',
+    art: code([...stripArt(order, p, cell, 3), '', `Your pick: ${want}`]),
+    caption: ['Dealer shuffles the deck', 'Suits flash by', 'Slowing down', 'Almost...', 'One more notch', `Suit drawn: ${res.card.s}`][k] || '...',
     ms: 800 + k * 80,
   }));
-  frames.push({ art: code([...vPad(cardLines(null, true), 4), '', `Ton choix : ${want}`]), caption: 'La carte est posée face cachée', ms: 900 });
-  frames.push({ art: code([...vPad(vFlip(), 4), '', `Ton choix : ${want}`]), caption: 'Elle se retourne...', ms: 700 });
-  frames.push({ art: code([...vPad(cardLines(res.card, false), 4), '', `Ton choix : ${want}`]), caption: `Carte retournée : ${res.card.r}${res.card.s}`, ms: 1200 });
+  frames.push({ art: code([...vPad(cardLines(null, true), 4), '', `Your pick: ${want}`]), caption: 'Card is placed face down', ms: 900 });
+  frames.push({ art: code([...vPad(vFlip(), 4), '', `Your pick: ${want}`]), caption: 'It flips over...', ms: 700 });
+  frames.push({ art: code([...vPad(cardLines(res.card, false), 4), '', `Your pick: ${want}`]), caption: `Card flipped: ${res.card.r}${res.card.s}`, ms: 1200 });
   return frames;
 };
 
-// ---------- Autres jeux : scènes à thème ----------
+// ---------- Other games: themed scenes ----------
 const vRow = (e, n) => e.repeat(n);
 const vScene = (lines) => lines.join('\n') + '\n';
 
 ANIMS.stardrop = (res) => {
   const sky = (r, c, e) => range(5).map((y) => range(7).map((x) => (y === r && x === c ? e : (vhash(y, x) % 5 === 0 ? '✨' : vBG))).join('')).join('\n') + '\n';
   return [
-    { art: sky(0, 5, '🌠') + '## 🌠 Une étoile filante…', caption: 'Étoile filante', ms: 800 },
-    { art: sky(1, 4, '⭐') + '## ⭐ Elle file dans la nuit', caption: 'Elle traverse', ms: 800 },
-    { art: sky(3, 2, '⭐') + '## ⭐ Elle descend…', caption: 'Elle approche', ms: 800 },
-    { art: sky(4, 2, res.falls ? '🌟' : '💨') + (res.falls ? '## 🌟 Attrapée !' : '## 💨 Elle s’est évanouie'), caption: res.falls ? 'Elle est tombée' : 'Elle continue', ms: 1200 },
+    { art: sky(0, 5, '🌠') + '## 🌠 A shooting star...', caption: 'Shooting star', ms: 800 },
+    { art: sky(1, 4, '⭐') + '## ⭐ It shoots across the night', caption: 'It crosses', ms: 800 },
+    { art: sky(3, 2, '⭐') + '## ⭐ It is descending…', caption: 'It is approaching', ms: 800 },
+    { art: sky(4, 2, res.falls ? '🌟' : '💨') + (res.falls ? '## 🌟 Caught!' : '## 💨 It faded away'), caption: res.falls ? 'It fell' : 'It keeps going', ms: 1200 },
   ];
 };
 ANIMS.volcano = (res) => [
-  { art: vScene(['☁️☁️🌫️☁️☁️', '⬛⬛🌋⬛⬛', '🟫🟫🟫🟫🟫']) + '## 🌋 Le volcan gronde', caption: 'Le volcan gronde', ms: 800 },
-  { art: vScene(['⬛⬛💨⬛⬛', '⬛🔥🌋🔥⬛', '🟫🟧🟧🟧🟫']) + '## 🔥 Ça chauffe', caption: 'Ça chauffe', ms: 800 },
-  { art: vScene(['⬛🔥💥🔥⬛', '🔥🌋🌋🌋🔥', '🟧🟧🟧🟧🟧']) + `## 🌋 ÉRUPTION zone ${res.eruption}`, caption: `Éruption zone ${res.eruption}`, ms: 1200 },
+  { art: vScene(['☁️☁️🌫️☁️☁️', '⬛⬛🌋⬛⬛', '🟫🟫🟫🟫🟫']) + '## 🌋 The volcano rumbles', caption: 'The volcano rumbles', ms: 800 },
+  { art: vScene(['⬛⬛💨⬛⬛', '⬛🔥🌋🔥⬛', '🟫🟧🟧🟧🟫']) + '## 🔥 Heating up', caption: 'Heating up', ms: 800 },
+  { art: vScene(['⬛🔥💥🔥⬛', '🔥🌋🌋🌋🔥', '🟧🟧🟧🟧🟧']) + `## 🌋 ERUPTION zone ${res.eruption}`, caption: `Eruption zone ${res.eruption}`, ms: 1200 },
 ];
 ANIMS.lightning = (res) => [
-  { art: vScene(['⬛☁️⬛☁️⬛', '⬛⬛⬛⬛⬛', '🟦🟦🟦🟦🟦']) + '## ☁️ Les nuages s’amassent', caption: 'Nuages', ms: 800 },
-  { art: vScene(['☁️☁️🌩️☁️☁️', '⬛⬛💧⬛⬛', '🟦🟦🟦🟦🟦']) + '## 🌩️ L’orage gronde', caption: 'Orage proche', ms: 800 },
-  { art: res.strike ? vScene(['☁️☁️🌩️☁️☁️', '⬛⬛⚡⬛⬛', '🟨🟨💥🟨🟨']) + '## ⚡ FOUDRE !' : vScene(['⬛☁️☁️☁️⬛', '⬛⬛⬛⬛⬛', '🟦🟦🟦🟦🟦']) + '## 🌤️ L’orage passe', caption: res.strike ? 'Éclair !' : 'L\'orage passe', ms: 1200 },
+  { art: vScene(['⬛☁️⬛☁️⬛', '⬛⬛⬛⬛⬛', '🟦🟦🟦🟦🟦']) + '## ☁️ Clouds gather', caption: 'Clouds', ms: 800 },
+  { art: vScene(['☁️☁️🌩️☁️☁️', '⬛⬛💧⬛⬛', '🟦🟦🟦🟦🟦']) + '## 🌩️ The storm is brewing', caption: 'Storm approaching', ms: 800 },
+  { art: res.strike ? vScene(['☁️☁️🌩️☁️☁️', '⬛⬛⚡⬛⬛', '🟨🟨💥🟨🟨']) + '## ⚡ LIGHTNING!' : vScene(['⬛☁️☁️☁️⬛', '⬛⬛⬛⬛⬛', '🟦🟦🟦🟦🟦']) + '## 🌤️ Storm passes', caption: res.strike ? 'Lightning!' : 'Storm passes', ms: 1200 },
 ];
 ANIMS.bombdefuse = (res) => {
   const ok = res.good === res.want;
   return [
-    { art: vScene(['🟥🟥🟥🟥🟥', '🟥💣⏱️3🟥', '🟥🟥🟥🟥🟥']).replace('⏱️3', '3️⃣') + '## ✂️ Choisis un fil…', caption: 'Compte à rebours', ms: 800 },
-    { art: vScene(['🟧🟧🟧🟧🟧', '🟧💣2️⃣🟧🟧', '🟧🟧🟧🟧🟧']) + '## ⏱️ Le temps presse', caption: 'Compte à rebours', ms: 800 },
-    { art: vScene(['🟨🟨🟨🟨🟨', '🟨💣1️⃣🟨🟨', '🟨🟨🟨🟨🟨']) + '## ✂️ Clic !', caption: 'Compte à rebours', ms: 800 },
-    { art: ok ? vScene(['🟩🟩🟩🟩🟩', '🟩✅💣✅🟩', '🟩🟩🟩🟩🟩']) + '## ✅ DÉSAMORCÉ' : vScene(['🔥🔥🔥🔥🔥', '🔥💥💥💥🔥', '🔥🔥🔥🔥🔥']) + '## 💥 BOOM', caption: ok ? 'Bon fil !' : `Mauvais fil (bon = ${res.good})`, ms: 1300 },
+    { art: vScene(['🟥🟥🟥🟥🟥', '🟥💣⏱️3🟥', '🟥🟥🟥🟥🟥']).replace('⏱️3', '3️⃣') + '## ✂️ Pick a wire...', caption: 'Countdown', ms: 800 },
+    { art: vScene(['🟧🟧🟧🟧🟧', '🟧💣2️⃣🟧🟧', '🟧🟧🟧🟧🟧']) + '## ⏱️ Time is running out', caption: 'Countdown', ms: 800 },
+    { art: vScene(['🟨🟨🟨🟨🟨', '🟨💣1️⃣🟨🟨', '🟨🟨🟨🟨🟨']) + '## ✂️ Click!', caption: 'Countdown', ms: 800 },
+    { art: ok ? vScene(['🟩🟩🟩🟩🟩', '🟩✅💣✅🟩', '🟩🟩🟩🟩🟩']) + '## ✅ DEFUSED' : vScene(['🔥🔥🔥🔥🔥', '🔥💥💥💥🔥', '🔥🔥🔥🔥🔥']) + '## 💥 BOOM', caption: ok ? 'Right wire!' : `Wrong wire (right = ${res.good})`, ms: 1300 },
   ];
 };
 ANIMS.freefall = (res) => {
   const col = (r, e) => range(6).map((y) => (y === r ? `⬛⬛${e}⬛⬛` : `${vBG}${vBG}${vBG}${vBG}${vBG}`)).join('\n') + '\n';
   return [
     { art: col(0, '🪂') + '🟩🟩🟩🟩🟩\n## 🪂 Saut !', caption: 'Saut !', ms: 800 },
-    { art: col(2, '🪂') + '🟩🟩🟩🟩🟩\n## ☁️ Chute libre', caption: 'Chute...', ms: 800 },
-    { art: col(4, '🪂') + '🟩🟩🟩🟩🟩\n## 🌍 Le sol approche', caption: 'Approche du sol', ms: 800 },
-    { art: (res.ok ? col(5, '🧍') : col(5, '💥')) + '🟩🟩🟩🟩🟩\n' + (res.ok ? '## ✅ Atterrissage parfait' : '## 💥 Crash'), caption: res.ok ? 'Zone atteinte' : 'Raté', ms: 1200 },
+    { art: col(2, '🪂') + '🟩🟩🟩🟩🟩\n## ☁️ Fall libre', caption: 'Fall...', ms: 800 },
+    { art: col(4, '🪂') + '🟩🟩🟩🟩🟩\n## 🌍 The ground approaches', caption: 'Approaching the ground', ms: 800 },
+    { art: (res.ok ? col(5, '🧍') : col(5, '💥')) + '🟩🟩🟩🟩🟩\n' + (res.ok ? '## ✅ Landedssage parfait' : '## 💥 Crash'), caption: res.ok ? 'Zone reached' : 'Missed', ms: 1200 },
   ];
 };
 ANIMS.balloon = (res) => {
   const frames = [];
   for (let k = 1; k <= res.need; k++) {
-    frames.push({ art: vScene([vRow('🎈', Math.min(9, k + 1)), '', `Niveau ${k}  ${vBar(k / Math.max(1, res.need))}`]) + '## 🎈 Gonflage…', caption: 'Gonflage...', ms: 700 });
+    frames.push({ art: vScene([vRow('🎈', Math.min(9, k + 1)), '', `Level ${k}  ${vBar(k / Math.max(1, res.need))}`]) + '## 🎈 Inflating…', caption: 'Inflating...', ms: 700 });
   }
-  frames.push({ art: vScene([res.ok ? '🎈🎈🎈🎈🎈' : '💥💥💥💥💥']) + (res.ok ? '## 🎈 Intact !' : '## 💥 POP !'), caption: res.ok ? 'Succès' : 'Trop gonflé', ms: 1200 });
+  frames.push({ art: vScene([res.ok ? '🎈🎈🎈🎈🎈' : '💥💥💥💥💥']) + (res.ok ? '## 🎈 Intact !' : '## 💥 POP !'), caption: res.ok ? 'Success' : 'Overinflated', ms: 1200 });
   return frames;
 };
 ANIMS.treasure = (res) => {
   const frames = [];
   for (let k = 1; k <= 5; k++) {
     const row = range(5).map((j) => (j + 1 < k ? '🕳️' : j + 1 === k ? (k === res.win ? '💎' : '🕳️') : '🟫')).join('');
-    frames.push({ art: vScene(['🏝️🌴🏝️🌴🏝️', row]) + `## ⛏️ Case ${k}`, caption: 'Fouille', ms: 600 });
+    frames.push({ art: vScene(['🏝️🌴🏝️🌴🏝️', row]) + `## ⛏️ Cell ${k}`, caption: 'Dig', ms: 600 });
   }
-  frames.push({ art: vScene(range(1).map(() => range(5).map((j) => (j + 1 === res.win ? '💎' : '🕳️')).join(''))) + `## 💎 Trésor en case ${res.win}`, caption: 'Résultat', ms: 1200 });
+  frames.push({ art: vScene(range(1).map(() => range(5).map((j) => (j + 1 === res.win ? '💎' : '🕳️')).join(''))) + `## 💎 Treasure in spot ${res.win}`, caption: 'Result', ms: 1200 });
   return frames;
 };
 ANIMS.gemhunt = (res) => {
@@ -4670,25 +4747,25 @@ ANIMS.gemhunt = (res) => {
     const row = range(6).map((j) => (j + 1 < k ? '🪨' : j + 1 === k ? (k === res.win ? '💎' : '🪨') : '⛰️')).join('');
     frames.push({ art: vScene(['⛏️✨⛏️✨⛏️✨', row]) + `## ⛏️ Roche ${k}`, caption: 'Fouille', ms: 550 });
   }
-  frames.push({ art: vScene([range(6).map((j) => (j + 1 === res.win ? '💎' : '🪨')).join('')]) + `## 💎 Gemme en roche ${res.win}`, caption: 'Trouvée', ms: 1200 });
+  frames.push({ art: vScene([range(6).map((j) => (j + 1 === res.win ? '💎' : '🪨')).join('')]) + `## 💎 Gem in rock ${res.win}`, caption: 'Found', ms: 1200 });
   return frames;
 };
 ANIMS.numguess = (res) => {
   const frames = [];
-  for (let k = 0; k < 6; k++) frames.push({ art: vScene(['🔮✨🔮✨🔮']) + `## 🔮 [ ${randomInt(1, 11)} ]`, caption: 'Les nombres défilent', ms: 550 });
-  frames.push({ art: vScene(['🌟🔮🔮🔮🌟']) + `## 🎯 [ ${res.n} ]`, caption: `Tirage : ${res.n}`, ms: 1200 });
+  for (let k = 0; k < 6; k++) frames.push({ art: vScene(['🔮✨🔮✨🔮']) + `## 🔮 [ ${randomInt(1, 11)} ]`, caption: 'Numbers rolling', ms: 550 });
+  frames.push({ art: vScene(['🌟🔮🔮🔮🌟']) + `## 🎯 [ ${res.n} ]`, caption: `Draw: ${res.n}`, ms: 1200 });
   return frames;
 };
 ANIMS.target = (res) => [
-  { art: vScene(['🏹⬛⬛⬛🎯']) + '## 🏹 Visée…', caption: 'Visée', ms: 700 },
+  { art: vScene(['🏹⬛⬛⬛🎯']) + '## 🏹 Aiming...', caption: 'Aiming', ms: 700 },
   { art: vScene(['⬛⬛➳⬛🎯']) + '## 💨 Tir !', caption: 'Lancer', ms: 700 },
-  { art: vScene(['⬛⬛⬛➳🎯']) + '## 💨 En vol', caption: 'Vol', ms: 700 },
-  { art: vScene(['⬛⬛⬛⬛💥']) + `## 🎯 Impact : ${res.hit}`, caption: 'Résultat', ms: 1200 },
+  { art: vScene(['⬛⬛⬛➳🎯']) + '## 💨 In flight', caption: 'Flight', ms: 700 },
+  { art: vScene(['⬛⬛⬛⬛💥']) + `## 🎯 Impact: ${res.hit}`, caption: 'Result', ms: 1200 },
 ];
 ANIMS.sequence = (res) => [
   { art: vScene(['🟪🟪🟪🟪🟪']) + `## 🔢 ${res.a}  ❔  ❔`, caption: 'Premier chiffre', ms: 800 },
-  { art: vScene(['🟪🟪🟪🟪🟪']) + `## 🔢 ${res.a}  ${res.b}  ❔`, caption: 'Deuxième', ms: 800 },
-  { art: vScene([res.ok ? '🟩🟩🟩🟩🟩' : '🟥🟥🟥🟥🟥']) + `## 🔢 ${res.a}  ${res.b}  ${res.c}`, caption: res.ok ? 'SUITE !' : 'Pas de suite', ms: 1200 },
+  { art: vScene(['🟪🟪🟪🟪🟪']) + `## 🔢 ${res.a}  ${res.b}  ❔`, caption: 'Second', ms: 800 },
+  { art: vScene([res.ok ? '🟩🟩🟩🟩🟩' : '🟥🟥🟥🟥🟥']) + `## 🔢 ${res.a}  ${res.b}  ${res.c}`, caption: res.ok ? 'STRAIGHT!' : 'No straight', ms: 1200 },
 ];
 ANIMS.animalrace = (res) => {
   const animals = ['🐰', '🦊', '🐺', '🦅'];
@@ -4699,21 +4776,21 @@ ANIMS.animalrace = (res) => {
     for (let a = 0; a < 4; a++) pos[a] = Math.min(5, pos[a] + randomInt(0, 2));
     frames.push({ art: vScene(animals.map((e, a) => lane(e, pos[a]))) + '## 🏃 Course en cours', caption: 'Course en cours', ms: 700 });
   }
-  frames.push({ art: vScene(animals.map((e) => lane(e, 0))) + `## 🏆 Gagnant : ${res.winner.name}`, caption: 'Arrivée', ms: 1300 });
+  frames.push({ art: vScene(animals.map((e) => lane(e, 0))) + `## 🏆 Winner: ${res.winner.name}`, caption: 'Finish', ms: 1300 });
   return frames;
 };
 ANIMS.bingo = (res) => {
   const frames = [];
   const cells = (on) => range(5).map((j) => (j + 1 === on ? '🔴' : '⚪')).join('');
-  for (let k = 0; k < 5; k++) frames.push({ art: vScene(['🎱✨🎱✨🎱', cells(randomInt(1, 6))]) + '## 🎰 La bille tourne…', caption: 'La bille tourne...', ms: 600 });
-  frames.push({ art: vScene(['🎱🎱🎱🎱🎱', cells(res.n)]) + `## 🎱 Case ${res.n}`, caption: `Bille dans la case ${res.n}`, ms: 1200 });
+  for (let k = 0; k < 5; k++) frames.push({ art: vScene(['🎱✨🎱✨🎱', cells(randomInt(1, 6))]) + '## 🎰 The ball spins…', caption: 'The ball spins...', ms: 600 });
+  frames.push({ art: vScene(['🎱🎱🎱🎱🎱', cells(res.n)]) + `## 🎱 Cell ${res.n}`, caption: `Ball in cell ${res.n}`, ms: 1200 });
   return frames;
 };
 ANIMS.colorswipe = (res) => {
   const cols = ['🔴', '🟠', '🟡', '🟢', '🔵', '🟣'];
   const em = { red: '🔴', orange: '🟠', yellow: '🟡', green: '🟢', blue: '🔵', purple: '🟣' };
-  const frames = cols.map((e, k) => ({ art: vScene([cols.map((_, j) => (j === k ? e : '⚫')).join('')]) + '## 🌈 Arc-en-ciel', caption: 'Arc-en-ciel', ms: 500 }));
-  frames.push({ art: vScene([vRow(em[res.out], 6)]) + `## ${em[res.out]} Couleur tirée`, caption: 'Couleur tirée', ms: 1200 });
+  const frames = cols.map((e, k) => ({ art: vScene([cols.map((_, j) => (j === k ? e : '⚫')).join('')]) + '## 🌈 Rainbow', caption: 'Rainbow', ms: 500 }));
+  frames.push({ art: vScene([vRow(em[res.out], 6)]) + `## ${em[res.out]} Color drawn`, caption: 'Color drawn', ms: 1200 });
   return frames;
 };
 ANIMS.spincolor = (res) => {
@@ -4721,51 +4798,51 @@ ANIMS.spincolor = (res) => {
   const em = { red: '🔴', blue: '🔵', green: '🟢', yellow: '🟡', purple: '🟣', orange: '🟠' };
   const wheel = (k) => cols.map((e, j) => (j === k % 6 ? '👉' + e : '⚪')).join('');
   const frames = [];
-  for (let k = 0; k < 8; k++) frames.push({ art: vScene(['🎡✨🎡✨🎡✨🎡', wheel(k)]) + '## 🎨 La roue tourne', caption: 'La roue tourne', ms: 500 });
-  frames.push({ art: vScene(['🎆' + vRow(em[res.out], 5) + '🎆']) + `## ${em[res.out]} Arrêt`, caption: 'Arrêt', ms: 1200 });
+  for (let k = 0; k < 8; k++) frames.push({ art: vScene(['🎡✨🎡✨🎡✨🎡', wheel(k)]) + '## 🎨 The wheel spins', caption: 'The wheel spins', ms: 500 });
+  frames.push({ art: vScene(['🎆' + vRow(em[res.out], 5) + '🎆']) + `## ${em[res.out]} Stop`, caption: 'Stop', ms: 1200 });
   return frames;
 };
 ANIMS.multiplier = (res) => {
   const frames = [];
-  for (let k = 0; k < 6; k++) frames.push({ art: vScene(['💠✨💠✨💠']) + `## 💠 x${[1.5, 2, 3, 5][randomInt(0, 4)]}`, caption: 'Multiplicateurs', ms: 600 });
-  frames.push({ art: vScene([res.ok ? '🟩🟩🟩🟩🟩' : '🟥🟥🟥🟥🟥']) + `## 💠 Cible ${res.pick}`, caption: res.ok ? 'Validé !' : 'Raté', ms: 1200 });
+  for (let k = 0; k < 6; k++) frames.push({ art: vScene(['💠✨💠✨💠']) + `## 💠 x${[1.5, 2, 3, 5][randomInt(0, 4)]}`, caption: 'Multipliers', ms: 600 });
+  frames.push({ art: vScene([res.ok ? '🟩🟩🟩🟩🟩' : '🟥🟥🟥🟥🟥']) + `## 💠 Target ${res.pick}`, caption: res.ok ? 'Cleared!' : 'Missed', ms: 1200 });
   return frames;
 };
 ANIMS.oddseven = (res) => {
   const r = () => randomInt(1, 7);
   return [
-    { art: code(dieLines(r())), caption: 'Le dé roule', ms: 700 },
+    { art: code(dieLines(r())), caption: 'The die rolls', ms: 700 },
     { art: code(dieLines(r())), caption: 'Rebond', ms: 700 },
-    { art: code(dieLines(res.n)), caption: `Résultat : ${res.n}`, ms: 1200 },
+    { art: code(dieLines(res.n)), caption: `Result: ${res.n}`, ms: 1200 },
   ];
 };
 
-// Bandeau de jeux « génériques » (≈ 40 mini-jeux) : scène à thème par emoji du jeu
+// Generic game banner (~40 mini-games): themed scene based on the game emoji
 function genericFrames(emoji, res) {
   const glow = res.ok ? '🟣' : '⚫';
   const line = (e) => `${e}✨${e}✨${e}✨${e}`;
   return [
-    { art: vScene([line(emoji), `${vRow('🟪', 7)}`, line('✨')]) + `## ${emoji} Tirage en cours…`, caption: 'Tirage', ms: 750 },
-    { art: vScene([line('💫'), `🟪🟪🌀🌀🌀🟪🟪`, line('💫')]) + `## 🌀 Ça tourne…`, caption: 'Suspense', ms: 750 },
-    { art: vScene([vRow(res.ok ? '🟩' : '🟥', 7), `${glow}${vRow(emoji, 5)}${glow}`, vRow(res.ok ? '🟩' : '🟥', 7)]) + `## ${res.ok ? '✅' : '❌'} ${res.detail}`, caption: res.ok ? 'Gagné' : 'Perdu', ms: 1100 },
+    { art: vScene([line(emoji), `${vRow('🟪', 7)}`, line('✨')]) + `## ${emoji} Drawing in progress…`, caption: 'Draw', ms: 750 },
+    { art: vScene([line('💫'), `🟪🟪🌀🌀🌀🟪🟪`, line('💫')]) + `## 🌀 Spinning...`, caption: 'Suspense', ms: 750 },
+    { art: vScene([vRow(res.ok ? '🟩' : '🟥', 7), `${glow}${vRow(emoji, 5)}${glow}`, vRow(res.ok ? '🟩' : '🟥', 7)]) + `## ${res.ok ? '✅' : '❌'} ${res.detail}`, caption: res.ok ? 'Won' : 'Lost', ms: 1100 },
   ];
 }
 
-// ---------- Jeux bulk (pour atteindre ~100) ----------
+// ---------- Bulk games (to reach ~100) ----------
 (function registerBulkGames() {
-  const bulk = [['coin2', 'Double pile', '🪙', 'Encore pile ou face', 'pile', 'face', 2], ['dice7', 'Dés 7+', '🎲', 'Somme >= 7', 'over', 'under', 2], ['lucky7', 'Lucky 7', '7️⃣', 'Exactement 7', 'yes', 'no', 5], ['evenodd2', 'Pair/Impair 2', '🔢', 'Dé pair ou impair', 'even', 'odd', 2], ['redblack2', 'Rouge Noir 2', '🔴', 'Carte rouge/noire', 'red', 'black', 2], ['highlow2', 'Haut Bas', '⬆️', 'Carte haute ou basse', 'high', 'low', 2], ['triple', 'Triple chance', '🎯', '1 sur 3', 'a', 'b', 2.8], ['quad', 'Quad', '4️⃣', '1 sur 4', 'a', 'b', 3.5], ['penta', 'Penta', '5️⃣', '1 sur 5', 'a', 'b', 4.5], ['coin3', 'Triple pile', '🪙', "3 piles d\'affilée", 'yes', 'no', 7], ['snake', 'Snake eyes', '🐍', 'Double 1', 'yes', 'no', 30], ['boxcars', 'Boxcars', '🎲', 'Double 6', 'yes', 'no', 30], ['anydouble', 'Double quelconque', '🎲', 'Deux dés égaux', 'yes', 'no', 5.5], ['acehigh', 'As haut', '🃏', 'As sort', 'yes', 'no', 12], ['facecard', 'Figure', '🃏', 'J Q ou K', 'yes', 'no', 3.5], ['suitspade', 'Pique', '♠️', 'Enseigne pique', 'yes', 'no', 3.8], ['suithr', 'Coeur', '♥️', 'Enseigne coeur', 'yes', 'no', 3.8], ['suitdi', 'Carreau', '♦️', 'Enseigne carreau', 'yes', 'no', 3.8], ['suitcl', 'Trèfle', '♣️', 'Enseigne trèfle', 'yes', 'no', 3.8], ['blast', 'Blast', '💥', 'Explosion ou pas', 'safe', 'boom', 1.9], ['freeze', 'Freeze', '❄️', 'Gel ou chaleur', 'ice', 'fire', 2], ['shadow', 'Ombre', '🌑', 'Ombre ou lumière', 'shadow', 'light', 2], ['pulse', 'Pulse', '💓', 'Rythme fort/faible', 'high', 'low', 2], ['orbit', 'Orbite', '🪐', 'Reste en orbite', 'in', 'out', 2.2], ['spark', 'Étincelle', '✨', 'Étincelle allumée', 'on', 'off', 2], ['wave', 'Vague', '🌊', 'Vague haute/basse', 'high', 'low', 2], ['mirror', 'Miroir', '🪞', 'Miroir cassé ou non', 'ok', 'break', 1.95], ['portal', 'Portail', '🌀', 'Portail ouvert', 'open', 'closed', 2.1], ['rune', 'Rune', '🔮', 'Bonne rune', 'yes', 'no', 3], ['totem', 'Totem', '🗿', 'Totem stable', 'yes', 'no', 2.4], ['cactus', 'Cactus', '🌵', 'Évite les épines', 'safe', 'ouch', 1.9], ['pearl', 'Perle', '🦪', 'Trouve la perle', 'yes', 'no', 4], ['compass', 'Boussole', '🧭', 'Bonne direction', 'n', 's', 2], ['anchor', 'Ancre', '⚓', 'Ancre levée', 'up', 'down', 2], ['torch', 'Torche', '🔥', 'Torche allumée', 'on', 'off', 2], ['keylock', 'Clé', '🔑', 'Bonne clé', 'yes', 'no', 3.5], ['hourglass', 'Sablier', '⏳', 'Temps restant', 'ok', 'out', 2.2], ['balloon2', 'Ballon 2', '🎈', 'Gonflé ou éclaté', 'ok', 'pop', 2], ['dicehi', 'Dé haut', '🎲', 'Dé >= 4', 'yes', 'no', 1.9], ['dicelo', 'Dé bas', '🎲', 'Dé <= 3', 'yes', 'no', 1.9], ['coinrush', 'Ruée pièces', '🪙', 'Plus de piles', 'yes', 'no', 2.5], ['starfall', "Pluie d\'étoiles", '🌟', 'Attrape 1 étoile', 'yes', 'no', 3], ['meteor', 'Météore', '☄️', 'Évite le météore', 'dodge', 'hit', 1.85], ['rainbow', 'Arc', '🌈', 'Couleur chanceuse', 'yes', 'no', 5], ['clover', 'Trèfle chance', '🍀', 'Trèfle trouvé', 'yes', 'no', 6]];
+  const bulk = [['coin2', 'Double heads', '🪙', 'Heads or tails again', 'pile', 'face', 2], ['dice7', 'Dice 7+', '🎲', 'Sum >= 7', 'over', 'under', 2], ['lucky7', 'Lucky 7', '7️⃣', 'Exactly 7', 'yes', 'no', 5], ['evenodd2', 'Even/Odd 2', '🔢', 'Even or odd die', 'even', 'odd', 2], ['redblack2', 'Red Black 2', '🔴', 'Red/black card', 'red', 'black', 2], ['highlow2', 'High Low', '⬆️', 'High or low card', 'high', 'low', 2], ['triple', 'Triple chance', '🎯', '1 in 3', 'a', 'b', 2.8], ['quad', 'Quad', '4️⃣', '1 in 4', 'a', 'b', 3.5], ['penta', 'Penta', '5️⃣', '1 in 5', 'a', 'b', 4.5], ['coin3', 'Triple heads', '🪙', "3 heads in a row", 'yes', 'no', 7], ['snake', 'Snake eyes', '🐍', 'Double 1', 'yes', 'no', 30], ['boxcars', 'Boxcars', '🎲', 'Double 6', 'yes', 'no', 30], ['anydouble', 'Any double', '🎲', 'Two matching dice', 'yes', 'no', 5.5], ['acehigh', 'High ace', '🃏', 'Ace drawn', 'yes', 'no', 12], ['facecard', 'Face card', '🃏', 'J, Q, or K', 'yes', 'no', 3.5], ['suitspade', 'Spades', '♠️', 'Spade suit', 'yes', 'no', 3.8], ['suithr', 'Hearts', '♥️', 'Heart suit', 'yes', 'no', 3.8], ['suitdi', 'Diamonds', '♦️', 'Diamond suit', 'yes', 'no', 3.8], ['suitcl', 'Clubs', '♣️', 'Club suit', 'yes', 'no', 3.8], ['blast', 'Blast', '💥', 'Explosion or not', 'safe', 'boom', 1.9], ['freeze', 'Freeze', '❄️', 'Ice or heat', 'ice', 'fire', 2], ['shadow', 'Shadow', '🌑', 'Shadow or light', 'shadow', 'light', 2], ['pulse', 'Pulse', '💓', 'Strong/weak pulse', 'high', 'low', 2], ['orbit', 'Orbit', '🪐', 'Stay in orbit', 'in', 'out', 2.2], ['spark', 'Spark', '✨', 'Spark lit', 'on', 'off', 2], ['wave', 'Wave', '🌊', 'High/low wave', 'high', 'low', 2], ['mirror', 'Mirror', '🪞', 'Mirror broken or not', 'ok', 'break', 1.95], ['portal', 'Portal', '🌀', 'Portal open', 'open', 'closed', 2.1], ['rune', 'Rune', '🔮', 'Good rune', 'yes', 'no', 3], ['totem', 'Totem', '🗿', 'Stable totem', 'yes', 'no', 2.4], ['cactus', 'Cactus', '🌵', 'Avoid the thorns', 'safe', 'ouch', 1.9], ['pearl', 'Pearl', '🦪', 'Find the pearl', 'yes', 'no', 4], ['compass', 'Compass', '🧭', 'Right direction', 'n', 's', 2], ['anchor', 'Anchor', '⚓', 'Anchor raised', 'up', 'down', 2], ['torch', 'Torch', '🔥', 'Torch lit', 'on', 'off', 2], ['keylock', 'Key', '🔑', 'Right key', 'yes', 'no', 3.5], ['hourglass', 'Hourglass', '⏳', 'Time remaining', 'ok', 'out', 2.2], ['balloon2', 'Ballon 2', '🎈', 'Inflated or popped', 'ok', 'pop', 2], ['dicehi', 'High die', '🎲', 'Die >= 4', 'yes', 'no', 1.9], ['dicelo', 'Low die', '🎲', 'Die <= 3', 'yes', 'no', 1.9], ['coinrush', 'Coin rush', '🪙', 'More heads', 'yes', 'no', 2.5], ['starfall', "Shower of stars", '🌟', 'Catch 1 star', 'yes', 'no', 3], ['meteor', 'Meteor', '☄️', 'Dodge the meteor', 'dodge', 'hit', 1.85], ['rainbow', 'Rainbow', '🌈', 'Lucky color', 'yes', 'no', 5], ['clover', 'Lucky clover', '🍀', 'Clover found', 'yes', 'no', 6]];
   for (const [key, name, emoji, desc, c1, c2, winMult] of bulk) {
     if (INSTANT[key]) continue;
     INSTANT[key] = {
       title: `${emoji} ${name}`,
       spinText: code(['...']),
       choices: [c1, c2],
-      info: (c) => `Choix ${c1}/${c2} · gain ≈ ${fx(winMult * c)}`,
+      info: (c) => `Choice ${c1}/${c2} · win ≈ ${fx(winMult * c)}`,
       picker: (c) =>
         choicePicker(
           key,
           `${emoji} ${name}`,
-          `${desc}\nGain ~ **${fx(winMult * c)}** si bon.`,
+          `${desc}\nWin ~ **${fx(winMult * c)}** if correct.`,
           [
             [c1, c1, '✅', ButtonStyle.Success],
             [c2, c2, '❌', ButtonStyle.Danger],
@@ -4782,7 +4859,7 @@ function genericFrames(emoji, res) {
           pick: choice,
           detail: out,
           ok: out === choice,
-          headline: out === choice ? `✅ **${out}** — gagné !` : `❌ Sortie **${out}** — perdu.`,
+          headline: out === choice ? `✅ **${out}** — won!` : `❌ Outcome **${out}** — lost.`,
         };
       },
     };
@@ -4791,11 +4868,11 @@ function genericFrames(emoji, res) {
 })();
 
 // ============================================================
-//  CATALOGUE : seuls les 20 premiers jeux sont gardés
+//  CATALOG: only the first 20 games are kept
 //  mines · bj · roulette · coinflip · dice · slots · wheel · duel · suit · zone · plinko · crash ·
 //  scratch · die · chest · russian · horses · limbo · higher · rps
-//  Les autres jeux sont retirés du casino (menu, règles, multiplicateurs, paris).
-//  Variable MAX_GAMES : 20 par défaut ; 30 = garder 30 jeux ; 0 = tout le catalogue d'origine.
+//  Other games are removed from the casino (menu, rules, multipliers, bets).
+//  MAX_GAMES variable: 20 by default; 30 = keep 30 games; 0 = keep the original catalog.
 // ============================================================
 let GAME_LIMIT = Number.parseInt(process.env.MAX_GAMES ?? '20', 10);
 if (!Number.isFinite(GAME_LIMIT) || GAME_LIMIT < 0) GAME_LIMIT = 20;
@@ -4804,16 +4881,16 @@ if (GAME_LIMIT > 0) {
   for (const k of Object.keys(GAME_NAMES)) if (!keep.has(k)) delete GAME_NAMES[k];
   for (const k of Object.keys(INSTANT)) if (!keep.has(k)) delete INSTANT[k];
   for (const k of Object.keys(ANIMS)) if (!keep.has(k)) delete ANIMS[k];
-  console.log(`[games] catalogue limité aux ${keep.size} premiers jeux : ${[...keep].join(', ')}`);
+  console.log(`[games] catalog limited to the first ${keep.size} games: ${[...keep].join(', ')}`);
 }
 
 async function playInstant(i, key, bet, choice) {
   const G = INSTANT[key];
-  if (!G || !G.choices.includes(choice)) return respondText(i, 'Pari invalide.');
+  if (!G || !G.choices.includes(choice)) return respondText(i, 'Invalid bet.');
   const uid = i.user.id;
   if (!tryLock(uid)) return respondText(i, MSG.busy);
 
-  // Répondre tout de suite pour éviter "l\'application n'a pas répondu"
+  // Reply right away to avoid "The application did not respond"
   try {
     if (!i.deferred && !i.replied) await i.deferReply({ flags: EPH });
   } catch {
@@ -4845,7 +4922,7 @@ async function playInstant(i, key, bet, choice) {
             .setAuthor({ name: `ZNK CASINO  •  ${gameNamePlain(key).toUpperCase()}`, iconURL: ZNK_LOGO })
             .setColor(COLORS.gold)
             .setDescription(
-              launchBanner('C’est parti !') + `${G.spinText}\nMise **${fmt(bet)}** · ${res.pick}` + (boost.label ? `\n⚡ Boost actif : **${boost.label}**` : '')
+              launchBanner('Lets go!') + `${G.spinText}\nBet **${fmt(bet)}** · ${res.pick}` + (boost.label ? `\n⚡ Boost active: **${boost.label}**` : '')
             ),
         ],
         components: [],
@@ -4871,18 +4948,18 @@ async function playInstant(i, key, bet, choice) {
       coef: c,
       outcome: kind,
       resultText: animResultText(kind, mult),
-      sub: `Mise ${coinTxt(bet)} · ${noEmoji(res.pick || '')}`,
+      sub: `Bet ${coinTxt(bet)} · ${noEmoji(res.pick || '')}`,
       data: { wheel: WHEEL, horses: HORSES },
     };
     const imgDone = await playGameImages(i, key, res, gCtx);
-    if (!imgDone) await animate(i, frames, G.title, `Mise **${fmt(bet)}** · ${res.pick || ''}\n`, key);
+    if (!imgDone) await animate(i, frames, G.title, `Bet **${fmt(bet)}** · ${res.pick || ''}\n`, key);
 
     const text =
       payout === 0
-        ? `Tu laisses **${fmt(bet)}**.`
+        ? `You lose **${fmt(bet)}**.`
         : kind === 'win'
-          ? `Tu empoches **${fmt(payout)}** (${fx(mult)}).`
-          : `Tu récupères **${fmt(payout)}** (${fx(mult)}).`;
+          ? `You win **${fmt(payout)}** (${fx(mult)}).`
+          : `You get back **${fmt(payout)}** (${fx(mult)}).`;
 
     const embed = brand(
       new EmbedBuilder()
@@ -4890,9 +4967,9 @@ async function playInstant(i, key, bet, choice) {
         .setColor(outcomeColor(kind))
         .setDescription(`${outcomeBanner(kind, kind === 'push' ? NaN : profit)}${res.headline}\n\n${text}\n${kind === 'win' ? '💜✨💜✨💜✨💜✨💜' : kind === 'lose' ? '🖤🌑🖤🌑🖤🌑🖤🌑🖤' : '💜🤍💜🤍💜🤍💜🤍💜'}`)
         .addFields(
-          { name: '🎯 Ton pari', value: res.pick, inline: true },
-          { name: '💰 Mise', value: fmt(bet), inline: true },
-          { name: '👛 Solde', value: fmt(balance), inline: true }
+          { name: '🎯 Your bet', value: res.pick, inline: true },
+          { name: '💰 Bet', value: fmt(bet), inline: true },
+          { name: '👛 Balance', value: fmt(balance), inline: true }
         ),
       key
     );
@@ -4921,70 +4998,70 @@ async function playInstant(i, key, bet, choice) {
 }
 
 // ============================================================
-//  PANNEAU DE JEU (boutons) + POP-UPS
+//  GAME PANEL (buttons) + POP-UPS
 // ============================================================
 function buildHelpEmbed() {
   return new EmbedBuilder()
     .setColor(COLORS.violet)
     .setAuthor({ name: 'ZNK CASINO' })
-    .setTitle('✨ Guide des commandes (slash)')
+    .setTitle('✨ Slash command guide')
     .setDescription(
-      '**Toutes les commandes sont en `/`** et **réservées au propriétaire** du serveur (couronne).'
+      '**All commands use `/`** and are **reserved for the server owner** (crown).'
     )
     .addFields(
       {
-        name: '📖 Aide',
-        value: '`/help` · `/aide` — ce guide',
+        name: '📖 Help',
+        value: '`/help` · `/aide` — this guide',
         inline: false,
       },
       {
-        name: '💰 Comptes',
+        name: '💰 Accounts',
         value:
-          '`/balance` `[membre]` · `/solde` — solde\n' +
-          '`/daily` — récompense quotidienne\n' +
-          '`/invites` `[membre]` — invitations\n' +
-          '`/add` `membre` `montant` — ajouter des coins\n' +
-          '`/remove` `membre` `montant` — retirer des coins',
+          '`/balance` `[member]` · `/solde` — balance\n' +
+          '`/daily` — daily reward\n' +
+          '`/invites` `[member]` — invitations\n' +
+          '`/add` `member` `amount` — add coins\n' +
+          '`/remove` `member` `amount` — remove coins',
         inline: false,
       },
       {
         name: '🎮 Casino',
         value:
-          '`/casino` · `/jeux` — publier le panneau de jeu\n' +
-          '`/setup` · `/salon` — configurer les salons\n' +
-          '`/wins` — salon des victoires\n' +
-          '`/classement` — message classement auto\n' +
-          '`/admin` — panneau admin\n' +
-          '`/invites-notif` — salon notifs d’invites',
+          '`/casino` · `/jeux` — publish the game panel\n' +
+          '`/setup` · `/salon` — configure channels\n' +
+          '`/wins` — wins channel\n' +
+          '`/classement` — auto leaderboard message\n' +
+          '`/admin` — admin panel\n' +
+          '`/invites-notif` — invite notification channel',
         inline: false,
       },
       {
-        name: '🎁 Boutique / tickets',
+        name: '🎁 Shop / tickets',
         value:
-          '`/ticketsetup` `[catégorie]` — panel claim rewards (order codes du site)',
+          '`/ticketsetup` `[category]` — claim rewards panel (site order codes)',
         inline: false,
       },
       {
-        name: '🌐 Site',
+        name: '🌐 Website',
         value:
-          'Jeux online / offline / **ranked** (RR) / shop / tasks — via le lien Discord du site.',
+          'Online / offline / **ranked** (RR) games / shop / tasks — via the website Discord link.',
         inline: false,
       }
     )
-    .setFooter({ text: 'ZNK Casino · commandes owner uniquement' })
+    .setFooter({ text: 'ZNK Casino · owner-only commands' })
     .setTimestamp();
 }
 
 function buildPanelPayload() {
   const panel = new EmbedBuilder()
     .setColor(0x7C3AED)
-    .setDescription('Clique sur **Start** pour ouvrir ton casino privé, puis choisis un jeu et ta mise.');
+    .setDescription('Click **Start** to open your private casino, then choose a game and your bet.');
 
   const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('panel_start').setLabel('Start').setEmoji('▶️').setStyle(ButtonStyle.Success),
-    new ButtonBuilder().setCustomId('panel_settings').setLabel('Paramètres').setEmoji('⚙️').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId('panel_settings').setLabel('Settings').setEmoji('⚙️').setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId('panel_stats').setLabel('Stats').setEmoji('📊').setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId('panel_rules').setLabel('Règles').setEmoji('📖').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('panel_rules').setLabel('Rules').setEmoji('📖').setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId('panel_invites').setLabel('Invites').setEmoji('📨').setStyle(ButtonStyle.Secondary)
   );
   return withBanner({ embeds: [panel], components: [row] }, 'panel_salon.png');
@@ -5000,43 +5077,43 @@ async function buildDmPlayPayload(userId) {
   }
   const embed = new EmbedBuilder()
     .setColor(0xA855F7)
-    .setTitle(lang === 'en' ? '✦ Your private casino' : '✦ Ton casino privé')
+    .setTitle(lang === 'en' ? '✦ Your private casino' : '✦ Your private casino')
     .setDescription(
       lang === 'en'
         ? [
-            `💰 **Balance : ${fmt(bal)}**`,
-            `🎁 Daily : **${DAILY_AMOUNT}** ${COIN} once a day (Paris midnight)`,
+            `💰 **Balance: ${fmt(bal)}**`,
+            `🎁 Daily: **${DAILY_AMOUNT}** ${COIN} once a day (Paris midnight)`,
             '',
             '**Play** → choose a game',
             '**Send** → transfer coins (username of a server member)',
             '**Rules** → simple rules of every game',
           ].join('\n')
         : [
-            `💰 **Solde : ${fmt(bal)}**`,
-            `🎁 Daily : **${DAILY_AMOUNT}** ${COIN} par jour (minuit Paris)`,
+            `💰 **Balance: ${fmt(bal)}**`,
+            `🎁 Daily: **${DAILY_AMOUNT}** ${COIN} per day (Paris midnight)`,
             '',
-            '**Jouer** → choisir un jeu',
-            '**Envoyer** → transférer des coins (pseudo d’un membre du serveur)',
-            '**Règles** → explications simples de chaque jeu',
+            '**Play** → choose a game',
+            '**Send** → transfer coins (username of a server member)',
+            '**Rules** → simple rules of every game',
           ].join('\n')
     )
-    .setFooter({ text: lang === 'en' ? 'Private panel' : 'Panneau privé' })
+    .setFooter({ text: lang === 'en' ? 'Private panel' : 'Private panel' })
     .setTimestamp();
 
   const row1 = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('panel_play').setLabel(lang === 'en' ? 'Play' : 'Jouer').setEmoji('🎮').setStyle(ButtonStyle.Success),
-    new ButtonBuilder().setCustomId('panel_search').setLabel(lang === 'en' ? 'Search' : 'Recherche').setEmoji('🔍').setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId('panel_favs').setLabel(lang === 'en' ? 'Favorites' : 'Favoris').setEmoji('⭐').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId('panel_play').setLabel(lang === 'en' ? 'Play' : 'Play').setEmoji('🎮').setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId('panel_search').setLabel(lang === 'en' ? 'Search' : 'Search').setEmoji('🔍').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId('panel_favs').setLabel(lang === 'en' ? 'Favorites' : 'Favorites').setEmoji('⭐').setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId('panel_daily').setLabel('Daily').setEmoji('🎁').setStyle(ButtonStyle.Success)
   );
   const row2 = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('panel_send').setLabel(lang === 'en' ? 'Send' : 'Envoyer').setEmoji('💸').setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId('panel_rules').setLabel(lang === 'en' ? 'Rules' : 'Règles').setEmoji('📖').setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId('panel_history').setLabel(lang === 'en' ? 'History' : 'Historique').setEmoji('📜').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('panel_send').setLabel(lang === 'en' ? 'Send' : 'Send').setEmoji('💸').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId('panel_rules').setLabel(lang === 'en' ? 'Rules' : 'Rules').setEmoji('📖').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('panel_history').setLabel('History').setEmoji('📜').setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId('panel_stats').setLabel('Stats').setEmoji('📊').setStyle(ButtonStyle.Secondary)
   );
   const row3 = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('panel_settings').setLabel(lang === 'en' ? 'Settings' : 'Paramètres').setEmoji('⚙️').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('panel_settings').setLabel(lang === 'en' ? 'Settings' : 'Settings').setEmoji('⚙️').setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId('panel_clearall').setLabel(lang === 'en' ? 'Clear chat' : 'Tout effacer').setEmoji('🧹').setStyle(ButtonStyle.Danger)
   );
   const menuPayload = { embeds: [embed], components: [row1, row2, row3] };
@@ -5047,132 +5124,132 @@ async function buildDmPlayPayload(userId) {
         menuPayload,
         await makeCard('menu', {
           avatar: mu,
-          tag: lang === 'en' ? 'PRIVATE CASINO' : 'CASINO PRIVÉ',
+          tag: lang === 'en' ? 'PRIVATE CASINO' : 'PRIVATE CASINO',
           headline: userName(mu),
           sub: 'ZNK CASINO',
-          barLeft: lang === 'en' ? 'BALANCE' : 'SOLDE',
+          barLeft: lang === 'en' ? 'BALANCE' : 'BALANCE',
           barRight: coinTxt(bal),
           cells: [
-            [lang === 'en' ? 'BALANCE' : 'SOLDE', coinTxt(bal)],
-            ['DAILY', `+${coinTxt(DAILY_AMOUNT)} / ${lang === 'en' ? 'day' : 'jour'}`],
-            [lang === 'en' ? 'LANGUAGE' : 'LANGUE', lang === 'en' ? 'ENGLISH' : 'FRANÇAIS'],
-            [lang === 'en' ? 'WIN PING' : 'PING VICTOIRE', wantsWinPing(userId) ? 'ON' : 'OFF'],
+            [lang === 'en' ? 'BALANCE' : 'BALANCE', coinTxt(bal)],
+            ['DAILY', `+${coinTxt(DAILY_AMOUNT)} / ${lang === 'en' ? 'day' : 'day'}`],
+            [lang === 'en' ? 'LANGUAGE' : 'LANGUAGE', lang === 'en' ? 'ENGLISH' : 'ENGLISH'],
+            [lang === 'en' ? 'WIN PING' : 'WIN PING', wantsWinPing(userId) ? 'ON' : 'OFF'],
             ['ANIMATIONS', wantsSkipAnim(userId) ? 'SKIP' : 'ON'],
-            [lang === 'en' ? 'FAVORITES' : 'FAVORIS', String(getFavs(userId).size)],
+            [lang === 'en' ? 'FAVORITES' : 'FAVORITES', String(getFavs(userId).size)],
           ],
         })
       );
     }
   } catch (e) {
-    console.error('[carte menu]', e?.message || e);
+    console.error('[card menu]', e?.message || e);
   }
   return menuPayload;
 }
 
 const GAME_MENU = [
-  ['mines', 'Mines', '💣', 'Bombes · multiplicateur croissant'],
-  ['bj', 'Blackjack', '🃏', 'Bats le croupier · As soft'],
-  ['roulette', 'Roulette', '🎡', 'Couleur · pair · numéro'],
-  ['coinflip', 'Pile/Face', '🪙', '50 / 50'],
-  ['dice', 'Dés', '🎲', 'Somme de 2 dés'],
-  ['slots', 'Slots', '🎰', '3 rouleaux · jackpot'],
-  ['wheel', 'Roue', '🎡', 'Roue de la fortune'],
-  ['duel', 'Duel', '⚔️', 'Carte vs croupier'],
-  ['suit', 'Enseigne', '🃏', 'Devine la couleur'],
-  ['zone', 'Zone', '🎯', 'Bas · milieu · haut'],
-  ['plinko', 'Plinko', '🎱', 'Bille · risque'],
-  ['crash', 'Crash', '🚀', 'Cash-out avant boom'],
-  ['scratch', 'Ticket', '🎟️', 'Gratte & gagne'],
-  ['die', 'Dé exact', '🎲', '1 chance sur 6'],
-  ['chest', 'Coffre', '📦', 'Trouve le trésor'],
-  ['russian', 'Russe', '🔫', 'Survis au barillet'],
-  ['horses', 'Chevaux', '🏇', 'Parie sur le gagnant'],
-  ['limbo', 'Limbo', '📈', 'Choisis ta cible'],
-  ['higher', 'Higher/Lower', '⬆️', 'Plus haut ou plus bas'],
-  ['rps', 'PFC', '✊', 'Pierre papier ciseaux'],
-  ['colorpick', 'Couleur', '🎨', 'Devine la couleur'],
-  ['ladder', 'Échelle', '🪜', 'Monte les échelons'],
-  ['keno', 'Keno', '🎱', 'Tire 1 numéro sur 10'],
-  ['war', 'Guerre', '⚔️', 'Carte vs carte'],
-  ['hilo', 'Hi-Lo', '🃏', 'Suite de cartes'],
-  ['bingo', 'Bingo', '🅱️', 'Numéro tiré'],
+  ['mines', 'Mines', '💣', 'Bombs · rising multiplier'],
+  ['bj', 'Blackjack', '🃏', 'Beat the dealer · soft ace'],
+  ['roulette', 'Roulette', '🎡', 'Color · even · number'],
+  ['coinflip', 'Heads/Tails', '🪙', '50 / 50'],
+  ['dice', 'Dice', '🎲', 'Sum of 2 dice'],
+  ['slots', 'Slots', '🎰', '3 reels · jackpot'],
+  ['wheel', 'Wheel', '🎡', 'Wheel of fortune'],
+  ['duel', 'Duel', '⚔️', 'Card vs dealer'],
+  ['suit', 'Suit', '🃏', 'Guess the suit'],
+  ['zone', 'Zone', '🎯', 'Low · mid · high'],
+  ['plinko', 'Plinko', '🎱', 'Ball · risk'],
+  ['crash', 'Crash', '🚀', 'Cash out before boom'],
+  ['scratch', 'Ticket', '🎟️', 'Scratch & win'],
+  ['die', 'Exact die', '🎲', '1 in 6 chance'],
+  ['chest', 'Chest', '📦', 'Find the treasure'],
+  ['russian', 'Russian', '🔫', 'Survive the cylinder'],
+  ['horses', 'Horses', '🏇', 'Bet on the winner'],
+  ['limbo', 'Limbo', '📈', 'Choose your target'],
+  ['higher', 'Higher/Lower', '⬆️', 'Higher or lower'],
+  ['rps', 'RPS', '✊', 'Rock paper scissors'],
+  ['colorpick', 'Color', '🎨', 'Guess the color'],
+  ['ladder', 'Ladder', '🪜', 'Climb the rungs'],
+  ['keno', 'Keno', '🎱', 'Draw 1 number out of 10'],
+  ['war', 'War', '⚔️', 'Card vs card'],
+  ['hilo', 'Hi-Lo', '🃏', 'Card sequence'],
+  ['bingo', 'Bingo', '🅱️', 'Number drawn'],
   ['jackpot', 'Jackpot', '💎', '3 symboles = jackpot'],
-  // 30 nouveaux
-  ['dicewar', 'Guerre dés', '🎲', 'Dés vs dés'],
-  ['coinladder', 'Échelle pièces', '🪙', 'Pile/face en chaîne'],
-  ['cardmatch', 'Match cartes', '🃏', 'Retrouve la carte'],
-  ['numguess', 'Devine nombre', '🔢', '1 à 10'],
-  ['bombdefuse', 'Désamorçage', '💣', 'Coupe le bon fil'],
-  ['treasure', 'Trésor', '🗺️', 'Choisis la case'],
-  ['highcard', 'Carte haute', '🃏', 'Au-dessus de 7'],
-  ['lowcard', 'Carte basse', '🃏', 'En-dessous de 8'],
-  ['pairmatch', 'Paire', '🃏', 'Deux mêmes rangs'],
-  ['freefall', 'Chute libre', '🪂', 'Atterris bien'],
-  ['balloon', 'Ballon', '🎈', 'Gonfle sans éclater'],
-  ['target', 'Cible', '🎯', 'Vise le centre'],
-  ['sequence', 'Séquence', '🔢', 'Suite de chiffres'],
-  ['animalrace', 'Course animaux', '🐾', 'Parie sur un animal'],
-  ['fruitmatch', 'Fruits', '🍎', '3 fruits identiques'],
-  ['gemhunt', 'Gemmes', '💎', 'Trouve la gemme'],
-  ['stardrop', 'Étoile', '⭐', 'Attrape l\'étoile'],
-  ['moonshot', 'Tir lunaire', '🌙', 'Atteins la lune'],
-  ['volcano', 'Volcan', '🌋', 'Évite l\'éruption'],
-  ['lightning', 'Éclair', '⚡', 'Survis à l\'orage'],
-  ['pokerhand', 'Poker express', '🃏', 'Meilleure main'],
-  ['redblack', 'Rouge/Noir', '🔴', 'Couleur simple'],
-  ['oddseven', 'Pair/Impair+', '🔢', 'Sur un dé'],
-  ['multiplier', 'Multi', '✖️', 'Choisis ton multi'],
-  ['memory', 'Mémoire', '🧠', 'Retrouve la paire'],
-  ['colorswipe', 'Arc-en-ciel', '🌈', 'Couleur tirée'],
-  ['rocket2', 'Fusée 2', '🚀', 'Cible haute'],
-  ['diceexact2', 'Double dé', '🎲', 'Somme exacte'],
-  ['chest2', 'Triple coffre', '📦', '1 trésor sur 3'],
-  ['spincolor', 'Roue couleur', '🎨', 'Roue à 6 couleurs'],
-  ['coin2', 'Double pile', '🪙', 'Encore pile ou face'],
-  ['dice7', 'Dés 7+', '🎲', 'Somme >= 7'],
-  ['lucky7', 'Lucky 7', '7️⃣', 'Exactement 7'],
-  ['evenodd2', 'Pair/Impair 2', '🔢', 'Dé pair ou impair'],
-  ['redblack2', 'Rouge Noir 2', '🔴', 'Carte rouge/noire'],
-  ['highlow2', 'Haut Bas', '⬆️', 'Carte haute ou basse'],
-  ['triple', 'Triple chance', '🎯', '1 sur 3'],
-  ['quad', 'Quad', '4️⃣', '1 sur 4'],
-  ['penta', 'Penta', '5️⃣', '1 sur 5'],
-  ['coin3', 'Triple pile', '🪙', '3 piles d\'affilée'],
+  // 30 new games
+  ['dicewar', 'Dice War', '🎲', 'Dice vs dice'],
+  ['coinladder', 'Coin Ladder', '🪙', 'Heads streak'],
+  ['cardmatch', 'Card Match', '🃏', 'Find the card'],
+  ['numguess', 'Guess number', '🔢', '1 to 10'],
+  ['bombdefuse', 'Defusal', '💣', 'Cut the right wire'],
+  ['treasure', 'Treasure', '🗺️', 'Choose the spot'],
+  ['highcard', 'High card', '🃏', 'Above 7'],
+  ['lowcard', 'Low card', '🃏', 'Below 8'],
+  ['pairmatch', 'Pair', '🃏', 'Two matching ranks'],
+  ['freefall', 'Free fall', '🪂', 'Land safely'],
+  ['balloon', 'Balloon', '🎈', 'Inflate without popping'],
+  ['target', 'Target', '🎯', 'Aim for the center'],
+  ['sequence', 'Sequence', '🔢', 'Number sequence'],
+  ['animalrace', 'Animal race', '🐾', 'Bet on an animal'],
+  ['fruitmatch', 'Fruits', '🍎', '3 matching fruits'],
+  ['gemhunt', 'Gems', '💎', 'Find the gem'],
+  ['stardrop', 'Star', '⭐', 'Catch the star'],
+  ['moonshot', 'Moon shot', '🌙', 'Reach the Moon'],
+  ['volcano', 'Volcano', '🌋', 'Avoid the eruption'],
+  ['lightning', 'Lightning', '⚡', 'Survive the storm'],
+  ['pokerhand', 'Express poker', '🃏', 'Best hand'],
+  ['redblack', 'Red/Black', '🔴', 'Simple color'],
+  ['oddseven', 'Even/Odd+', '🔢', 'On a die'],
+  ['multiplier', 'Multiplier', '✖️', 'Choose your multiplier'],
+  ['memory', 'Memory', '🧠', 'Find the pair'],
+  ['colorswipe', 'Rainbow', '🌈', 'Color drawn'],
+  ['rocket2', 'Rocket 2', '🚀', 'High target'],
+  ['diceexact2', 'Double die', '🎲', 'Exact sum'],
+  ['chest2', 'Triple chest', '📦', '1 treasure in 3'],
+  ['spincolor', 'Color wheel', '🎨', '6-color wheel'],
+  ['coin2', 'Double heads', '🪙', 'Heads or tails again'],
+  ['dice7', 'Dice 7+', '🎲', 'Sum >= 7'],
+  ['lucky7', 'Lucky 7', '7️⃣', 'Exactly 7'],
+  ['evenodd2', 'Even/Odd 2', '🔢', 'Even or odd die'],
+  ['redblack2', 'Red Black 2', '🔴', 'Red/black card'],
+  ['highlow2', 'High Low', '⬆️', 'High or low card'],
+  ['triple', 'Triple chance', '🎯', '1 in 3'],
+  ['quad', 'Quad', '4️⃣', '1 in 4'],
+  ['penta', 'Penta', '5️⃣', '1 in 5'],
+  ['coin3', 'Triple heads', '🪙', '3 heads in a row'],
   ['snake', 'Snake eyes', '🐍', 'Double 1'],
   ['boxcars', 'Boxcars', '🎲', 'Double 6'],
-  ['anydouble', 'Double quelconque', '🎲', 'Deux dés égaux'],
-  ['acehigh', 'As haut', '🃏', 'As sort'],
-  ['facecard', 'Figure', '🃏', 'J Q ou K'],
-  ['suitspade', 'Pique', '♠️', 'Enseigne pique'],
-  ['suithr', 'Coeur', '♥️', 'Enseigne coeur'],
-  ['suitdi', 'Carreau', '♦️', 'Enseigne carreau'],
-  ['suitcl', 'Trèfle', '♣️', 'Enseigne trèfle'],
-  ['blast', 'Blast', '💥', 'Explosion ou pas'],
-  ['freeze', 'Freeze', '❄️', 'Gel ou chaleur'],
-  ['shadow', 'Ombre', '🌑', 'Ombre ou lumière'],
-  ['pulse', 'Pulse', '💓', 'Rythme fort/faible'],
-  ['orbit', 'Orbite', '🪐', 'Reste en orbite'],
-  ['spark', 'Étincelle', '✨', 'Étincelle allumée'],
-  ['wave', 'Vague', '🌊', 'Vague haute/basse'],
-  ['mirror', 'Miroir', '🪞', 'Miroir cassé ou non'],
-  ['portal', 'Portail', '🌀', 'Portail ouvert'],
-  ['rune', 'Rune', '🔮', 'Bonne rune'],
-  ['totem', 'Totem', '🗿', 'Totem stable'],
-  ['cactus', 'Cactus', '🌵', 'Évite les épines'],
-  ['pearl', 'Perle', '🦪', 'Trouve la perle'],
-  ['compass', 'Boussole', '🧭', 'Bonne direction'],
-  ['anchor', 'Ancre', '⚓', 'Ancre levée'],
-  ['torch', 'Torche', '🔥', 'Torche allumée'],
-  ['keylock', 'Clé', '🔑', 'Bonne clé'],
-  ['hourglass', 'Sablier', '⏳', 'Temps restant'],
-  ['balloon2', 'Ballon 2', '🎈', 'Gonflé ou éclaté'],
-  ['dicehi', 'Dé haut', '🎲', 'Dé >= 4'],
-  ['dicelo', 'Dé bas', '🎲', 'Dé <= 3'],
-  ['coinrush', 'Ruée pièces', '🪙', 'Plus de piles'],
-  ['starfall', 'Pluie d\'étoiles', '🌟', 'Attrape 1 étoile'],
-  ['meteor', 'Météore', '☄️', 'Évite le météore'],
-  ['rainbow', 'Arc', '🌈', 'Couleur chanceuse'],
-  ['clover', 'Trèfle chance', '🍀', 'Trèfle trouvé'],
+  ['anydouble', 'Any double', '🎲', 'Two matching dice'],
+  ['acehigh', 'High ace', '🃏', 'Ace drawn'],
+  ['facecard', 'Face card', '🃏', 'J, Q, or K'],
+  ['suitspade', 'Spades', '♠️', 'Spade suit'],
+  ['suithr', 'Hearts', '♥️', 'Heart suit'],
+  ['suitdi', 'Diamonds', '♦️', 'Diamond suit'],
+  ['suitcl', 'Clubs', '♣️', 'Club suit'],
+  ['blast', 'Blast', '💥', 'Explosion or not'],
+  ['freeze', 'Freeze', '❄️', 'Ice or heat'],
+  ['shadow', 'Shadow', '🌑', 'Shadow or light'],
+  ['pulse', 'Pulse', '💓', 'Strong/weak pulse'],
+  ['orbit', 'Orbit', '🪐', 'Stay in orbit'],
+  ['spark', 'Spark', '✨', 'Spark lit'],
+  ['wave', 'Wave', '🌊', 'High/low wave'],
+  ['mirror', 'Mirror', '🪞', 'Mirror broken or not'],
+  ['portal', 'Portal', '🌀', 'Portal open'],
+  ['rune', 'Rune', '🔮', 'Good rune'],
+  ['totem', 'Totem', '🗿', 'Stable totem'],
+  ['cactus', 'Cactus', '🌵', 'Avoid the thorns'],
+  ['pearl', 'Pearl', '🦪', 'Find the pearl'],
+  ['compass', 'Compass', '🧭', 'Right direction'],
+  ['anchor', 'Anchor', '⚓', 'Anchor raised'],
+  ['torch', 'Torch', '🔥', 'Torch lit'],
+  ['keylock', 'Key', '🔑', 'Right key'],
+  ['hourglass', 'Hourglass', '⏳', 'Time remaining'],
+  ['balloon2', 'Balloon 2', '🎈', 'Inflated or popped'],
+  ['dicehi', 'High die', '🎲', 'Die >= 4'],
+  ['dicelo', 'Low die', '🎲', 'Die <= 3'],
+  ['coinrush', 'Coin rush', '🪙', 'More heads'],
+  ['starfall', 'Shower of stars', '🌟', 'Catch 1 star'],
+  ['meteor', 'Meteor', '☄️', 'Dodge the meteor'],
+  ['rainbow', 'Rainbow', '🌈', 'Lucky color'],
+  ['clover', 'Lucky clover', '🍀', 'Clover found'],
 ];
 
 function buildGameMenuPayload(userId = null, page = 0, mode = 'all', query = '') {
@@ -5187,7 +5264,7 @@ function buildGameMenuPayload(userId = null, page = 0, mode = 'all', query = '')
       return hay.includes(q);
     });
   }
-  // Favoris en tête si mode all
+  // Favorites first in all mode
   if (mode === 'all' && favs.size) {
     list = [
       ...list.filter(([k]) => favs.has(k)),
@@ -5201,14 +5278,14 @@ function buildGameMenuPayload(userId = null, page = 0, mode = 'all', query = '')
   const slice = list.slice(p * PAGE_SIZE, p * PAGE_SIZE + PAGE_SIZE);
 
   const modeLabel =
-    mode === 'favs' ? '⭐ Favoris' : mode === 'search' ? `🔍 « ${query} »` : '🎮 Tous les jeux';
+    mode === 'favs' ? '⭐ Favorites' : mode === 'search' ? `🔍 “${query}”` : '🎮 All games';
   const embed = new EmbedBuilder()
     .setColor(0xA855F7)
     .setTitle(t(userId, 'lobbyTitle'))
     .setDescription(
       `${modeLabel}\n` +
-        (list.length ? `**Page ${p + 1}/${totalPages}** · ${list.length} jeu(x)` : '_Aucun résultat_') +
-        `\n⭐ = favori · utilise **Recherche** ou **Favoris** depuis le panneau`
+        (list.length ? `**Page ${p + 1}/${totalPages}** · ${list.length} game(s)` : '_No results_') +
+        `\n⭐ = favorite · use **Search** or **Favorites** from the panel`
     )
     .setFooter({ text: t(userId, 'lobbyFooter') })
     .setTimestamp();
@@ -5241,9 +5318,9 @@ function buildGameMenuPayload(userId = null, page = 0, mode = 'all', query = '')
       .setLabel('▶')
       .setStyle(ButtonStyle.Secondary)
       .setDisabled(p >= totalPages - 1 || list.length === 0),
-    new ButtonBuilder().setCustomId('panel_search').setLabel('Recherche').setEmoji('🔍').setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId('panel_favs').setLabel('Favoris').setEmoji('⭐').setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId('panel_play').setLabel('Tous').setEmoji('🎮').setStyle(ButtonStyle.Secondary)
+    new ButtonBuilder().setCustomId('panel_search').setLabel('Search').setEmoji('🔍').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId('panel_favs').setLabel('Favorites').setEmoji('⭐').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId('panel_play').setLabel('All').setEmoji('🎮').setStyle(ButtonStyle.Secondary)
   );
   components.push(nav);
 
@@ -5256,31 +5333,31 @@ function buildSettingsPayload(userId) {
   const skip = wantsSkipAnim(userId);
   const embed = new EmbedBuilder()
     .setColor(0x7C3AED)
-    .setTitle(`⚙️ ${L(userId, 'Paramètres', 'Settings')}`)
+    .setTitle(`⚙️ ${L(userId, 'Settings', 'Settings')}`)
     .setDescription(
       code([
-        `${padR(L(userId, 'Langue', 'Language'), 22)}${padL(cur === 'fr' ? 'Français' : 'English', 10)}`,
-        `${padR(L(userId, 'Ping des victoires', 'Win pings'), 22)}${padL(ping ? 'ON' : 'OFF', 10)}`,
+        `${padR(L(userId, 'Language', 'Language'), 22)}${padL(cur === 'fr' ? 'English (FR)' : 'English', 10)}`,
+        `${padR(L(userId, 'Win pings', 'Win pings'), 22)}${padL(ping ? 'ON' : 'OFF', 10)}`,
         `${padR(L(userId, 'Animations', 'Animations'), 22)}${padL(skip ? 'SKIP' : 'ON', 10)}`,
       ]) +
         L(
           userId,
-          '**Langue** : menus privés.\n**Ping** : mentions dans le salon wins.\n**Animations** : SKIP = résultat immédiat sans anim.',
+          '**Language**: private menus.\n**Ping**: mentions in wins channel.\n**Animations**: SKIP = instant result.',
           '**Language**: private menus.\n**Ping**: mentions in wins channel.\n**Animations**: SKIP = instant result.'
         )
     )
-    .setFooter({ text: L(userId, 'Sauvegardé pour toi', 'Saved for you') });
+    .setFooter({ text: L(userId, 'Saved for you', 'Saved for you') });
   const row = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('panel_lang_fr').setLabel('Français').setEmoji('🇫🇷').setStyle(cur === 'fr' ? ButtonStyle.Success : ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('panel_lang_fr').setLabel('English (FR)').setEmoji('🇫🇷').setStyle(cur === 'fr' ? ButtonStyle.Success : ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId('panel_lang_en').setLabel('English').setEmoji('🇬🇧').setStyle(cur === 'en' ? ButtonStyle.Success : ButtonStyle.Secondary),
     new ButtonBuilder()
       .setCustomId('panel_ping')
-      .setLabel(`Ping : ${ping ? 'ON' : 'OFF'}`)
+      .setLabel(`Ping: ${ping ? 'ON' : 'OFF'}`)
       .setEmoji('🔔')
       .setStyle(ping ? ButtonStyle.Primary : ButtonStyle.Danger),
     new ButtonBuilder()
       .setCustomId('panel_skipanim')
-      .setLabel(skip ? 'Anim : SKIP' : 'Anim : ON')
+      .setLabel(skip ? 'Anim: SKIP' : 'Anim: ON')
       .setEmoji('⏩')
       .setStyle(skip ? ButtonStyle.Danger : ButtonStyle.Success)
   );
@@ -5291,65 +5368,65 @@ function buildRulesPayload(userId) {
   const lang = getLang(userId);
   const fr = lang !== 'en';
   let lines = [
-    ['💣 Mines', fr ? 'Choisis une difficulté. Clique sur les cases pour trouver des diamants. Évite les mines. Encaisse quand tu veux : plus tu trouves de diamants, plus le multiplicateur monte.' : 'Pick a difficulty. Click tiles for diamonds. Avoid mines. Cash out anytime: more diamonds = higher multiplier.'],
-    ['🃏 Blackjack', fr ? 'Bats le croupier sans dépasser 21. Tirer = nouvelle carte, Rester = s’arrêter, Doubler = double la mise et tire une seule carte. Blackjack naturel paie x2.5.' : 'Beat the dealer without going over 21. Hit, Stand or Double. Natural blackjack pays x2.5.'],
-    ['🎡 Roulette', fr ? 'Mise sur rouge/noir/pair/impair (x2) ou un numéro / vert (x36). La bille tourne puis s’arrête.' : 'Bet on red/black/even/odd (x2) or a number / green (x36). The ball spins then stops.'],
-    ['🪙 Pile ou Face', fr ? 'Choisis pile ou face. 1 chance sur 2, victoire environ x1.95.' : 'Pick heads or tails. 50/50, win about x1.95.'],
-    ['🎲 Dés', fr ? '2 dés. Parie moins de 7, plus de 7 ou exactement 7. Exactement 7 paie plus.' : '2 dice. Bet under 7, over 7 or exactly 7. Exactly 7 pays more.'],
-    ['🎰 Slots', fr ? '3 rouleaux. 3 symboles identiques = gros gain. 2 cerises = petit gain.' : '3 reels. 3 matching symbols = big win. 2 cherries = small win.'],
-    ['🎡 Roue', fr ? 'La roue tourne et s’arrête sur un multiplicateur (ou x0).' : 'The wheel spins and stops on a multiplier (or x0).'],
-    ['⚔️ Duel', fr ? 'Tu tires une carte contre le croupier. La plus haute gagne (As faible).' : 'Draw a card vs the dealer. Highest wins (Ace is low).'],
-    ['🃏 Enseigne', fr ? 'Devine la couleur de la carte (pique, cœur, carreau, trèfle). 1 chance sur 4.' : 'Guess the suit of the card. 1 in 4.'],
-    ['🎯 Zone', fr ? 'Un nombre de 1 à 10. Choisis bas (1-3), milieu (4-7) ou haut (8-10).' : 'A number from 1 to 10. Pick low (1-3), mid (4-7) or high (8-10).'],
-    ['🎱 Plinko', fr ? 'La bille descend et tombe dans une case. Choisis le niveau de risque.' : 'The ball falls into a slot. Choose the risk level.'],
-    ['🚀 Crash', fr ? 'Choisis une cible (x1.5, x2…). La fusée monte puis explose. Si elle atteint ta cible, tu gagnes.' : 'Pick a target (x1.5, x2…). Rocket rises then crashes. If it reaches your target, you win.'],
-    ['🎟️ Ticket', fr ? 'Gratte 3 cases. 3 symboles identiques = gagné.' : 'Scratch 3 cells. 3 matching symbols = win.'],
-    ['🎲 Dé exact', fr ? 'Devine le chiffre du dé (1 à 6). 1 chance sur 6.' : 'Guess the die face (1-6). 1 in 6.'],
-    ['📦 Coffre', fr ? '3 coffres, 1 trésor. Choisis le bon.' : '3 chests, 1 treasure. Pick the right one.'],
-    ['🔫 Roulette russe', fr ? 'Choisis le nombre de balles. Survis pour gagner (plus de balles = plus gros gain).' : 'Pick how many bullets. Survive to win (more bullets = bigger payout).'],
-    ['🏇 Chevaux', fr ? 'Parie sur un des 5 chevaux. Chacun a ses cotes.' : 'Bet on one of 5 horses. Each has its own odds.'],
-    ['📈 Limbo', fr ? 'Choisis une cible (x1.5 à x10). Le multiplicateur monte au hasard : s’il dépasse ta cible, tu gagnes.' : 'Pick a target (x1.5 to x10). Multiplier rises randomly: if it exceeds your target, you win.'],
-    ['⬆️ Higher/Lower', fr ? 'Une carte de référence est tirée. Devine si la suivante est plus haute ou plus basse.' : 'A reference card is drawn. Guess if the next is higher or lower.'],
-    ['✊ Pierre-Papier-Ciseaux', fr ? 'Choisis pierre, papier ou ciseaux contre le bot. Victoire ≈ x2.8, égalité = remboursement.' : 'Pick rock, paper or scissors vs the bot. Win ≈ x2.8, draw = refund.'],
-    ['🎨 Couleur', fr ? 'Devine la couleur tirée parmi 4 (rouge, bleu, vert, jaune).' : 'Guess the drawn color among 4 (red, blue, green, yellow).'],
-    ['🪜 Échelle', fr ? 'Choisis jusqu’à quel palier tu montes. Plus haut = plus risqué et plus rémunérateur.' : 'Choose how high you climb. Higher = riskier and more rewarding.'],
-    ['🎱 Keno', fr ? 'Choisis un numéro de 1 à 10. Un seul est tiré.' : 'Pick a number from 1 to 10. One is drawn.'],
-    ['⚔️ Guerre', fr ? 'Une carte contre le croupier. La plus haute gagne.' : 'One card vs the dealer. Highest wins.'],
-    ['🃏 Hi-Lo', fr ? '3 cartes. Si les 3 sont hautes (8+) ou les 3 basses (7-), tu gagnes.' : '3 cards. If all high (8+) or all low (7-), you win.'],
-    ['🅱️ Bingo', fr ? 'Choisis une case parmi 5. Une bille sort.' : 'Pick one of 5 slots. A ball is drawn.'],
-    ['💎 Jackpot', fr ? '3 symboles. 3 identiques = gros jackpot, 2 identiques = petit gain.' : '3 symbols. 3 matching = big jackpot, 2 matching = small win.'],
-    ['🎲 Guerre de dés', fr ? 'Ton dé contre le croupier. Le plus haut gagne.' : 'Your die vs dealer. Highest wins.'],
-    ['🪙 Échelle de pièces', fr ? 'Enchaîne des piles pour monter l\'échelle.' : 'Chain heads to climb the ladder.'],
-    ['🃏 Match de cartes', fr ? 'Retrouve la carte secrète parmi 4.' : 'Find the secret card among 4.'],
-    ['🔢 Devine le nombre', fr ? 'Un nombre de 1 à 10.' : 'A number from 1 to 10.'],
-    ['💣 Désamorçage', fr ? 'Coupe le bon fil parmi 4.' : 'Cut the right wire among 4.'],
-    ['🗺️ Carte au trésor', fr ? '5 cases, 1 trésor.' : '5 spots, 1 treasure.'],
-    ['🃏 Carte haute / basse', fr ? 'Carte ≥ 8 ou ≤ 7.' : 'Card ≥ 8 or ≤ 7.'],
-    ['🃏 Paire', fr ? 'Deux cartes du même rang.' : 'Two cards of the same rank.'],
-    ['🪂 Chute libre', fr ? 'Choisis ta zone d\'atterrissage.' : 'Pick your landing zone.'],
-    ['🎈 Ballon', fr ? 'Gonfle sans faire éclater.' : 'Inflate without popping.'],
-    ['🎯 Cible', fr ? 'Centre, intérieur ou extérieur.' : 'Center, inner or outer.'],
-    ['🔢 Séquence', fr ? '3 chiffres en suite.' : '3 numbers in a row.'],
-    ['🐾 Course d\'animaux', fr ? 'Parie sur un animal.' : 'Bet on an animal.'],
-    ['🍎 Fruits', fr ? '3 fruits identiques ou 2.' : '3 matching fruits or 2.'],
-    ['💎 Chasse aux gemmes', fr ? '6 roches, 1 gemme.' : '6 rocks, 1 gem.'],
-    ['⭐ Étoile filante', fr ? 'Attrape ou laisse passer.' : 'Catch or let pass.'],
-    ['🌙 Tir lunaire', fr ? 'Atteins la distance choisie.' : 'Reach the chosen distance.'],
-    ['🌋 Volcan', fr ? 'Devine la zone d\'éruption.' : 'Guess the eruption zone.'],
-    ['⚡ Éclair', fr ? 'Reste ou fuis l\'orage.' : 'Stay or run from the storm.'],
-    ['🃏 Poker express', fr ? '3 cartes : paire ou brelan.' : '3 cards: pair or three of a kind.'],
-    ['🔴 Rouge/Noir', fr ? 'Couleur de la carte.' : 'Card color.'],
-    ['🔢 Pair/Impair', fr ? 'Sur un dé.' : 'On a die.'],
-    ['✖️ Multiplicateur', fr ? 'Valide ta cible de multi.' : 'Hit your multi target.'],
-    ['🧠 Mémoire', fr ? 'Retourne 2 cartes, trouve la paire.' : 'Flip 2 cards, find the pair.'],
-    ['🌈 Arc-en-ciel', fr ? '6 couleurs possibles.' : '6 possible colors.'],
-    ['🚀 Fusée 2', fr ? 'Cible de multiplicateur haute.' : 'High multiplier target.'],
-    ['🎲 Double dé', fr ? 'Devine la somme exacte.' : 'Guess the exact sum.'],
-    ['📦 Triple coffre', fr ? '1 trésor sur 3 coffres.' : '1 treasure in 3 chests.'],
-    ['🎨 Roue couleur', fr ? 'Roue à 6 couleurs.' : '6-color wheel.'],
+    ['💣 Mines', fr ? 'Pick a difficulty. Click tiles for diamonds. Avoid mines. Cash out anytime: more diamonds = higher multiplier.' : 'Pick a difficulty. Click tiles for diamonds. Avoid mines. Cash out anytime: more diamonds = higher multiplier.'],
+    ['🃏 Blackjack', fr ? 'Beat the dealer without going over 21. Hit, Stand or Double. Natural blackjack pays x2.5.' : 'Beat the dealer without going over 21. Hit, Stand or Double. Natural blackjack pays x2.5.'],
+    ['🎡 Roulette', fr ? 'Bet on red/black/even/odd (x2) or a number / green (x36). The ball spins then stops.' : 'Bet on red/black/even/odd (x2) or a number / green (x36). The ball spins then stops.'],
+    ['🪙 Heads or Tails', fr ? 'Pick heads or tails. 50/50, win about x1.95.' : 'Pick heads or tails. 50/50, win about x1.95.'],
+    ['🎲 Dice', fr ? '2 dice. Bet under 7, over 7 or exactly 7. Exactly 7 pays more.' : '2 dice. Bet under 7, over 7 or exactly 7. Exactly 7 pays more.'],
+    ['🎰 Slots', fr ? '3 reels. 3 matching symbols = big win. 2 cherries = small win.' : '3 reels. 3 matching symbols = big win. 2 cherries = small win.'],
+    ['🎡 Wheel', fr ? 'The wheel spins and stops on a multiplier (or x0).' : 'The wheel spins and stops on a multiplier (or x0).'],
+    ['⚔️ Duel', fr ? 'Draw a card vs the dealer. Highest wins (Ace is low).' : 'Draw a card vs the dealer. Highest wins (Ace is low).'],
+    ['🃏 Suit', fr ? 'Guess the suit of the card (spades, hearts, diamonds, clubs). 1 in 4.' : 'Guess the suit of the card. 1 in 4.'],
+    ['🎯 Zone', fr ? 'A number from 1 to 10. Pick low (1-3), mid (4-7) or high (8-10).' : 'A number from 1 to 10. Pick low (1-3), mid (4-7) or high (8-10).'],
+    ['🎱 Plinko', fr ? 'The ball falls into a slot. Choose the risk level.' : 'The ball falls into a slot. Choose the risk level.'],
+    ['🚀 Crash', fr ? 'Pick a target (x1.5, x2…). Rocket rises then crashes. If it reaches your target, you win.' : 'Pick a target (x1.5, x2…). Rocket rises then crashes. If it reaches your target, you win.'],
+    ['🎟️ Ticket', fr ? 'Scratch 3 cells. 3 matching symbols = win.' : 'Scratch 3 cells. 3 matching symbols = win.'],
+    ['🎲 Exact die', fr ? 'Guess the die face (1-6). 1 in 6.' : 'Guess the die face (1-6). 1 in 6.'],
+    ['📦 Chest', fr ? '3 chests, 1 treasure. Pick the right one.' : '3 chests, 1 treasure. Pick the right one.'],
+    ['🔫 Russian roulette', fr ? 'Pick how many bullets. Survive to win (more bullets = bigger payout).' : 'Pick how many bullets. Survive to win (more bullets = bigger payout).'],
+    ['🏇 Horses', fr ? 'Bet on one of 5 horses. Each has its own odds.' : 'Bet on one of 5 horses. Each has its own odds.'],
+    ['📈 Limbo', fr ? 'Pick a target (x1.5 to x10). Multiplier rises randomly: if it exceeds your target, you win.' : 'Pick a target (x1.5 to x10). Multiplier rises randomly: if it exceeds your target, you win.'],
+    ['⬆️ Higher/Lower', fr ? 'A reference card is drawn. Guess if the next is higher or lower.' : 'A reference card is drawn. Guess if the next is higher or lower.'],
+    ['✊ Rock-Paper-Scissors', fr ? 'Pick rock, paper or scissors vs the bot. Win ≈ x2.8, draw = refund.' : 'Pick rock, paper or scissors vs the bot. Win ≈ x2.8, draw = refund.'],
+    ['🎨 Color', fr ? 'Guess the drawn color among 4 (red, blue, green, yellow).' : 'Guess the drawn color among 4 (red, blue, green, yellow).'],
+    ['🪜 Ladder', fr ? 'Choose how high you climb. Higher = riskier and more rewarding.' : 'Choose how high you climb. Higher = riskier and more rewarding.'],
+    ['🎱 Keno', fr ? 'Pick a number from 1 to 10. One is drawn.' : 'Pick a number from 1 to 10. One is drawn.'],
+    ['⚔️ War', fr ? 'One card vs the dealer. Highest wins.' : 'One card vs the dealer. Highest wins.'],
+    ['🃏 Hi-Lo', fr ? '3 cards. If all high (8+) or all low (7-), you win.' : '3 cards. If all high (8+) or all low (7-), you win.'],
+    ['🅱️ Bingo', fr ? 'Pick one of 5 slots. A ball is drawn.' : 'Pick one of 5 slots. A ball is drawn.'],
+    ['💎 Jackpot', fr ? '3 symbols. 3 matching = big jackpot, 2 matching = small win.' : '3 symbols. 3 matching = big jackpot, 2 matching = small win.'],
+    ['🎲 Dice War', fr ? 'Your die vs dealer. Highest wins.' : 'Your die vs dealer. Highest wins.'],
+    ['🪙 Coin Ladder', fr ? 'Chain heads to climb the ladder.' : 'Chain heads to climb the ladder.'],
+    ['🃏 Card Match', fr ? 'Find the secret card among 4.' : 'Find the secret card among 4.'],
+    ['🔢 Guess the number', fr ? 'A number from 1 to 10.' : 'A number from 1 to 10.'],
+    ['💣 Defusal', fr ? 'Cut the right wire among 4.' : 'Cut the right wire among 4.'],
+    ['🗺️ Treasure map', fr ? '5 spots, 1 treasure.' : '5 spots, 1 treasure.'],
+    ['🃏 High / low card', fr ? 'Card ≥ 8 or ≤ 7.' : 'Card ≥ 8 or ≤ 7.'],
+    ['🃏 Pair', fr ? 'Two cards of the same rank.' : 'Two cards of the same rank.'],
+    ['🪂 Free fall', fr ? 'Pick your landing zone.' : 'Pick your landing zone.'],
+    ['🎈 Balloon', fr ? 'Inflate without popping.' : 'Inflate without popping.'],
+    ['🎯 Target', fr ? 'Center, inner or outer.' : 'Center, inner or outer.'],
+    ['🔢 Sequence', fr ? '3 numbers in a row.' : '3 numbers in a row.'],
+    ['🐾 Animal race', fr ? 'Bet on an animal.' : 'Bet on an animal.'],
+    ['🍎 Fruits', fr ? '3 matching fruits or 2.' : '3 matching fruits or 2.'],
+    ['💎 Gem hunt', fr ? '6 rocks, 1 gem.' : '6 rocks, 1 gem.'],
+    ['⭐ Shooting star', fr ? 'Catch or let pass.' : 'Catch or let pass.'],
+    ['🌙 Moon shot', fr ? 'Reach the chosen distance.' : 'Reach the chosen distance.'],
+    ['🌋 Volcano', fr ? 'Guess the eruption zone.' : 'Guess the eruption zone.'],
+    ['⚡ Lightning', fr ? 'Stay or run from the storm.' : 'Stay or run from the storm.'],
+    ['🃏 Poker express', fr ? '3 cards: pair or three of a kind.' : '3 cards: pair or three of a kind.'],
+    ['🔴 Red/Black', fr ? 'Card color.' : 'Card color.'],
+    ['🔢 Even/Odd', fr ? 'On a die.' : 'On a die.'],
+    ['✖️ Multiplier', fr ? 'Hit your multi target.' : 'Hit your multi target.'],
+    ['🧠 Memory', fr ? 'Flip 2 cards, find the pair.' : 'Flip 2 cards, find the pair.'],
+    ['🌈 Rainbow', fr ? '6 possible colors.' : '6 possible colors.'],
+    ['🚀 Rocket 2', fr ? 'High multiplier target.' : 'High multiplier target.'],
+    ['🎲 Double die', fr ? 'Guess the exact sum.' : 'Guess the exact sum.'],
+    ['📦 Triple chest', fr ? '1 treasure in 3 chests.' : '1 treasure in 3 chests.'],
+    ['🎨 Color wheel', fr ? '6-color wheel.' : '6-color wheel.'],
   ];
-  if (GAME_LIMIT > 0) lines = lines.slice(0, GAME_LIMIT); // mêmes jeux que le catalogue
-  // Plusieurs embeds si trop long
+  if (GAME_LIMIT > 0) lines = lines.slice(0, GAME_LIMIT); // same games as the catalog
+  // Multiple embeds if too long
   const chunks = [];
   let buf = [];
   let len = 0;
@@ -5367,9 +5444,9 @@ function buildRulesPayload(userId) {
   const embeds = chunks.map((desc, i) =>
     new EmbedBuilder()
       .setColor(0x8B5CF6)
-      .setTitle(fr ? `📖 Règles des jeux${chunks.length > 1 ? ` (${i + 1}/${chunks.length})` : ''}` : `📖 Game rules${chunks.length > 1 ? ` (${i + 1}/${chunks.length})` : ''}`)
+      .setTitle(fr ? `📖 Game rules${chunks.length > 1 ? ` (${i + 1}/${chunks.length})` : ''}` : `📖 Game rules${chunks.length > 1 ? ` (${i + 1}/${chunks.length})` : ''}`)
       .setDescription(desc)
-      .setFooter({ text: fr ? 'Mise avant de lancer · parties privées' : 'Bet before playing · private games' })
+      .setFooter({ text: fr ? 'Bet before playing · private games' : 'Bet before playing · private games' })
   );
   return animPanel({ embeds, components: [] });
 }
@@ -5382,10 +5459,10 @@ function modalInput(id, label, { placeholder, value, required = true, max = 30 }
 }
 
 const betLabel = (bal) => {
-  const s = `Mise (solde: ${num(bal)} ${COIN_PLAIN})`;
-  return s.length > 45 ? `Mise · solde ${num(bal)}` : s;
+  const s = `Bet (balance: ${num(bal)} ${COIN_PLAIN})`;
+  return s.length > 45 ? `Bet · balance ${num(bal)}` : s;
 };
-const BET_PLACEHOLDER = 'ex : 1  ou  all';
+const BET_PLACEHOLDER = 'e.g.: 1  or  all';
 
 const minesBetModal = (level, bal = 0) =>
   new ModalBuilder()
@@ -5402,16 +5479,16 @@ const blackjackModal = (bal = 0) =>
 function rouletteModal(key, bal = 0) {
   const m = new ModalBuilder()
     .setCustomId(`modal_rl_${key}`)
-    .setTitle(key === 'num' ? '🎡 Roulette · Numéro' : `🎡 Roulette · ${parseRouletteBet(key)?.label || key}`.slice(0, 45))
+    .setTitle(key === 'num' ? '🎡 Roulette · Number' : `🎡 Roulette · ${parseRouletteBet(key)?.label || key}`.slice(0, 45))
     .addComponents(modalInput('bet', betLabel(bal), { placeholder: BET_PLACEHOLDER }));
-  if (key === 'num') m.addComponents(modalInput('num', 'Ton numéro (0 à 36)', { placeholder: 'ex : 17', max: 2 }));
+  if (key === 'num') m.addComponents(modalInput('num', 'Your number (0 to 36)', { placeholder: 'e.g.: 17', max: 2 }));
   return m;
 }
 
 const instantBetModal = (key, choice, bal = 0) =>
   new ModalBuilder()
     .setCustomId(`modal_ig_${key}_${choice}`)
-    .setTitle((INSTANT[key]?.title || 'Jeu').slice(0, 45))
+    .setTitle((INSTANT[key]?.title || 'Game').slice(0, 45))
     .addComponents(modalInput('bet', betLabel(bal), { placeholder: BET_PLACEHOLDER }));
 
 async function handlePanelButton(i) {
@@ -5428,19 +5505,19 @@ async function handlePanelButton(i) {
   if (i.customId.startsWith('panel_favtoggle_')) {
     const game = i.customId.slice('panel_favtoggle_'.length);
     const on = toggleFav(i.user.id, game);
-    return i.reply({ content: on ? `⭐ **${GAME_NAMES[game] || game}** ajouté aux favoris.` : `☆ **${GAME_NAMES[game] || game}** retiré des favoris.`, flags: EPH });
+    return i.reply({ content: on ? `⭐ **${GAME_NAMES[game] || game}** added to favorites.` : `☆ **${GAME_NAMES[game] || game}** removed from favorites.`, flags: EPH });
   }
 
   const instantKey = i.customId.slice('panel_'.length);
   if (INSTANT[instantKey]) {
     const payload = INSTANT[instantKey].picker(coef(instantKey));
-    payload.embeds.forEach((e) => brand(e, instantKey, 'ZNK Casino  •  Choisis, puis mise'));
-    // Ajoute bouton favori
+    payload.embeds.forEach((e) => brand(e, instantKey, 'ZNK Casino  •  Choose, then bet'));
+    // Add favorite button
     const favOn = getFavs(i.user.id).has(instantKey);
     const favRow = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId(`panel_favtoggle_${instantKey}`)
-        .setLabel(favOn ? 'Retirer des favoris' : 'Ajouter aux favoris')
+        .setLabel(favOn ? 'Remove from favorites' : 'Add to favorites')
         .setEmoji('⭐')
         .setStyle(favOn ? ButtonStyle.Secondary : ButtonStyle.Primary)
     );
@@ -5456,12 +5533,12 @@ async function handlePanelButton(i) {
         const dm = await i.user.createDM();
         await dm.send(payload);
         return i.reply({
-          content: L(i.user.id, '✅ **Start** envoyé en **message privé**. Ouvre tes MP avec le bot.', '✅ **Start** sent in your DMs. Open your private messages with the bot.'),
+          content: L(i.user.id, '✅ **Start** sent in your DMs. Open your private messages with the bot.', '✅ **Start** sent in your DMs. Open your private messages with the bot.'),
           flags: EPH,
         });
       } catch {
         return i.reply({
-          content: L(i.user.id, '⚠️ Impossible de t’écrire en MP (MP fermés). Voici ton panneau privé :', '⚠️ Could not DM you (DMs closed). Here’s your private panel instead:'),
+          content: L(i.user.id, '⚠️ Could not DM you (DMs closed). Here’s your private panel instead:', '⚠️ Could not DM you (DMs closed). Here’s your private panel instead:'),
           ...payload,
           flags: EPH,
         });
@@ -5475,8 +5552,8 @@ async function handlePanelButton(i) {
       return i.showModal(
         new ModalBuilder()
           .setCustomId('modal_search_game')
-          .setTitle('🔍 Rechercher un jeu')
-          .addComponents(modalInput('q', 'Nom du jeu (ex : poker, dés, crash)', { placeholder: 'mines, slots…', max: 40 }))
+          .setTitle('🔍 Search for a game')
+          .addComponents(modalInput('q', 'Game name (e.g.: poker, dice, crash)', { placeholder: 'mines, slots…', max: 40 }))
       );
     case 'panel_home': {
       const payload = await buildDmPlayPayload(i.user.id);
@@ -5502,7 +5579,7 @@ async function handlePanelButton(i) {
     case 'panel_clearall': {
       await i.deferReply({ flags: EPH });
       const channel = i.channel?.isDMBased?.() ? i.channel : await i.user.createDM().catch(() => null);
-      if (!channel) return i.editReply({ content: 'Impossible d’accéder à la conversation.' });
+      if (!channel) return i.editReply({ content: 'Unable to access the conversation.' });
       let deleted = 0;
       try {
         let lastId;
@@ -5523,7 +5600,7 @@ async function handlePanelButton(i) {
         console.error('[clearall]', e?.message || e);
       }
       await channel.send(await buildDmPlayPayload(i.user.id)).catch(() => {});
-      return i.editReply({ content: `🧹 **${deleted}** message(s) supprimé(s). Panneau renvoyé.` }).catch(() => {});
+      return i.editReply({ content: `🧹 **${deleted}** message(s) deleted. Panel resent.` }).catch(() => {});
     }
     case 'panel_stats': {
       await i.deferReply({ flags: EPH });
@@ -5541,7 +5618,7 @@ async function handlePanelButton(i) {
           await i.deferReply({ flags: EPH });
           const channel = i.channel?.isDMBased?.() ? i.channel : await i.user.createDM().catch(() => null);
           if (channel) {
-            // Supprime autant de messages du bot que possible
+            // Delete as many bot messages as possible
             for (let page = 0; page < 5; page++) {
               const fetched = await channel.messages.fetch({ limit: 100 }).catch(() => null);
               if (!fetched || fetched.size === 0) break;
@@ -5553,7 +5630,7 @@ async function handlePanelButton(i) {
             await channel.send(await buildDmPlayPayload(i.user.id));
           }
           return i.editReply({
-            content: L(i.user.id, '🧹 Tout a été nettoyé · parties fermées · panneau renvoyé.', '🧹 Everything cleaned · games closed · fresh panel sent.'),
+            content: L(i.user.id, '🧹 Everything cleaned · games closed · fresh panel sent.', '🧹 Everything cleaned · games closed · fresh panel sent.'),
           });
         } catch (e) {
           console.error('[clear dm]', e?.message || e);
@@ -5561,13 +5638,13 @@ async function handlePanelButton(i) {
       }
 
       return i.reply({
-        content: L(i.user.id, '🧹 Parties fermées. **Start** pour un panneau privé propre.', '🧹 Open games closed. Use **Start** for a clean private panel.'),
+        content: L(i.user.id, '🧹 Open games closed. Use **Start** for a clean private panel.', '🧹 Open games closed. Use **Start** for a clean private panel.'),
         flags: EPH,
       });
     }
     case 'panel_mines': {
       const pl = minesPickerPayload();
-      pl.embeds.forEach((e) => brand(e, 'mines', 'ZNK Casino  •  Choisis ta difficulté'));
+      pl.embeds.forEach((e) => brand(e, 'mines', 'ZNK Casino  •  Choose your difficulty'));
       return i.reply({ ...pl, flags: EPH });
     }
     case 'panel_bj': {
@@ -5576,7 +5653,7 @@ async function handlePanelButton(i) {
     }
     case 'panel_roulette': {
       const pl = roulettePickerPayload();
-      pl.embeds.forEach((e) => brand(e, 'roulette', 'ZNK Casino  •  Choisis ton pari'));
+      pl.embeds.forEach((e) => brand(e, 'roulette', 'ZNK Casino  •  Place your bet'));
       return i.reply({ ...pl, flags: EPH });
     }
     case 'panel_daily': {
@@ -5596,15 +5673,15 @@ async function handlePanelButton(i) {
     }
     case 'panel_invites': {
       await i.deferReply({ flags: EPH });
-      if (!i.guild) return i.editReply({ content: 'Les invitations se consultent depuis le serveur.' });
+      if (!i.guild) return i.editReply({ content: 'Invitations can be checked from the server.' });
       return i.editReply(await buildInvitesPayload(i.guild, i.user.id, getLang(i.user.id)));
     }
     case 'panel_send': {
-      // Envoi par pseudo : uniquement un membre du serveur
+      // Send by username: server members only
       const guildId = resolveGuildId(i);
       if (!guildId) {
         return i.reply({
-          content: L(i.user.id, '⚠️ Ouvre **Start** depuis le serveur pour pouvoir envoyer des coins.', '⚠️ Use **Start** from the server to send coins.'),
+          content: L(i.user.id, '⚠️ Use **Start** from the server to send coins.', '⚠️ Use **Start** from the server to send coins.'),
           flags: EPH,
         });
       }
@@ -5612,13 +5689,13 @@ async function handlePanelButton(i) {
       return i.showModal(
         new ModalBuilder()
           .setCustomId('modal_send_name')
-          .setTitle(L(i.user.id, `💸 Envoyer des ${COIN_PLAIN}`, `💸 Send ${COIN_PLAIN}`))
+          .setTitle(L(i.user.id, `💸 Send ${COIN_PLAIN}`, `💸 Send ${COIN_PLAIN}`))
           .addComponents(
-            modalInput('to', L(i.user.id, 'Pseudo du joueur (exact)', 'Exact username'), {
-              placeholder: L(i.user.id, 'ex : JeanDupont', 'ex : JohnDoe'),
+            modalInput('to', L(i.user.id, 'Exact username', 'Exact username'), {
+              placeholder: L(i.user.id, 'e.g.: JohnDoe', 'e.g.: JohnDoe'),
               max: 32,
             }),
-            modalInput('amount', betLabel(bal), { placeholder: 'ex : 5  ou  all' })
+            modalInput('amount', betLabel(bal), { placeholder: 'e.g.: 5  or  all' })
           )
       );
     }
@@ -5635,7 +5712,7 @@ async function handleModalSubmit(i) {
     const bal = await getBalance(i.user.id);
     return parseAmount(get('bet'), bal);
   };
-  const badBet = () => respondText(i, 'Mise invalide : écris un nombre (ex : 1 ou 2.5) ou "all".');
+  const badBet = () => respondText(i, 'Invalid bet: enter a number (e.g. 1 or 2.5) or "all".');
 
   if (id.startsWith('modal_mines_')) {
     const level = id.slice('modal_mines_'.length);
@@ -5656,7 +5733,7 @@ async function handleModalSubmit(i) {
   if (id.startsWith('modal_rl_')) {
     const key = id.slice('modal_rl_'.length);
     const choiceStr = key === 'num' ? get('num') : key;
-    if (!parseRouletteBet(choiceStr)) return respondText(i, 'Numéro invalide : entre un nombre de 0 à 36.');
+    if (!parseRouletteBet(choiceStr)) return respondText(i, 'Invalid number: enter a number from 0 to 36.');
     const bet = await readBet();
     return bet ? playRoulette(i, bet, choiceStr) : badBet();
   }
@@ -5664,14 +5741,14 @@ async function handleModalSubmit(i) {
     let toId = null;
     if (id === 'modal_send_name') {
       const name = String(get('to') || '').trim().toLowerCase();
-      if (!name) return respondText(i, L(i.user.id, 'Indique un pseudo.', 'Enter a username.'));
+      if (!name) return respondText(i, L(i.user.id, 'Enter a username.', 'Enter a username.'));
       const guildId = resolveGuildId(i);
       if (!guildId) {
-        return respondText(i, L(i.user.id, 'Ouvre Start depuis le serveur pour envoyer des coins.', 'Open Start from the server to send coins.'));
+        return respondText(i, L(i.user.id, 'Open Start from the server to send coins.', 'Open Start from the server to send coins.'));
       }
       const guild = await client.guilds.fetch(guildId).catch(() => null);
-      if (!guild) return respondText(i, L(i.user.id, 'Serveur introuvable.', 'Server not found.'));
-      // Cherche le membre par username ou globalName (doit être sur le serveur)
+      if (!guild) return respondText(i, L(i.user.id, 'Server not found.', 'Server not found.'));
+      // Find the member by username or globalName (must be on the server)
       let member = guild.members.cache.find(
         (m) =>
           !m.user.bot &&
@@ -5698,7 +5775,7 @@ async function handleModalSubmit(i) {
           i,
           L(
             i.user.id,
-            `❌ Aucun membre **${escapeMarkdown(get('to'))}** trouvé sur le serveur. Le pseudo doit être exact et la personne doit être présente.`,
+            `❌ No member **${escapeMarkdown(get('to'))}** found on the server. Username must be exact and the person must be on the server.`,
             `❌ No member **${escapeMarkdown(get('to'))}** found on the server. Username must be exact and the person must be on the server.`
           )
         );
@@ -5707,15 +5784,15 @@ async function handleModalSubmit(i) {
     } else {
       toId = id.slice('modal_send_'.length);
       if (!/^\d{15,25}$/.test(toId)) {
-        return respondText(i, L(i.user.id, 'Destinataire invalide.', 'Invalid recipient.'));
+        return respondText(i, L(i.user.id, 'Invalid recipient.', 'Invalid recipient.'));
       }
     }
     if (toId === i.user.id) {
-      return respondText(i, L(i.user.id, `❌ Tu ne peux pas t’envoyer des ${COIN} à toi-même.`, `❌ You cannot send ${COIN} to yourself.`));
+      return respondText(i, L(i.user.id, `❌ You cannot send ${COIN} to yourself.`, `❌ You cannot send ${COIN} to yourself.`));
     }
     const bal = await getBalance(i.user.id);
     const amount = parseAmount(get('amount'), bal);
-    if (!amount) return respondText(i, 'Montant invalide : nombre ou "all".');
+    if (!amount) return respondText(i, 'Invalid amount: number or "all".');
     if (amount > bal) return respondText(i, t(i.user.id, 'insufficient'));
     const newBal = await debit(i.user.id, amount);
     if (newBal === null) return respondText(i, t(i.user.id, 'insufficient'));
@@ -5723,29 +5800,29 @@ async function handleModalSubmit(i) {
     const toUser = await client.users.fetch(toId).catch(() => null);
     const tcard = await makeCard('transfer', {
       avatar: i.user,
-      tag: 'TRANSFERT',
+      tag: 'TRANSFER',
       headline: userName(i.user),
-      sub: `a envoyé à ${userName(toUser)}`,
-      barLeft: 'MONTANT',
+      sub: `sent to ${userName(toUser)}`,
+      barLeft: 'AMOUNT',
       barRight: coinTxt(amount),
       cells: [
-        ['DE', userName(i.user)],
-        ['À', userName(toUser)],
-        ['MONTANT', coinTxt(amount), '#86EFAC'],
-        ['TON SOLDE', coinTxt(newBal)],
-        ['SOLDE DESTINATAIRE', coinTxt(toBal)],
+        ['FROM', userName(i.user)],
+        ['TO', userName(toUser)],
+        ['AMOUNT', coinTxt(amount), '#86EFAC'],
+        ['YOUR BALANCE', coinTxt(newBal)],
+        ['RECIPIENT BALANCE', coinTxt(toBal)],
         ['DATE', dateFR()],
       ],
     });
-    // Notif MP au destinataire
+    // DM notification to the recipient
     const dmPayload = {
       embeds: [
         new EmbedBuilder()
           .setColor(COLORS.green)
-          .setTitle(`💸 Tu as reçu des ${COIN_PLAIN}`)
+          .setTitle(`💸 You received ${COIN_PLAIN}`)
           .setDescription(
-            `<@${i.user.id}> t’a envoyé **${fmt(amount)}**.\n` +
-              `Nouveau solde : **${fmt(toBal)}**`
+            `<@${i.user.id}> sent you **${fmt(amount)}**.\n` +
+              `New balance: **${fmt(toBal)}**`
           )
           .setTimestamp(),
       ],
@@ -5755,7 +5832,7 @@ async function handleModalSubmit(i) {
     const sendReply = {
       content:
         `✅ **${fmt(amount)}** → <@${toId}>\n` +
-        `💰 ${t(i.user.id, 'yourBalance')} : **${fmt(newBal)}** · Dest. : **${fmt(toBal)}**`,
+        `💰 ${t(i.user.id, 'yourBalance')} : **${fmt(newBal)}** · Recipient: **${fmt(toBal)}**`,
       flags: EPH,
     };
     if (tcard) {
@@ -5770,7 +5847,7 @@ async function handleModalSubmit(i) {
 async function handleReplay(i) {
   const [, type, betStr, arg] = i.customId.split('|');
   const bet = Number(betStr);
-  if (!Number.isFinite(bet) || bet <= 0) return respondText(i, 'Mise invalide.');
+  if (!Number.isFinite(bet) || bet <= 0) return respondText(i, 'Invalid bet.');
   if (type === 'mines') return startMines(i, arg, bet);
   if (type === 'bj') return startBlackjack(i, bet);
   if (type === 'rl') return playRoulette(i, bet, arg);
@@ -5778,114 +5855,114 @@ async function handleReplay(i) {
 }
 
 // ============================================================
-//  PANNEAU ADMIN (propriétaire uniquement)
+//  ADMIN PANEL (owner only)
 // ============================================================
 function buildAdminPayload() {
   const embed = new EmbedBuilder()
     .setColor(0xEF4444)
     .setTitle('✦ Admin')
-    .setDescription(`Contrôle propriétaire · monnaie **${COIN}**\nChaque action publique indique **qui** l’a faite.`)
+    .setDescription(`Owner control · currency **${COIN}**\nEvery public action shows **who** did it.`)
     .addFields(
-      { name: '💰 Économie', value: 'Ajouter · Retirer · Définir · Voir · Offrir all', inline: false },
-      { name: '💥 Resets', value: 'Soldes · All-time · Stats', inline: true },
-      { name: '🎚️ Live', value: 'Mult · Events · Boosts', inline: true },
-      { name: '📡 Salons', value: 'All-time · Notifs · Classement', inline: true }
+      { name: '💰 Economy', value: 'Add · Remove · Set · View · Gift all', inline: false },
+      { name: '💥 Resets', value: 'Balances · All-time · Stats', inline: true },
+      { name: '🎚️ Live', value: 'Multipliers · Events · Boosts', inline: true },
+      { name: '📡 Channels', value: 'All-time · Notifications · Leaderboard', inline: true }
     )
     .setFooter({ text: 'Owner only' })
     .setTimestamp();
   const row1 = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('admin_add').setLabel('Ajouter').setEmoji('➕').setStyle(ButtonStyle.Success),
-    new ButtonBuilder().setCustomId('admin_remove').setLabel('Retirer').setEmoji('➖').setStyle(ButtonStyle.Danger),
-    new ButtonBuilder().setCustomId('admin_set').setLabel('Définir').setEmoji('🎯').setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId('admin_view').setLabel('Voir').setEmoji('👀').setStyle(ButtonStyle.Secondary)
+    new ButtonBuilder().setCustomId('admin_add').setLabel('Add').setEmoji('➕').setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId('admin_remove').setLabel('Remove').setEmoji('➖').setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId('admin_set').setLabel('Set').setEmoji('🎯').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId('admin_view').setLabel('View').setEmoji('👀').setStyle(ButtonStyle.Secondary)
   );
   const row2 = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('admin_all').setLabel('Offrir all').setEmoji('🎁').setStyle(ButtonStyle.Success),
-    new ButtonBuilder().setCustomId('admin_reset').setLabel('Reset soldes').setEmoji('💥').setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId('admin_all').setLabel('Gift all').setEmoji('🎁').setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId('admin_reset').setLabel('Reset balances').setEmoji('💥').setStyle(ButtonStyle.Danger),
     new ButtonBuilder().setCustomId('admin_resetpeaks').setLabel('Reset all-time').setEmoji('👑').setStyle(ButtonStyle.Danger),
     new ButtonBuilder().setCustomId('admin_resetstats').setLabel('Reset stats').setEmoji('📊').setStyle(ButtonStyle.Danger)
   );
   const row3 = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('admin_mult').setLabel('Multiplicateurs').setEmoji('🎚️').setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId('admin_event').setLabel('Événement').setEmoji('📢').setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId('admin_annonce').setLabel('Annonce').setEmoji('📣').setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId('admin_alltimechan').setLabel('Salon all-time').setEmoji('🏆').setStyle(ButtonStyle.Secondary)
+    new ButtonBuilder().setCustomId('admin_mult').setLabel('Multipliers').setEmoji('🎚️').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId('admin_event').setLabel('Event').setEmoji('📢').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId('admin_annonce').setLabel('Announcement').setEmoji('📣').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId('admin_alltimechan').setLabel('All-time channel').setEmoji('🏆').setStyle(ButtonStyle.Secondary)
   );
   const row4 = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('admin_notifchan').setLabel('Salon notifs').setEmoji('🔔').setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId('admin_pokerchan').setLabel('Salon online').setEmoji('🌐').setStyle(ButtonStyle.Success),
-    new ButtonBuilder().setCustomId('admin_top').setLabel('Classement').setEmoji('🏆').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('admin_notifchan').setLabel('Notifications channel').setEmoji('🔔').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('admin_pokerchan').setLabel('Online channel').setEmoji('🌐').setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId('admin_top').setLabel('Leaderboard').setEmoji('🏆').setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId('admin_topall').setLabel('All-time').setEmoji('👑').setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId('admin_stats').setLabel('Stats joueur').setEmoji('📊').setStyle(ButtonStyle.Primary)
+    new ButtonBuilder().setCustomId('admin_stats').setLabel('Player stats').setEmoji('📊').setStyle(ButtonStyle.Primary)
   );
   return withBanner({ embeds: [embed], components: [row1, row2, row3, row4] }, 'panel_admin.png');
 }
 
-// ---------- Événements (claim, giveaway, boosts) ----------
+// ---------- Events (claim, giveaway, boosts) ----------
 const activeEvents = new Map();
 
 const EVENT_TYPES = [
-  { id: 'claim', label: 'Claim rapide', desc: 'Les N premiers qui cliquent gagnent' },
-  { id: 'giveaway', label: 'Giveaway', desc: 'Inscriptions, tirage à la fin du timer' },
-  { id: 'x2win', label: 'x2 Gains', desc: 'Tous les gains sont doublés pendant X min' },
-  { id: 'x2lose', label: 'x2 Pertes', desc: 'Les pertes sont doublées pendant X min' },
-  { id: 'x2both', label: 'x2 Gains & Pertes', desc: 'Gains et pertes x2 pendant X min' },
-  { id: 'lucky', label: 'Heure chanceuse', desc: 'Gains x1.5 pendant X min' },
-  { id: 'goldrush', label: 'Ruée vers l’or', desc: 'Gains x3 pendant X min' },
+  { id: 'claim', label: 'Quick claim', desc: 'First N players to click win' },
+  { id: 'giveaway', label: 'Giveaway', desc: 'Sign-ups, draw when the timer ends' },
+  { id: 'x2win', label: 'x2 Wins', desc: 'All wins are doubled for X minutes' },
+  { id: 'x2lose', label: 'x2 Losses', desc: 'Losses are doubled for X minutes' },
+  { id: 'x2both', label: 'x2 Wins & Losses', desc: 'Wins and losses x2 for X minutes' },
+  { id: 'lucky', label: 'Lucky hour', desc: 'Wins x1.5 for X minutes' },
+  { id: 'goldrush', label: 'Gold rush', desc: 'Wins x3 for X minutes' },
 ];
 
 const BOOST_PRESETS = {
-  x2win: { winMult: 2, loseMult: 1, label: 'x2 Gains 🔥' },
-  x2lose: { winMult: 1, loseMult: 2, label: 'x2 Pertes 💀' },
-  x2both: { winMult: 2, loseMult: 2, label: 'x2 Gains & Pertes ⚡' },
-  lucky: { winMult: 1.5, loseMult: 1, label: 'Heure chanceuse 🍀' },
-  goldrush: { winMult: 3, loseMult: 1, label: 'Ruée vers l’or 🏆' },
+  x2win: { winMult: 2, loseMult: 1, label: 'x2 Wins 🔥' },
+  x2lose: { winMult: 1, loseMult: 2, label: 'x2 Losses 💀' },
+  x2both: { winMult: 2, loseMult: 2, label: 'x2 Wins & Losses ⚡' },
+  lucky: { winMult: 1.5, loseMult: 1, label: 'Lucky Hour 🍀' },
+  goldrush: { winMult: 3, loseMult: 1, label: 'Gold Rush 🏆' },
 };
-/** envoie une notification d'événement dans la boîte de réception du site (tous les joueurs du serveur) */
+/** sends an event notification to the site inbox (all players on the server) */
 function webEvent(guildId, n) {
   try { if (webApp && webApp.pushEvent) webApp.pushEvent(String(guildId), n); } catch (e) { console.error('[web event]', e?.message || e); }
 }
-const boostText = (p, minutes) => [p.winMult !== 1 ? `Gains ×${p.winMult}` : '', p.loseMult !== 1 ? `Pertes ×${p.loseMult}` : '', `pendant ${minutes} min`].filter(Boolean).join(' · ');
+const boostText = (p, minutes) => [p.winMult !== 1 ? `Wins ×${p.winMult}` : '', p.loseMult !== 1 ? `Losses ×${p.loseMult}` : '', `for ${minutes} min`].filter(Boolean).join(' · ');
 const evNotif = (ev, eventId) => ({
   kind: ev.type, eventId,
-  title: ev.type === 'giveaway' ? '🎉 Giveaway' : '📢 Claim : premier arrivé',
-  text: ev.type === 'giveaway' ? `Prix : ${num(ev.amount)} × ${ev.maxWinners} gagnant(s) · tirage ${ev.expiresAt ? 'dans ' + Math.max(1, Math.round((ev.expiresAt - Date.now()) / 60000)) + ' min' : ''}` : `${num(ev.amount)} par gagnant · ${ev.maxWinners} place(s)` + (ev.expiresAt ? ` · ${Math.max(1, Math.round((ev.expiresAt - Date.now()) / 60000))} min` : ''),
+  title: ev.type === 'giveaway' ? '🎉 Giveaway' : '📢 Claim: first come, first served',
+  text: ev.type === 'giveaway' ? `Prize: ${num(ev.amount)} × ${ev.maxWinners} winner(s) · drawing ${ev.expiresAt ? 'in ' + Math.max(1, Math.round((ev.expiresAt - Date.now()) / 60000)) + ' min' : ''}` : `${num(ev.amount)} per winner · ${ev.maxWinners} spot(s)` + (ev.expiresAt ? ` · ${Math.max(1, Math.round((ev.expiresAt - Date.now()) / 60000))} min` : ''),
   amount: ev.amount, expiresAt: ev.expiresAt || 0,
 });
 
 function claimEventEmbed(ev) {
   const left = ev.maxWinners - ev.winners.size;
-  const host = ev.hostId ? `👤 Par <@${ev.hostId}>\n` : '';
-  const e = new EmbedBuilder().setTitle('📢 Claim : premier arrivé').setColor(left > 0 ? COLORS.violet : COLORS.grey);
+  const host = ev.hostId ? `👤 By <@${ev.hostId}>\n` : '';
+  const e = new EmbedBuilder().setTitle('📢 Claim: first come, first served').setColor(left > 0 ? COLORS.violet : COLORS.grey);
   if (ev.finished || left <= 0) {
-    const names = [...ev.winners].map((id) => `<@${id}>`).join(', ') || 'personne';
-    e.setDescription(`${host}🏁 **Terminé** · gagnant(s) : ${names}\nChacun a reçu **${fmt(ev.amount)}**.`);
+    const names = [...ev.winners].map((id) => `<@${id}>`).join(', ') || 'no one';
+    e.setDescription(`${host}🏁 **Finished** · winner(s): ${names}\nEach received **${fmt(ev.amount)}**.`);
   } else {
-    const timeLine = ev.expiresAt ? `\n⏱️ Expire <t:${Math.floor(ev.expiresAt / 1000)}:R>` : '\n⏱️ Sans limite';
+    const timeLine = ev.expiresAt ? `\n⏱️ Expires <t:${Math.floor(ev.expiresAt / 1000)}:R>` : '\n⏱️ No limit';
     e.setDescription(
-      `${host}🎁 **${fmt(ev.amount)}** par gagnant\n` +
-        `Places restantes : **${left}/${ev.maxWinners}**\n` +
-        `Clique **Réclamer** pour empocher ta part !${timeLine}`
+      `${host}🎁 **${fmt(ev.amount)}** per winner\n` +
+        `Spots remaining: **${left}/${ev.maxWinners}**\n` +
+        `Click **Claim** to collect your share!${timeLine}`
     );
   }
   return e;
 }
 
 function giveawayEmbed(ev) {
-  const host = ev.hostId ? `👤 Par <@${ev.hostId}>\n` : '';
+  const host = ev.hostId ? `👤 By <@${ev.hostId}>\n` : '';
   const e = new EmbedBuilder().setTitle('🎉 Giveaway').setColor(ev.finished ? COLORS.grey : COLORS.gold);
   if (ev.finished) {
-    const names = [...ev.winners].map((id) => `<@${id}>`).join(', ') || 'personne';
+    const names = [...ev.winners].map((id) => `<@${id}>`).join(', ') || 'no one';
     e.setDescription(
-      `${host}🏁 **Tirage terminé**\nGagnant(s) : ${names}\nPrix : **${fmt(ev.amount)}** chacun\n` +
-        `Participants : **${ev.entries.size}**`
+      `${host}🏁 **Giveaway finished**\nWinner(s): ${names}\nPrize: **${fmt(ev.amount)}** each\n` +
+        `Participants: **${ev.entries.size}**`
     );
   } else {
     e.setDescription(
-      `${host}🎁 Prix : **${fmt(ev.amount)}** × **${ev.maxWinners}** gagnant(s)\n` +
-        `Clique **Participer** pour t’inscrire !\n` +
-        `👥 Inscrits : **${ev.entries.size}**\n` +
-        `⏱️ Tirage <t:${Math.floor(ev.expiresAt / 1000)}:R>`
+      `${host}🎁 Prize: **${fmt(ev.amount)}** × **${ev.maxWinners}** winner(s)\n` +
+        `Click **Join** to enter!\n` +
+        `👥 Entrants: **${ev.entries.size}**\n` +
+        `⏱️ Drawing <t:${Math.floor(ev.expiresAt / 1000)}:R>`
     );
   }
   return e;
@@ -5896,7 +5973,7 @@ function eventActionRow(eventId, type, disabled) {
     return new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId(`event_join_${eventId}`)
-        .setLabel(disabled ? 'Terminé' : 'Participer')
+        .setLabel(disabled ? 'Finished' : 'Join')
         .setEmoji(disabled ? '🏁' : '🎟️')
         .setStyle(disabled ? ButtonStyle.Secondary : ButtonStyle.Success)
         .setDisabled(!!disabled)
@@ -5905,7 +5982,7 @@ function eventActionRow(eventId, type, disabled) {
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId(`event_claim_${eventId}`)
-      .setLabel(disabled ? 'Terminé' : 'Réclamer')
+      .setLabel(disabled ? 'Finished' : 'Claim')
       .setEmoji(disabled ? '🏁' : '🎁')
       .setStyle(disabled ? ButtonStyle.Secondary : ButtonStyle.Success)
       .setDisabled(!!disabled)
@@ -5929,7 +6006,7 @@ async function finishGiveaway(eventId) {
       console.error('[giveaway] credit', e?.message || e);
     }
   }
-  webEvent(ev.guildId, { kind: 'giveaway_end', title: '🎉 Giveaway terminé', text: `Gagnant(s) : ${[...ev.winners].map((id) => { const u = client.users.cache.get(id); return u ? u.globalName || u.username : id; }).join(', ') || 'personne'} · ${num(ev.amount)} chacun` });
+  webEvent(ev.guildId, { kind: 'giveaway_end', title: '🎉 Giveaway finished', text: `Winner(s): ${[...ev.winners].map((id) => { const u = client.users.cache.get(id); return u ? u.globalName || u.username : id; }).join(', ') || 'no one'} · ${num(ev.amount)} each` });
   activeEvents.delete(eventId);
 }
 
@@ -5945,17 +6022,17 @@ async function handleEventClaim(i) {
   const eventId = i.customId.slice('event_claim_'.length);
   const ev = activeEvents.get(eventId);
   if (!ev || ev.finished || ev.type !== 'claim') {
-    return i.reply({ content: 'Cette récompense n’est plus disponible.' });
+    return i.reply({ content: 'This reward is no longer available.' });
   }
   if (ev.expiresAt && Date.now() > ev.expiresAt) {
     await expireClaimEvent(eventId);
-    return i.reply({ content: '⏱️ Cet événement a expiré.' });
+    return i.reply({ content: '⏱️ This event has expired.' });
   }
-  if (ev.winners.has(i.user.id)) return i.reply({ content: 'Tu as déjà réclamé ta part !' });
+  if (ev.winners.has(i.user.id)) return i.reply({ content: 'You already claimed your share!' });
   if (ev.winners.size >= ev.maxWinners) {
     ev.finished = true;
     activeEvents.delete(eventId);
-    return i.reply({ content: 'Plus de places disponibles.' });
+    return i.reply({ content: 'No more spots available.' });
   }
 
   ev.winners.add(i.user.id);
@@ -5971,13 +6048,13 @@ async function handleEventClaim(i) {
     await i.update({
       embeds: [claimEventEmbed(ev)],
       components: [eventActionRow(eventId, 'claim', true)],
-    }).catch(() => i.reply({ content: `✅ Tu as reçu **${fmt(ev.amount)}** !` }));
-    await i.followUp({ content: `✅ Tu as reçu **${fmt(ev.amount)}** !` }).catch(() => {});
+    }).catch(() => i.reply({ content: `✅ You received **${fmt(ev.amount)}**!` }));
+    await i.followUp({ content: `✅ You received **${fmt(ev.amount)}**!` }).catch(() => {});
   } catch (e) {
     ev.winners.delete(i.user.id);
     console.error('[event] claim', e?.message || e);
     if (!i.replied && !i.deferred) {
-      await i.reply({ content: '⚠️ Erreur lors du crédit.' }).catch(() => {});
+      await i.reply({ content: '⚠️ Error while crediting.' }).catch(() => {});
     }
   }
 }
@@ -5985,20 +6062,20 @@ async function handleEventClaim(i) {
 async function handleEventJoin(i) {
   const eventId = i.customId.slice('event_join_'.length);
   const ev = activeEvents.get(eventId);
-  if (!ev || ev.finished || ev.type !== 'giveaway') return i.reply({ content: 'Ce giveaway est terminé.' });
+  if (!ev || ev.finished || ev.type !== 'giveaway') return i.reply({ content: 'This giveaway is finished.' });
   if (ev.expiresAt && Date.now() > ev.expiresAt) {
     await finishGiveaway(eventId);
-    return i.reply({ content: '⏱️ Le giveaway est terminé.' });
+    return i.reply({ content: '⏱️ The giveaway is finished.' });
   }
-  if (ev.entries.has(i.user.id)) return i.reply({ content: 'Tu es déjà inscrit !' });
+  if (ev.entries.has(i.user.id)) return i.reply({ content: 'You are already entered!' });
   ev.entries.add(i.user.id);
   try {
     await i.update({
       embeds: [giveawayEmbed(ev)],
       components: [eventActionRow(eventId, 'giveaway', false)],
     }).catch(() => {});
-    await i.followUp({ content: '🎟️ Tu es inscrit au giveaway ! Bonne chance.' }).catch(() =>
-      i.reply({ content: '🎟️ Tu es inscrit au giveaway ! Bonne chance.' }).catch(() => {})
+    await i.followUp({ content: '🎟️ You are entered in the giveaway! Good luck.' }).catch(() =>
+      i.reply({ content: '🎟️ You are entered in the giveaway! Good luck.' }).catch(() => {})
     );
   } catch (e) {
     console.error('[giveaway] join', e?.message || e);
@@ -6008,17 +6085,17 @@ async function handleEventJoin(i) {
 async function postBoostEvent(i, kind, minutes) {
   const presets = BOOST_PRESETS;
   const p = presets[kind];
-  if (!p) return respondText(i, 'Type de boost inconnu.');
-  if (!minutes || minutes < 1) return respondText(i, 'Indique une durée en minutes (min. 1).');
+  if (!p) return respondText(i, 'Unknown boost type.');
+  if (!minutes || minutes < 1) return respondText(i, 'Enter a duration in minutes (min. 1).');
 
   await startBoost(i.guild.id, { ...p, minutes });
-  webEvent(i.guild.id, { kind: 'boost', title: `⚡ Boost : ${p.label}`, text: boostText(p, minutes), expiresAt: Date.now() + minutes * 60_000 });
-  return i.reply({ content: `✅ Boost **${p.label}** lancé · popup affiché sur le site.`, flags: EPH });
+  webEvent(i.guild.id, { kind: 'boost', title: `⚡ Boost: ${p.label}`, text: boostText(p, minutes), expiresAt: Date.now() + minutes * 60_000 });
+  return i.reply({ content: `✅ Boost **${p.label}** started · popup shown on the site.`, flags: EPH });
 }
 
 async function createClaimOrGiveaway(i, type, amount, winners, minutes) {
   if (type === 'giveaway' && (!minutes || minutes < 1)) {
-    return respondText(i, 'Un giveaway doit avoir une durée (minutes ≥ 1).');
+    return respondText(i, 'A giveaway must have a duration (minutes ≥ 1).');
   }
 
   const eventId = `${Date.now().toString(36)}_${randomInt(1000, 9999)}`;
@@ -6049,34 +6126,34 @@ async function createClaimOrGiveaway(i, type, amount, winners, minutes) {
   return i.reply({
     content:
       type === 'giveaway'
-        ? `✅ Giveaway créé : **${fmt(amount)}** × ${maxWinners} · tirage dans **${minutes} min** · popup affiché sur le site.`
-        : `✅ Claim créé : **${fmt(amount)}** × ${maxWinners}` +
-          (minutes > 0 ? ` · expire dans **${minutes} min**` : '') +
-          ' · popup affiché sur le site.',
+        ? `✅ Giveaway created: **${fmt(amount)}** × ${maxWinners} · drawing in **${minutes} min** · popup shown on the site.`
+        : `✅ Claim created: **${fmt(amount)}** × ${maxWinners}` +
+          (minutes > 0 ? ` · expires in **${minutes} min**` : '') +
+          ' · popup shown on the site.',
     flags: EPH,
   });
 }
 
-// ---------- Événements lancés / utilisés depuis le site ----------
+// ---------- Events launched / used from the site ----------
 async function webLaunchBoost(guildId, hostId, kind, minutes) {
   const p = BOOST_PRESETS[kind];
-  if (!p) throw new Error('Type de boost inconnu.');
+  if (!p) throw new Error('Unknown boost type.');
   minutes = Math.max(1, Math.min(24 * 60, Math.floor(Number(minutes) || 0)));
   const guild = await client.guilds.fetch(guildId).catch(() => null);
-  if (!guild) throw new Error('Serveur introuvable.');
+  if (!guild) throw new Error('Server not found.');
   await startBoost(guildId, { ...p, minutes });
-  webEvent(guildId, { kind: 'boost', title: `⚡ Boost : ${p.label}`, text: boostText(p, minutes), expiresAt: Date.now() + minutes * 60_000 });
+  webEvent(guildId, { kind: 'boost', title: `⚡ Boost: ${p.label}`, text: boostText(p, minutes), expiresAt: Date.now() + minutes * 60_000 });
   return { label: p.label, minutes };
 }
 
 async function webLaunchEvent(guildId, hostId, type, amount, winners, minutes) {
-  if (type !== 'claim' && type !== 'giveaway') throw new Error('Type d’événement inconnu.');
+  if (type !== 'claim' && type !== 'giveaway') throw new Error('Unknown event type.');
   amount = round2(Number(amount));
-  if (!(amount > 0) || amount > MAX_ADMIN_AMOUNT) throw new Error(`Montant invalide (entre 0.01 et ${num(MAX_ADMIN_AMOUNT)}).`);
+  if (!(amount > 0) || amount > MAX_ADMIN_AMOUNT) throw new Error(`Invalid amount (between 0.01 and ${num(MAX_ADMIN_AMOUNT)}).`);
   minutes = Math.max(0, Math.min(24 * 60, Math.floor(Number(minutes) || 0)));
-  if (type === 'giveaway' && minutes < 1) throw new Error('Un giveaway doit avoir une durée (minutes ≥ 1).');
+  if (type === 'giveaway' && minutes < 1) throw new Error('A giveaway must have a duration (minutes ≥ 1).');
   const guild = await client.guilds.fetch(guildId).catch(() => null);
-  if (!guild) throw new Error('Serveur introuvable.');
+  if (!guild) throw new Error('Server not found.');
   const eventId = `${Date.now().toString(36)}_${randomInt(1000, 9999)}`;
   const expiresAt = minutes > 0 ? Date.now() + minutes * 60_000 : null;
   const ev = { type, amount, maxWinners: Math.max(1, Math.min(50, Math.floor(Number(winners) || 1))), winners: new Set(), entries: new Set(), guildId, channelId: null, messageId: null, expiresAt, finished: false, timer: null, hostId, dmMode: true };
@@ -6089,35 +6166,35 @@ async function webLaunchEvent(guildId, hostId, type, amount, winners, minutes) {
 
 async function webEventClaim(uid, guildId, eventId) {
   const ev = activeEvents.get(eventId);
-  if (!ev || ev.guildId !== guildId || ev.finished || ev.type !== 'claim') return { ok: false, msg: 'Cette récompense n’est plus disponible.' };
-  if (ev.expiresAt && Date.now() > ev.expiresAt) { await expireClaimEvent(eventId); return { ok: false, msg: 'Cet événement a expiré.' }; }
-  if (ev.winners.has(uid)) return { ok: false, msg: 'Tu as déjà réclamé ta part !' };
-  if (ev.winners.size >= ev.maxWinners) { ev.finished = true; activeEvents.delete(eventId); return { ok: false, msg: 'Plus de places disponibles.' }; }
+  if (!ev || ev.guildId !== guildId || ev.finished || ev.type !== 'claim') return { ok: false, msg: 'This reward is no longer available.' };
+  if (ev.expiresAt && Date.now() > ev.expiresAt) { await expireClaimEvent(eventId); return { ok: false, msg: 'This event has expired.' }; }
+  if (ev.winners.has(uid)) return { ok: false, msg: 'You already claimed your share!' };
+  if (ev.winners.size >= ev.maxWinners) { ev.finished = true; activeEvents.delete(eventId); return { ok: false, msg: 'No more spots available.' }; }
   ev.winners.add(uid);
   if (ev.winners.size >= ev.maxWinners) { ev.finished = true; clearTimeout(ev.timer); activeEvents.delete(eventId); }
   try {
     const balance = await credit(uid, ev.amount);
-    return { ok: true, msg: `Tu as reçu ${num(ev.amount)} !`, balance };
+    return { ok: true, msg: `You received ${num(ev.amount)}!`, balance };
   } catch (e) {
     ev.winners.delete(uid);
     console.error('[event web] claim', e?.message || e);
-    return { ok: false, msg: 'Erreur lors du crédit.' };
+    return { ok: false, msg: 'Error while crediting.' };
   }
 }
 
 async function webEventJoin(uid, guildId, eventId) {
   const ev = activeEvents.get(eventId);
-  if (!ev || ev.guildId !== guildId || ev.finished || ev.type !== 'giveaway') return { ok: false, msg: 'Ce giveaway est terminé.' };
-  if (ev.expiresAt && Date.now() > ev.expiresAt) { await finishGiveaway(eventId); return { ok: false, msg: 'Le giveaway est terminé.' }; }
-  if (ev.entries.has(uid)) return { ok: false, msg: 'Tu es déjà inscrit !' };
+  if (!ev || ev.guildId !== guildId || ev.finished || ev.type !== 'giveaway') return { ok: false, msg: 'This giveaway is finished.' };
+  if (ev.expiresAt && Date.now() > ev.expiresAt) { await finishGiveaway(eventId); return { ok: false, msg: 'The giveaway is finished.' }; }
+  if (ev.entries.has(uid)) return { ok: false, msg: 'You are already entered!' };
   ev.entries.add(uid);
-  return { ok: true, msg: 'Tu es inscrit au giveaway ! Bonne chance.' };
+  return { ok: true, msg: 'You are entered in the giveaway! Good luck.' };
 }
 
 const MULT_INFO = {
-  mines: () => `1er 💎 : Easy ${fx(minesMultiplier(1, LEVELS.easy.mines))} · Impossible ${fx(minesMultiplier(1, LEVELS.impossible.mines))}`,
-  bj: (c) => `victoire ${fx(2 * c)} · blackjack ${fx(2.5 * c)}`,
-  roulette: (c) => `couleur/pair/impair ${fx(2 * c)} · numéro ${fx(36 * c)}`,
+  mines: () => `1st 💎: Easy ${fx(minesMultiplier(1, LEVELS.easy.mines))} · Impossible ${fx(minesMultiplier(1, LEVELS.impossible.mines))}`,
+  bj: (c) => `win ${fx(2 * c)} · blackjack ${fx(2.5 * c)}`,
+  roulette: (c) => `color/even/odd ${fx(2 * c)} · number ${fx(36 * c)}`,
 };
 
 function multAdminPayload(note, page = 0) {
@@ -6140,22 +6217,22 @@ function multAdminPayload(note, page = 0) {
   });
 
   const embed = new EmbedBuilder()
-    .setTitle('🎚️ Multiplicateurs des jeux')
+    .setTitle('🎚️ Game multipliers')
     .setColor(COLORS.red)
     .setDescription(
-      `Coefficient × tous les gains (x1.00 = normal). Plage ${fx(MULT_MIN)}–${fx(MULT_MAX)}.\n` +
+      `Multiplier × all winnings (x1.00 = normal). Range ${fx(MULT_MIN)}–${fx(MULT_MAX)}.\n` +
         `**Page ${p + 1}/${totalPages}**\n\n${lines.join('\n\n')}`.slice(0, 4000) +
         (note ? `\n\n${note}` : '')
     );
 
   const select = new StringSelectMenuBuilder()
     .setCustomId('admin_multpick')
-    .setPlaceholder('Choisis le jeu à modifier')
+    .setPlaceholder('Choose the game to modify')
     .addOptions(
       slice.map((g) => ({
         label: (GAME_NAMES[g] || g).replace(/^\S+\s/, '').slice(0, 100),
         value: g,
-        description: `Coefficient actuel : ${fx(coef(g))}`.slice(0, 100),
+        description: `Current multiplier: ${fx(coef(g))}`.slice(0, 100),
       }))
     );
 
@@ -6176,11 +6253,11 @@ function multAdminPayload(note, page = 0) {
 }
 
 const ADMIN_TITLES = {
-  add: '➕ Ajouter de l’argent : choisis le membre',
-  remove: '➖ Retirer de l’argent : choisis le membre',
-  set: '🎯 Définir le solde : choisis le membre',
-  view: '👀 Voir un solde : choisis le membre',
-  stats: '📊 Stats d’un joueur : choisis le membre',
+  add: '➕ Add money: choose the member',
+  remove: '➖ Remove money: choose the member',
+  set: '🎯 Set balance: choose the member',
+  view: '👀 View a balance: choose the member',
+  stats: '📊 Player stats: choose the member',
 };
 
 async function handleAdmin(i) {
@@ -6199,10 +6276,10 @@ async function handleAdmin(i) {
     if (action === 'event') {
       const select = new StringSelectMenuBuilder()
         .setCustomId('admin_eventpick')
-        .setPlaceholder('Type d’événement')
+        .setPlaceholder('Event type')
         .addOptions(EVENT_TYPES.map((et) => ({ label: et.label, value: et.id, description: et.desc.slice(0, 100) })));
       return i.reply({
-        content: '📢 Choisis le type d’événement :',
+        content: '📢 Choose the event type:',
         components: [new ActionRowBuilder().addComponents(select)],
         flags: EPH,
       });
@@ -6211,42 +6288,42 @@ async function handleAdmin(i) {
       return i.showModal(
         new ModalBuilder()
           .setCustomId('modal_admin_reset')
-          .setTitle('💥 Reset tous les soldes')
-          .addComponents(modalInput('confirm', 'Tape RESET pour confirmer', { placeholder: 'RESET', max: 10 }))
+          .setTitle('💥 Reset all balances')
+          .addComponents(modalInput('confirm', 'Type RESET to confirm', { placeholder: 'RESET', max: 10 }))
       );
     }
     if (action === 'resetpeaks') {
       return i.showModal(
         new ModalBuilder()
           .setCustomId('modal_admin_resetpeaks')
-          .setTitle('👑 Reset classement all-time')
-          .addComponents(modalInput('confirm', 'Tape RESET pour confirmer', { placeholder: 'RESET', max: 10 }))
+          .setTitle('👑 Reset all-time leaderboard')
+          .addComponents(modalInput('confirm', 'Type RESET to confirm', { placeholder: 'RESET', max: 10 }))
       );
     }
     if (action === 'resetstats') {
       return i.showModal(
         new ModalBuilder()
           .setCustomId('modal_admin_resetstats')
-          .setTitle('📊 Reset toutes les stats')
-          .addComponents(modalInput('confirm', 'Tape RESET pour confirmer', { placeholder: 'RESET', max: 10 }))
+          .setTitle('📊 Reset all stats')
+          .addComponents(modalInput('confirm', 'Type RESET to confirm', { placeholder: 'RESET', max: 10 }))
       );
     }
     if (action === 'top') {
       await i.deferReply({ flags: EPH });
-      return i.editReply(await buildBoardPayload('rich', { lang: 'fr' }));
+      return i.editReply(await buildBoardPayload('rich', { lang: 'en' }));
     }
     if (action === 'topall') {
       await i.deferReply({ flags: EPH });
-      return i.editReply(await buildBoardPayload('alltime', { lang: 'fr' }));
+      return i.editReply(await buildBoardPayload('alltime', { lang: 'en' }));
     }
     if (action === 'annonce') {
       return i.showModal(
         new ModalBuilder()
           .setCustomId('modal_admin_annonce')
-          .setTitle('📣 Annonce récompense')
+          .setTitle('📣 Reward announcement')
           .addComponents(
-            modalInput('amount', `Nombre de ${COIN_PLAIN}`, { placeholder: 'ex : 100' }),
-            modalInput('reward', 'Récompense (texte)', { placeholder: 'ex : un nitro d’1 mois', max: 100 })
+            modalInput('amount', `Number of ${COIN_PLAIN}`, { placeholder: 'e.g.: 100' }),
+            modalInput('reward', 'Reward (text)', { placeholder: 'e.g.: one month of Nitro', max: 100 })
           )
       );
     }
@@ -6257,22 +6334,22 @@ async function handleAdmin(i) {
       const row = new ActionRowBuilder().addComponents(
         new ChannelSelectMenuBuilder()
           .setCustomId('admin_notifpick')
-          .setPlaceholder('Choisis le salon des notifications')
+          .setPlaceholder('Choose the notifications channel')
           .setMinValues(1)
           .setMaxValues(1)
           .addChannelTypes(ChannelType.GuildText)
       );
       return i.reply({
         content:
-          `🔔 Choisis le salon où envoyer les notifs admin (offrir all, reset, giveaway, boosts, annonces...).\n` +
-          (current ? `Salon actuel : <#${current}>` : `Actuellement : salon **casino** (par défaut).`),
+          `🔔 Choose the channel where admin notifications are sent (gift all, reset, giveaway, boosts, announcements...).\n` +
+          (current ? `Current channel: <#${current}>` : `Currently: **casino** channel (default).`),
         components: [row],
         flags: EPH,
       });
     }
     if (ADMIN_TITLES[action]) {
       const row = new ActionRowBuilder().addComponents(
-        new UserSelectMenuBuilder().setCustomId(`admin_pick_${action}`).setPlaceholder('Choisis un membre').setMinValues(1).setMaxValues(1)
+        new UserSelectMenuBuilder().setCustomId(`admin_pick_${action}`).setPlaceholder('Choose a member').setMinValues(1).setMaxValues(1)
       );
       return i.reply({ content: ADMIN_TITLES[action], components: [row], flags: EPH });
     }
@@ -6280,8 +6357,8 @@ async function handleAdmin(i) {
       return i.showModal(
         new ModalBuilder()
           .setCustomId('modal_admin_all')
-          .setTitle('🎁 Offrir à tous')
-          .addComponents(modalInput('amount', 'Montant offert à chaque joueur', { placeholder: 'ex : 10' }))
+          .setTitle('🎁 Gift to everyone')
+          .addComponents(modalInput('amount', 'Amount gifted to each player', { placeholder: 'e.g.: 10' }))
       );
     }
     return;
@@ -6295,7 +6372,7 @@ async function handleAdmin(i) {
         .setCustomId(`modal_admin_mult_${game}`)
         .setTitle(`🎚️ ${GAME_NAMES[game]}`.slice(0, 45))
         .addComponents(
-          modalInput('amount', `Coefficient (${MULT_MIN} à ${MULT_MAX}, 1 = normal)`, {
+          modalInput('amount', `Multiplier (${MULT_MIN} to ${MULT_MAX}, 1 = normal)`, {
             placeholder: 'ex : 1.5',
             value: String(coef(game)),
             max: 6,
@@ -6311,7 +6388,7 @@ async function handleAdmin(i) {
         new ModalBuilder()
           .setCustomId(`modal_admin_boost_${kind}`)
           .setTitle(`⚡ ${EVENT_TYPES.find((et) => et.id === kind)?.label || 'Boost'}`.slice(0, 45))
-          .addComponents(modalInput('minutes', 'Durée en minutes', { placeholder: 'ex : 15', value: '15', max: 6 }))
+          .addComponents(modalInput('minutes', 'Duration in minutes', { placeholder: 'e.g.: 15', value: '15', max: 6 }))
       );
     }
     if (kind === 'claim' || kind === 'giveaway') {
@@ -6320,9 +6397,9 @@ async function handleAdmin(i) {
           .setCustomId(`modal_admin_event_${kind}`)
           .setTitle(kind === 'giveaway' ? '🎉 Giveaway' : '📢 Claim multi-gagnants')
           .addComponents(
-            modalInput('amount', 'Montant par gagnant', { placeholder: 'ex : 50' }),
-            modalInput('winners', 'Nombre de gagnants', { placeholder: 'ex : 3', value: '1', max: 3 }),
-            modalInput('minutes', kind === 'giveaway' ? 'Durée avant tirage (min)' : 'Durée max (0 = illimité)', {
+            modalInput('amount', 'Amount per winner', { placeholder: 'e.g.: 50' }),
+            modalInput('winners', 'Number of winners', { placeholder: 'e.g.: 3', value: '1', max: 3 }),
+            modalInput('minutes', kind === 'giveaway' ? 'Duration before drawing (min)' : 'Max duration (0 = unlimited)', {
               placeholder: 'ex : 10',
               value: kind === 'giveaway' ? '10' : '5',
               required: false,
@@ -6339,8 +6416,8 @@ async function handleAdmin(i) {
     const saved = await saveChannel(i.guild.id, 'notifs', channelId);
     return i.update({
       content:
-        `✅ Salon des notifications défini : <#${channelId}>\n` +
-        `Offrir all, reset, giveaway, boosts, annonces, multiplicateurs y seront postés.` +
+        `✅ Notification channel set: <#${channelId}>\n` +
+        `Gift all, reset, giveaway, boosts, announcements, multipliers will be posted there.` +
         (saved ? '' : DB_WARN),
       components: [],
     });
@@ -6349,32 +6426,32 @@ async function handleAdmin(i) {
   if (i.isUserSelectMenu() && id.startsWith('admin_pick_')) {
     const action = id.slice('admin_pick_'.length);
     const userId = i.values[0];
-    if (i.users?.get(userId)?.bot) return i.update({ content: '❌ Choisis un vrai membre, pas un bot.', components: [] });
+    if (i.users?.get(userId)?.bot) return i.update({ content: '❌ Choose a real member, not a bot.', components: [] });
     if (action === 'view') {
       const bal = await getBalance(userId);
-      return i.update({ content: `💰 Solde de <@${userId}> : **${fmt(bal)}**`, components: [] });
+      return i.update({ content: `💰 Balance of <@${userId}>: **${fmt(bal)}**`, components: [] });
     }
     if (action === 'stats') {
       await i.deferUpdate();
       const target = i.users?.get(userId) || (await client.users.fetch(userId).catch(() => null));
-      if (!target) return i.editReply({ content: '❌ Joueur introuvable.', components: [] });
-      const payload = await buildStatsPayload(target, 'fr', ' · vue admin');
-      return i.editReply({ content: `📊 Stats de <@${userId}>`, components: [], ...payload });
+      if (!target) return i.editReply({ content: '❌ Player not found.', components: [] });
+      const payload = await buildStatsPayload(target, 'en', ' · admin view');
+      return i.editReply({ content: `📊 Stats for <@${userId}>`, components: [], ...payload });
     }
-    const titles = { add: '➕ Ajouter', remove: '➖ Retirer', set: '🎯 Définir le solde' };
+    const titles = { add: '➕ Add', remove: '➖ Remove', set: '🎯 Set balance' };
     if (!titles[action]) return;
     return i.showModal(
       new ModalBuilder()
         .setCustomId(`modal_admin_${action}_${userId}`)
         .setTitle(titles[action])
-        .addComponents(modalInput('amount', action === 'set' ? 'Nouveau solde' : 'Montant', { placeholder: 'ex : 10' }))
+        .addComponents(modalInput('amount', action === 'set' ? 'New balance' : 'Amount', { placeholder: 'e.g.: 10' }))
     );
   }
 
   if (i.isModalSubmit()) {
     if (id === 'modal_admin_reset') {
       const confirm = i.fields.getTextInputValue('confirm')?.trim().toUpperCase();
-      if (confirm !== 'RESET') return respondText(i, 'Annulé : tu dois taper **RESET** pour confirmer.');
+      if (confirm !== 'RESET') return respondText(i, 'Cancelled: you must type **RESET** to confirm.');
       try {
         const { data, error } = await supabase
           .from('players')
@@ -6383,26 +6460,26 @@ async function handleAdmin(i) {
           .select('user_id');
         if (error) throw error;
         const count = data?.length ?? 0;
-        await i.reply({ content: `✅ Soldes reset : **${count}** joueur(s) à 0. MP en cours…`, flags: EPH });
+        await i.reply({ content: `✅ Balances reset: **${count}** player(s) to 0. Sending DMs…`, flags: EPH });
         const { ok, fail } = await dmGuildEveryone(i.guild, {
           embeds: [
             new EmbedBuilder()
-              .setTitle('💥 Reset des soldes')
+              .setTitle('💥 Reset balances')
               .setColor(COLORS.red)
-              .setDescription(`👤 Par <@${i.user.id}>\nTous les soldes ont été remis à **0**.`)
+              .setDescription(`👤 By <@${i.user.id}>\nAll balances were reset to **0**.`)
               .setTimestamp(),
           ],
         });
-        return i.followUp({ content: `📬 MP : **${ok}** ok · **${fail}** échecs.`, flags: EPH }).catch(() => {});
+        return i.followUp({ content: `📬 DMs: **${ok}** ok · **${fail}** failed.`, flags: EPH }).catch(() => {});
       } catch (e) {
         console.error('[reset]', e?.message || e);
-        return respondText(i, `Erreur reset : ${explainError(e)}`);
+        return respondText(i, `Reset error: ${explainError(e)}`);
       }
     }
 
     if (id === 'modal_admin_resetpeaks') {
       const confirm = i.fields.getTextInputValue('confirm')?.trim().toUpperCase();
-      if (confirm !== 'RESET') return respondText(i, 'Annulé : tu dois taper **RESET** pour confirmer.');
+      if (confirm !== 'RESET') return respondText(i, 'Cancelled: you must type **RESET** to confirm.');
       peaks.clear();
       savePeaksLocal();
       try {
@@ -6410,62 +6487,62 @@ async function handleAdmin(i) {
       } catch (e) {
         console.error('[resetpeaks]', e?.message || e);
       }
-      await i.reply({ content: '✅ Classement all-time réinitialisé. MP en cours…', flags: EPH });
+      await i.reply({ content: '✅ All-time leaderboard reset. Sending DMs…', flags: EPH });
       const r1 = await dmGuildEveryone(i.guild, {
         embeds: [
           new EmbedBuilder()
-            .setTitle('👑 Reset classement all-time')
+            .setTitle('👑 Reset all-time leaderboard')
             .setColor(COLORS.red)
-            .setDescription(`👤 Par <@${i.user.id}>\nTous les records de solde max ont été effacés.`)
+            .setDescription(`👤 By <@${i.user.id}>\nAll peak balance records were cleared.`)
             .setTimestamp(),
         ],
       });
-      return i.followUp({ content: `📬 MP : **${r1.ok}** ok · **${r1.fail}** échecs.`, flags: EPH }).catch(() => {});
+      return i.followUp({ content: `📬 DMs: **${r1.ok}** ok · **${r1.fail}** failed.`, flags: EPH }).catch(() => {});
     }
 
     if (id === 'modal_admin_resetstats') {
       const confirm = i.fields.getTextInputValue('confirm')?.trim().toUpperCase();
-      if (confirm !== 'RESET') return respondText(i, 'Annulé : tu dois taper **RESET** pour confirmer.');
+      if (confirm !== 'RESET') return respondText(i, 'Cancelled: you must type **RESET** to confirm.');
       try {
         const { error } = await supabase.from('game_history').delete().neq('user_id', '__impossible__');
         if (error) throw error;
-        await i.reply({ content: '✅ Statistiques réinitialisées. MP en cours…', flags: EPH });
+        await i.reply({ content: '✅ Statistics reset. Sending DMs…', flags: EPH });
         const r2 = await dmGuildEveryone(i.guild, {
           embeds: [
             new EmbedBuilder()
-              .setTitle('📊 Reset des statistiques')
+              .setTitle('📊 Reset statistics')
               .setColor(COLORS.red)
-              .setDescription(`👤 Par <@${i.user.id}>\nTout l’historique des parties a été effacé.`)
+              .setDescription(`👤 By <@${i.user.id}>\nAll game history was cleared.`)
               .setTimestamp(),
           ],
         });
-        return i.followUp({ content: `📬 MP : **${r2.ok}** ok · **${r2.fail}** échecs.`, flags: EPH }).catch(() => {});
+        return i.followUp({ content: `📬 DMs: **${r2.ok}** ok · **${r2.fail}** failed.`, flags: EPH }).catch(() => {});
       } catch (e) {
         console.error('[resetstats]', e?.message || e);
-        return respondText(i, `Erreur reset stats : ${explainError(e)}`);
+        return respondText(i, `Stats reset error: ${explainError(e)}`);
       }
     }
 
     if (id === 'modal_admin_annonce') {
       const amount = parseAmount(i.fields.getTextInputValue('amount')?.trim());
       const reward = i.fields.getTextInputValue('reward')?.trim();
-      if (!amount) return respondText(i, 'Montant invalide.');
-      if (!reward) return respondText(i, 'Indique la récompense en texte.');
-      await i.reply({ content: `✅ Annonce **${fmt(amount)}** = **${reward}** · MP en cours…`, flags: EPH });
+      if (!amount) return respondText(i, 'Invalid amount.');
+      if (!reward) return respondText(i, 'Enter the reward as text.');
+      await i.reply({ content: `✅ Announcement **${fmt(amount)}** = **${reward}** · Sending DMs…`, flags: EPH });
       const r3 = await dmGuildEveryone(i.guild, {
         embeds: [
           new EmbedBuilder()
-            .setTitle('📣 Récompense disponible')
+            .setTitle('📣 Reward available')
             .setColor(COLORS.gold)
             .setDescription(
-              `👤 Annonce de <@${i.user.id}>\n\n` +
+              `👤 Announcement by <@${i.user.id}>\n\n` +
                 `**${fmt(amount)}**  ≈  **${reward}**\n\n` +
-                `Contacte le propriétaire pour échanger tes ${COIN} contre cette récompense.`
+                `Contact the owner to exchange your ${COIN} for this reward.`
             )
             .setTimestamp(),
         ],
       });
-      return i.followUp({ content: `📬 MP : **${r3.ok}** ok · **${r3.fail}** échecs.`, flags: EPH }).catch(() => {});
+      return i.followUp({ content: `📬 DMs: **${r3.ok}** ok · **${r3.fail}** failed.`, flags: EPH }).catch(() => {});
     }
 
     const boostM = id.match(/^modal_admin_boost_([a-z0-9]+)$/);
@@ -6480,7 +6557,7 @@ async function handleAdmin(i) {
     try {
       raw = i.fields.getTextInputValue('amount').trim();
     } catch {
-      return respondText(i, 'Formulaire invalide (champ montant manquant).');
+      return respondText(i, 'Invalid form (amount field missing).');
     }
 
     const evM = id.match(/^modal_admin_event_(claim|giveaway)$/);
@@ -6488,7 +6565,7 @@ async function handleAdmin(i) {
       const type = evM[1];
       const amount = parseAmount(raw);
       if (!amount || amount > MAX_ADMIN_AMOUNT) {
-        return respondText(i, `Montant invalide (entre 0.01 et ${num(MAX_ADMIN_AMOUNT)}).`);
+        return respondText(i, `Invalid amount (between 0.01 and ${num(MAX_ADMIN_AMOUNT)}).`);
       }
       const wRaw = i.fields.getTextInputValue('winners')?.trim() || '1';
       const winners = Math.max(1, Math.min(50, Math.floor(Number(wRaw) || 1)));
@@ -6500,7 +6577,7 @@ async function handleAdmin(i) {
     if (id === 'modal_admin_all') {
       const amount = parseAmount(raw);
       if (!amount || amount > MAX_ADMIN_AMOUNT) {
-        return respondText(i, `Montant invalide (entre 0.01 et ${num(MAX_ADMIN_AMOUNT)}).`);
+        return respondText(i, `Invalid amount (between 0.01 and ${num(MAX_ADMIN_AMOUNT)}).`);
       }
       let count = 0;
       try {
@@ -6520,19 +6597,19 @@ async function handleAdmin(i) {
           }
         }
       }
-      await i.reply({ content: `✅ **${fmt(amount)}** offerts à **${count}** compte(s). MP en cours…`, flags: EPH });
+      await i.reply({ content: `✅ **${fmt(amount)}** gifted to **${count}** account(s). Sending DMs…`, flags: EPH });
       const rg = await dmGuildEveryone(i.guild, {
         embeds: [
           new EmbedBuilder()
-            .setTitle('🎁 Cadeau pour tous')
+            .setTitle('🎁 Gift for everyone')
             .setColor(COLORS.green)
             .setDescription(
-              `👤 Par <@${i.user.id}>\n💰 **${fmt(amount)}** offerts à **chaque** joueur.`
+              `👤 By <@${i.user.id}>\n💰 **${fmt(amount)}** gifted to **every** player.`
             )
             .setTimestamp(),
         ],
       });
-      return i.followUp({ content: `📬 MP : **${rg.ok}** ok · **${rg.fail}** échecs.`, flags: EPH }).catch(() => {});
+      return i.followUp({ content: `📬 DMs: **${rg.ok}** ok · **${rg.fail}** failed.`, flags: EPH }).catch(() => {});
     }
 
     const mm = id.match(/^modal_admin_mult_([a-z0-9]+)$/);
@@ -6541,12 +6618,12 @@ async function handleAdmin(i) {
       if (!GAME_NAMES[game]) return;
       const value = parseAmount(raw);
       if (value === null || value < MULT_MIN || value > MULT_MAX) {
-        return respondText(i, `Valeur invalide : entre ${fx(MULT_MIN)} et ${fx(MULT_MAX)} (ex : 1.5).`);
+        return respondText(i, `Invalid value: between ${fx(MULT_MIN)} and ${fx(MULT_MAX)} (e.g.: 1.5).`);
       }
       const { db } = await saveMultiplier(game, value, i.guild.id, i.user.id);
       const note =
-        `✅ **${GAME_NAMES[game]}** : coefficient réglé sur **${fx(value)}** (annoncé dans le casino).` +
-        (db ? '' : '\n⚠️ Sauvegardé uniquement en local : lance **schema_v3.sql** dans Supabase pour que ça survive à un redéploiement.');
+        `✅ **${GAME_NAMES[game]}**: multiplier set to **${fx(value)}** (announced in the casino).` +
+        (db ? '' : '\n⚠️ Saved locally only: run **schema_v3.sql** in Supabase so it survives a redeploy.');
       return respond(i, multAdminPayload(note));
     }
 
@@ -6555,7 +6632,7 @@ async function handleAdmin(i) {
     const [, action, userId] = m;
     const amount = parseAmount(raw, null, action === 'set');
     if (amount === null || amount > MAX_ADMIN_AMOUNT) {
-      return respondText(i, `Montant invalide (max ${num(MAX_ADMIN_AMOUNT)}).`);
+      return respondText(i, `Invalid amount (max ${num(MAX_ADMIN_AMOUNT)}).`);
     }
 
     let balance;
@@ -6566,39 +6643,39 @@ async function handleAdmin(i) {
       balance = Number(await rpc('admin_adjust', { p_user_id: userId, p_amount: round2(amount - current) }));
     }
     await touchPeak(userId, balance);
-    const verb = { add: `➕ **${fmt(amount)}** ajoutés à`, remove: `➖ **${fmt(amount)}** retirés à`, set: '🎯 Solde défini pour' }[action];
+    const verb = { add: `➕ **${fmt(amount)}** added to`, remove: `➖ **${fmt(amount)}** removed from`, set: '🎯 Balance set for' }[action];
     const dmText =
       action === 'add'
-        ? `<@${i.user.id}> t’a **ajouté** **${fmt(amount)}**.\nNouveau solde : **${fmt(balance)}**`
+        ? `<@${i.user.id}> **added** **${fmt(amount)}** to you.\nNew balance: **${fmt(balance)}**`
         : action === 'remove'
-          ? `<@${i.user.id}> t’a **retiré** **${fmt(amount)}**.\nNouveau solde : **${fmt(balance)}**`
-          : `<@${i.user.id}> a **défini** ton solde à **${fmt(balance)}**.`;
+          ? `<@${i.user.id}> **removed** **${fmt(amount)}** from you.\nNew balance: **${fmt(balance)}**`
+          : `<@${i.user.id}> **set** your balance to **${fmt(balance)}**.`;
     await dmUser(userId, {
       embeds: [
         new EmbedBuilder()
           .setColor(action === 'remove' ? COLORS.red : COLORS.green)
-          .setTitle(action === 'set' ? '🎯 Solde modifié' : action === 'add' ? '➕ Coins reçus' : '➖ Coins retirés')
+          .setTitle(action === 'set' ? '🎯 Balance updated' : action === 'add' ? '➕ Coins received' : '➖ Coins removed')
           .setDescription(dmText)
           .setTimestamp(),
       ],
     });
-    return i.reply({ content: `✅ ${verb} <@${userId}>. Nouveau solde : **${fmt(balance)}**`, flags: EPH });
+    return i.reply({ content: `✅ ${verb} <@${userId}>. New balance: **${fmt(balance)}**`, flags: EPH });
   }
 }
 
 // ============================================================
-//  balance / daily (commandes écrites)
+//  balance / daily (written commands)
 // ============================================================
 const dailyText = (res) =>
   res.claimed
-    ? `🎁 Tu as reçu **${fmt(DAILY_AMOUNT)}** ! Nouveau solde : **${fmt(res.balance)}**`
-    : `⏰ Tu as déjà récupéré ta récompense aujourd’hui. Reviens après minuit (heure de Paris) !\nSolde : **${fmt(res.balance)}**`;
+    ? `🎁 You received **${fmt(DAILY_AMOUNT)}**! New balance: **${fmt(res.balance)}**`
+    : `⏰ You already claimed your reward today. Come back after midnight (Paris time)!\nBalance: **${fmt(res.balance)}**`;
 
 async function cmdBalance(msg, args) {
   const targetId = parseUserId(args[0]) || msg.author.id;
   const bal = await getBalance(targetId);
-  if (targetId === msg.author.id) return msg.reply(`💰 Ton solde : **${fmt(bal)}**`);
-  return msg.reply(`💰 Solde de <@${targetId}> : **${fmt(bal)}**`);
+  if (targetId === msg.author.id) return msg.reply(`💰 Your balance: **${fmt(bal)}**`);
+  return msg.reply(`💰 Balance of <@${targetId}>: **${fmt(bal)}**`);
 }
 
 async function cmdDaily(msg) {
@@ -6608,15 +6685,15 @@ async function cmdDaily(msg) {
 }
 
 // ============================================================
-//  COMMANDES DU PROPRIÉTAIRE
+//  OWNER COMMANDS
 // ============================================================
 async function cmdAdjust(msg, args, sign) {
   if (!isCrown(msg)) return msg.reply(CROWN_ONLY);
   const name = sign > 0 ? 'add' : 'remove';
   const targetId = parseUserId(args[0]);
   const amount = parseAmount(args[1]);
-  if (!targetId || !amount) return msg.reply('Usage : /' + name + ' membre:@… montant:…');
-  if (amount > MAX_ADMIN_AMOUNT) return msg.reply(`Montant trop grand (max ${num(MAX_ADMIN_AMOUNT)}).`);
+  if (!targetId || !amount) return msg.reply('Usage: /' + name + ' member:@… amount:…');
+  if (amount > MAX_ADMIN_AMOUNT) return msg.reply(`Amount too large (max ${num(MAX_ADMIN_AMOUNT)}).`);
 
   const balance = Number(await rpc('admin_adjust', { p_user_id: targetId, p_amount: sign * amount }));
   await touchPeak(targetId, balance);
@@ -6624,23 +6701,23 @@ async function cmdAdjust(msg, args, sign) {
     embeds: [
       new EmbedBuilder()
         .setColor(sign > 0 ? COLORS.green : COLORS.red)
-        .setTitle(sign > 0 ? '➕ Coins reçus' : '➖ Coins retirés')
+        .setTitle(sign > 0 ? '➕ Coins received' : '➖ Coins removed')
         .setDescription(
           sign > 0
-            ? `<@${msg.author.id}> t’a **ajouté** **${fmt(amount)}**.\nNouveau solde : **${fmt(balance)}**`
-            : `<@${msg.author.id}> t’a **retiré** **${fmt(amount)}**.\nNouveau solde : **${fmt(balance)}**`
+            ? `<@${msg.author.id}> **added** **${fmt(amount)}** to you.\nNew balance: **${fmt(balance)}**`
+            : `<@${msg.author.id}> **removed** **${fmt(amount)}** from you.\nNew balance: **${fmt(balance)}**`
         )
         .setTimestamp(),
     ],
   });
   return msg.reply(
     sign > 0
-      ? `✅ **${fmt(amount)}** ajoutés à <@${targetId}>. Nouveau solde : **${fmt(balance)}**`
-      : `✅ **${fmt(amount)}** retirés à <@${targetId}>. Nouveau solde : **${fmt(balance)}**`
+      ? `✅ **${fmt(amount)}** added to <@${targetId}>. New balance: **${fmt(balance)}**`
+      : `✅ **${fmt(amount)}** removed from <@${targetId}>. New balance: **${fmt(balance)}**`
   );
 }
 
-// ---------- Salons enregistrés ----------
+// ---------- Registered channels ----------
 const casinoChannels = new Map();
 const guildChannels = new Map();
 
@@ -6650,7 +6727,7 @@ async function loadChannels() {
   else for (const r of a.data) casinoChannels.set(r.guild_id, r.channel_id);
 
   const b = await supabase.from('guild_channels').select('guild_id, kind, channel_id');
-  if (b.error) console.error('[salons] guild_channels (as-tu lancé schema_v2.sql ?) :', b.error.message);
+  if (b.error) console.error('[channels] guild_channels (did you run schema_v2.sql?):', b.error.message);
   else for (const r of b.data) guildChannels.set(`${r.guild_id}:${r.kind}`, r.channel_id);
 }
 
@@ -6661,7 +6738,7 @@ const CHANNEL_NAMES = {
   alltime: 'alltime',
   notifs: 'casino-notifs',
   online: 'online',
-  poker: 'online', // alias rétrocompat
+  poker: 'online', // backward-compat alias
 };
 const alltimeBoardMessages = new Map();
 const ALLTIME_MSG_FILE = path.join(__dirname, 'data', 'alltime_msgs.json');
@@ -6673,15 +6750,16 @@ function loadAlltimeMsgs() {
     const raw = JSON.parse(fs.readFileSync(ALLTIME_MSG_FILE, 'utf8'));
     for (const [gid, v] of Object.entries(raw)) if (v?.channelId && v?.messageId) alltimeBoardMessages.set(gid, v);
   } catch {
-    /* premier lancement */
+
+    /* first launch */
   }
 }
 function trackAlltime(guildId, channelId, messageId) {
   alltimeBoardMessages.set(guildId, { channelId, messageId });
   saveAlltimeMsgs();
 }
-// Retrouve le message du classement all-time de chaque serveur après un redéploiement (le fichier data/ est perdu).
-// NE REPOSTE JAMAIS : si le message est introuvable, on ne fait rien (le bouton admin « Salon all-time » en recrée un).
+// Finds each server's all-time leaderboard message after a redeploy (the data/ folder is lost).
+// NEVER REPOST: if the message cannot be found, do nothing (the admin "All-time channel" button recreates one).
 const isAlltimeBoardMsg = (m) =>
   m.author?.id === client.user.id &&
   (/^Record/.test(m.embeds?.[0]?.footer?.text || '') || /board-alltime-/.test(m.embeds?.[0]?.image?.url || '') || m.attachments?.some?.((a) => /^board-alltime-/.test(a.name || '')));
@@ -6700,7 +6778,7 @@ async function ensureAlltimeMessages() {
         mine = recent?.find(isAlltimeBoardMsg);
       }
       if (mine) trackAlltime(guild.id, ch.id, mine.id);
-      else console.warn(`[alltime] message du classement introuvable dans <#${chId}> : rien n'est reposté (utilise Admin → Salon all-time pour le recréer).`);
+      else console.warn(`[alltime] leaderboard message not found in <#${chId}>: nothing was reposted (use Admin → All-time channel to recreate it).`);
     } catch (e) {
       console.error('[alltime] restauration', e?.message || e);
     }
@@ -6708,20 +6786,20 @@ async function ensureAlltimeMessages() {
 }
 
 // ============================================================
-//  BLACKJACK + ROULETTE EN LIGNE — tables EXTERNES (page web hébergée par le bot)
-//  Les autres jeux « online » (poker, roulette, pile ou face, dés, cartes, slots, courses, crash) sont supprimés.
-//  Code : web/server.js (serveur + temps réel) · web/table.js (blackjack) · web/roulette.js (roulette multijoueur) · web/public/index.html (animations)
-//  Adresse : PUBLIC_URL (défaut https://znkcasdiscordbot-production.up.railway.app) · port : PORT (Railway)
-//  Désactiver : variable WEB=off
+//  ONLINE BLACKJACK + ROULETTE — EXTERNAL tables (web page hosted by the bot)
+//  Other "online" games (poker, roulette, heads or tails, dice, cards, slots, races, crash) are removed.
+//  Code: web/server.js (server + realtime) · web/table.js (blackjack) · web/roulette.js (multiplayer roulette) · web/public/index.html (animations)
+//  Address: PUBLIC_URL (default https://znkcasdiscordbot-production.up.railway.app) · port: PORT (Railway)
+//  Disable: WEB=off variable
 // ============================================================
-const lbLast = new Map(); // dernière description publiée par message de classement (évite les edits inutiles)
+const lbLast = new Map(); // last description posted by a leaderboard message (avoids needless edits)
 function lbSameSig(id, sig) {
   if (lbLast.get(id) === sig) return true;
   lbLast.set(id, sig);
   return false;
 }
 
-// Classements affichés sur le site (page « Classement ») : plus riches (solde actuel) + all-time (solde max), cache 30 s
+// Leaderboards shown on the site ("Leaderboard" page): richest (current balance) + all-time (peak balance), 30s cache
 const webBoardCache = { t: 0, data: null, p: null };
 function getWebBoards() {
   if (webBoardCache.data && Date.now() - webBoardCache.t < 30000) return Promise.resolve(webBoardCache.data);
@@ -6734,7 +6812,7 @@ function getWebBoards() {
         out[kind] = await Promise.all(
           rows.map(async (r) => {
             const u = await client.users.fetch(r.id).catch(() => null);
-            return { uid: r.id, name: u ? u.globalName || u.username : 'Utilisateur inconnu', value: r.value, avatar: u ? u.displayAvatarURL({ size: 64, extension: 'png' }) : '' };
+            return { uid: r.id, name: u ? u.globalName || u.username : 'Unknown user', value: r.value, avatar: u ? u.displayAvatarURL({ size: 64, extension: 'png' }) : '' };
           })
         );
       }
@@ -6748,26 +6826,108 @@ function getWebBoards() {
   return webBoardCache.p;
 }
 
+// Site admin: Discord account @b7f5 (unique username) + optional ADMIN_IDS (comma-separated IDs).
+const webIsAdmin = async (uid) => {
+  uid = String(uid);
+  if (String(process.env.ADMIN_IDS || '').split(',').map((x) => x.trim()).filter(Boolean).includes(uid)) return true;
+  const u = await client.users.fetch(uid).catch(() => null);
+  return !!u && String(u.username).toLowerCase() === 'b7f5';
+};
+const requireWebAdmin = async (actorId) => {
+  if (actorId && !(await webIsAdmin(actorId))) throw new Error('Admin only.');
+};
+
 let webApp = { makeLink: () => null, enabled: false };
 try {
   webApp = require('./web/server').init({
-    supabase, // rangs / RR persistants (table player_rank)
+    supabase, // ranks / persistent RR (player_rank table)
     getBalance,
     debit,
     credit,
     getBoards: getWebBoards,
-    // admin du site : compte Discord @b7f5 (nom d'utilisateur unique, non usurpable) + ADMIN_IDS optionnel (ids séparés par des virgules)
-    isAdmin: async (uid) => {
-      uid = String(uid);
-      if (String(process.env.ADMIN_IDS || '').split(',').map((x) => x.trim()).filter(Boolean).includes(uid)) return true;
-      const u = await client.users.fetch(uid).catch(() => null);
-      return !!u && String(u.username).toLowerCase() === 'b7f5';
+    isAdmin: webIsAdmin,
+    // DM a user from the website (role purchase confirmations, etc.)
+    notifyUser: async (uid, text) => {
+      const u = await client.users.fetch(String(uid));
+      await u.send(String(text).slice(0, 1800));
+    },
+    // Search guild members by name for the website "send coins" picker.
+    searchMembers: async (guildId, q) => {
+      const needle = String(q || '').trim().toLowerCase();
+      if (!needle) return [];
+      const guild = client.guilds.cache.get(String(guildId));
+      if (!guild) return [];
+      try {
+        await guild.members.fetch();
+      } catch {}
+      return [...guild.members.cache.values()]
+        .filter((m) => !m.user.bot)
+        .filter((m) => {
+          const hay = `${m.user.username} ${m.user.globalName || ''} ${m.displayName || m.nickname || ''}`.toLowerCase();
+          return hay.includes(needle);
+        })
+        .slice(0, 20)
+        .map((m) => ({
+          uid: m.id,
+          name: m.displayName || m.user.globalName || m.user.username,
+          avatar: m.user.displayAvatarURL({ extension: 'png', size: 128 }),
+        }));
+    },
+    // Admin economy actions from the website (server.js already checks isAdmin too).
+    giftAll: async (guildId, amount, actorId) => {
+      await requireWebAdmin(actorId);
+      amount = round2(Number(amount));
+      if (!(amount > 0) || amount > MAX_ADMIN_AMOUNT) throw new Error('Invalid amount.');
+      let count = 0;
+      try {
+        count = Number(await rpc('give_all', { p_amount: amount }));
+      } catch (e) {
+        console.error('[web giftAll] rpc', e?.message || e);
+        const { data: rows, error } = await supabase.from('players').select('user_id, balance');
+        if (error) throw error;
+        for (const row of rows || []) {
+          const newBal = Number(row.balance) + amount;
+          const { error: upErr } = await supabase
+            .from('players')
+            .update({ balance: newBal, updated_at: new Date().toISOString() })
+            .eq('user_id', row.user_id);
+          if (!upErr) {
+            count++;
+            await touchPeak(row.user_id, newBal);
+          }
+        }
+      }
+      return count;
+    },
+    resetBalances: async (guildId, actorId) => {
+      await requireWebAdmin(actorId);
+      const { data, error } = await supabase
+        .from('players')
+        .update({ balance: 0, updated_at: new Date().toISOString() })
+        .neq('user_id', '__impossible__')
+        .select('user_id');
+      if (error) throw error;
+      return data?.length ?? 0;
+    },
+    resetAlltime: async (guildId, actorId) => {
+      await requireWebAdmin(actorId);
+      peaks.clear();
+      savePeaksLocal();
+      const { error } = await supabase.from('player_peaks').update({ peak: 0 }).neq('user_id', '__impossible__');
+      if (error) throw error;
+      return true;
+    },
+    resetStats: async (guildId, actorId) => {
+      await requireWebAdmin(actorId);
+      const { error } = await supabase.from('game_history').delete().neq('user_id', '__impossible__');
+      if (error) throw error;
+      return true;
     },
     grantRole: async (guildId, uid, roleId) => {
       const g = client.guilds.cache.get(String(guildId));
-      if (!g) throw new Error('Serveur introuvable.');
+      if (!g) throw new Error('Server not found.');
       const member = await g.members.fetch(String(uid));
-      await member.roles.add(String(roleId), 'Boutique ZNK — livraison auto');
+      await member.roles.add(String(roleId), 'ZNK Shop — automatic delivery');
       return true;
     },
     notifyAdmins: async (text, guildId) => {
@@ -6780,20 +6940,20 @@ try {
       for (const id of [...new Set(ids)]) {
         try {
           const u = await client.users.fetch(id);
-          await u.send({ content: '🛒 **Boutique**\n' + body });
+          await u.send({ content: '🛒 **Shop**\n' + body });
         } catch {}
       }
     },
     runBotCommand: async (guildId, actorId, cmd, params = {}) => {
       const guild = client.guilds.cache.get(String(guildId));
-      if (!guild) throw new Error('Serveur Discord introuvable (bot hors ligne ?).');
+      if (!guild) throw new Error('Discord server not found (bot offline?).');
       const channel =
         guild.channels.cache.get(casinoChannels.get(guild.id)) ||
         guild.systemChannel ||
         guild.channels.cache.find((c) => c.isTextBased?.() && c.viewable) ||
         null;
       if (!channel && !['balance', 'invites', 'help', 'remove', 'add'].includes(String(cmd))) {
-        throw new Error('Aucun salon texte accessible pour poster.');
+        throw new Error('No accessible text channel to post in.');
       }
       const replies = [];
       const fakeMsg = {
@@ -6825,11 +6985,11 @@ try {
         case 'balance': {
           const target = String(params.userId || actorId);
           const bal = await getBalance(target);
-          return { ok: true, msg: 'Solde de ' + target + ' : ' + fmt(bal), balance: bal };
+          return { ok: true, msg: 'Balance of ' + target + ': ' + fmt(bal), balance: bal };
         }
         case 'daily':
           await cmdDaily(fakeMsg);
-          return { ok: true, msg: replies.join(' ') || 'Daily traité.' };
+          return { ok: true, msg: replies.join(' ') || 'Daily processed.' };
         case 'invites': {
           const target = String(params.userId || actorId);
           let count = 0;
@@ -6837,69 +6997,69 @@ try {
             const { count: c, error } = await supabase.from('invite_rewards').select('invited_id', { count: 'exact', head: true }).eq('guild_id', String(guildId)).eq('inviter_id', target);
             if (!error) count = c || 0;
           } catch {}
-          return { ok: true, msg: 'Invitations de ' + target + ' : ' + count, invites: count };
+          return { ok: true, msg: 'Invites for ' + target + ': ' + count, invites: count };
         }
         case 'casino':
         case 'jeux': {
-          if (!channel) throw new Error('Salon casino introuvable — lance /setup d’abord.');
+          if (!channel) throw new Error('Casino channel not found — run /setup first.');
           await channel.send(buildPanelPayload());
-          return { ok: true, msg: 'Panneau de jeu publié dans #' + channel.name + '.' };
+          return { ok: true, msg: 'Game panel posted in #' + channel.name + '.' };
         }
         case 'setup':
         case 'salon':
           await cmdSetup(fakeMsg);
-          return { ok: true, msg: replies.join(' ') || 'Setup exécuté.' };
+          return { ok: true, msg: replies.join(' ') || 'Setup completed.' };
         case 'wins':
           await cmdWins(fakeMsg);
-          return { ok: true, msg: replies.join(' ') || 'Salon wins OK.' };
+          return { ok: true, msg: replies.join(' ') || 'Wins channel OK.' };
         case 'classement':
           await cmdLeaderboard(fakeMsg);
-          return { ok: true, msg: replies.join(' ') || 'Classement posté.' };
+          return { ok: true, msg: replies.join(' ') || 'Leaderboard posted.' };
         case 'admin':
           await cmdAdmin(fakeMsg);
-          return { ok: true, msg: replies.join(' ') || 'Panneau admin Discord posté.' };
+          return { ok: true, msg: replies.join(' ') || 'Discord admin panel posted.' };
         case 'add': {
           const to = String(params.userId || '');
           const amount = Number(params.amount);
-          if (!/^\d{5,25}$/.test(to)) throw new Error('ID membre invalide.');
-          if (!Number.isFinite(amount) || amount <= 0) throw new Error('Montant invalide.');
+          if (!/^\d{5,25}$/.test(to)) throw new Error('Invalid member ID.');
+          if (!Number.isFinite(amount) || amount <= 0) throw new Error('Invalid amount.');
           await cmdAdjust(fakeMsg, [to, String(amount)], +1);
-          return { ok: true, msg: replies.join(' ') || ('+' + amount + ' pour ' + to) };
+          return { ok: true, msg: replies.join(' ') || ('+' + amount + ' for ' + to) };
         }
         case 'remove': {
           const to = String(params.userId || '');
           const amount = Number(params.amount);
-          if (!/^\d{5,25}$/.test(to)) throw new Error('ID membre invalide.');
-          if (!Number.isFinite(amount) || amount <= 0) throw new Error('Montant invalide.');
+          if (!/^\d{5,25}$/.test(to)) throw new Error('Invalid member ID.');
+          if (!Number.isFinite(amount) || amount <= 0) throw new Error('Invalid amount.');
           await cmdAdjust(fakeMsg, [to, String(amount)], -1);
-          return { ok: true, msg: replies.join(' ') || ('−' + amount + ' pour ' + to) };
+          return { ok: true, msg: replies.join(' ') || ('−' + amount + ' for ' + to) };
         }
         case 'invites-notif':
           await cmdInvitesNotif(fakeMsg);
-          return { ok: true, msg: replies.join(' ') || 'Salon notifs invites OK.' };
+          return { ok: true, msg: replies.join(' ') || 'Invite notifs channel OK.' };
         case 'ticketsetup':
           await cmdTicketSetup(fakeMsg);
-          return { ok: true, msg: replies.join(' ') || 'Panel ticket posté.' };
+          return { ok: true, msg: replies.join(' ') || 'Ticket panel posted.' };
         default:
-          throw new Error('Commande inconnue : ' + cmd);
+          throw new Error('Unknown command: ' + cmd);
       }
     },
 
-    // événements (boosts, claim, giveaway) lancés depuis la page admin du site ; les notifs partent aussi quand c'est lancé depuis Discord
+    // events (boosts, claim, giveaway) launched from the site admin page; notifs also go out when launched from Discord
     launchBoost: webLaunchBoost,
     launchEvent: webLaunchEvent,
     eventClaim: webEventClaim,
     eventJoin: webEventJoin,
-    // bouton « Daily » du site : même RPC que le bouton Discord
+    // site "Daily" button: same RPC as the Discord button
     claimDaily: async (uid) => {
       const res = await rpc('claim_daily', { p_user_id: String(uid), p_amount: DAILY_AMOUNT });
       if (res?.balance != null) await touchPeak(String(uid), res.balance);
       return { claimed: !!res?.claimed, balance: res?.balance ?? null, amount: DAILY_AMOUNT };
     },
-    coin: /^<a?:\w+:\d+>$/.test(COIN_PLAIN) ? '🪙' : COIN_PLAIN, // un emoji perso Discord ne s'affiche pas sur le web
+    coin: /^<a?:\w+:\d+>$/.test(COIN_PLAIN) ? '🪙' : COIN_PLAIN, // a custom Discord emoji does not display on the web
     secretSeed: DISCORD_TOKEN,
     clientId: () => client.user?.id,
-    // « Se connecter avec Discord » : serveurs du casino où le joueur est membre (nom, avatar, rôle le plus haut)
+    // "Log in with Discord": casino servers where the player is a member (name, avatar, highest role)
     resolveMember: async (userId, guildIds) => {
       const out = [];
       for (const gid of guildIds) {
@@ -6951,14 +7111,29 @@ try {
     },
   });
 } catch (e) {
-  console.error('[web] blackjack en ligne non démarré (dossier web/ manquant ?) :', e?.message || e);
+  console.error('[web] online blackjack failed to start (web/ folder missing?):', e?.message || e);
 }
 
-// Récap d'une manche en ligne (blackjack / poker / roulette) envoyé dans le salon des victoires
-const SPOT_FR = { red: 'Rouge', black: 'Noir', even: 'Pair', odd: 'Impair', low: '1-18', high: '19-36', d1: '1re 12', d2: '2e 12', d3: '3e 12', c1: 'Col. 1', c2: 'Col. 2', c3: 'Col. 3' };
+// Instant order delivery: Supabase Realtime pushes new shop_orders to the bot.
+// The 2 s SQL poll in web/shop.js remains as a fallback if Realtime is disabled.
+try {
+  if (webApp.enabled && webApp.shop && webApp.shop.syncOrdersFromDb) {
+    supabase
+      .channel('znk-shop-orders')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'shop_orders' }, () => {
+        Promise.resolve(webApp.shop.syncOrdersFromDb()).catch(() => {});
+      })
+      .subscribe();
+  }
+} catch (e) {
+  console.warn('[shop] realtime unavailable (SQL polling still active):', e?.message || e);
+}
+
+// Recap of an online round (blackjack / poker / roulette) sent to the wins channel
+const SPOT_FR = { red: 'Red', black: 'Black', even: 'Even', odd: 'Odd', low: '1-18', high: '19-36', d1: '1st 12', d2: '2nd 12', d3: '3rd 12', c1: 'Col. 1', c2: 'Col. 2', c3: 'Col. 3' };
 const spotFr = (k) => SPOT_FR[k] || `N°${String(k).slice(1)}`;
 async function postOnlineRecap(guildId, r) {
-  // Récap = uniquement les GAGNANTS. Si personne n'a gagné : aucun message.
+  // Recap = WINNERS only. If nobody won: no message.
   const winners = (r.players || []).filter((p) => p.net > 0).sort((a, b) => b.net - a.net);
   if (!winners.length) return;
   const ch = await findWinsChannel(guildId);
@@ -6969,38 +7144,38 @@ async function postOnlineRecap(guildId, r) {
     if (r.game === 'roulette') extra = ' · ' + Object.entries(p.bets || {}).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k, v]) => `${spotFr(k)} ${num(v)}`).join(', ');
     else if (r.game === 'blackjack') extra = p.outcome === 'bj' ? ' · BLACKJACK' : '';
     else if (p.detail) extra = ` · ${p.detail}`;
-    return `🟢 **${escapeMarkdown(p.name)}** · mise ${fmt(p.bet)} · **${signed(p.net)}**${extra}`;
+    return `🟢 **${escapeMarkdown(p.name)}** · bet ${fmt(p.bet)} · **${signed(p.net)}**${extra}`;
   });
-  if (winners.length > MAXL) lines.push(`… et ${winners.length - MAXL} autre(s)`);
+  if (winners.length > MAXL) lines.push(`… and ${winners.length - MAXL} more`);
   let title, head = '';
   if (r.game === 'blackjack') {
     const d = r.dealer;
     title = '🃏 Blackjack en ligne — victoires';
-    head = `🎩 Croupier : **${d.cards.join(' ')} → ${d.bj ? 'Blackjack' : d.bust ? `bust (${d.total})` : d.total}**\n`;
+    head = `🎩 Dealer: **${d.cards.join(' ')} → ${d.bj ? 'Blackjack' : d.bust ? `bust (${d.total})` : d.total}**\n`;
   } else if (r.game === 'poker') {
     title = '♠️ Poker en ligne — victoires';
-    head = r.board && r.board.length ? `🃏 Board : **${r.board.join(' ')}**\n` : '';
+    head = r.board && r.board.length ? `🃏 Board: **${r.board.join(' ')}**\n` : '';
   } else if (r.game === 'roulette') {
     const dot = r.color === 'rouge' ? '🔴' : r.color === 'noir' ? '⚫' : '🟢';
     title = '🎰 Roulette en ligne — victoires';
-    head = `${dot} Numéro sorti : **${r.n}** (${r.color})\n`;
-  } else if (r.game === 'mines') title = '💣 Mines — victoire';
-  else if (r.game === 'fuse') title = '🚀 Fusé — victoire';
-  else if (r.game === 'bj-solo') title = '🃏 Blackjack solo — victoire';
-  else if (r.game === 'coin') title = '🪙 Pile ou Face — victoire';
-  else if (r.game === 'dice') title = '🎲 Dés — victoire';
-  else if (r.game === 'horses') title = '🏇 Course de chevaux — victoire';
-  else if (r.game === 'russian') title = '🔫 Roulette russe — victoire';
-  else if (r.game === 'slots') title = '🎰 Slots — victoire';
-  else if (r.game === 'duel') title = '🤠 Duel — victoire';
-  else if (r.game === 'plinko') title = '🎱 Plinko — victoire';
-  else if (r.game === 'scratch') title = '🎟️ Ticket à gratter — victoire';
+    head = `${dot} Number: **${r.n}** (${r.color})\n`;
+  } else if (r.game === 'mines') title = '💣 Mines — win';
+  else if (r.game === 'fuse') title = '🚀 Fuse — win';
+  else if (r.game === 'bj-solo') title = '🃏 Solo Blackjack — win';
+  else if (r.game === 'coin') title = '🪙 Heads or Tails — win';
+  else if (r.game === 'dice') title = '🎲 Dice — win';
+  else if (r.game === 'horses') title = '🏇 Horse Race — win';
+  else if (r.game === 'russian') title = '🔫 Russian Roulette — win';
+  else if (r.game === 'slots') title = '🎰 Slots — win';
+  else if (r.game === 'duel') title = '🤠 Duel — win';
+  else if (r.game === 'plinko') title = '🎱 Plinko — win';
+  else if (r.game === 'scratch') title = '🎟️ Scratch Ticket — win';
   else return;
   const embed = new EmbedBuilder()
     .setColor(COLORS.violet)
     .setTitle(title)
     .setDescription(`${head}${LINE}\n${lines.join('\n')}`)
-    .setFooter({ text: 'ZNK Casino  •  Parties en ligne' })
+    .setFooter({ text: 'ZNK Casino  •  Games online' })
     .setTimestamp();
   await ch.send({ embeds: [embed], allowedMentions: { parse: [] } });
 }
@@ -7009,8 +7184,8 @@ function buildPokerPanelPayload() {
   const embed = new EmbedBuilder()
     .setColor(0x7c3aed)
     .setTitle('🎮 Casino en ligne')
-    .setDescription('Clique sur **Play Online** : le site s’ouvre et tu choisis ton jeu (ton solde du casino est utilisé).')
-    .setFooter({ text: 'Admin → Salon online pour créer ce salon' });
+    .setDescription('Click **Play Online**: the site opens and you choose your game (your casino balance is used).')
+    .setFooter({ text: 'Admin → Online channel to create this channel' });
   const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('online_play').setLabel('Play Online').setEmoji('🎮').setStyle(ButtonStyle.Primary)
   );
@@ -7024,13 +7199,13 @@ async function createPokerChannel(i) {
   const existing = (await getSavedChannel(guild, 'online')) || (await getSavedChannel(guild, 'poker'));
   if (existing) {
     await existing.send(buildPokerPanelPayload()).catch(() => {});
-    return i.reply({ content: `✅ Salon online déjà présent : <#${existing.id}> (panneau renvoyé).`, flags: EPH });
+    return i.reply({ content: `✅ Online channel already exists: <#${existing.id}> (panel reposted).`, flags: EPH });
   }
   if (!me.permissions.has(P.ManageChannels)) return i.reply({ content: NEED_MANAGE_CHANNELS, flags: EPH });
   const channel = await guild.channels.create({
     name: 'online',
     type: ChannelType.GuildText,
-    topic: 'Casino en ligne 🃏🎰 — blackjack, poker et roulette multijoueurs sur le site du casino',
+    topic: 'Online casino 🃏🎰 — multiplayer blackjack, poker and roulette on the casino site',
     permissionOverwrites: [
       {
         id: guild.roles.everyone.id,
@@ -7049,33 +7224,33 @@ async function createPokerChannel(i) {
   await panelMsg.pin().catch(() => {});
   const saved = await saveChannel(guild.id, 'online', channel.id);
   return i.reply({
-    content: `✅ Salon <#${channel.id}> créé (bouton Play Online).${saved ? '' : DB_WARN}`,
+    content: `✅ Channel <#${channel.id}> created (Play Online button).${saved ? '' : DB_WARN}`,
     flags: EPH,
   });
 }
 
-// Tous les boutons du salon online (y compris ceux des anciens panneaux : poker_new / poker_top / poker_hist…)
-// donnent le lien PERSONNEL vers la table web.
+// All buttons in the online channel (including those from old panels: poker_new / poker_top / poker_hist…)
+// give the PERSONAL link to the web table.
 async function handlePokerButton(i) {
-  if (!i.guild) return respondText(i, 'Utilise ce bouton dans le serveur.');
-  if (!webApp.enabled) return respondText(i, '⚠️ Les jeux en ligne sont désactivés pour le moment.');
-  // Un seul lien pour tous les boutons (y compris ceux des anciens panneaux) : il ouvre la page d'accueil des jeux.
-  const shared = !!(webApp.oauth && webApp.oauth()); // connexion Discord configurée : même lien pour tout le monde
+  if (!i.guild) return respondText(i, 'Use this button in the server.');
+  if (!webApp.enabled) return respondText(i, '⚠️ Online games are currently disabled.');
+  // A single link for all buttons (including those from old panels): it opens the games home page.
+  const shared = !!(webApp.oauth && webApp.oauth()); // Discord login configured: same link for everyone
   const url = shared ? webApp.publicUrl : webApp.makeLink({
     id: i.user.id,
     name: i.member?.displayName || i.user.globalName || i.user.username,
     avatar: i.user.displayAvatarURL({ extension: 'png', size: 128 }),
-    role: (() => { const r = i.member?.roles?.highest; return r && r.id !== i.guild.id ? r.name : ''; })(), // rôle Discord le plus haut (affiché dans le chat)
+    role: (() => { const r = i.member?.roles?.highest; return r && r.id !== i.guild.id ? r.name : ''; })(), // highest Discord role (shown in chat)
   }, i.guild.id);
-  if (!url) return respondText(i, '⚠️ Lien indisponible, réessaie dans un instant.');
+  if (!url) return respondText(i, '⚠️ Link unavailable, try again in a moment.');
   const bal = await getBalance(i.user.id).catch(() => null);
   const embed = new EmbedBuilder()
     .setColor(COLORS.violet)
     .setAuthor({ name: 'ZNK CASINO  •  JEUX EN LIGNE', iconURL: ZNK_LOGO })
-    .setTitle('🎮 Les jeux t’attendent')
+    .setTitle('🎮 The games are waiting for you')
     .setDescription(
-      `Clique sur le bouton pour ouvrir le site, puis choisis ton jeu${bal !== null ? ` (solde : **${fmt(bal)}**)` : ''}.\n\n` +
-        (shared ? '🔐 Sur le site, clique sur **Se connecter avec Discord** : tu es reconnu automatiquement.' : `🔒 Ce lien est **personnel** (il te connecte à ton compte) : ne le partage pas. Valable 12 h.`)
+      `Click the button to open the site, then choose your game${bal !== null ? ` (balance: **${fmt(bal)}**)` : ''}.\n\n` +
+        (shared ? '🔐 On the site, click **Log in with Discord**: you will be recognized automatically.' : `🔒 This link is **personal** (it logs you into your account): do not share it. Valid for 12 h.`)
     );
   return i.reply({
     embeds: [embed],
@@ -7085,7 +7260,7 @@ async function handlePokerButton(i) {
 }
 
 async function getAnnounceChannel(guildId) {
-  // Ancienne logique salon — conservée en secours uniquement
+  // Old channel logic — kept as fallback only
   const notifId = guildChannels.get(`${guildId}:notifs`);
   if (notifId) {
     const ch = await client.channels.fetch(notifId).catch(() => null);
@@ -7096,7 +7271,7 @@ async function getAnnounceChannel(guildId) {
   return null;
 }
 
-/** Envoie un MP à un utilisateur (ignore si MP fermés). */
+/** Sends a DM to a user (ignores if DMs are closed). */
 async function dmUser(userId, payload) {
   try {
     const u = await client.users.fetch(userId);
@@ -7107,7 +7282,7 @@ async function dmUser(userId, payload) {
   }
 }
 
-/** Diffuse un MP à tous les membres non-bot du serveur (lent, rate-limit). */
+/** Broadcasts a DM to all non-bot members of the server (slow, rate-limited). */
 async function dmGuildEveryone(guild, payload) {
   if (!guild) return { ok: 0, fail: 0 };
   if (
@@ -7120,7 +7295,7 @@ async function dmGuildEveryone(guild, payload) {
     try {
       putCard(payload, await announceCardFor(payload.embeds[0]));
     } catch (e) {
-      console.error('[carte annonce]', e?.message || e);
+      console.error('[card announcement]', e?.message || e);
     }
   }
   let list;
@@ -7152,13 +7327,13 @@ async function createAllTimeChannel(i) {
   if (existing) {
     const msg = await existing.send(await buildBoardPayload('alltime'));
     trackAlltime(guild.id, existing.id, msg.id);
-    return i.reply({ content: `✅ Salon all-time déjà présent : <#${existing.id}> (classement reposté).`, flags: EPH });
+    return i.reply({ content: `✅ All-time channel already exists: <#${existing.id}> (leaderboard reposted).`, flags: EPH });
   }
   if (!me.permissions.has(P.ManageChannels)) return i.reply({ content: NEED_MANAGE_CHANNELS, flags: EPH });
   const channel = await guild.channels.create({
     name: 'alltime',
     type: ChannelType.GuildText,
-    topic: 'Classement all-time : solde max historique 👑',
+    topic: 'All-time leaderboard: all-time peak balance 👑',
     permissionOverwrites: [
       {
         id: guild.roles.everyone.id,
@@ -7177,7 +7352,7 @@ async function createAllTimeChannel(i) {
   await msg.pin().catch(() => {});
   trackAlltime(guild.id, channel.id, msg.id);
   const saved = await saveChannel(guild.id, 'alltime', channel.id);
-  return i.reply({ content: `✅ Salon <#${channel.id}> créé avec le classement all-time.${saved ? '' : DB_WARN}`, flags: EPH });
+  return i.reply({ content: `✅ Channel <#${channel.id}> created with the all-time leaderboard.${saved ? '' : DB_WARN}`, flags: EPH });
 }
 
 async function restoreChannelsByName() {
@@ -7220,23 +7395,23 @@ async function saveChannel(guildId, kind, channelId) {
     if (error) throw error;
     return true;
   } catch (e) {
-    console.error(`[salons] impossible d'enregistrer "${kind}" dans guild_channels (lance schema_v3.sql) :`, e?.message || e);
+    console.error(`[channels] could not save "${kind}" in guild_channels (run schema_v3.sql):`, e?.message || e);
     return false;
   }
 }
 
-const DB_WARN = '\n⚠️ Je n’ai pas pu l’enregistrer dans la base (table `guild_channels` manquante) : lance **schema_v3.sql** dans Supabase.';
+const DB_WARN = '\n⚠️ I could not save it to the database (missing `guild_channels` table): run **schema_v3.sql** in Supabase.';
 
 function explainError(e) {
   const msg = String(e?.message || e || '');
   if (e?.code === 50013 || /Missing Permissions/i.test(msg)) {
-    return 'Il me manque une permission Discord (**Gérer les salons**, **Voir le salon**, **Envoyer des messages**, **Intégrer des liens**).';
+    return 'I am missing a Discord permission (**Manage Channels**, **View Channel**, **Send Messages**, **Embed Links**).';
   }
-  if (e?.code === 50001 || /Missing Access/i.test(msg)) return 'Je n’ai pas accès à ce salon/serveur (**Missing Access**).';
+  if (e?.code === 50001 || /Missing Access/i.test(msg)) return 'I do not have access to this channel/server (**Missing Access**).';
   if (/relation|does not exist|schema cache|PGRST|42P01|Could not find the table/i.test(msg)) {
-    return 'Une table Supabase est manquante : lance **schema_v3.sql** dans l’éditeur SQL de Supabase.';
+    return 'A Supabase table is missing: run **schema_v3.sql** in the Supabase SQL editor.';
   }
-  return `Détail technique : \`${msg.slice(0, 180)}\``;
+  return `Technical detail: \`${msg.slice(0, 180)}\``;
 }
 
 function botCan(guild, wanted) {
@@ -7245,9 +7420,9 @@ function botCan(guild, wanted) {
 }
 
 const NEED_MANAGE_CHANNELS =
-  '⚠️ Il me faut la permission **Gérer les salons** pour créer le salon (Paramètres du serveur → Rôles → rôle du bot).';
+  '⚠️ I need the **Manage Channels** permission to create the channel (Server Settings → Roles → bot role).';
 
-// ---------- !setup : salon casino ----------
+// ---------- !setup: casino channel ----------
 async function cmdSetup(msg) {
   if (!isCrown(msg)) return msg.reply(CROWN_ONLY);
   const guild = msg.guild;
@@ -7261,7 +7436,7 @@ async function cmdSetup(msg) {
       await existing.permissionOverwrites.edit(guild.roles.everyone, { SendMessages: false }).catch(() => {});
       const panelMsg = await existing.send(buildPanelPayload());
       await panelMsg.pin().catch(() => {});
-      return msg.reply(`✅ Le salon <#${existingId}> existe déjà : j’y ai posté un nouveau panneau de jeu (épinglé).`);
+      return msg.reply(`✅ Channel <#${existingId}> already exists: I posted a new game panel there (pinned).`);
     }
     casinoChannels.delete(guild.id);
   }
@@ -7272,7 +7447,7 @@ async function cmdSetup(msg) {
   const channel = await guild.channels.create({
     name: 'casino',
     type: ChannelType.GuildText,
-    topic: 'Casino 🪙 : joue avec les boutons du panneau épinglé',
+    topic: 'Casino 🪙: play using the buttons on the pinned panel',
     permissionOverwrites: [
       { id: guild.roles.everyone.id, allow: [P.ViewChannel, P.ReadMessageHistory], deny: [P.SendMessages] },
       { id: me.id, allow: botAllow },
@@ -7297,13 +7472,13 @@ async function cmdSetup(msg) {
 
   const warn = me.permissions.has(P.ManageMessages)
     ? ''
-    : '\n⚠️ Il me manque **Gérer les messages** : je ne pourrai pas épingler le panneau.';
+    : '\n⚠️ I am missing **Manage Messages**: I will not be able to pin the panel.';
   return msg.reply(
-    `✅ Salon <#${channel.id}> créé avec le panneau de boutons (épinglé). Chacun joue en cliquant, et ses parties ne sont visibles que par lui.${warn}`
+    `✅ Channel <#${channel.id}> created with the button panel (pinned). Everyone plays by clicking, and their games are only visible to them.${warn}`
   );
 }
 
-// ---------- !wins : salon des victoires ----------
+// ---------- !wins: wins channel ----------
 async function cmdWins(msg) {
   if (!isCrown(msg)) return msg.reply(CROWN_ONLY);
   const guild = msg.guild;
@@ -7311,13 +7486,13 @@ async function cmdWins(msg) {
   const me = guild.members.me;
 
   const existing = await getSavedChannel(guild, 'wins');
-  if (existing) return msg.reply(`Le salon des victoires existe déjà : <#${existing.id}>`);
+  if (existing) return msg.reply(`The wins channel already exists: <#${existing.id}>`);
   if (!me.permissions.has(P.ManageChannels)) return msg.reply(NEED_MANAGE_CHANNELS);
 
   const channel = await guild.channels.create({
     name: 'wins',
     type: ChannelType.GuildText,
-    topic: 'Les victoires de tout le monde 🎉',
+    topic: 'Everyone\'s wins 🎉',
     permissionOverwrites: [
       {
         id: guild.roles.everyone.id,
@@ -7334,7 +7509,7 @@ async function cmdWins(msg) {
   });
   const saved = await saveChannel(guild.id, 'wins', channel.id);
   return msg.reply(
-    `✅ Salon <#${channel.id}> créé : chaque victoire (jeu, mise, multiplicateur, gain) s’y affichera automatiquement.${saved ? '' : DB_WARN}`
+    `✅ Channel <#${channel.id}> created: every win (game, bet, multiplier, payout) will be shown there automatically.${saved ? '' : DB_WARN}`
   );
 }
 
@@ -7346,13 +7521,13 @@ async function cmdInvitesNotif(msg) {
   const me = guild.members.me;
 
   const existing = await getSavedChannel(guild, 'invites');
-  if (existing) return msg.reply(`Le salon des notifications d’invitations existe déjà : <#${existing.id}>`);
+  if (existing) return msg.reply(`The invite notifications channel already exists: <#${existing.id}>`);
   if (!me.permissions.has(P.ManageChannels)) return msg.reply(NEED_MANAGE_CHANNELS);
 
   const channel = await guild.channels.create({
     name: 'invites-notif',
     type: ChannelType.GuildText,
-    topic: 'Notifications quand quelqu’un invite un nouveau membre 📨',
+    topic: 'Notifications when someone invites a new member 📨',
     permissionOverwrites: [
       {
         id: guild.roles.everyone.id,
@@ -7369,7 +7544,7 @@ async function cmdInvitesNotif(msg) {
   });
   const saved = await saveChannel(guild.id, 'invites', channel.id);
   return msg.reply(
-    `✅ Salon <#${channel.id}> créé : chaque invitation réussie (nouveau membre + récompense) s’y affichera automatiquement.${saved ? '' : DB_WARN}`
+    `✅ Channel <#${channel.id}> created: every successful invite (new member + reward) will be shown there automatically.${saved ? '' : DB_WARN}`
   );
 }
 
@@ -7383,14 +7558,14 @@ async function cmdAdmin(msg) {
   const existing = await getSavedChannel(guild, 'admin');
   if (existing) {
     await existing.send(buildAdminPayload());
-    return msg.reply(`✅ Le salon admin existe déjà : j’y ai reposté le panneau dans <#${existing.id}>.`);
+    return msg.reply(`✅ The admin channel already exists: I reposted the panel in <#${existing.id}>.`);
   }
   if (!me.permissions.has(P.ManageChannels)) return msg.reply(NEED_MANAGE_CHANNELS);
 
   const channel = await guild.channels.create({
     name: 'casino-admin',
     type: ChannelType.GuildText,
-    topic: 'Panneau admin du casino (visible uniquement par le propriétaire)',
+    topic: 'Casino admin panel (only visible to the owner)',
     permissionOverwrites: [
       { id: guild.roles.everyone.id, type: OverwriteType.Role, deny: [P.ViewChannel] },
       { id: guild.ownerId, type: OverwriteType.Member, allow: [P.ViewChannel, P.SendMessages, P.ReadMessageHistory] },
@@ -7410,28 +7585,28 @@ async function cmdAdmin(msg) {
     await channel.delete().catch(() => {});
     throw e;
   }
-  return msg.reply(`✅ Salon privé <#${channel.id}> créé avec le panneau admin (visible uniquement par toi).${saved ? '' : DB_WARN}`);
+  return msg.reply(`✅ Private channel <#${channel.id}> created with the admin panel (only visible to you).${saved ? '' : DB_WARN}`);
 }
 
 // ============================================================
-//  CLASSEMENT (auto-actualisé toutes les minutes)
+//  LEADERBOARD (auto-updated every minute)
 // ============================================================
 // ============================================================
-//  CLASSEMENTS EN IMAGE (plus riches, all-time, invitations)
+//  IMAGE LEADERBOARDS (richest, all-time, invites)
 //  Variables Railway (optionnelles) : LB_BG_URL, ALLTIME_BG_URL, INVITES_BG_URL
-//  Si l'URL est définie, l'image est un "template" : le bot n'écrit que le texte dedans.
-//  Gabarit : image 1600x1800 px (ratio 8:9). Positions en dur dans renderBoardImage (repère 800x900, x2 pour l'image) :
-//    titre   : centré x=400, ligne de base y=83, zone x 40-760 / y 30-110
-//    lignes  : 10 lignes, haut de la ligne k = 130 + 74*k, hauteur 66, zone x 40-760
-//    rang    : centré x=80 | avatar : centre x=144, diamètre 44 | pseudo : x 182-530
-//    valeur  : alignée à droite sur x=744 (zone x 540-744) | sous-texte invitations : même x, y_ligne+54
+//  If the URL is set, the image is a "template": the bot only writes text in it.
+//  Template: 1600x1800 px image (8:9 ratio). Hardcoded positions in renderBoardImage (800x900 coordinates, x2 for the image):
+//    title   : centered x=400, baseline y=83, area x 40-760 / y 30-110
+//    rows    : 10 rows, top of row k = 130 + 74*k, height 66, area x 40-760
+//    rank    : centered x=80 | avatar: center x=144, diameter 44 | username: x 182-530
+//    value   : right-aligned at x=744 (area x 540-744) | invites subtext: same x, y_line+54
 // ============================================================
 const BOARD_BG = {
   rich: bgSource('LB_BG_URL', 'richest_leaderboard.png'),
   alltime: bgSource('ALLTIME_BG_URL', 'alltime_leaderboard.png'),
   invites: bgSource('INVITES_BG_URL', 'top_inviters_leaderboard.png'),
-  winNotif: bgSource('WIN_NOTIF_BG_URL', 'win_notification.png'), // notif de victoire (image 1774x887)
-  inviteNotif: bgSource('INVITE_NOTIF_BG_URL', 'invite_notification.png'), // notif "X a invité Y" (image 1600x800)
+  winNotif: bgSource('WIN_NOTIF_BG_URL', 'win_notification.png'), // win notif (image 1774x887)
+  inviteNotif: bgSource('INVITE_NOTIF_BG_URL', 'invite_notification.png'), // notif "X invited Y" (image 1600x800)
 };
 const bgByUrl = new Map(); // url -> Promise<Image|null>
 function getBgByUrl(url, loadImage) {
@@ -7440,8 +7615,8 @@ function getBgByUrl(url, loadImage) {
     bgByUrl.set(
       url,
       readImageSource(url, loadImage).catch((e) => {
-        console.warn('[classement] image de fond illisible (lien direct png/jpg requis) :', e?.message || e);
-        bgByUrl.delete(url); // réessaie au prochain affichage
+        console.warn('[leaderboard] unreadable background image (direct png/jpg link required):', e?.message || e);
+        bgByUrl.delete(url); // retry on next display
         return null;
       })
     );
@@ -7461,19 +7636,19 @@ async function getAvatarCached(user, loadImage) {
   return img;
 }
 
-// Mise en page logique 800x900 (image finale 1000x1125). Gabarit conseillé : 1600x1800 (x2).
+// Logical layout 800x900 (final image 1000x1125). Recommended template: 1600x1800 (x2).
 const BOARD_ROW_Y = (k) => 130 + 74 * k; // 10 lignes de 66 px de haut
 
-// Positions calées sur les images néon classement_riches.png / classement_alltime.png
-// (1180x1327 px, rendues en 800x900). Rang, couronnes, pièces, titre et cadres sont DÉJÀ dans l'image :
-// le bot écrit seulement l'avatar, le pseudo et le montant. Coordonnées dans le repère 800x900.
+// Positions aligned to neon leaderboard images classement_riches.png / classement_alltime.png
+// (1180x1327 px, rendered at 800x900). Rank, crowns, coins, title and frames are ALREADY in the image:
+// the bot only writes the avatar, username and amount. Coordinates in the 800x900 reference frame.
 const BOARD_TPL = {
-  rowCy: [268.9, 330.3, 391.7, 451.3, 510.4, 568.7, 627.0, 685.3, 743.0, 802.0], // centre y des 10 lignes
-  avatar: { cx: 191.5, d: 47 },                          // rond d'avatar (centre x, diamètre)
-  name: { x: 243, maxW: 344, font: 24 },                 // pseudo à gauche (x 243 -> 587)
-  nameInv: { maxW: 300 },                                // top invitations : pseudo plus court (x 243 -> 543, pas de pièce dans l'image)
-  invValue: { right: 756, maxW: 200, font: 22, subFont: 13, mainDy: 3, subDy: 19 }, // top invitations : "N invités" + "+N pièces" alignés à droite
-  value: { x: 647, maxW: 109, font: 26, minFont: 14 },   // montant à droite de la pièce (x 647 -> 756)
+  rowCy: [268.9, 330.3, 391.7, 451.3, 510.4, 568.7, 627.0, 685.3, 743.0, 802.0], // center y of the 10 rows
+  avatar: { cx: 191.5, d: 47 },                          // avatar circle (center x, diameter)
+  name: { x: 243, maxW: 344, font: 24 },                 // username on the left (x 243 -> 587)
+  nameInv: { maxW: 300 },                                // top invites: shorter username (x 243 -> 543, no coin in the image)
+  invValue: { right: 756, maxW: 200, font: 22, subFont: 13, mainDy: 3, subDy: 19 }, // top invites: "N invited" + "+N coins" right-aligned
+  value: { x: 647, maxW: 109, font: 26, minFont: 14 },   // amount to the right of the coin (x 647 -> 756)
 };
 
 async function renderBoardImage({ kind, title, rows, bgUrl }) {
@@ -7495,7 +7670,7 @@ async function renderBoardImage({ kind, title, rows, bgUrl }) {
   g.fillRect(0, 0, W, H);
   const bgImg = await getBgByUrl(bgUrl, loadImage);
   const T = !!bgImg;
-  const TPL = T && (kind === 'rich' || kind === 'alltime' || kind === 'invites'); // image néon avec rang/titre déjà dessinés
+  const TPL = T && (kind === 'rich' || kind === 'alltime' || kind === 'invites'); // neon image with rank/title already drawn
   const INV = kind === 'invites';
   if (T) {
     const k = Math.max(W / bgImg.width, H / bgImg.height);
@@ -7511,7 +7686,7 @@ async function renderBoardImage({ kind, title, rows, bgUrl }) {
     g.fill();
   }
 
-  // titre centré dans la zone x 40-760, y 30-110 (déjà dans l'image en mode néon)
+  // title centered in area x 40-760, y 30-110 (already in the image in neon mode)
   g.textAlign = 'center';
   g.textBaseline = 'alphabetic';
   if (!TPL) {
@@ -7572,7 +7747,7 @@ async function renderBoardImage({ kind, title, rows, bgUrl }) {
         g.textAlign = 'left';
         continue;
       }
-      // montant (la pièce est déjà dans l'image) : on réduit la taille si le nombre est long
+      // amount (the coin is already in the image): shrink font if the number is long
       const vtxt = String(r.val ?? r.main);
       let fs = BOARD_TPL.value.font;
       g.font = `bold ${fs}px ${FONT}`;
@@ -7591,7 +7766,7 @@ async function renderBoardImage({ kind, title, rows, bgUrl }) {
     }
     const rankColor = k === 0 ? '#FACC15' : k === 1 ? '#E5E7EB' : k === 2 ? '#FB923C' : '#FFFFFF';
 
-    // rang (centré en x = 80)
+    // rank (centered at x = 80)
     g.textAlign = 'center';
     g.fillStyle = r ? rankColor : 'rgba(255,255,255,0.35)';
     g.font = `bold ${k < 3 ? 30 : 26}px ${FONT}`;
@@ -7605,7 +7780,7 @@ async function renderBoardImage({ kind, title, rows, bgUrl }) {
       continue;
     }
 
-    // avatar rond (diamètre 44, x 122-166)
+    // round avatar (diameter 44, x 122-166)
     const cx = 144;
     const cy = y + 33;
     g.fillStyle = k < 3 ? rankColor : '#D946EF';
@@ -7635,7 +7810,7 @@ async function renderBoardImage({ kind, title, rows, bgUrl }) {
     g.font = `bold 24px ${FONT}`;
     g.fillText(fitText(g, r.name, 348), 182, y + 42);
 
-    // valeur alignée à droite (x ... 744)
+    // value right-aligned (x ... 744)
     g.textAlign = 'right';
     g.fillStyle = k < 3 ? rankColor : '#FFFFFF';
     g.font = `bold 24px ${FONT}`;
@@ -7655,23 +7830,23 @@ const cleanTxt = (s) => String(s || '').replace(/[\u0000-\u001F\u007F]/g, '').tr
 const plainNum = (n) => num(n).replace(/\s/g, ' ');
 
 // ------------------------------------------------------------
-//  IMAGE DE NOTIFICATION D'INVITATION (variable Railway : INVITE_NOTIF_BG_URL)
-//  Image fournie : notif_invitation.png, 1774x887 px (ratio 2:1). En mode image, positions (repère 800x400) :
-//    avatar invitant (103,115) d84 | avatar invité (534,115) d84 | titre x171 y100 | pseudo invitant x171 y137
-//    barre : "A INVITÉ" x77 y196, pseudo invité aligné à droite x627 y197 | récompense centrée x387 (y252 libellé, y302 montant) Repère logique 800x400 (image finale 1000x500).
-//  Positions en dur (x2 pour ton image) :
-//    titre         : centré x=400, ligne de base y=70, zone x 100-700 / y 35-85
-//    avatar invitant : centre (200, 190), diamètre 120 | pseudo centré x=200, ligne de base y=290 (largeur max 300)
-//    "a invité"    : centré x=400, ligne de base y=198 (zone x 310-490)
-//    avatar invité   : centre (600, 190), diamètre 120 | pseudo centré x=600, ligne de base y=290 (largeur max 300)
-//    récompense    : centrée x=400, ligne de base y=355, zone x 150-650 / y 320-370
+//  INVITE NOTIFICATION IMAGE (Railway variable: INVITE_NOTIF_BG_URL)
+//  Provided image: notif_invitation.png, 1774x887 px (2:1 ratio). In image mode, positions (800x400 reference):
+//    inviter avatar (103,115) d84 | invitee avatar (534,115) d84 | title x171 y100 | inviter username x171 y137
+//    bar: "INVITED" x77 y196, invitee username right-aligned x627 y197 | reward centered x387 (y252 label, y302 amount) Logical reference 800x400 (final image 1000x500).
+//  Hardcoded positions (x2 for your image):
+//    title         : centered x=400, baseline y=70, area x 100-700 / y 35-85
+//    inviter avatar : center (200, 190), diameter 120 | username centered x=200, baseline y=290 (max width 300)
+//    "invited"     : centered x=400, baseline y=198 (area x 310-490)
+//    invitee avatar  : center (600, 190), diameter 120 | username centered x=600, baseline y=290 (max width 300)
+//    reward        : centered x=400, baseline y=355, area x 150-650 / y 320-370
 // ------------------------------------------------------------
 // ============================================================
-//  CARTES IMAGE (win, résultat, daily, transfert, annonce, online, menu, invitation)
-//  Gabarit : "carte de profil" 1774x887 (1 avatar rond, bandeau, barre, 6 cases) -> repère 800x400.
-//  Variables Railway : WIN_NOTIF_BG_URL, RESULT_BG_URL, DAILY_BG_URL, TRANSFER_BG_URL, ANNOUNCE_BG_URL,
-//                      ONLINE_BG_URL, MENU_BG_URL, INVITE_NOTIF_BG_URL   (lien direct png/jpg)
-//  Sans variable => ancien affichage texte.
+//  IMAGE CARDS (win, result, daily, transfer, announcement, online, menu, invitation)
+//  Template: "profile card" 1774x887 (1 round avatar, banner, bar, 6 cells) -> 800x400 reference.
+//  Railway variables: WIN_NOTIF_BG_URL, RESULT_BG_URL, DAILY_BG_URL, TRANSFER_BG_URL, ANNOUNCE_BG_URL,
+//                      ONLINE_BG_URL, MENU_BG_URL, INVITE_NOTIF_BG_URL   (direct png/jpg link)
+//  No variable => old text display.
 // ============================================================
 const CARD_BG = {
   win: bgSource('WIN_NOTIF_BG_URL', 'win_notification.png'),
@@ -7700,7 +7875,7 @@ const CARD_L = {
   cols: [[64, 198], [271, 199], [480, 230]],
   rows: [[220, 45], [271, 45]],
 };
-// texte sans emoji (le canvas n'affiche pas les emojis) ; garde le symbole de monnaie texte
+// text without emoji (canvas does not display emoji); keeps the text currency symbol
 const noEmoji = (s) => {
   const keep = '\uE000';
   return String(s ?? '')
@@ -7711,7 +7886,7 @@ const noEmoji = (s) => {
     .replace(/\s+/g, ' ')
     .trim();
 };
-const dateFR = () => new Date().toLocaleDateString('fr-FR', { timeZone: 'Europe/Paris', day: '2-digit', month: '2-digit', year: 'numeric' });
+const dateFR = () => new Date().toLocaleDateString('en-US', { timeZone: 'Europe/Paris', month: '2-digit', day: '2-digit', year: 'numeric' });
 
 function drawStar(g, cx, cy, r) {
   g.beginPath();
@@ -7731,7 +7906,7 @@ function drawStar(g, cx, cy, r) {
 async function renderCard(kind, d) {
   if (!canvasLib) return null;
   const { createCanvas, loadImage } = canvasLib;
-  // 1) lien Railway  2) fichier local images/…  3) dégradé violet dessiné (la carte est TOUJOURS une image)
+  // 1) Railway link  2) local images/… file  3) drawn purple gradient (the card is ALWAYS an image)
   let bgImg = await getBgByUrl(CARD_BG[kind], loadImage);
   if (!bgImg && CARD_FILE[kind]) bgImg = await getBgByUrl(localImg(CARD_FILE[kind]), loadImage);
   const W = 800, H = 400, SCALE = 1.25;
@@ -7745,7 +7920,7 @@ async function renderCard(kind, d) {
     const sw = W / k, sh = H / k;
     g.drawImage(bgImg, (bgImg.width - sw) / 2, (bgImg.height - sh) / 2, sw, sh, 0, 0, W, H);
   } else {
-    console.warn(`[carte ${kind}] image de fond introuvable : dégradé violet de secours`);
+    console.warn(`[card ${kind}] background image not found: fallback purple gradient`);
     const bg = g.createLinearGradient(0, 0, W, H);
     bg.addColorStop(0, '#1A0B2E');
     bg.addColorStop(0.5, '#4C1D95');
@@ -7765,7 +7940,7 @@ async function renderCard(kind, d) {
     }
   }
 
-  // avatar rond (dans le cadre du gabarit)
+  // round avatar (in the template frame)
   const A = CARD_L.av;
   const av = d.avatar ? await getAvatarCached(d.avatar, loadImage) : null;
   g.save();
@@ -7780,7 +7955,7 @@ async function renderCard(kind, d) {
     drawStar(g, A.cx, A.cy, A.d * 0.3);
   }
 
-  // icône du jeu à droite du bandeau
+  // game icon on the right of the banner
   const icon = d.icon ? await loadRemoteImage(d.icon, loadImage) : null;
   if (icon) g.drawImage(icon, 531, 91, 62, 62);
 
@@ -7794,7 +7969,7 @@ async function renderCard(kind, d) {
   g.fillStyle = 'rgba(255,255,255,0.75)'; g.font = `15px ${FONT}`;
   g.fillText(fitText(g, S(d.sub), tmax), tx, 145);
 
-  // barre : libellé à gauche, valeur à droite
+  // bar: label on the left, value on the right
   const B = CARD_L.bar;
   g.fillStyle = 'rgba(255,255,255,0.9)'; g.font = `bold 14px ${FONT}`;
   g.fillText(fitText(g, S(d.barLeft).toUpperCase(), 200), B.x + 16, B.y + B.h / 2 + 5);
@@ -7802,7 +7977,7 @@ async function renderCard(kind, d) {
   g.fillText(fitText(g, S(d.barRight), 380), B.x + B.w - 16, B.y + B.h / 2 + 7);
   g.textAlign = 'left';
 
-  // 6 cases (grille 3x2)
+  // 6 cells (3x2 grid)
   const boxes = CARD_L.rows.flatMap(([y, h]) => CARD_L.cols.map(([x, w]) => ({ x, y, w, h })));
   (d.cells || []).slice(0, 6).forEach(([label, value, color], n) => {
     const b = boxes[n];
@@ -7827,17 +8002,17 @@ async function makeCard(kind, d) {
     const name = `${kind}-${Date.now()}-${randomInt(1000, 9999)}.${imgExt(buf)}`;
     return { name, file: new AttachmentBuilder(buf, { name }) };
   } catch (e) {
-    console.error(`[carte ${kind}]`, e?.message || e);
+    console.error(`[card ${kind}]`, e?.message || e);
     return null;
   }
 }
 async function editWithCard(i, payload) {
-  if (payload.attachments === undefined && !payload.files?.length) payload.attachments = []; // retire les images d'animation
+  if (payload.attachments === undefined && !payload.files?.length) payload.attachments = []; // removes animation images
   try {
     return await i.editReply(payload);
   } catch (e) {
     if (!payload.files?.length) throw e;
-    console.error('[carte] image refusée, repli sur le texte :', e?.message || e);
+    console.error('[card] image rejected, falling back to text:', e?.message || e);
     payload.embeds.forEach((em) => em.setImage(null));
     payload.files = [];
     payload.attachments = [];
@@ -7848,13 +8023,13 @@ async function editWithCard(i, payload) {
 function putCard(payload, card, embed) {
   return payload;
 }
-const userName = (u) => cleanTxt(u?.globalName || u?.username) || 'Joueur';
+const userName = (u) => cleanTxt(u?.globalName || u?.username) || 'Player';
 const cardColors = { win: '#86EFAC', lose: '#FCA5A5', push: '#E9D5FF' };
 const coinTxt = (n) => `${plainNum(n)} ${COIN_PLAIN}`;
 
 async function resultCard(user, game, bet, mult, profit, balance = null) {
   const kind = profit > 0 ? 'win' : profit < 0 ? 'lose' : 'push';
-  const tag = kind === 'win' ? 'VICTOIRE' : kind === 'lose' ? 'DÉFAITE' : 'ÉGALITÉ';
+  const tag = kind === 'win' ? 'WIN' : kind === 'lose' ? 'LOSS' : 'TIE';
   const col = cardColors[kind];
   const payout = Math.max(0, round2(bet + profit));
   return makeCard('result', {
@@ -7863,15 +8038,15 @@ async function resultCard(user, game, bet, mult, profit, balance = null) {
     tag,
     headline: userName(user),
     sub: gameNamePlain(game),
-    barLeft: balance == null ? 'RÉSULTAT' : 'SOLDE',
+    barLeft: balance == null ? 'RESULT' : 'BALANCE',
     barRight: balance == null ? tag : coinTxt(balance),
     cells: [
-      ['JEU', gameNamePlain(game)],
-      ['MISE', coinTxt(bet)],
-      ['MULTIPLICATEUR', fx(mult)],
-      ['GAIN TOTAL', coinTxt(payout)],
+      ['GAME', gameNamePlain(game)],
+      ['BET', coinTxt(bet)],
+      ['MULTIPLIER', fx(mult)],
+      ['TOTAL WIN', coinTxt(payout)],
       ['PROFIT', `${profit > 0 ? '+' : ''}${coinTxt(profit)}`, col],
-      ['RÉSULTAT', tag, col],
+      ['RESULT', tag, col],
     ],
   });
 }
@@ -7881,17 +8056,17 @@ async function dailyPayload(user, res, content) {
   const claimed = !!res?.claimed;
   const card = await makeCard('daily', {
     avatar: user,
-    tag: 'RÉCOMPENSE QUOTIDIENNE',
+    tag: 'DAILY REWARD',
     headline: userName(user),
-    sub: claimed ? 'Daily récupéré' : 'Daily déjà récupéré aujourd’hui',
-    barLeft: 'SOLDE',
+    sub: claimed ? 'Daily claimed' : 'Daily already claimed today',
+    barLeft: 'BALANCE',
     barRight: coinTxt(res?.balance ?? 0),
     cells: [
-      ['REÇU', claimed ? `+${coinTxt(DAILY_AMOUNT)}` : '0', claimed ? '#86EFAC' : '#E9D5FF'],
-      ['STATUT', claimed ? 'RÉCUPÉRÉ' : 'DÉJÀ PRIS', claimed ? '#86EFAC' : '#FCA5A5'],
+      ['RECEIVED', claimed ? `+${coinTxt(DAILY_AMOUNT)}` : '0', claimed ? '#86EFAC' : '#E9D5FF'],
+      ['STATUS', claimed ? 'CLAIMED' : 'ALREADY TAKEN', claimed ? '#86EFAC' : '#FCA5A5'],
       ['PROCHAIN DAILY', 'MINUIT (PARIS)'],
-      ['SOLDE', coinTxt(res?.balance ?? 0)],
-      ['DAILY / JOUR', coinTxt(DAILY_AMOUNT)],
+      ['BALANCE', coinTxt(res?.balance ?? 0)],
+      ['DAILY', coinTxt(DAILY_AMOUNT)],
       ['DATE', dateFR()],
     ],
   });
@@ -7903,7 +8078,7 @@ async function dailyPayload(user, res, content) {
   return payload;
 }
 
-// Carte « annonce » générée automatiquement depuis l'embed d'une diffusion admin
+// "Announcement" card generated automatically from a admin broadcast embed
 async function announceCardFor(embed) {
   const title = noEmoji(embed.data?.title || '');
   const desc = String(embed.data?.description || '');
@@ -7911,27 +8086,27 @@ async function announceCardFor(embed) {
   const actorId = (desc.match(/<@!?(\d{15,25})>/) || [])[1];
   const actor = actorId ? await client.users.fetch(actorId).catch(() => null) : null;
   let label = 'INFO';
-  let value = title || 'ANNONCE';
+  let value = title || 'ANNOUNCEMENT';
   let color = '#FFFFFF';
-  if (/Cadeau/i.test(title)) { label = 'OFFERT À CHAQUE JOUEUR'; value = `+${bolds[0] || ''}`; color = '#86EFAC'; }
-  else if (/Multiplicateur/i.test(title)) { label = bolds[0] || 'MULTIPLICATEUR'; value = bolds[1] || title; }
-  else if (/Boost termin/i.test(title)) { label = 'ÉVÉNEMENT TERMINÉ'; value = bolds[0] || title; color = '#E9D5FF'; }
-  else if (/Boost/i.test(title)) { label = `ACTIF PENDANT ${bolds[0] || ''}`; value = title.replace(/^Boost\s*:?\s*/i, '') || title; }
-  else if (/R[ée]compense/i.test(title)) { label = bolds[1] || 'RÉCOMPENSE'; value = bolds[0] || title; color = '#FACC15'; }
+  if (/Gift/i.test(title)) { label = 'GIFTED TO EVERY PLAYER'; value = `+${bolds[0] || ''}`; color = '#86EFAC'; }
+  else if (/Multiplier/i.test(title)) { label = bolds[0] || 'MULTIPLIER'; value = bolds[1] || title; }
+  else if (/Boost ended/i.test(title)) { label = 'EVENT ENDED'; value = bolds[0] || title; color = '#E9D5FF'; }
+  else if (/Boost/i.test(title)) { label = `ACTIVE FOR ${bolds[0] || ''}`; value = title.replace(/^Boost\s*:?\s*/i, '') || title; }
+  else if (/Reward/i.test(title)) { label = bolds[1] || 'REWARD'; value = bolds[0] || title; color = '#FACC15'; }
   else if (/Reset/i.test(title)) { label = 'ADMINISTRATION'; value = title; color = '#FCA5A5'; }
   return makeCard('announce', {
     avatar: actor,
-    tag: 'ANNONCE · ZNK CASINO',
+    tag: 'ANNOUNCEMENT · ZNK CASINO',
     headline: title,
-    sub: actor ? `Par ${userName(actor)}` : 'Administration',
+    sub: actor ? `By ${userName(actor)}` : 'Administration',
     barLeft: label,
     barRight: value,
     cells: [
-      ['ANNONCE', title],
-      ['PAR', actor ? userName(actor) : 'ADMIN'],
+      ['ANNOUNCEMENT', title],
+      ['BY', actor ? userName(actor) : 'ADMIN'],
       [label, value, color],
-      ['DÉTAIL', bolds[0] || '-'],
-      ['DÉTAIL 2', bolds[1] || '-'],
+      ['DETAIL', bolds[0] || '-'],
+      ['DETAIL 2', bolds[1] || '-'],
       ['DATE', dateFR()],
     ],
   });
@@ -7955,45 +8130,45 @@ async function loadRemoteImage(url, loadImage) {
   }
 }
 
-// Notif de victoire du salon wins (gabarit carte de profil)
+// Win notif from the wins channel (profile card template)
 async function renderWinNotif(user, game, bet, mult, profit, detail = '') {
   const payout = round2(bet + profit);
   return renderCard('win', {
     avatar: user,
     icon: gameIcon(game),
-    tag: 'VICTOIRE',
+    tag: 'WIN',
     headline: userName(user),
     sub: gameNamePlain(game),
-    barLeft: 'GAIN',
+    barLeft: 'WIN',
     barRight: `+${coinTxt(profit)}`,
     cells: [
-      ['JEU', gameNamePlain(game)],
-      ['MISE', coinTxt(bet)],
-      ['MULTIPLICATEUR', fx(mult)],
-      ['GAIN TOTAL', coinTxt(payout)],
+      ['GAME', gameNamePlain(game)],
+      ['BET', coinTxt(bet)],
+      ['MULTIPLIER', fx(mult)],
+      ['TOTAL WIN', coinTxt(payout)],
       ['PROFIT', `+${coinTxt(profit)}`, '#86EFAC'],
-      ['DÉTAIL', detail || '-'],
+      ['DETAIL', detail || '-'],
     ],
   });
 }
 
-async function renderInviteNotif(inviter, invited, lang = 'fr') {
+async function renderInviteNotif(inviter, invited, lang = 'en') {
   {
     const en0 = lang === 'en';
     const newCard = await renderCard('invite', {
       avatar: inviter,
       tag: en0 ? 'NEW INVITE' : 'NOUVELLE INVITATION',
       headline: userName(inviter),
-      sub: `${en0 ? 'invited' : 'a invité'} ${userName(invited)}`,
-      barLeft: en0 ? 'REWARD' : 'RÉCOMPENSE',
+      sub: `${en0 ? 'invited' : 'invited'} ${userName(invited)}`,
+      barLeft: en0 ? 'REWARD' : 'REWARD',
       barRight: `+${coinTxt(INVITE_REWARD)}`,
       cells: [
         [en0 ? 'INVITER' : 'INVITANT', userName(inviter)],
-        [en0 ? 'INVITED' : 'INVITÉ', userName(invited)],
-        [en0 ? 'REWARD' : 'RÉCOMPENSE', `+${coinTxt(INVITE_REWARD)}`, '#86EFAC'],
-        ['STATUT', en0 ? 'VALIDATED' : 'VALIDÉE', '#86EFAC'],
+        [en0 ? 'INVITED' : 'INVITED', userName(invited)],
+        [en0 ? 'REWARD' : 'REWARD', `+${coinTxt(INVITE_REWARD)}`, '#86EFAC'],
+        ['STATUS', en0 ? 'VALIDATED' : 'VALIDATED', '#86EFAC'],
         ['DATE', dateFR()],
-        ['SERVEUR', 'ZNK CASINO'],
+        ['SERVER', 'ZNK CASINO'],
       ],
     });
     if (newCard) return newCard;
@@ -8016,7 +8191,7 @@ async function renderInviteNotif(inviter, invited, lang = 'fr') {
   g.fillStyle = bg;
   g.fillRect(0, 0, W, H);
   const bgImg = await getBgByUrl(BOARD_BG.inviteNotif, loadImage);
-  const T = !!bgImg; // mode template : l'image contient déjà le décor, le bot n'écrit que le texte
+  const T = !!bgImg; // template mode: the image already contains the decor, the bot only writes text
   if (T) {
     const k = Math.max(W / bgImg.width, H / bgImg.height);
     const sw = W / k;
@@ -8031,9 +8206,9 @@ async function renderInviteNotif(inviter, invited, lang = 'fr') {
     roundRect(g, 150, 318, 500, 54, 18); g.fill();
   }
 
-  // ---- mode template (notif_invitation.png, 1774x887) : positions calées sur l'image ----
+  // ---- template mode (notif_invitation.png, 1774x887): positions aligned to the image ----
   if (T) {
-    const clean1 = (u) => (u ? cleanTxt(u.globalName || u.username) || '?' : en ? 'Unknown user' : 'Utilisateur inconnu');
+    const clean1 = (u) => (u ? cleanTxt(u.globalName || u.username) || '?' : en ? 'Unknown user' : 'Unknown user');
     const avatarAt = async (user, cx, cy, D) => {
       g.save();
       g.beginPath();
@@ -8054,8 +8229,8 @@ async function renderInviteNotif(inviter, invited, lang = 'fr') {
       }
       g.restore();
     };
-    await avatarAt(inviter, 103, 115, 84);   // avatar de l'invitant (rond de gauche)
-    await avatarAt(invited, 534, 115, 84);   // avatar de l'invité (rond de droite)
+    await avatarAt(inviter, 103, 115, 84);   // inviter's avatar (circle on the left)
+    await avatarAt(invited, 534, 115, 84);   // invitee avatar (right circle)
     g.textAlign = 'left';
     g.textBaseline = 'alphabetic';
     g.fillStyle = 'rgba(255,255,255,0.7)';
@@ -8064,19 +8239,19 @@ async function renderInviteNotif(inviter, invited, lang = 'fr') {
     g.fillStyle = '#FFFFFF';
     g.font = `bold 28px ${FONT}`;
     g.fillText(fitText(g, clean1(inviter), 300), 171, 137);
-    // barre violette : "a invité" à gauche, pseudo de l'invité à droite
+    // purple bar: "invited" on the left, invitee username on the right
     g.fillStyle = 'rgba(255,255,255,0.9)';
     g.font = `bold 14px ${FONT}`;
-    g.fillText(en ? 'INVITED' : 'A INVITÉ', 77, 196);
+    g.fillText(en ? 'INVITED' : 'INVITED', 77, 196);
     g.textAlign = 'right';
     g.fillStyle = '#FFFFFF';
     g.font = `bold 18px ${FONT}`;
     g.fillText(fitText(g, clean1(invited), 400), 627, 197);
-    // récompense au centre de la zone du bas
+    // reward centered in the bottom area
     g.textAlign = 'center';
     g.fillStyle = 'rgba(255,255,255,0.78)';
     g.font = `bold 16px ${FONT}`;
-    g.fillText(en ? 'REWARD' : 'RÉCOMPENSE', 387, 252);
+    g.fillText(en ? 'REWARD' : 'REWARD', 387, 252);
     g.fillStyle = '#86EFAC';
     g.font = `bold 52px ${FONT}`;
     g.fillText(fitText(g, `+${plainNum(INVITE_REWARD)} ${COIN_PLAIN}`, 500), 387, 302);
@@ -8091,7 +8266,7 @@ async function renderInviteNotif(inviter, invited, lang = 'fr') {
   g.font = `bold 28px ${FONT}`;
   g.fillText(fitText(g, en ? 'NEW INVITE' : 'NOUVELLE INVITATION', 600), 400, 70);
 
-  // deux avatars ronds (diamètre 120)
+  // two round avatars (diameter 120)
   const drawAvatar = async (user, cx, cy, D) => {
     if (!T) {
       g.fillStyle = '#D946EF';
@@ -8119,22 +8294,22 @@ async function renderInviteNotif(inviter, invited, lang = 'fr') {
   await drawAvatar(inviter, 200, 190, 120);
   await drawAvatar(invited, 600, 190, 120);
 
-  const nameOf = (u) => (u ? cleanTxt(u.globalName || u.username) || '?' : en ? 'Unknown user' : 'Utilisateur inconnu');
+  const nameOf = (u) => (u ? cleanTxt(u.globalName || u.username) || '?' : en ? 'Unknown user' : 'Unknown user');
   g.textAlign = 'center';
   g.fillStyle = '#FFFFFF';
   g.font = `bold 24px ${FONT}`;
   g.fillText(fitText(g, nameOf(inviter), 300), 200, 290);
   g.fillText(fitText(g, nameOf(invited), 300), 600, 290);
 
-  // "a invité"
+  // "invited"
   g.fillStyle = 'rgba(255,255,255,0.85)';
   g.font = `bold 20px ${FONT}`;
-  g.fillText(en ? 'invited' : 'a invité', 400, 198);
+  g.fillText(en ? 'invited' : 'invited', 400, 198);
 
-  // récompense
+  // reward
   g.fillStyle = '#86EFAC';
   g.font = `bold 26px ${FONT}`;
-  g.fillText(fitText(g, `${en ? 'REWARD' : 'RÉCOMPENSE'} : +${plainNum(INVITE_REWARD)} ${COIN_PLAIN}`, 480), 400, 355);
+  g.fillText(fitText(g, `${en ? 'REWARD' : 'REWARD'}: +${plainNum(INVITE_REWARD)} ${COIN_PLAIN}`, 480), 400, 355);
   g.textAlign = 'left';
 
   return cv.toBuffer('image/png');
@@ -8188,14 +8363,14 @@ async function getBoardData(kind, guild) {
 }
 
 const BOARD_TITLES = {
-  rich: { fr: 'CLASSEMENT · PLUS RICHES', en: 'RICHEST PLAYERS' },
-  alltime: { fr: 'ALL-TIME · SOLDE MAX', en: 'ALL-TIME · PEAK BALANCE' },
+  rich: { fr: 'RICHEST PLAYERS', en: 'RICHEST PLAYERS' },
+  alltime: { fr: 'ALL-TIME · PEAK BALANCE', en: 'ALL-TIME · PEAK BALANCE' },
   invites: { fr: 'TOP INVITATIONS', en: 'TOP INVITERS' },
 };
 const boardRenderCache = new Map(); // kind:guild -> { sig, buf }
 
-// Retourne { buf, sig } (image prête) ou null si le canvas est indisponible.
-async function renderBoard(kind, { lang = 'fr', guild = null } = {}) {
+// Returns { buf, sig } (ready image) or null if canvas is unavailable.
+async function renderBoard(kind, { lang = 'en', guild = null } = {}) {
   if (!canvasLib) return null;
   const en = lang === 'en';
   const data = await getBoardData(kind, guild);
@@ -8207,12 +8382,12 @@ async function renderBoard(kind, { lang = 'fr', guild = null } = {}) {
   const rows = [];
   for (const d of data) {
     const user = await client.users.fetch(d.id).catch(() => null);
-    const name = user ? cleanTxt(user.globalName || user.username) || '?' : en ? 'Unknown user' : 'Utilisateur inconnu';
+    const name = user ? cleanTxt(user.globalName || user.username) || '?' : en ? 'Unknown user' : 'Unknown user';
     if (kind === 'invites') {
       rows.push({
         user,
         name,
-        main: en ? `${d.value} invite${d.value > 1 ? 's' : ''}` : `${d.value} invité${d.value > 1 ? 's' : ''}`,
+        main: en ? `${d.value} invite${d.value > 1 ? 's' : ''}` : `${d.value} invited${d.value > 1 ? 's' : ''}`,
         sub: `+${plainNum(d.value * INVITE_REWARD)} ${COIN_PLAIN}`,
       });
     } else {
@@ -8227,13 +8402,14 @@ async function renderBoard(kind, { lang = 'fr', guild = null } = {}) {
 
 const boardFileName = (kind, buf) => `board-${kind}-${Date.now()}.${imgExt(buf)}`;
 
-// Payload prêt à envoyer : { embeds, files, sig }. Retombe sur l'ancien embed texte si le canvas échoue.
-async function buildBoardPayload(kind, { lang = 'fr', guild = null } = {}) {
+// Payload ready to send: { embeds, files, sig }. Falls back to the old text embed if canvas fails.
+async function buildBoardPayload(kind, { lang = 'en', guild = null } = {}) {
   const en = lang === 'en';
   const textFallback = async () => {
     const embed = kind === 'rich' ? await buildLeaderboardEmbed(lang) : await buildAllTimeLeaderboardEmbed(lang);
     return { embeds: [embed], files: [], sig: embed.data?.description || '' };
   };
+  return textFallback(); // image leaderboards removed — text only
   if (!canvasLib || kind === 'invites') return textFallback();
   try {
     const r = await renderBoard(kind, { lang, guild });
@@ -8245,22 +8421,23 @@ async function buildBoardPayload(kind, { lang = 'fr', guild = null } = {}) {
       .setFooter({
         text:
           kind === 'rich'
-            ? en ? 'Auto-updated every minute' : 'Mis à jour automatiquement toutes les minutes'
-            : en ? 'Record = highest balance ever reached' : 'Record = plus haut solde jamais atteint',
+            ? en ? 'Auto-updated every minute' : 'Auto-updated every minute'
+            : en ? 'Record = highest balance ever reached' : 'Record = highest balance ever reached',
       })
       .setTimestamp();
     return { embeds: [embed], files: [new AttachmentBuilder(r.buf, { name })], sig: r.sig };
   } catch (e) {
-    console.error('[classement] image', e?.message || e);
+    console.error('[leaderboard] image', e?.message || e);
     return textFallback();
   }
 }
 
-// Pour message.edit : remplace aussi l'ancienne pièce jointe
+// For message.edit: also replaces the old attachment
 const editable = (p) => ({ embeds: p.embeds, files: p.files, attachments: [] });
 
-async function buildInvitesPayload(guild, targetId, lang = 'fr') {
+async function buildInvitesPayload(guild, targetId, lang = 'en') {
   const textEmbed = await buildInvitesEmbed(guild, targetId);
+  return { embeds: [textEmbed], files: [] }; // image cards removed
   if (!canvasLib) return { embeds: [textEmbed], files: [] };
   try {
     const r = await renderBoard('invites', { lang, guild });
@@ -8274,7 +8451,7 @@ async function buildInvitesPayload(guild, targetId, lang = 'fr') {
   }
 }
 
-async function buildLeaderboardEmbed(lang = 'fr') {
+async function buildLeaderboardEmbed(lang = 'en') {
   const { data, error } = await supabase
     .from('players')
     .select('user_id, balance')
@@ -8287,19 +8464,19 @@ async function buildLeaderboardEmbed(lang = 'fr') {
   const lines = [];
   for (let i = 0; i < data.length; i++) {
     const u = await client.users.fetch(data[i].user_id).catch(() => null);
-    const name = u ? escapeMarkdown(u.globalName || u.username) : lang === 'en' ? 'Unknown user' : 'Utilisateur inconnu';
+    const name = u ? escapeMarkdown(u.globalName || u.username) : lang === 'en' ? 'Unknown user' : 'Unknown user';
     lines.push(`${medals[i] ?? `**${i + 1}.**`} ${name} : **${fmt(data[i].balance)}**`);
   }
 
   return new EmbedBuilder()
-    .setTitle(lang === 'en' ? '🏆 Richest players' : '🏆 Classement des plus riches')
+    .setTitle(lang === 'en' ? '🏆 Richest players' : '🏆 Richest players')
     .setColor(COLORS.gold)
-    .setDescription(lines.length ? lines.join('\n') : lang === 'en' ? 'No balances yet.' : `Personne n’a encore de ${COIN}.`)
-    .setFooter({ text: lang === 'en' ? 'Auto-updated every minute' : 'Mis à jour automatiquement toutes les minutes' })
+    .setDescription(lines.length ? lines.join('\n') : lang === 'en' ? 'No balances yet.' : `Nobody has any ${COIN} yet.`)
+    .setFooter({ text: lang === 'en' ? 'Auto-updated every minute' : 'Auto-updated every minute' })
     .setTimestamp();
 }
 
-async function buildAllTimeLeaderboardEmbed(lang = 'fr') {
+async function buildAllTimeLeaderboardEmbed(lang = 'en') {
   try {
     const { data } = await supabase.from('players').select('user_id, balance').gt('balance', 0).limit(50);
     if (data) for (const r of data) await touchPeak(r.user_id, Number(r.balance));
@@ -8314,17 +8491,17 @@ async function buildAllTimeLeaderboardEmbed(lang = 'fr') {
   for (let i = 0; i < ranked.length; i++) {
     const [uid, peak] = ranked[i];
     const u = await client.users.fetch(uid).catch(() => null);
-    const name = u ? escapeMarkdown(u.globalName || u.username) : lang === 'en' ? 'Unknown user' : 'Utilisateur inconnu';
+    const name = u ? escapeMarkdown(u.globalName || u.username) : lang === 'en' ? 'Unknown user' : 'Unknown user';
     lines.push(`${medals[i] ?? `**${i + 1}.**`} ${name} : **${fmt(peak)}**`);
   }
 
   return new EmbedBuilder()
-    .setTitle(lang === 'en' ? '👑 All-time leaderboard (peak balance)' : '👑 Classement all-time (solde max)')
+    .setTitle(lang === 'en' ? '👑 All-time leaderboard (peak balance)' : '👑 All-time leaderboard (peak balance)')
     .setColor(COLORS.violet)
     .setDescription(
-      lines.length ? lines.join('\n') : lang === 'en' ? 'No records yet. Peaks update on every win.' : 'Aucun record encore. Les pics se mettent à jour à chaque gain.'
+      lines.length ? lines.join('\n') : lang === 'en' ? 'No records yet. Peaks update on every win.' : 'No records yet. Peaks update on every win.'
     )
-    .setFooter({ text: lang === 'en' ? 'Record = highest balance ever reached' : 'Record = plus haut solde jamais atteint' })
+    .setFooter({ text: lang === 'en' ? 'Record = highest balance ever reached' : 'Record = highest balance ever reached' })
     .setTimestamp();
 }
 
@@ -8338,7 +8515,7 @@ async function cmdLeaderboard(msg) {
       const m = await ch.messages.fetch(old.message_id);
       await m.delete();
     } catch {
-      /* déjà supprimé */
+      /* already removed */
     }
   }
 
@@ -8374,7 +8551,7 @@ async function updateLeaderboards() {
           if ([10008, 10003, 50001, 50013].includes(e?.code)) {
             await supabase.from('leaderboard_messages').delete().eq('guild_id', row.guild_id);
           } else {
-            console.error('[classement] edit', e?.message || e);
+            console.error('[leaderboard] edit', e?.message || e);
           }
         }
       }
@@ -8396,37 +8573,37 @@ async function updateLeaderboards() {
       }
     }
   } catch (e) {
-    console.error('[classement] update', e?.message || e);
+    console.error('[leaderboard] update', e?.message || e);
   } finally {
     updatingLeaderboards = false;
   }
 }
 
 // ============================================================
-//  MESSAGES (commandes écrites)
+//  MESSAGES (written commands)
 // ============================================================
 // ============================================================
-//  MESSAGES — les commandes sont en SLASH uniquement
+//  MESSAGES — slash commands only
 // ============================================================
 client.on(Events.MessageCreate, async (msg) => {
   if (msg.author.bot || !msg.guild) return;
   if (!msg.content.startsWith(PREFIX)) return;
   const cmd = msg.content.slice(PREFIX.length).trim().split(/\s+/)[0]?.toLowerCase() || '';
   if (!cmd) return;
-  // Plus de préfixe ! — orienter vers /
+  // No more prefix! — point users to /
   if (msg.author.id !== msg.guild.ownerId) {
     return msg.reply(CROWN_ONLY).catch(() => {});
   }
   return msg
     .reply({
       content:
-        `Les commandes **\`!\`** sont désactivées.\nUtilise les **slash commands** : tape **\`/\`** puis choisis (ex. \`/help\`, \`/setup\`, \`/admin\`).`,
+        `Commands with **\`!\`** are disabled.\nUse **slash commands**: type **\`/\`** then choose (e.g. \`/help\`, \`/setup\`, \`/admin\`).`,
     })
     .catch(() => {});
 });
 
 // ============================================================
-//  BOUTONS, MENUS ET POP-UPS
+//  BUTTONS, MENUS AND POP-UPS
 // ============================================================
 client.on(Events.InteractionCreate, async (i) => {
   try {
@@ -8453,7 +8630,7 @@ client.on(Events.InteractionCreate, async (i) => {
     if ((id.startsWith('poker_') || id.startsWith('online_')) && i.isButton()) return await handlePokerButton(i);
     if (id === 'modal_search_game' && i.isModalSubmit()) {
       const q = i.fields.getTextInputValue('q')?.trim() || '';
-      if (!q) return respondText(i, 'Indique un mot-clé.');
+      if (!q) return respondText(i, 'Enter a keyword.');
       return i.reply({ ...buildGameMenuPayload(i.user.id, 0, 'search', q), flags: EPH });
     }
 
@@ -8472,16 +8649,16 @@ client.on(Events.InteractionCreate, async (i) => {
     if (i.isUserSelectMenu() && id === 'panel_send_pick') {
       const userId = i.values[0];
       if (userId === i.user.id) {
-        return i.update({ content: `❌ Tu ne peux pas t’envoyer de ${COIN} à toi-même.`, components: [] });
+        return i.update({ content: `❌ You cannot send ${COIN} to yourself.`, components: [] });
       }
       if (i.users?.get(userId)?.bot) {
-        return i.update({ content: `❌ Tu ne peux pas envoyer de ${COIN} à un bot.`, components: [] });
+        return i.update({ content: `❌ You cannot send ${COIN} to a bot.`, components: [] });
       }
       return i.showModal(
         new ModalBuilder()
           .setCustomId(`modal_send_${userId}`)
-          .setTitle(`💸 Envoyer des ${COIN_PLAIN}`)
-          .addComponents(modalInput('amount', 'Montant à envoyer (ou "all")', { placeholder: 'ex : 5' }))
+          .setTitle(`💸 Send ${COIN_PLAIN}`)
+          .addComponents(modalInput('amount', 'Amount to send (or "all")', { placeholder: 'e.g.: 5' }))
       );
     }
 
@@ -8517,8 +8694,8 @@ client.on(Events.InteractionCreate, async (i) => {
     }
   } catch (e) {
     console.error('[interaction]', e);
-    const detail = String(e?.message || e || 'erreur inconnue').slice(0, 300);
-    const text = `⚠️ Une erreur est survenue : \`${detail}\``;
+    const detail = String(e?.message || e || 'unknown error').slice(0, 300);
+    const text = `⚠️ An error occurred: \`${detail}\``;
     try {
       if (i.deferred || i.replied) await i.followUp({ content: text, flags: EPH }).catch(() => {});
       else if (i.isRepliable?.()) await i.reply({ content: text, flags: EPH }).catch(() => {});
@@ -8529,7 +8706,7 @@ client.on(Events.InteractionCreate, async (i) => {
 });
 
 // ============================================================
-//  INVITATIONS : +1 coin pour celui qui invite quelqu'un qui rejoint
+//  INVITATIONS: +1 coin for whoever invites someone who joins
 // ============================================================
 const inviteCache = new Map();
 const rewardedLocal = new Set();
@@ -8543,7 +8720,7 @@ async function cacheInvites(guild) {
     );
     return true;
   } catch (e) {
-    console.error(`[invitations] ${guild.name} : impossible de lire les invitations (permission "Gérer le serveur" requise) :`, e?.message || e);
+    console.error(`[invitations] ${guild.name}: could not read invites ("Manage Server" permission required):`, e?.message || e);
     return false;
   }
 }
@@ -8601,14 +8778,14 @@ client.on(Events.GuildMemberAdd, async (member) => {
       const embed = new EmbedBuilder()
         .setColor(COLORS.violet)
         .setAuthor({
-          name: inviter ? `${inviter.globalName || inviter.username} a invité quelqu’un !` : 'Nouvelle invitation',
+          name: inviter ? `${inviter.globalName || inviter.username} invited someone!` : 'New invite',
           iconURL: inviter?.displayAvatarURL(),
         })
-        .setDescription(`📨 <@${inviterId}> a invité <@${member.id}>\n🎁 Récompense : **${fmt(INVITE_REWARD)}**`)
+        .setDescription(`📨 <@${inviterId}> invited <@${member.id}>\n🎁 Reward: **${fmt(INVITE_REWARD)}**`)
         .setTimestamp();
       const payload = { embeds: [embed] };
       try {
-        const buf = await renderInviteNotif(inviter, member.user, 'fr');
+        const buf = await renderInviteNotif(inviter, member.user, 'en');
         if (buf) {
           const fname = `invite-${Date.now()}.${imgExt(buf)}`;
           embed.setImage(`attachment://${fname}`);
@@ -8623,7 +8800,7 @@ client.on(Events.GuildMemberAdd, async (member) => {
       ch.send(payload).catch(() => {});
     }
   } catch (e) {
-    console.error('[invitations] arrivée', e?.message || e);
+    console.error('[invitations] join', e?.message || e);
   }
 });
 
@@ -8649,14 +8826,14 @@ async function buildInvitesEmbed(guild, targetId) {
   if (listError) throw listError;
 
   const invitedIds = [...new Set((data || []).map((row) => row.invited_id).filter(Boolean))];
-  const members = invitedIds.length ? invitedIds.map((id) => `<@${id}>`).join('\n') : 'Aucun membre invité enregistré pour le moment.';
+  const members = invitedIds.length ? invitedIds.map((id) => `<@${id}>`).join('\n') : 'No invited members recorded yet.';
   const total = count ?? 0;
 
   return new EmbedBuilder()
-    .setTitle('📨 Tes invitations')
+    .setTitle('📨 Your invites')
     .setColor(COLORS.blue)
-    .setDescription(`Tu as invité **${total}** membre(s) et reçu **${fmt(total * INVITE_REWARD)}**.`)
-    .addFields({ name: `Membres invités${total > 20 ? ' (20 affichés)' : ''}`, value: members.slice(0, 1024) });
+    .setDescription(`You invited **${total}** member(s) and received **${fmt(total * INVITE_REWARD)}**.`)
+    .addFields({ name: `Invited members${total > 20 ? ' (20 shown)' : ''}`, value: members.slice(0, 1024) });
 }
 
 async function cmdInvites(msg, args) {
@@ -8681,7 +8858,7 @@ client.on(Events.ChannelDelete, async (channel) => {
   }
 });
 
-// Image dédiée à chaque jeu : images/games/<clé>.jpg (sinon carte générique)
+// Dedicated image for each game: images/games/<key>.jpg (otherwise generic card)
 const GAME_BG_BY_NAME = new Map();
 const GAME_BG_BY_TITLE = new Map();
 const GAME_BG_BY_ICON = new Map();
@@ -8689,7 +8866,7 @@ for (const k of Object.keys(GAME_NAMES)) {
   GAME_BG_BY_NAME.set(gameNamePlain(k).toUpperCase(), k);
   GAME_BG_BY_TITLE.set(GAME_NAMES[k], k);
   const ic = gameIcon(k);
-  GAME_BG_BY_ICON.set(ic, GAME_BG_BY_ICON.has(ic) ? null : k); // icône partagée par plusieurs jeux : ignorée
+  GAME_BG_BY_ICON.set(ic, GAME_BG_BY_ICON.has(ic) ? null : k); // icon shared by several games: ignored
 }
 function gameBgForEmbed(e) {
   const authorName = String(e?.author?.name || '');
@@ -8704,8 +8881,8 @@ function gameBgForEmbed(e) {
 }
 
 // ============================================================
-//  TEXTE -> IMAGE : plus aucun texte "normal", tout est converti en image (voir textcard.js)
-//  Désactiver temporairement : variable Railway TEXT_CARDS=off
+//  TEXT -> IMAGE: no more "normal" text, everything is converted to an image (see textcard.js)
+//  Temporarily disable: Railway TEXT_CARDS=off variable
 // ============================================================
 // TEXT CARDS / image message system DISABLED — plain Discord embeds only
 // (ONLINE panel banner is still attached via withBanner for panel_online.png only)
@@ -8820,10 +8997,12 @@ async function handleTicketModal(i) {
   const shop = webApp.shop;
   if (!shop) return i.reply({ content: 'Shop unavailable.', flags: EPH });
 
-  // STRICT validation FIRST — never create a ticket on invalid/foreign/delivered codes
-  const order = shop.getOrder(code);
+  // STRICT validation FIRST — never create a ticket on invalid/foreign/delivered codes.
+  // Prefer the async Supabase lookup (the shop polls it for codes placed on the website);
+  // fall back to the in-memory sync lookup for older orders.
+  const order = (shop.getOrderAsync ? await shop.getOrderAsync(code) : null) || shop.getOrder(code);
   if (!order) {
-    return i.reply({ content: '❌ Invalid order code. No ticket created.', flags: EPH });
+    return i.reply({ content: '❌ Invalid order code. Check the code from the website and try again in a few seconds.', flags: EPH });
   }
   if (String(order.uid) !== String(i.user.id)) {
     return i.reply({ content: '❌ This code does not belong to you. No ticket created.', flags: EPH });
@@ -8832,21 +9011,27 @@ async function handleTicketModal(i) {
     return i.reply({ content: '✅ This order was already delivered. The code no longer works.', flags: EPH });
   }
 
-  // Auto-role delivery
+  // Auto-role delivery: grant immediately, confirm by DM, and never open a ticket on success.
   if (order.type === 'role' && order.roleId) {
     try {
       const member = await i.guild.members.fetch(i.user.id);
       await member.roles.add(order.roleId, `Shop order ${order.code}`);
-      shop.markDelivered(order.code);
       try {
-        await i.user.send({
-          content:
-            `✅ **Role delivered**\n` +
-            `The role **${order.rewardName}** has been added to your account.\n` +
-            `Order code: \`${order.code}\``,
-        });
-      } catch {}
-      return i.reply({ content: `✅ Role **${order.rewardName}** granted. No ticket needed.`, flags: EPH });
+        shop.markDelivered(order.code);
+      } catch (markErr) {
+        console.error('[ticket] role markDelivered', markErr?.message || markErr);
+      }
+      const confirmText =
+        `✅ **Role added**\n` +
+        `The role **${order.rewardName}** has been added to your account.\n` +
+        `Order code: \`${order.code}\``;
+      try {
+        await i.user.send({ content: confirmText });
+      } catch (dmErr) {
+        console.error('[ticket] role DM', dmErr?.message || dmErr);
+      }
+      // Always reply ephemerally too, so the confirmation is visible even if the DM failed.
+      return i.reply({ content: confirmText, flags: EPH });
     } catch (e) {
       console.error('[ticket] role', e?.message || e);
       // fall through to create ticket if role grant failed
@@ -8905,12 +9090,12 @@ async function handleTicketModal(i) {
     embeds: [embed],
     components: [row],
   });
-  await i.reply({ content: `✅ Ticket opened: ${ch}`, flags: EPH });
+  await i.reply({ content: `✅ Ticket opened in #${ch.name} — ${ch}\nOrder code: \`${code}\``, flags: EPH });
   return true;
 }
 
 
-/** Contexte type "message" pour réutiliser les cmd* existantes depuis un slash */
+/** "message"-like context to reuse existing cmd* functions from a slash command */
 function slashCtx(i) {
   return {
     author: i.user,
@@ -8931,7 +9116,7 @@ function slashCtx(i) {
     },
     reply: async (payload) => {
       const data = typeof payload === 'string' ? { content: payload } : { ...payload };
-      // réponses de commandes owner = éphémères sauf si déjà flags
+      // owner command replies = ephemeral unless already flagged
       if (data.flags == null) data.flags = EPH;
       if (!i.replied && !i.deferred) return i.reply(data);
       return i.followUp(data);
@@ -8942,7 +9127,7 @@ function slashCtx(i) {
 
 function requireOwner(i) {
   if (!i.guild) {
-    return i.reply({ content: 'Utilisable uniquement sur un serveur.', flags: EPH }).then(() => false);
+    return i.reply({ content: 'Only usable in a server.', flags: EPH }).then(() => false);
   }
   if (i.user.id !== i.guild.ownerId) {
     return i.reply({ content: CROWN_ONLY, flags: EPH }).then(() => false);
@@ -8967,8 +9152,8 @@ async function handleSlashCommand(i) {
       case 'solde': {
         const targetId = member?.id || i.user.id;
         const bal = await getBalance(targetId);
-        if (targetId === i.user.id) return i.reply({ content: `💰 Ton solde : **${fmt(bal)}**`, flags: EPH });
-        return i.reply({ content: `💰 Solde de <@${targetId}> : **${fmt(bal)}**`, flags: EPH });
+        if (targetId === i.user.id) return i.reply({ content: `💰 Your balance: **${fmt(bal)}**`, flags: EPH });
+        return i.reply({ content: `💰 Balance of <@${targetId}>: **${fmt(bal)}**`, flags: EPH });
       }
       case 'daily':
         return cmdDaily(msg);
@@ -8979,7 +9164,7 @@ async function handleSlashCommand(i) {
       case 'casino':
       case 'jeux': {
         await i.channel.send(buildPanelPayload());
-        return i.reply({ content: '✅ Panneau de jeu publié.', flags: EPH });
+        return i.reply({ content: '✅ Game panel posted.', flags: EPH });
       }
       case 'setup':
       case 'salon':
@@ -8992,31 +9177,31 @@ async function handleSlashCommand(i) {
         return cmdAdmin(msg);
       case 'add': {
         if (!member || amountOpt == null) {
-          return i.reply({ content: 'Usage : `/add membre:@… montant:…`', flags: EPH });
+          return i.reply({ content: 'Usage: `/add member:@… amount:…`', flags: EPH });
         }
         return cmdAdjust(msg, [member.id, String(amountOpt)], +1);
       }
       case 'remove': {
         if (!member || amountOpt == null) {
-          return i.reply({ content: 'Usage : `/remove membre:@… montant:…`', flags: EPH });
+          return i.reply({ content: 'Usage: `/remove member:@… amount:…`', flags: EPH });
         }
         return cmdAdjust(msg, [member.id, String(amountOpt)], -1);
       }
       case 'invites-notif':
         return cmdInvitesNotif(msg);
       case 'ticketsetup': {
-        // adapter catégorie depuis option
+        // adapt category from option
         const cat = i.options.getChannel('categorie');
         const fake = slashCtx(i);
         fake.mentions.channels.find = (fn) => (cat && fn(cat) ? cat : null);
         return cmdTicketSetup(fake);
       }
       default:
-        return i.reply({ content: 'Commande inconnue. Utilise `/help`.', flags: EPH });
+        return i.reply({ content: 'Unknown command. Use `/help`.', flags: EPH });
     }
   } catch (e) {
     console.error(`[slash:${i.commandName}]`, e);
-    const text = `⚠️ Erreur : ${explainError(e)}`;
+    const text = `⚠️ Error: ${explainError(e)}`;
     if (i.replied || i.deferred) return i.followUp({ content: text, flags: EPH }).catch(() => {});
     return i.reply({ content: text, flags: EPH }).catch(() => {});
   }
@@ -9025,47 +9210,47 @@ async function handleSlashCommand(i) {
 async function registerSlashCommands() {
   try {
     const commands = [
-      new SlashCommandBuilder().setName('help').setDescription('Guide des commandes du casino ZNK (owner)'),
-      new SlashCommandBuilder().setName('aide').setDescription('Guide des commandes du casino ZNK (owner)'),
+      new SlashCommandBuilder().setName('help').setDescription('ZNK Casino command guide (owner)'),
+      new SlashCommandBuilder().setName('aide').setDescription('ZNK Casino command guide (owner)'),
       new SlashCommandBuilder()
         .setName('balance')
-        .setDescription('Affiche un solde (owner)')
-        .addUserOption((o) => o.setName('membre').setDescription('Membre (défaut : toi)')),
-      new SlashCommandBuilder().setName('solde').setDescription('Alias de /balance').addUserOption((o) => o.setName('membre').setDescription('Membre')),
-      new SlashCommandBuilder().setName('daily').setDescription('Récompense quotidienne (owner)'),
+        .setDescription('Shows a balance (owner)')
+        .addUserOption((o) => o.setName('membre').setDescription('Member (default: you)')),
+      new SlashCommandBuilder().setName('solde').setDescription('Alias of /balance').addUserOption((o) => o.setName('membre').setDescription('Member')),
+      new SlashCommandBuilder().setName('daily').setDescription('Daily reward (owner)'),
       new SlashCommandBuilder()
         .setName('invites')
-        .setDescription('Statistiques d’invitations (owner)')
-        .addUserOption((o) => o.setName('membre').setDescription('Membre (défaut : toi)')),
-      new SlashCommandBuilder().setName('casino').setDescription('Publie le panneau de jeu (owner)'),
-      new SlashCommandBuilder().setName('jeux').setDescription('Alias de /casino'),
-      new SlashCommandBuilder().setName('setup').setDescription('Configure les salons du casino (owner)'),
-      new SlashCommandBuilder().setName('salon').setDescription('Alias de /setup'),
-      new SlashCommandBuilder().setName('wins').setDescription('Crée le salon des victoires (owner)'),
-      new SlashCommandBuilder().setName('classement').setDescription('Poste le classement auto (owner)'),
-      new SlashCommandBuilder().setName('admin').setDescription('Ouvre / crée le panneau admin (owner)'),
+        .setDescription('Invite statistics (owner)')
+        .addUserOption((o) => o.setName('membre').setDescription('Member (default: you)')),
+      new SlashCommandBuilder().setName('casino').setDescription('Posts the game panel (owner)'),
+      new SlashCommandBuilder().setName('jeux').setDescription('Alias of /casino'),
+      new SlashCommandBuilder().setName('setup').setDescription('Configures the casino channels (owner)'),
+      new SlashCommandBuilder().setName('salon').setDescription('Alias of /setup'),
+      new SlashCommandBuilder().setName('wins').setDescription('Creates the wins channel (owner)'),
+      new SlashCommandBuilder().setName('classement').setDescription('Posts the auto leaderboard (owner)'),
+      new SlashCommandBuilder().setName('admin').setDescription('Opens / creates the admin panel (owner)'),
       new SlashCommandBuilder()
         .setName('add')
-        .setDescription('Ajoute des coins à un membre (owner)')
-        .addUserOption((o) => o.setName('membre').setDescription('Membre').setRequired(true))
-        .addNumberOption((o) => o.setName('montant').setDescription('Montant').setRequired(true).setMinValue(0.01)),
+        .setDescription('Adds coins to a member (owner)')
+        .addUserOption((o) => o.setName('membre').setDescription('Member').setRequired(true))
+        .addNumberOption((o) => o.setName('montant').setDescription('Amount').setRequired(true).setMinValue(0.01)),
       new SlashCommandBuilder()
         .setName('remove')
-        .setDescription('Retire des coins à un membre (owner)')
-        .addUserOption((o) => o.setName('membre').setDescription('Membre').setRequired(true))
-        .addNumberOption((o) => o.setName('montant').setDescription('Montant').setRequired(true).setMinValue(0.01)),
-      new SlashCommandBuilder().setName('invites-notif').setDescription('Crée le salon notifs d’invites (owner)'),
+        .setDescription('Removes coins from a member (owner)')
+        .addUserOption((o) => o.setName('membre').setDescription('Member').setRequired(true))
+        .addNumberOption((o) => o.setName('montant').setDescription('Amount').setRequired(true).setMinValue(0.01)),
+      new SlashCommandBuilder().setName('invites-notif').setDescription('Creates the invite notifications channel (owner)'),
       new SlashCommandBuilder()
         .setName('ticketsetup')
-        .setDescription('Poste le panel claim rewards / tickets (owner)')
+        .setDescription('Posts the claim rewards / tickets panel (owner)')
         .addChannelOption((o) =>
-          o.setName('categorie').setDescription('Catégorie où créer les tickets').addChannelTypes(ChannelType.GuildCategory)
+          o.setName('categorie').setDescription('Category where tickets are created').addChannelTypes(ChannelType.GuildCategory)
         ),
     ].map((c) => c.toJSON());
 
     const rest = new REST({ version: '10' }).setToken(DISCORD_TOKEN);
     const appId = client.user.id;
-    // Guild commands = dispo immédiatement + réservées en pratique au serveur
+    // Guild commands = available immediately + in practice restricted to the server
     for (const [gid] of client.guilds.cache) {
       try {
         await rest.put(Routes.applicationGuildCommands(appId, gid), { body: commands });
@@ -9073,16 +9258,16 @@ async function registerSlashCommands() {
         console.warn('[slash] guild', gid, e?.message || e);
       }
     }
-    // Global aussi (propagation plus lente)
+    // Global too (slower propagation)
     await rest.put(Routes.applicationCommands(appId), { body: commands });
-    console.log('[slash] commandes / enregistrées (' + commands.length + ')');
+    console.log('[slash] / commands registered (' + commands.length + ')');
   } catch (e) {
-    console.error('[slash] enregistrement impossible :', e?.message || e);
+    console.error('[slash] registration failed:', e?.message || e);
   }
 }
 
 client.once(Events.ClientReady, (c) => {
-  console.log(`✅ Connecté en tant que ${c.user.tag}`);
+  console.log(`✅ Logged in as ${c.user.tag}`);
   loadMultipliers();
   loadPeaks();
   for (const g of c.guilds.cache.values()) cacheInvites(g);
@@ -9109,16 +9294,16 @@ async function start() {
       if (!(flags & GUILD_MEMBERS)) {
         client.options.intents.remove(GatewayIntentBits.GuildMembers);
         console.warn(
-          '⚠️ "Server Members Intent" n’est pas activé : le bot démarre SANS le système d’invitations.\n' +
-            '   Pour l’activer : Developer Portal → ton application → Bot → Privileged Gateway Intents → Server Members Intent → Save, puis redémarre.'
+          '⚠️ "Server Members Intent" is not enabled: the bot starts WITHOUT the invite system.\n' +
+            '   To enable it: Developer Portal → your application → Bot → Privileged Gateway Intents → Server Members Intent → Save, then restart.'
         );
       }
       if (!(flags & MESSAGE_CONTENT)) {
-        console.warn('⚠️ "Message Content Intent" n’est pas activé : les commandes écrites (!setup, !admin...) ne marcheront pas.');
+        console.warn('⚠️ "Message Content Intent" is not enabled: written commands (!setup, !admin...) will not work.');
       }
     }
   } catch (e) {
-    console.warn('[démarrage] vérification des intents impossible :', e?.message || e);
+    console.warn('[startup] could not check intents:', e?.message || e);
   }
   try {
     await client.login(DISCORD_TOKEN);
