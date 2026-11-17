@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 675" width="1200" height="675">
+  <defs>
+    <radialGradient id="glow" cx="50%" cy="18%" r="78%">
+      <stop offset="0" stop-color="#3a2f12"/>
+      <stop offset="0.38" stop-color="#14120c"/>
+      <stop offset="1" stop-color="#000000"/>
+    </radialGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fbbf24" stop-opacity="0"/>
+      <stop offset="0.45" stop-color="#fbbf24" stop-opacity="0.85"/>
+      <stop offset="1" stop-color="#78350f" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="sheen" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0"/>
+      <stop offset="0.5" stop-color="#ffffff" stop-opacity="0.07"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <pattern id="grid" width="60" height="60" patternUnits="userSpaceOnUse">
+      <path d="M60 0H0V60" fill="none" stroke="#ffffff" stroke-opacity="0.028" stroke-width="1"/>
+    </pattern>
+    <filter id="soft"><feGaussianBlur stdDeviation="16"/></filter>
+  </defs>
+  <rect width="1200" height="675" fill="url(#glow)"/>
+  <rect width="1200" height="675" fill="url(#grid)"/>
+  <ellipse cx="600" cy="120" rx="430" ry="150" fill="#fbbf24" opacity="0.10" filter="url(#soft)"/>
+  <path d="M40 40h180M40 40v90M1160 635H980M1160 635v-90" fill="none" stroke="url(#gold)" stroke-width="3"/>
+  <path d="M70 600h340M790 75h340" fill="none" stroke="url(#gold)" stroke-width="1.5" opacity="0.55"/>
+  <path d="M600 96l620 340-620 340L-20 436z" fill="none" stroke="#fbbf24" stroke-opacity="0.06" stroke-width="2"/>
+  <path d="M600 180l420 230-420 230L180 410z" fill="none" stroke="#fde68a" stroke-opacity="0.08" stroke-width="1.5"/>
+  <rect x="0" y="250" width="1200" height="120" fill="url(#sheen)"/>
+  <rect width="1200" height="675" fill="none" stroke="#fbbf24" stroke-opacity="0.22" stroke-width="2"/>
+</svg>
