@@ -2111,41 +2111,40 @@ function connect() {
   es.addEventListener('ranked', (e) => {
     try {
       const st = JSON.parse(e.data);
-      // Table state (has seats/phase) vs rank meta (has me/placementN)
       if (st && st.seats && String(st.tid || RANKED_TID) === RANKED_TID) bjUpdate(st);
-      if (st && (st.me || st.placementN != null || st.prov != null)) {
-        const info = document.getElementById('bjRankedInfo');
-        const m = st.me || st;
-        const pn = st.placementN || 5;
-        if (info) {
-          if (m.prov) info.textContent = 'Placement ' + (m.placementDone || 0) + '/' + pn + ' · RR hidden';
-          else info.textContent = (m.elo != null ? Number(m.elo).toLocaleString('en-US') + ' RR' : 'RR') + (m.pos ? ' · #' + m.pos : '');
-        }
+      if (st && (st.me || st.placementN != null || st.prov != null || st.elo != null)) {
+        applyRankedTag(st);
         if (W.view === 'rank') { try { rkRenderMe(st); rkRenderElo(st); rkRenderLadder(st); } catch {} }
+        const m = st.me || st;
         if (W.view === 'ranked' && m.elo != null) {
           const bal = document.getElementById('meBal');
-          if (bal) bal.textContent = Number(m.elo).toLocaleString('en-US') + ' RR';
+          if (bal) bal.textContent = num(m.elo) + ' RR';
         }
-      } else if (W.view === 'ranked' && st && !st.seats) {
-        try { rkRender(st); } catch {}
       }
-    } catch {}
-    queueLiveRefresh(80);
+    } catch (err) { console.error('ranked evt', err); }
   });
 es.addEventListener('roulette', (e) => { const st = JSON.parse(e.data); offset = st.now - Date.now(); rRender(st); });
   es.addEventListener('rocket', (e) => { const st = JSON.parse(e.data); offset = st.now - Date.now(); rocRender(st); });
 es.addEventListener('penalty', (e) => { try { penRender(JSON.parse(e.data)); } catch {} });
-es.addEventListener('tasks_tick', () => queueLiveRefresh(100));
+es.addEventListener('tasks_tick', () => {
+    if (W.view === 'tasks') loadTasks(true);
+    else queueLiveRefresh(100);
+    syncWalletQuiet();
+  });
 es.addEventListener('rank', (e) => { try { const d = JSON.parse(e.data); if (W.view === 'rank') { rkRenderMe(d); rkRenderElo(d); rkRenderLadder(d); } } catch {} queueLiveRefresh(100); });
   es.addEventListener('poker', (e) => { const st = JSON.parse(e.data); offset = st.now - Date.now(); pUpdate(st); });
   es.addEventListener('admin', () => $('#bAdmin').classList.remove('hide'));
   es.addEventListener('bal', (e) => {
     try {
-      W.bal = JSON.parse(e.data).bal;
+      const nb = JSON.parse(e.data).bal;
+      if (nb == null) return;
+      W.bal = nb;
       pHeader();
       const balEl = document.getElementById('meBal');
-      if (balEl && W.bal != null && W.view !== 'ranked' && !O.hold) balEl.textContent = num(W.bal) + ' ' + COIN;
-      queueLiveRefresh(400);
+      if (balEl && W.view !== 'ranked' && !(typeof O !== 'undefined' && O.hold)) {
+        const want = num(W.bal) + ' ' + COIN;
+        if (balEl.textContent !== want) balEl.textContent = want;
+      }
       document.dispatchEvent(new CustomEvent('znk-bal'));
     } catch (err) { console.error('bal', err); }
   });
@@ -2654,8 +2653,12 @@ async function loadRankedTag() {
   } catch { info.textContent = 'RR indisponible'; }
 }
 function bjRankedTag(on) {
-  const tag = $('#bjRankedTag'); if (tag) tag.classList.toggle('on', !!on);
-  if (on) loadRankedTag();
+  const tag = document.getElementById('bjRankedTag');
+  if (tag) tag.classList.toggle('on', !!on);
+  if (on) {
+    if (W._rankMeta) applyRankedTag(W._rankMeta);
+    loadRankedTag(true);
+  }
 }
 function bjTabs() {
   const box = $('#bjTabs'); if (!box) return;
@@ -5120,17 +5123,46 @@ async function loadAccount() {
 }
 // ---- rafraîchissement automatique des vues qui affichent des données changeantes
 const LIVE = { busy: false, timer: 0 };
+async function syncWalletQuiet() {
+  try {
+    // Prefer live W.bal; if missing, ask server
+    if (W.bal != null && W.view !== 'ranked') {
+      const balEl = document.getElementById('meBal');
+      if (balEl && !String(balEl.textContent || '').includes('Spectateur')) {
+        const want = num(W.bal) + ' ' + COIN;
+        if (balEl.textContent !== want) balEl.textContent = want;
+      }
+      return;
+    }
+    const res = await fetch('/api/me?t=' + encodeURIComponent(TOKEN));
+    if (!res.ok) return;
+    const d = await res.json();
+    if (d && d.bal != null) {
+      W.bal = d.bal;
+      if (W.view !== 'ranked') {
+        const balEl = document.getElementById('meBal');
+        if (balEl) balEl.textContent = num(d.bal) + ' ' + COIN;
+      }
+    }
+  } catch {}
+}
 async function refreshActiveView() {
   if (LIVE.busy || document.hidden) return;
   const v = W.view;
   LIVE.busy = true;
   try {
+    // Wallet always (no flash)
+    await syncWalletQuiet();
     if (v === 'tasks') await loadTasks(true);
     else if (v === 'shop') await loadShop(true);
     else if (v === 'account') await loadAccount();
     else if (v === 'rank') await rkLoad();
     else if (v === 'top') await lbLoad();
-    else if (v === 'ranked') { try { await loadRankedTag(); } catch {} }
+    else if (v === 'ranked') {
+      // Update tag without placeholder flash
+      if (W._rankMeta) applyRankedTag(W._rankMeta);
+      await loadRankedTag(false);
+    }
     if (LB_GAME_KEY[v]) await loadGameLB(v, true);
   } catch (e) { console.error('live refresh', e); }
   finally { LIVE.busy = false; }
@@ -5139,10 +5171,10 @@ function queueLiveRefresh(ms = 250) {
   clearTimeout(LIVE.timer);
   LIVE.timer = setTimeout(() => refreshActiveView(), ms);
 }
-setInterval(() => refreshActiveView(), 2500);
-// Also refresh when a balance event arrives (game just paid out / task progressed)
-document.addEventListener('znk-bal', () => queueLiveRefresh(150));
-document.addEventListener('znk-round', () => queueLiveRefresh(200));
+setInterval(() => refreshActiveView(), 2000);
+// Balance / round events → immediate quiet refresh
+document.addEventListener('znk-bal', () => { syncWalletQuiet(); queueLiveRefresh(120); });
+document.addEventListener('znk-round', () => queueLiveRefresh(180));
 
 $('#accCopyInvite').onclick = () => {
   const v = $('#accInvite').value;
