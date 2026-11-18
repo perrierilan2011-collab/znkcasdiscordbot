@@ -1026,8 +1026,8 @@ header .sp{flex:1 1 0}
 #pgPeng.fly{transition:left linear}
 #pgResult{text-align:center;margin-top:10px;font-weight:800;color:var(--gold);min-height:24px}
 /* Penalty 1v1 */
-#penView{flex:1;display:none;flex-direction:column;align-items:center;padding:12px;gap:12px;overflow:auto}
-#penView.on{display:flex}
+#penView{flex:1;display:flex;flex-direction:column;align-items:center;padding:12px;gap:12px;overflow:auto}
+#penView.hide{display:none !important}
 #penPitch{position:relative;width:min(100%,640px);aspect-ratio:16/10;border-radius:18px;overflow:hidden;
   background:radial-gradient(ellipse at 50% 60%,#166534 0%,#14532d 45%,#052e16 100%);border:3px solid #a3a3a3}
 #penGoal{position:absolute;left:50%;top:8%;transform:translateX(-50%);width:56%;height:38%;
@@ -1494,8 +1494,7 @@ create table if not exists roulette_event_results (
   </div>
 </main>
 
-<main 
-<div id="penView">
+<main id="penView" class="hide">
   <div id="penScore">0 — 0</div>
   <div id="penMsg" style="color:#a3a3a3;font-weight:700">1v1 Penalty · match bets · first to lead by 2</div>
   <div id="penPitch">
@@ -1518,8 +1517,8 @@ create table if not exists roulette_event_results (
     <button class="btn" id="penLeave">Leave</button>
   </div>
   <div id="penPlayers" style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap"></div>
-</div>
-id="shopView" class="hide">
+</main>
+<main id="shopView" class="hide">
   <div class="lbwrap" style="align-items:center">
     <div class="lbhead"><div><h2>Boutique</h2><p>Achète une récompense avec tes ZTKN · tu reçois un <b>code de commande</b> à coller dans le ticket Discord</p></div></div>
     <div class="shopgrid" id="shopGrid"><div class="lbnone">Chargement…</div></div>
@@ -2038,7 +2037,16 @@ es.addEventListener('tasks_tick', () => queueLiveRefresh(100));
 es.addEventListener('rank', (e) => { try { const d = JSON.parse(e.data); if (W.view === 'rank') { rkRenderMe(d); rkRenderElo(d); rkRenderLadder(d); } } catch {} queueLiveRefresh(100); });
   es.addEventListener('poker', (e) => { const st = JSON.parse(e.data); offset = st.now - Date.now(); pUpdate(st); });
   es.addEventListener('admin', () => $('#bAdmin').classList.remove('hide'));
-  es.addEventListener('bal', (e) => { W.bal = JSON.parse(e.data).bal; pHeader(); if (W.view !== 'ranked' && !O.hold && W.bal != null) $('#meBal').textContent = num(W.bal) + ' ' + COIN; queueLiveRefresh(700);  try { document.dispatchEvent(new CustomEvent('znk-bal')); } catch {}});
+  es.addEventListener('bal', (e) => {
+    try {
+      W.bal = JSON.parse(e.data).bal;
+      pHeader();
+      const balEl = document.getElementById('meBal');
+      if (balEl && W.bal != null && W.view !== 'ranked' && !O.hold) balEl.textContent = num(W.bal) + ' ' + COIN;
+      queueLiveRefresh(400);
+      document.dispatchEvent(new CustomEvent('znk-bal'));
+    } catch (err) { console.error('bal', err); }
+  });
   es.addEventListener('inbox', (e) => { nSet(JSON.parse(e.data), false); queueLiveRefresh(700); });
   es.addEventListener('notif', (e) => { nAdd(JSON.parse(e.data)); queueLiveRefresh(700); });
   es.addEventListener('roulette_event', (e) => { try { reSetEvent(JSON.parse(e.data), false); } catch {} });
@@ -2973,19 +2981,21 @@ function setView(v) {
   routeSet(v);
   navHighlight(v);
   const bjMode = v === 'bj' || v === 'ranked';
-  $('#hubView').classList.toggle('hide', v !== 'hub');
-  $('#bjView').classList.toggle('hide', !bjMode);
-  $('#pkView').classList.toggle('hide', v !== 'poker');
-  $('#rlView').classList.toggle('hide', v !== 'roulette');
-  $('#rocketView').classList.toggle('hide', v !== 'rocket');
-  $('#ofView').classList.toggle('hide', !v.startsWith('off-'));
-  $('#topView').classList.toggle('hide', v !== 'top');
-  $('#rankView').classList.toggle('hide', v !== 'rank');
-  $('#adminView').classList.toggle('hide', v !== 'admin');
-  $('#shopView').classList.toggle('hide', v !== 'shop');
-  $('#tasksView').classList.toggle('hide', v !== 'tasks');
-  $('#accountView').classList.toggle('hide', v !== 'account');
-  $('#rkArenaView').classList.add('hide'); // ancienne arène skill : remplacée par le blackjack ranked
+  const show = (id, on) => { const el = document.getElementById(id); if (el) el.classList.toggle('hide', !on); };
+  show('hubView', v === 'hub');
+  show('bjView', bjMode);
+  show('pkView', v === 'poker');
+  show('rlView', v === 'roulette');
+  show('rocketView', false); // rocket removed from menu
+  show('penView', v === 'penalty');
+  show('ofView', v.startsWith('off-'));
+  show('topView', v === 'top');
+  show('rankView', v === 'rank');
+  show('adminView', v === 'admin');
+  show('shopView', v === 'shop');
+  show('tasksView', v === 'tasks');
+  show('accountView', v === 'account');
+  show('rkArenaView', false);
   bjRankedTag(v === 'ranked');
   try { document.body.classList.toggle('view-ranked', v === 'ranked'); } catch {}
   document.body.classList.toggle('vpk', v === 'poker');
@@ -3037,11 +3047,26 @@ function setView(v) {
   if (bjMode) send('sync');
   if (v.startsWith('off-')) ofOpen(v);
   if (v === 'poker') { pSend('psync'); if (P.S) pRender(P.S); }
-  if (v === 'roulette') { rEnter(); if (W.S) rRender(W.S); else $('#meBal').textContent = num(rBal()) + ' ' + COIN; }
-  else if (v === 'penalty') { penShow(true); penBind(); if (PEN.st) penRender(PEN.st); }
-  if (v !== 'penalty') { try { penShow(false); } catch {} }
-  else if (v === 'rocket') { rocEnter(); if (ROC.st) rocRender(ROC.st); else $('#meBal').textContent = W.bal != null ? num(W.bal) + ' ' + COIN : 'Casino'; }
-  else { const m = v === 'poker' ? null : mySeat(); const UC = v === 'ranked' ? 'RR' : COIN; $('#meBal').textContent = m ? num(m.bal) + ' ' + UC : bjMode ? 'Spectateur' : (W.bal != null ? num(W.bal) + ' ' + UC : 'Casino'); }
+  if (v === 'roulette') { rEnter(); if (W.S) rRender(W.S); }
+  if (v === 'penalty') { penBind(); if (PEN.st) penRender(PEN.st); }
+  // Wallet label
+  try {
+    const balEl = document.getElementById('meBal');
+    if (balEl) {
+      if (v === 'roulette') balEl.textContent = num(rBal()) + ' ' + COIN;
+      else if (v === 'ranked') {
+        const m = mySeat();
+        balEl.textContent = m ? num(m.bal) + ' RR' : (W.bal != null ? num(W.bal) + ' RR' : 'RR');
+      } else if (v === 'poker') {
+        const pm = typeof pMe === 'function' ? pMe() : null;
+        balEl.textContent = pm ? num(pm.stack != null ? pm.stack : pm.bal) + ' ' + COIN : (W.bal != null ? num(W.bal) + ' ' + COIN : 'Casino');
+      } else {
+        const m = (v === 'bj') ? mySeat() : null;
+        const UC = COIN;
+        balEl.textContent = m ? num(m.bal) + ' ' + UC : (bjMode ? 'Spectateur' : (W.bal != null ? num(W.bal) + ' ' + UC : 'Casino'));
+      }
+    }
+  } catch (e) { console.error('bal label', e); }
   if (LB_GAME_KEY[v]) loadGameLB(v);
 }
 document.querySelectorAll('.gcard').forEach((c) => (c.onclick = () => { ac(); setView(c.dataset.go); }));
@@ -4996,7 +5021,6 @@ const LIVE = { busy: false, timer: 0 };
 async function refreshActiveView() {
   if (LIVE.busy || document.hidden) return;
   const v = W.view;
-  if (!['tasks', 'shop', 'account', 'rank', 'top'].includes(v) && !LB_GAME_KEY[v]) return;
   LIVE.busy = true;
   try {
     if (v === 'tasks') await loadTasks(true);
@@ -5004,8 +5028,10 @@ async function refreshActiveView() {
     else if (v === 'account') await loadAccount();
     else if (v === 'rank') await rkLoad();
     else if (v === 'top') await lbLoad();
+    else if (v === 'ranked') { try { await loadRankedTag(); } catch {} }
     if (LB_GAME_KEY[v]) await loadGameLB(v, true);
-  } catch {} finally { LIVE.busy = false; }
+  } catch (e) { console.error('live refresh', e); }
+  finally { LIVE.busy = false; }
 }
 function queueLiveRefresh(ms = 250) {
   clearTimeout(LIVE.timer);
@@ -5720,7 +5746,9 @@ function pgRender(st) {
 const PEN = { st: null, joined: false };
 function penShow(on) {
   const v = document.getElementById('penView');
-  if (v) v.classList.toggle('on', !!on);
+  if (!v) return;
+  v.classList.toggle('hide', !on);
+  v.classList.toggle('on', !!on);
 }
 function penRender(st) {
   if (!st) return;
