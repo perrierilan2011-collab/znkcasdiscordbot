@@ -1706,7 +1706,7 @@ create table if not exists roulette_event_results (
 </main>
 <main id="bjView" class="hide">
   <div class="tbar" id="bjTabs"></div>
-  <div id="bjRankedTag"><span>BLACKJACK RANKED</span><span class="rkinf" id="bjRankedInfo">RR …</span></div>
+  <div id="bjRankedTag"><span>BLACKJACK RANKED</span><span class="rkinf" id="bjRankedInfo">—</span></div>
   <section id="table">
     <div id="dealer"><div class="dname">CROUPIER</div><div class="cards" id="dcards"></div><div id="dtot"></div></div>
     <div id="shoe"><span id="shoeN"></span></div>
@@ -2639,18 +2639,31 @@ const RANKED_TID = 'ranked';
 const isRankedTid = (t) => String(t) === RANKED_TID;
 function bjNormalTables() { const m = new Map(); BJT.forEach((st, t) => { if (!isRankedTid(t)) m.set(t, st); }); return m; }
 function bjNormalId() { const ids = [...bjNormalTables().keys()].sort((a, b) => a - b); return ids.length ? ids[0] : null; }
-async function loadRankedTag() {
-  const info = $('#bjRankedInfo'); if (!info) return;
-  info.textContent = 'RR …';
+function applyRankedTag(d) {
+  const info = document.getElementById('bjRankedInfo');
+  if (!info || !d) return;
+  const m = d.me || d;
+  const pn = d.placementN || 5;
+  let txt = null;
+  if (m.prov) txt = 'Placement ' + (m.placementDone || 0) + '/' + pn + ' · RR hidden';
+  else if (m.elo != null) txt = num(m.elo) + ' RR' + (m.pos ? ' · #' + m.pos : '');
+  if (txt && info.textContent !== txt) info.textContent = txt;
+  info.dataset.ready = '1';
+  const gl = document.getElementById('gRankedLive');
+  if (gl && m.elo != null) gl.textContent = num(m.elo) + ' RR · ranked table';
+  W._rankMeta = d;
+}
+async function loadRankedTag(force) {
+  const info = document.getElementById('bjRankedInfo');
+  if (!info) return;
+  // NEVER write "RR …" over an existing value
   try {
     const res = await fetch('/api/rank?t=' + encodeURIComponent(TOKEN));
     if (!res.ok) throw new Error('rank');
-    const d = await res.json(), m = d.me || {};
-    const gl = $('#gRankedLive'); if (gl) gl.textContent = m.elo != null ? num(m.elo) + ' RR · table classée' : 'Table classée · RR';
-    info.textContent = m.prov
-      ? 'Placement ' + (m.placementDone || 0) + '/' + (d.placementN || 5) + ' · RR masqué'
-      : (m.elo != null ? num(m.elo) + ' RR' : 'RR …') + (m.pos ? ' · #' + m.pos : '');
-  } catch { info.textContent = 'RR indisponible'; }
+    applyRankedTag(await res.json());
+  } catch {
+    if (!info.dataset.ready) info.textContent = 'RR n/a';
+  }
 }
 function bjRankedTag(on) {
   const tag = document.getElementById('bjRankedTag');
@@ -5125,25 +5138,19 @@ async function loadAccount() {
 const LIVE = { busy: false, timer: 0 };
 async function syncWalletQuiet() {
   try {
-    // Prefer live W.bal; if missing, ask server
-    if (W.bal != null && W.view !== 'ranked') {
-      const balEl = document.getElementById('meBal');
-      if (balEl && !String(balEl.textContent || '').includes('Spectateur')) {
-        const want = num(W.bal) + ' ' + COIN;
-        if (balEl.textContent !== want) balEl.textContent = want;
-      }
-      return;
-    }
     const res = await fetch('/api/me?t=' + encodeURIComponent(TOKEN));
     if (!res.ok) return;
     const d = await res.json();
-    if (d && d.bal != null) {
-      W.bal = d.bal;
-      if (W.view !== 'ranked') {
-        const balEl = document.getElementById('meBal');
-        if (balEl) balEl.textContent = num(d.bal) + ' ' + COIN;
-      }
-    }
+    if (d == null || d.bal == null) return;
+    W.bal = d.bal;
+    // Update wallet panel unless ranked table shows RR instead
+    if (W.view === 'ranked') return;
+    const balEl = document.getElementById('meBal');
+    if (!balEl) return;
+    const t = String(balEl.textContent || '');
+    if (t.includes('Spectateur') || t.includes('Spectator')) return;
+    const want = num(d.bal) + ' ' + COIN;
+    if (balEl.textContent !== want) balEl.textContent = want;
   } catch {}
 }
 async function refreshActiveView() {
@@ -5172,6 +5179,7 @@ function queueLiveRefresh(ms = 250) {
   LIVE.timer = setTimeout(() => refreshActiveView(), ms);
 }
 setInterval(() => refreshActiveView(), 2000);
+setInterval(() => { syncWalletQuiet(); }, 1500);
 // Balance / round events → immediate quiet refresh
 document.addEventListener('znk-bal', () => { syncWalletQuiet(); queueLiveRefresh(120); });
 document.addEventListener('znk-round', () => queueLiveRefresh(180));

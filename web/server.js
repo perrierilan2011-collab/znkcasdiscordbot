@@ -309,6 +309,24 @@ function init(deps) {
   // ---------- fin de manche : rang / ELO + récap Discord + annonce des gagnants dans le chat du site ----------
   function roundEnd(guildId, r) {
     try { rankApi.record(r, (uid) => avatarMap.get(uid)); } catch (e) { console.error('[web] rang/elo', e?.message || e); }
+    // Push fresh wallet balance to every player who was in the round
+    try {
+      const entry = rooms.get(String(guildId));
+      if (entry && r && Array.isArray(r.players)) {
+        for (const p of r.players) {
+          if (!p || !p.uid) continue;
+          const uid = String(p.uid);
+          Promise.resolve(deps.getBalance(uid)).then((bal) => {
+            if (bal == null) return;
+            for (const c of entry.clients) {
+              if (c.uid === uid) {
+                try { c.write(`event: bal\ndata: ${JSON.stringify({ bal })}\n\n`); } catch {}
+              }
+            }
+          }).catch(() => {});
+        }
+      }
+    } catch (e) { console.error('[web] bal push', e?.message || e); }
     //历史 / historique : alimente le classement « plus gros gain en une fois » par jeu
     try {
       if (deps.supabase && r && Array.isArray(r.players)) {
