@@ -4954,7 +4954,35 @@ $('#bBell').onclick = (e) => {
   const open = w.classList.toggle('open');
   if (open) { nRender(); setTimeout(nMarkSeen, 1200); } // les nouvelles restent surlignées un instant
 };
-$('#me').onclick = (e) => { e.stopPropagation(); const w = $('#meWrap'); popClose(w); menuClose(); w.classList.toggle('open'); };
+$('#me').onclick = async (e) => {
+  e.stopPropagation();
+  const w = $('#meWrap');
+  popClose(w);
+  menuClose();
+  const opening = !w.classList.contains('open');
+  w.classList.toggle('open');
+  // Refresh ZTKN only when opening the profile panel
+  if (opening) {
+    const balEl = document.getElementById('meBal');
+    if (balEl) balEl.textContent = '…';
+    try {
+      const res = await fetch('/api/me?t=' + encodeURIComponent(TOKEN));
+      if (res.ok) {
+        const d = await res.json();
+        if (d && d.bal != null) {
+          W.bal = d.bal;
+          if (balEl) balEl.textContent = num(d.bal) + ' ' + COIN;
+        } else if (balEl && W.bal != null) {
+          balEl.textContent = num(W.bal) + ' ' + COIN;
+        }
+      } else if (balEl && W.bal != null) {
+        balEl.textContent = num(W.bal) + ' ' + COIN;
+      }
+    } catch {
+      if (balEl && W.bal != null) balEl.textContent = num(W.bal) + ' ' + COIN;
+    }
+  }
+};
 $('#me').onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $('#me').click(); } };
 async function refreshBalance(e) {
   if (e) { e.stopPropagation(); e.preventDefault(); }
@@ -5179,7 +5207,6 @@ function queueLiveRefresh(ms = 250) {
   LIVE.timer = setTimeout(() => refreshActiveView(), ms);
 }
 setInterval(() => refreshActiveView(), 2000);
-setInterval(() => { syncWalletQuiet(); }, 1500);
 // Balance / round events → immediate quiet refresh
 document.addEventListener('znk-bal', () => { syncWalletQuiet(); queueLiveRefresh(120); });
 document.addEventListener('znk-round', () => queueLiveRefresh(180));
