@@ -278,10 +278,18 @@ th{color:var(--mut);font-size:12px}
 @media(max-width:600px){.glbbody .lbrow{grid-template-columns:24px minmax(0,1fr) auto}.glbbody .lbsub{display:none}.glbbody .lbval small{display:none}}
 /* sur PC, le classement passe à gauche de la table de jeu solo */
 @media(min-width:1100px){
-  #ofView.has-lb{display:grid;grid-template-columns:280px minmax(0,1fr);align-items:start;justify-items:center;gap:14px;padding:10px 14px 56px}
-  #ofView.has-lb>.glb{grid-column:1;grid-row:1;margin:0;width:100%;max-width:none;position:sticky;top:10px}
-  #ofView.has-lb>.ofplay{grid-column:2;grid-row:1;max-width:900px}
+  #ofView.has-lb{display:grid !important;grid-template-columns:280px minmax(0,1fr);align-items:start;justify-items:stretch;gap:16px;padding:12px 16px 56px;width:100%;box-sizing:border-box}
+  #ofView.has-lb>.glb{grid-column:1;grid-row:1;margin:0;width:100%;max-width:none;position:sticky;top:10px;justify-self:stretch}
+  #ofView.has-lb>.ofplay{grid-column:2;grid-row:1;width:100%;max-width:920px;justify-self:center;margin:0 auto}
 }
+#ofView{display:flex;flex-direction:column;align-items:center}
+.ofplay{width:100%;max-width:920px;margin:0 auto;display:flex;flex-direction:column;align-items:center}
+#ofTable.ftable.of{width:100%;max-width:900px;margin:0 auto}
+#ofDock{width:100%;max-width:900px;margin:0 auto}
+/* also center online tables */
+#bjView,#pkView,#rlView,#penView{align-items:center}
+#table,.ftable{margin-left:auto;margin-right:auto}
+
 /* mobile/tablette : le classement des meilleurs gains reste SOUS le jeu */
 @media(max-width:1099px){
   #ofView.has-lb{display:flex !important;flex-direction:column !important;align-items:center;width:100%}
@@ -4045,9 +4053,9 @@ function scAuto() {
   });
 }
 // ============================================================= JEUX OFFLINE (solo, serveur : offline.js)
-const O = { game: null, st: null, bal: null, bet: '100', mines: 3, auto: '', hist: { fuse: [], mines: [], bj: [], coin: [], dice: [], horses: [], russian: [], slots: [], duel: [], scratch: [] }, timer: 0, pp: [], run: 0, anim: false, hold: false, pick: { coin: 'pile', dice: 'over', horses: '1', russian: '1', slots: '1', duel: '0' } };
+const O = { game: null, st: null, bal: null, bet: '100', mines: 3, auto: '', hist: { fuse: [], mines: [], bj: [], coin: [], dice: [], horses: [], russian: [], slots: [], duel: [], scratch: [], plinko: [], penguin: [] }, timer: 0, pp: [], run: 0, anim: false, hold: false, pick: { coin: 'pile', dice: 'over', horses: '1', russian: '1', slots: '1', duel: '0' } };
 const OMAP = { 'off-bj': 'bj', 'off-fuse': 'fuse', 'off-mine': 'mines', 'off-coin': 'coin', 'off-dice': 'dice', 'off-horses': 'horses', 'off-russian': 'russian', 'off-slots': 'slots', 'off-duel': 'duel', 'off-scratch': 'scratch', 'off-plinko': 'plinko', 'off-penguin': 'penguin' };
-O.hist.plinko = []; O.pick.plinko = 'med'; O.balls = 1;
+O.hist.plinko = []; O.hist.penguin = []; O.pick.plinko = 'med'; O.balls = 1;
 const OT = { bj: 'BLACKJACK SOLO', fuse: 'FUSÉ', mines: 'MINES', coin: 'PILE OU FACE', dice: 'DÉS', horses: 'COURSE DE CHEVAUX', russian: 'ROULETTE RUSSE', slots: 'SLOTS', duel: 'DUEL', scratch: 'TICKET À GRATTER', plinko: 'PLINKO', penguin: 'PENGUIN SLIDE' };
 const GEM = '<svg viewBox="0 0 24 24"><path d="M6 3h12l4 6-10 12L2 9z" fill="#bbf7d0" stroke="#fff" stroke-width="1.2" stroke-linejoin="round"/><path d="M2 9h20M9 3l3 6 3-6M12 9v12" fill="none" stroke="#16a34a" stroke-width="1"/></svg>';
 const BOMB = '<svg viewBox="0 0 24 24"><circle cx="11" cy="14" r="7.5" fill="#1c1c1c" stroke="#fca5a5" stroke-width="1.4"/><path d="M16 8l3-3M18 3v3M17 4h3" stroke="#fbbf24" stroke-width="1.6" stroke-linecap="round"/><circle cx="8.5" cy="11.5" r="1.8" fill="#fff" opacity=".5"/></svg>';
@@ -4227,7 +4235,7 @@ function ofWatch() {
 function ofDone(prev, st) {
   if (!st || !st.over || (prev && prev.over)) return;
   const net = Math.round((st.win - st.bet) * 100) / 100;
-  const h = O.hist[st.type]; h.unshift(st.type === 'fuse' ? st.crash : net); h.length = Math.min(h.length, 10);
+  const h = O.hist[st.type] || (O.hist[st.type] = []); h.unshift(st.type === 'fuse' ? st.crash : net); h.length = Math.min(h.length, 10);
   if (st.outcome === 'push') SFX.push(); else if (st.outcome === 'bj') SFX.bj(); else if (st.win > 0) SFX.win(); else SFX.lose();
   floatText($('#ofTable'), (net > 0 ? '+' : '') + num(net) + ' ' + COIN, net > 0 ? 'pos' : net < 0 ? 'neg' : 'neu');
 }
@@ -4271,10 +4279,18 @@ function ofBuild() {
   else b.innerHTML = '<div class="gems" id="oGems"></div><div class="stats" id="oStats"></div>';
 }
 function ofRender() {
-  const s = O.st, h = $('#oHist'); if (!h) return; h.textContent = '';
-  O.hist[O.game].forEach((v) => h.append(O.game === 'fuse' ? el('span', 'hc ' + (v >= 2 ? 'g' : 'r'), v.toFixed(2) + 'x') : el('span', 'hc ' + (v > 0 ? 'g' : v < 0 ? 'r' : 'z0'), (v > 0 ? '+' : '') + num(v))));
-  if (O.game === 'penguin') { try { pgRender(s); } catch(e){} }
-  if (O.game === 'bj') rBj(s); else if (O.game === 'mines') rMines(s); else if (INST[O.game]) rInst(s); else if (O.game === 'scratch') rScratch(s); else ofFuseTick();
+  const s = O.st, h = $('#oHist');
+  if (h) {
+    h.textContent = '';
+    const hist = O.hist[O.game] || (O.hist[O.game] = []);
+    hist.forEach((v) => h.append(O.game === 'fuse' ? el('span', 'hc ' + (v >= 2 ? 'g' : 'r'), v.toFixed(2) + 'x') : el('span', 'hc ' + (v > 0 ? 'g' : v < 0 ? 'r' : 'z0'), (v > 0 ? '+' : '') + num(v))));
+  }
+  if (O.game === 'penguin') { try { pgRender(s); } catch (e) { console.error(e); } }
+  else if (O.game === 'bj') rBj(s);
+  else if (O.game === 'mines') rMines(s);
+  else if (INST[O.game]) rInst(s);
+  else if (O.game === 'scratch') rScratch(s);
+  else if (O.game === 'fuse') ofFuseTick();
   ofDock();
 }
 // ---- blackjack
@@ -4424,9 +4440,14 @@ function ofDock() {
   if (O.game === 'scratch' && SC.busy) { row(act('go', 'Tout gratter', scAuto)); d.append(el('div', 'hint', 'Gratte les cases avec la souris ou le doigt, ou révèle tout d’un coup.')); return; }
   if (O.anim) { row(act('go', 'En cours…', () => {}, false)); return; }
   if (live) {
+    if (O.game === 'penguin') {
+      d.append(el('div', 'hint', s.phase === 'aim2' ? 'SECOND wheel — click STOP on the meter above' : 'Click STOP on the colored semi-circle above'));
+      return;
+    }
     if (O.game === 'mines') { row(act('go', 'Encaisser ' + num(s.cash) + ' ' + COIN, () => ofMove('cash'), s.picks.length)); d.append(el('div', 'hint', s.picks.length ? 'Chaque case sûre augmente le gain : encaisse avant de toucher une mine.' : 'Révèle au moins une case pour pouvoir encaisser.')); }
     else if (O.game === 'fuse') { const b = act('go', 'Encaisser', () => ofMove('cash')); b.id = 'oCash'; row(b); d.append(el('div', 'hint', 'Encaisse avant que la fusée explose.')); }
-    else { row(act('hit', 'Tirer', () => ofMove('hit')), act('std', 'Rester', () => ofMove('stand')), act('dbl', 'Doubler', () => ofMove('double'), s.canDouble)); }
+    else if (O.game === 'bj') { row(act('hit', 'Tirer', () => ofMove('hit')), act('std', 'Rester', () => ofMove('stand')), act('dbl', 'Doubler', () => ofMove('double'), s.canDouble)); }
+    else { row(act('go', '…', () => {}, false)); }
     return;
   }
   const chips = [[1, 'c1', '1'], [10, 'c10', '10'], [100, 'c100', '100'], [1000, 'c1k', '1K'], [10000, 'c10k', '10K'], [100000, 'c100k', '100K']].map(([v, c, t]) => { const b = el('button', 'chip ' + c, t); b.title = '+' + num(v); b.onclick = () => { ofSet((parseAmt(O.bet) || 0) + v); SFX.chip(); }; return b; });
@@ -4447,7 +4468,7 @@ function ofDock() {
     if (O.game === 'plinko') { const rb = row(el('span', 'note', 'Billes')); [1, 3, 5, 10].forEach((n) => { const b = el('button', 'rchip' + (n === O.balls ? ' on' : ''), String(n)); b.onclick = () => { SFX.chip(); O.balls = n; ofDock(); ofStatsInst(); }; rb.append(b); }); }
     const gb = act('go', 'Lancer', ofStart); gb.id = 'oGo'; row(gb); ofGoLabel(); return;
   }
-  row(act('go', O.game === 'scratch' ? 'Acheter un ticket' : s ? 'Rejouer' : 'Jouer', ofStart));
+  row(act('go', O.game === 'scratch' ? 'Acheter un ticket' : O.game === 'penguin' ? (s ? 'Replay' : 'Play') : s ? 'Rejouer' : 'Jouer', ofStart));
 }
 // ---- jeux « un coup » : pile ou face, dés, chevaux, roulette russe (tirage côté serveur, animation côté site)
 const INST = { coin: 1, dice: 1, horses: 1, russian: 1, slots: 1, duel: 1, plinko: 1 };
