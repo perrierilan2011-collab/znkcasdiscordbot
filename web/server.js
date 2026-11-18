@@ -335,6 +335,26 @@ function init(deps) {
     } catch (e) { console.error('[web history]', e?.message || e); }
     try { for (const p of (r && r.players) || []) if (p && p.uid) shopApi.bumpProgress(p.uid, 'games', 1); } catch (e) { console.error('[web] shop tasks', e?.message || e); }
     try {
+      const entry = rooms.get(String(guildId));
+      if (entry) {
+        entry.broadcast(`event: tasks_tick\ndata: {"t":${Date.now()}}\n\n`);
+        // Ranked blackjack: push fresh rank view to each player who played
+        if (r && (r.game === 'blackjack' || r.game === 'ranked' || r.mode === 'ranked')) {
+          for (const p of (r.players || [])) {
+            if (!p || !p.uid) continue;
+            try {
+              const view = rankApi.view(String(p.uid), 20);
+              for (const c of entry.clients) {
+                if (c.uid === String(p.uid)) {
+                  try { c.write(`event: rank\ndata: ${JSON.stringify(view)}\n\n`); } catch {}
+                }
+              }
+            } catch {}
+          }
+        }
+      }
+    } catch (e) { console.error('[web] tasks_tick', e?.message || e); }
+    try {
       const room = GAME_ROOM[r && r.game];
       if (room) {
         const entry = roomOf(guildId);

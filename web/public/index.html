@@ -283,9 +283,9 @@ th{color:var(--mut);font-size:12px}
 }
 /* mobile/tablette : le classement des meilleurs gains reste SOUS le jeu */
 @media(max-width:1099px){
-  #ofView.has-lb{display:flex;flex-direction:column;align-items:center;width:100%}
-  #ofView.has-lb>.ofplay{order:1;width:100%}
-  #ofView.has-lb>.glb{order:2;width:100%;max-width:760px;margin:14px auto 0;position:static}
+  #ofView.has-lb{display:flex !important;flex-direction:column !important;align-items:center;width:100%}
+  #ofView.has-lb>.ofplay{order:1 !important;width:100%;grid-column:auto !important;grid-row:auto !important}
+  #ofView.has-lb>.glb{order:2 !important;width:100%;max-width:760px;margin:14px auto 0;position:static !important;grid-column:auto !important;grid-row:auto !important}
 }
 /* ---------- ADMIN ---------- */
 #adminView{align-items:center;padding:24px 16px 64px;overflow:auto}
@@ -1954,9 +1954,11 @@ function connect() {
   });
 es.addEventListener('roulette', (e) => { const st = JSON.parse(e.data); offset = st.now - Date.now(); rRender(st); });
   es.addEventListener('rocket', (e) => { const st = JSON.parse(e.data); offset = st.now - Date.now(); rocRender(st); });
+es.addEventListener('tasks_tick', () => queueLiveRefresh(100));
+es.addEventListener('rank', (e) => { try { const d = JSON.parse(e.data); if (W.view === 'rank') { rkRenderMe(d); rkRenderElo(d); rkRenderLadder(d); } } catch {} queueLiveRefresh(100); });
   es.addEventListener('poker', (e) => { const st = JSON.parse(e.data); offset = st.now - Date.now(); pUpdate(st); });
   es.addEventListener('admin', () => $('#bAdmin').classList.remove('hide'));
-  es.addEventListener('bal', (e) => { W.bal = JSON.parse(e.data).bal; pHeader(); if (W.view !== 'ranked' && !O.hold && W.bal != null) $('#meBal').textContent = num(W.bal) + ' ' + COIN; queueLiveRefresh(700); });
+  es.addEventListener('bal', (e) => { W.bal = JSON.parse(e.data).bal; pHeader(); if (W.view !== 'ranked' && !O.hold && W.bal != null) $('#meBal').textContent = num(W.bal) + ' ' + COIN; queueLiveRefresh(700);  try { document.dispatchEvent(new CustomEvent('znk-bal')); } catch {}});
   es.addEventListener('inbox', (e) => { nSet(JSON.parse(e.data), false); queueLiveRefresh(700); });
   es.addEventListener('notif', (e) => { nAdd(JSON.parse(e.data)); queueLiveRefresh(700); });
   es.addEventListener('roulette_event', (e) => { try { reSetEvent(JSON.parse(e.data), false); } catch {} });
@@ -2829,13 +2831,20 @@ const LB_GAME_KEY = {
 };
 function ensureGameLB() {
   const host = $('#ofView');
-  if (!host || host.querySelector(':scope > .glb')) return;
-  const sec = el('section', 'glb');
-  sec.append(el('div', 'lbtitle'));
-  const t = sec.firstChild;
-  t.append(el('b', '', '🏆 Top 10 · plus gros gains all-time'), el('small', '', 'Plus gros gain remporté en une seule fois'));
-  const body = el('div', 'glbbody'); body.append(el('div', 'lbnone', '…'));
-  sec.append(body); host.append(sec);
+  if (!host) return;
+  let sec = host.querySelector(':scope > .glb');
+  if (!sec) {
+    sec = el('section', 'glb');
+    sec.append(el('div', 'lbtitle'));
+    const t = sec.firstChild;
+    t.append(el('b', '', 'Top 10 · biggest wins'), el('small', '', 'Biggest single-round payout'));
+    const body = el('div', 'glbbody'); body.append(el('div', 'lbnone', '—'));
+    sec.append(body);
+    const play = host.querySelector(':scope > .ofplay');
+    if (play && play.nextSibling) host.insertBefore(sec, play.nextSibling);
+    else if (play) host.appendChild(sec);
+    else host.appendChild(sec);
+  }
   host.classList.add('has-lb');
 }
 function lbFillGame(top) {
@@ -4916,7 +4925,10 @@ function queueLiveRefresh(ms = 250) {
   clearTimeout(LIVE.timer);
   LIVE.timer = setTimeout(() => refreshActiveView(), ms);
 }
-setInterval(() => refreshActiveView(), 5000);
+setInterval(() => refreshActiveView(), 2500);
+// Also refresh when a balance event arrives (game just paid out / task progressed)
+document.addEventListener('znk-bal', () => queueLiveRefresh(150));
+document.addEventListener('znk-round', () => queueLiveRefresh(200));
 
 $('#accCopyInvite').onclick = () => {
   const v = $('#accInvite').value;

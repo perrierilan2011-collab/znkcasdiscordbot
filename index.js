@@ -7452,6 +7452,12 @@ async function cmdSetup(msg) {
   }
 
   if (!me.permissions.has(P.ManageChannels)) return msg.reply(NEED_MANAGE_CHANNELS);
+  // Name-based dedup: never create a second #casino even if the DB id was lost.
+  const byName = guild.channels.cache.find((c) => c && c.type === ChannelType.GuildText && c.name === 'casino');
+  if (byName) {
+    casinoChannels.set(guild.id, byName.id);
+    return msg.reply(`✅ Channel <#${byName.id}> already exists.`);
+  }
   const botAllow = botCan(guild, [P.ViewChannel, P.SendMessages, P.EmbedLinks, P.AttachFiles, P.ReadMessageHistory, P.ManageMessages]);
 
   const channel = await guild.channels.create({
@@ -8949,6 +8955,7 @@ function ticketPanelRow() {
 // several channels or several panels at the same time.
 const ticketLocks = new Map();   // orderCode -> Promise
 const panelLocks = new Map();    // guildId -> Promise
+const channelCreateLocks = new Map(); // guildId:kind -> Promise
 
 async function cmdTicketSetup(msg) {
   if (!isCrown(msg)) return msg.reply(CROWN_ONLY).catch(() => {});

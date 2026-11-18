@@ -294,7 +294,7 @@ class RocketRaceRoom {
       p.rank = null;
     }
     this.phase = 'countdown';
-    this.say('🚀 Prêts… 3… 2… 1… PARTEZ !');
+    this.say('Ready… 3… 2… 1… GO!');
     this.emit();
     // passe en "racing" après le décompte, puis règle à la fin du tour
     this.timer = setTimeout(() => this.run(() => {
@@ -308,7 +308,7 @@ class RocketRaceRoom {
   async settle() {
     if (this.phase !== 'racing' || !this.track) return;
     const ranking = this.track.ranking;
-    const byUid = new Map(this.players.values().map((p) => [p.uid, p]));
+    const byUid = new Map([...this.players.values()].map((p) => [p.uid, p]));
     const recapPlayers = [];
     // Le POT est redistribué au classement : la maison prélève HOUSE_EDGE,
     // le reste est réparti selon sharesFor(rang), quelles que soient les mises.
@@ -336,7 +336,7 @@ class RocketRaceRoom {
       p.net = floor2(win - stake);
       p.rank = i + 1;
       recapPlayers.push({ uid: p.uid, name: p.name, bet: stake, win, net: p.net, mult: multipliers[i], rank: i + 1, detail: `arrivé n°${i + 1}/${ranking.length}` });
-      this.say(`🏁 ${p.name} arrivé n°${i + 1} · ${p.net >= 0 ? '+' : ''}${p.net}`);
+      this.say(`${p.name} arrivé n°${i + 1} · ${p.net >= 0 ? '+' : ''}${p.net}`);
     }
     this.result = { ranking, multipliers, pot };
     this.history.unshift(ranking[0]);
