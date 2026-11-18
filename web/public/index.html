@@ -75,7 +75,8 @@ main{flex:1;display:flex;flex-direction:column;min-height:0;padding:10px 10px 0;
   box-shadow:inset 0 0 70px rgba(0,0,0,.85),inset 0 0 0 1px rgba(255,255,255,.06),0 0 0 1px rgba(255,255,255,.14),0 26px 60px rgba(0,0,0,.75);
   display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:14px 8px 62px;overflow:hidden}
 /* liseré doré imprimé sur le tapis */
-#table::after,.ftable::after{content:"";position:absolute;inset:9px;border:2px solid rgba(251,191,36,.4);border-radius:22px 22px 50% 50%/22px 22px 21% 21%;box-shadow:0 0 0 5px rgba(0,0,0,0),inset 0 0 22px rgba(251,191,36,.1);pointer-events:none;z-index:0}
+#table::after,.ftable::after{content:"";position:absolute;inset:9px;border:2px solid rgba(255,255,255,.12);border-radius:22px 22px 50% 50%/22px 22px 21% 21%;box-shadow:none;pointer-events:none;z-index:0}
+body.view-ranked #table::after{border-color:rgba(251,191,36,.45);box-shadow:inset 0 0 22px rgba(251,191,36,.1)}
 /* ZNK transparent (lettres de verre : contour + reflet qui glisse), centré sur la table, sous les cartes et les joueurs */
 #table::before,.ftable::before{content:"ZNK";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:0;
   font-size:min(15vw,165px);font-weight:900;line-height:1;letter-spacing:.16em;padding-left:.16em;white-space:nowrap;
@@ -1013,6 +1014,37 @@ header .sp{flex:1 1 0}
   #rocketDock .row .btn{flex:1 1 100%}
   .rqtop{gap:6px}
 }
+
+/* Penguin Slide */
+#pgArena{position:relative;width:min(100%,720px);height:280px;margin:0 auto;border-radius:16px;overflow:hidden;
+  background:linear-gradient(180deg,#0b1a2a 0%,#0a2740 40%,#0c3a4d 70%,#134e5a 100%);border:1px solid #1e3a4a}
+#pgIce{position:absolute;left:0;right:0;bottom:0;height:42%;background:linear-gradient(180deg,rgba(186,230,253,.25),rgba(224,242,254,.5));
+  border-top:2px solid rgba(255,255,255,.35)}
+#pgTrack{position:absolute;left:8%;right:8%;bottom:18%;height:4px;background:rgba(255,255,255,.15);border-radius:2px}
+#pgMarks{position:absolute;left:8%;right:8%;bottom:22%;display:flex;justify-content:space-between;font-size:10px;color:#94a3b8}
+#pgPeng{position:absolute;bottom:20%;left:8%;width:48px;height:48px;font-size:40px;line-height:1;transition:left .05s linear;filter:drop-shadow(0 4px 6px rgba(0,0,0,.5))}
+#pgPeng.fly{transition:left linear}
+#pgResult{text-align:center;margin-top:10px;font-weight:800;color:var(--gold);min-height:24px}
+/* Penalty 1v1 */
+#penView{flex:1;display:none;flex-direction:column;align-items:center;padding:12px;gap:12px;overflow:auto}
+#penView.on{display:flex}
+#penPitch{position:relative;width:min(100%,640px);aspect-ratio:16/10;border-radius:18px;overflow:hidden;
+  background:radial-gradient(ellipse at 50% 60%,#166534 0%,#14532d 45%,#052e16 100%);border:3px solid #a3a3a3}
+#penGoal{position:absolute;left:50%;top:8%;transform:translateX(-50%);width:56%;height:38%;
+  border:4px solid #e5e5e5;border-bottom:0;border-radius:8px 8px 0 0;background:rgba(0,0,0,.2)}
+#penNet{position:absolute;inset:0;background:
+  repeating-linear-gradient(0deg,transparent,transparent 10px,rgba(255,255,255,.12) 10px,rgba(255,255,255,.12) 11px),
+  repeating-linear-gradient(90deg,transparent,transparent 10px,rgba(255,255,255,.12) 10px,rgba(255,255,255,.12) 11px)}
+#penBall{position:absolute;width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 2px 6px #000;
+  left:50%;bottom:12%;transform:translate(-50%,0);transition:left 0.9s cubic-bezier(.2,.7,.3,1), bottom 0.9s cubic-bezier(.2,.7,.3,1)}
+#penKeeper{position:absolute;left:50%;top:28%;transform:translate(-50%,-50%);font-size:42px;transition:left .55s cubic-bezier(.2,.8,.3,1)}
+#penShooter{position:absolute;left:50%;bottom:4%;transform:translateX(-50%);font-size:36px}
+#penScore{font-size:28px;font-weight:900;color:#fff;letter-spacing:.08em}
+#penDirs{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+#penDirs button{min-width:90px;padding:12px 16px;border-radius:12px;font-weight:800;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2)}
+#penDirs button:hover{background:rgba(255,255,255,.22)}
+#penDirs button.on{border-color:var(--gold);background:rgba(251,191,36,.2)}
+
 </style>
 </head>
 <body>
@@ -1080,10 +1112,10 @@ header .sp{flex:1 1 0}
         <span class="gdesc">Roulette européenne · rouge, noir, pair, impair, numéros pleins</span>
         <span class="glive" id="gRlLive"></span><span class="gplay">Jouer</span>
       </button>
-      <button class="gcard" data-go="rocket" id="gcRocket">
-        <span class="gname">Rocket Race</span>
-        <span class="gdesc">Course de fusées · chacun la sienne avec son pseudo · le premier au tour du Soleil gagne le pot</span>
-        <span class="glive" id="gRocketLive"></span><span class="gplay">Jouer</span>
+      <button class="gcard" data-go="penalty" id="gcPenalty">
+        <span class="gname">Penalty</span>
+        <span class="gdesc">1v1 shootout · shoot & save · first to lead by 2 wins</span>
+        <span class="glive" id="gPenLive"></span><span class="gplay">Play</span>
       </button>
     </div>
   </section>
@@ -1140,6 +1172,11 @@ header .sp{flex:1 1 0}
         <span class="gname">Plinko</span>
         <span class="gdesc">Lâche la bille dans les piquets, jusqu’à x130</span>
         <span class="glive"></span><span class="gplay">Jouer</span>
+      </button>
+      <button class="gcard" data-go="off-penguin" id="gcPenguin">
+        <span class="gname">Penguin Slide</span>
+        <span class="gdesc">One tap — the penguin slides on the ice. Farther = bigger multiplier</span>
+        <span class="gplay">Play</span>
       </button>
       <button class="gcard" data-go="off-scratch">
         <span class="gname">Ticket à gratter</span>
@@ -1457,7 +1494,32 @@ create table if not exists roulette_event_results (
   </div>
 </main>
 
-<main id="shopView" class="hide">
+<main 
+<div id="penView">
+  <div id="penScore">0 — 0</div>
+  <div id="penMsg" style="color:#a3a3a3;font-weight:700">1v1 Penalty · match bets · first to lead by 2</div>
+  <div id="penPitch">
+    <div id="penGoal"><div id="penNet"></div></div>
+    <div id="penKeeper">🧤</div>
+    <div id="penBall"></div>
+    <div id="penShooter">👟</div>
+  </div>
+  <div id="penDirs">
+    <button data-dir="left">◀ Left</button>
+    <button data-dir="center">Center</button>
+    <button data-dir="right">Right ▶</button>
+  </div>
+  <div class="row" style="gap:8px;flex-wrap:wrap;justify-content:center">
+    <button class="btn" id="penJoin0">Seat 1</button>
+    <button class="btn" id="penJoin1">Seat 2</button>
+    <div class="amt"><input id="penAmt" type="number" min="1" step="1" placeholder="Bet"/><span>🪙</span></div>
+    <button class="btn go" id="penBet">Bet</button>
+    <button class="btn" id="penReady">Ready</button>
+    <button class="btn" id="penLeave">Leave</button>
+  </div>
+  <div id="penPlayers" style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap"></div>
+</div>
+id="shopView" class="hide">
   <div class="lbwrap" style="align-items:center">
     <div class="lbhead"><div><h2>Boutique</h2><p>Achète une récompense avec tes ZTKN · tu reçois un <b>code de commande</b> à coller dans le ticket Discord</p></div></div>
     <div class="shopgrid" id="shopGrid"><div class="lbnone">Chargement…</div></div>
@@ -1948,12 +2010,30 @@ function connect() {
   es.addEventListener('ranked', (e) => {
     try {
       const st = JSON.parse(e.data);
-      if (st && String(st.tid) === RANKED_TID) bjUpdate(st);
-      else if (W.view === 'ranked') rkRender(st);
+      // Table state (has seats/phase) vs rank meta (has me/placementN)
+      if (st && st.seats && String(st.tid || RANKED_TID) === RANKED_TID) bjUpdate(st);
+      if (st && (st.me || st.placementN != null || st.prov != null)) {
+        const info = document.getElementById('bjRankedInfo');
+        const m = st.me || st;
+        const pn = st.placementN || 5;
+        if (info) {
+          if (m.prov) info.textContent = 'Placement ' + (m.placementDone || 0) + '/' + pn + ' · RR hidden';
+          else info.textContent = (m.elo != null ? Number(m.elo).toLocaleString('en-US') + ' RR' : 'RR') + (m.pos ? ' · #' + m.pos : '');
+        }
+        if (W.view === 'rank') { try { rkRenderMe(st); rkRenderElo(st); rkRenderLadder(st); } catch {} }
+        if (W.view === 'ranked' && m.elo != null) {
+          const bal = document.getElementById('meBal');
+          if (bal) bal.textContent = Number(m.elo).toLocaleString('en-US') + ' RR';
+        }
+      } else if (W.view === 'ranked' && st && !st.seats) {
+        try { rkRender(st); } catch {}
+      }
     } catch {}
+    queueLiveRefresh(80);
   });
 es.addEventListener('roulette', (e) => { const st = JSON.parse(e.data); offset = st.now - Date.now(); rRender(st); });
   es.addEventListener('rocket', (e) => { const st = JSON.parse(e.data); offset = st.now - Date.now(); rocRender(st); });
+es.addEventListener('penalty', (e) => { try { penRender(JSON.parse(e.data)); } catch {} });
 es.addEventListener('tasks_tick', () => queueLiveRefresh(100));
 es.addEventListener('rank', (e) => { try { const d = JSON.parse(e.data); if (W.view === 'rank') { rkRenderMe(d); rkRenderElo(d); rkRenderLadder(d); } } catch {} queueLiveRefresh(100); });
   es.addEventListener('poker', (e) => { const st = JSON.parse(e.data); offset = st.now - Date.now(); pUpdate(st); });
@@ -2246,8 +2326,8 @@ const C = { msgs: {}, open: false, unread: 0 };
 const SET = { winOthers: '1', winMine: '1', chatNotif: 'silent' };
 try { Object.assign(SET, JSON.parse(localStorage.getItem('znk_set') || '{}')); } catch {}
 const cShow = (m) => m.sys !== 'win' || (me && m.uid === me.uid ? SET.winMine !== '0' : SET.winOthers !== '0');
-const CNAME = { hub: 'Accueil', bj: 'Blackjack', poker: 'Poker', roulette: 'Roulette', rocket: 'Rocket Race', 'off-bj': 'Blackjack solo', 'off-fuse': 'Fusé', 'off-mine': 'Mine', 'off-coin': 'Pile ou Face', 'off-dice': 'Dés', 'off-horses': 'Chevaux', 'off-russian': 'Roulette russe', 'off-slots': 'Slots', 'off-duel': 'Duel', 'off-scratch': 'Ticket à gratter', 'off-plinko': 'Plinko' };
-const GLAB = { blackjack: 'Blackjack', poker: 'Poker', roulette: 'Roulette', rocket: 'Rocket Race', 'bj-solo': 'Blackjack solo', fuse: 'Fusé', mines: 'Mines', coin: 'Pile ou Face', dice: 'Dés', horses: 'Chevaux', russian: 'Roulette russe', slots: 'Slots', duel: 'Duel', scratch: 'Ticket à gratter', plinko: 'Plinko' };
+const CNAME = { hub: 'Accueil', bj: 'Blackjack', poker: 'Poker', roulette: 'Roulette',  'off-bj': 'Blackjack solo', 'off-fuse': 'Fusé', 'off-mine': 'Mine', 'off-coin': 'Pile ou Face', 'off-dice': 'Dés', 'off-horses': 'Chevaux', 'off-russian': 'Roulette russe', 'off-slots': 'Slots', 'off-duel': 'Duel', 'off-scratch': 'Ticket à gratter', 'off-plinko': 'Plinko', 'off-penguin': 'Penguin Slide' };
+const GLAB = { blackjack: 'Blackjack', poker: 'Poker', roulette: 'Roulette',  'bj-solo': 'Blackjack solo', fuse: 'Fusé', mines: 'Mines', coin: 'Pile ou Face', dice: 'Dés', horses: 'Chevaux', russian: 'Roulette russe', slots: 'Slots', duel: 'Duel', scratch: 'Ticket à gratter', plinko: 'Plinko', penguin: 'Penguin Slide' };
 const cRoom = () => (W.view === 'top' || W.view === 'rank' || W.view === 'admin' ? 'hub' : W.view);
 function cLine(m) {
   if (m.sys === 'win') { // annonce automatique d'une victoire (tous les jeux du site)
@@ -2797,7 +2877,7 @@ function pTick() {
 
 // ========== Routing URL (hash) — refresh garde la page ==========
 const ROUTE_OK = new Set(['hub','bj','poker','roulette','rocket','rank','ranked','top','admin','shop','tasks','account',
-  'off-bj','off-fuse','off-mine','off-coin','off-dice','off-horses','off-russian','off-slots','off-duel','off-plinko','off-scratch']);
+  'off-bj','off-fuse','off-mine','off-coin','off-dice','off-horses','off-russian','off-slots','off-duel','off-plinko','off-scratch','off-penguin']);
 function routeFromHash() {
   const h = (location.hash || '').replace(/^#\/?/, '').trim();
   if (h && ROUTE_OK.has(h)) return h;
@@ -2827,7 +2907,7 @@ function navHighlight(v) {
 const LB_GAME_KEY = {
   'off-bj': 'bj-solo', 'off-fuse': 'fuse', 'off-mine': 'mines', 'off-coin': 'coin',
   'off-dice': 'dice', 'off-horses': 'horses', 'off-russian': 'russian', 'off-slots': 'slots',
-  'off-duel': 'duel', 'off-plinko': 'plinko', 'off-scratch': 'scratch',
+  'off-duel': 'duel', 'off-plinko': 'plinko', 'off-scratch': 'scratch', 'off-penguin': 'penguin',
 };
 function ensureGameLB() {
   const host = $('#ofView');
@@ -2907,6 +2987,7 @@ function setView(v) {
   $('#accountView').classList.toggle('hide', v !== 'account');
   $('#rkArenaView').classList.add('hide'); // ancienne arène skill : remplacée par le blackjack ranked
   bjRankedTag(v === 'ranked');
+  try { document.body.classList.toggle('view-ranked', v === 'ranked'); } catch {}
   document.body.classList.toggle('vpk', v === 'poker');
   lbWatch(v === 'top');
   rkWatch(v === 'rank');
@@ -2914,8 +2995,8 @@ function setView(v) {
   document.querySelectorAll('.mitem').forEach((t) => t.classList.toggle('on', t.dataset.g === v));
   menuSync(v);
   const TITLES = LANG === 'en'
-    ? { ranked: 'Casino · Ranked', shop: 'Casino · Shop', tasks: 'Casino · Tasks', account: 'Casino · Account', roulette: 'Casino · Roulette', rocket: 'Casino · Rocket Race', bj: 'Casino · Blackjack', poker: 'Casino · Poker', top: 'Casino · Leaderboard', rank: 'Casino · Rank', admin: 'Casino · Admin' }
-    : { ranked: 'Casino · Ranked', shop: 'Casino · Boutique', tasks: 'Casino · Tasks', account: 'Casino · Compte', roulette: 'Casino · Roulette', rocket: 'Casino · Rocket Race', bj: 'Casino · Blackjack', poker: 'Casino · Poker', top: 'Casino · Classement', rank: 'Casino · Rank', admin: 'Casino · Admin' };
+    ? { ranked: 'Casino · Ranked', shop: 'Casino · Shop', tasks: 'Casino · Tasks', account: 'Casino · Account', roulette: 'Casino · Roulette',  bj: 'Casino · Blackjack', poker: 'Casino · Poker', top: 'Casino · Leaderboard', rank: 'Casino · Rank', admin: 'Casino · Admin' }
+    : { ranked: 'Casino · Ranked', shop: 'Casino · Boutique', tasks: 'Casino · Tasks', account: 'Casino · Compte', roulette: 'Casino · Roulette',  bj: 'Casino · Blackjack', poker: 'Casino · Poker', top: 'Casino · Classement', rank: 'Casino · Rank', admin: 'Casino · Admin' };
   document.title = v.startsWith('off-') ? (LANG === 'en' ? 'Casino · Offline games' : 'Casino · Jeux offline') : (TITLES[v] || (LANG === 'en' ? 'Casino · Games' : 'Casino · Jeux'));
   $('#bTop').classList.toggle('hide', !bjMode && v !== 'poker');
   $('#bRules').classList.toggle('hide', v === 'hub' || v === 'top' || v === 'rank' || v === 'admin' || v === 'shop' || v === 'tasks' || v === 'account' || v.startsWith('off-'));
@@ -2957,6 +3038,8 @@ function setView(v) {
   if (v.startsWith('off-')) ofOpen(v);
   if (v === 'poker') { pSend('psync'); if (P.S) pRender(P.S); }
   if (v === 'roulette') { rEnter(); if (W.S) rRender(W.S); else $('#meBal').textContent = num(rBal()) + ' ' + COIN; }
+  else if (v === 'penalty') { penShow(true); penBind(); if (PEN.st) penRender(PEN.st); }
+  if (v !== 'penalty') { try { penShow(false); } catch {} }
   else if (v === 'rocket') { rocEnter(); if (ROC.st) rocRender(ROC.st); else $('#meBal').textContent = W.bal != null ? num(W.bal) + ' ' + COIN : 'Casino'; }
   else { const m = v === 'poker' ? null : mySeat(); const UC = v === 'ranked' ? 'RR' : COIN; $('#meBal').textContent = m ? num(m.bal) + ' ' + UC : bjMode ? 'Spectateur' : (W.bal != null ? num(W.bal) + ' ' + UC : 'Casino'); }
   if (LB_GAME_KEY[v]) loadGameLB(v);
@@ -3018,7 +3101,7 @@ if ($('#menuBtn') && $('#menu')) $('#menuBtn').onclick = (e) => { e.stopPropagat
 document.querySelectorAll('#menuPanel .mhead').forEach((b) => (b.onclick = (e) => { e.stopPropagation(); b.parentElement.classList.toggle('open'); }));
 document.addEventListener('click', (e) => { if (!e.target.closest('#menu')) menuClose(); });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') menuClose(); });
-const MENU_LBL = { hub: 'Menu', bj: 'Blackjack', poker: 'Poker', roulette: 'Roulette', rocket: 'Rocket Race', 'off-bj': 'Blackjack solo', 'off-fuse': 'Fusé', 'off-mine': 'Mine', 'off-coin': 'Pile ou Face', 'off-dice': 'Dés', 'off-horses': 'Chevaux', 'off-russian': 'Roulette russe', 'off-slots': 'Slots', 'off-duel': 'Duel', 'off-scratch': 'Ticket à gratter', 'off-plinko': 'Plinko', top: 'Classement', rank: 'Rank', admin: 'Admin' };
+const MENU_LBL = { hub: 'Menu', bj: 'Blackjack', poker: 'Poker', roulette: 'Roulette',  'off-bj': 'Blackjack solo', 'off-fuse': 'Fusé', 'off-mine': 'Mine', 'off-coin': 'Pile ou Face', 'off-dice': 'Dés', 'off-horses': 'Chevaux', 'off-russian': 'Roulette russe', 'off-slots': 'Slots', 'off-duel': 'Duel', 'off-scratch': 'Ticket à gratter', 'off-plinko': 'Plinko', 'off-penguin': 'Penguin', top: 'Classement', rank: 'Rank', admin: 'Admin' };
 function menuSync(v) {
   const _l = $('#menuLbl'); if (_l) _l.textContent = MENU_LBL[v] || 'Menu';
   const _on = $('#msOn'); if (_on) _on.classList.toggle('open', v === 'bj' || v === 'poker' || v === 'roulette' || v === 'rocket');
@@ -3781,9 +3864,9 @@ function scAuto() {
 }
 // ============================================================= JEUX OFFLINE (solo, serveur : offline.js)
 const O = { game: null, st: null, bal: null, bet: '100', mines: 3, auto: '', hist: { fuse: [], mines: [], bj: [], coin: [], dice: [], horses: [], russian: [], slots: [], duel: [], scratch: [] }, timer: 0, pp: [], run: 0, anim: false, hold: false, pick: { coin: 'pile', dice: 'over', horses: '1', russian: '1', slots: '1', duel: '0' } };
-const OMAP = { 'off-bj': 'bj', 'off-fuse': 'fuse', 'off-mine': 'mines', 'off-coin': 'coin', 'off-dice': 'dice', 'off-horses': 'horses', 'off-russian': 'russian', 'off-slots': 'slots', 'off-duel': 'duel', 'off-scratch': 'scratch', 'off-plinko': 'plinko' };
+const OMAP = { 'off-bj': 'bj', 'off-fuse': 'fuse', 'off-mine': 'mines', 'off-coin': 'coin', 'off-dice': 'dice', 'off-horses': 'horses', 'off-russian': 'russian', 'off-slots': 'slots', 'off-duel': 'duel', 'off-scratch': 'scratch', 'off-plinko': 'plinko', 'off-penguin': 'penguin' };
 O.hist.plinko = []; O.pick.plinko = 'med'; O.balls = 1;
-const OT = { bj: 'BLACKJACK SOLO', fuse: 'FUSÉ', mines: 'MINES', coin: 'PILE OU FACE', dice: 'DÉS', horses: 'COURSE DE CHEVAUX', russian: 'ROULETTE RUSSE', slots: 'SLOTS', duel: 'DUEL', scratch: 'TICKET À GRATTER', plinko: 'PLINKO' };
+const OT = { bj: 'BLACKJACK SOLO', fuse: 'FUSÉ', mines: 'MINES', coin: 'PILE OU FACE', dice: 'DÉS', horses: 'COURSE DE CHEVAUX', russian: 'ROULETTE RUSSE', slots: 'SLOTS', duel: 'DUEL', scratch: 'TICKET À GRATTER', plinko: 'PLINKO', penguin: 'PENGUIN SLIDE' };
 const GEM = '<svg viewBox="0 0 24 24"><path d="M6 3h12l4 6-10 12L2 9z" fill="#bbf7d0" stroke="#fff" stroke-width="1.2" stroke-linejoin="round"/><path d="M2 9h20M9 3l3 6 3-6M12 9v12" fill="none" stroke="#16a34a" stroke-width="1"/></svg>';
 const BOMB = '<svg viewBox="0 0 24 24"><circle cx="11" cy="14" r="7.5" fill="#1c1c1c" stroke="#fca5a5" stroke-width="1.4"/><path d="M16 8l3-3M18 3v3M17 4h3" stroke="#fbbf24" stroke-width="1.6" stroke-linecap="round"/><circle cx="8.5" cy="11.5" r="1.8" fill="#fff" opacity=".5"/></svg>';
 async function osend(action, extra = {}) {
@@ -3839,7 +3922,9 @@ function ofBuild() {
   const top = el('div', 'otop'), hist = el('div', 'ohist'); hist.id = 'oHist';
   top.append(el('span', 'dname', OT[O.game]), el('span', 'grow'), hist);
   const b = el('div', 'obody'); t.append(top, b);
-  if (O.game === 'bj') {
+  if (O.game === 'penguin') {
+    b.innerHTML = '<div id="pgArena"><div id="pgIce"></div><div id="pgTrack"></div><div id="pgMarks"><span>0</span><span>25</span><span>50</span><span>75</span><span>100m</span></div><div id="pgPeng">🐧</div></div><div id="pgResult">One tap to launch</div>';
+  } else if (O.game === 'bj') {
     t.append(el('div', 'shoe'));
     b.innerHTML = '<div class="dname">CROUPIER</div><div class="cards" id="oDc"></div><div id="oDt"></div><div class="omsg" id="oMsg"></div><div class="dname">TOI</div><div class="cards" id="oPc"></div><div id="oPt"></div><div class="betspot" id="oBs"></div>';
   } else if (O.game === 'fuse') b.innerHTML = '<div class="fz"><canvas id="oCv"></canvas><div class="bigm" id="oMult">1.00x</div><div class="fst" id="oStat"></div></div>';
@@ -3850,6 +3935,7 @@ function ofBuild() {
 function ofRender() {
   const s = O.st, h = $('#oHist'); if (!h) return; h.textContent = '';
   O.hist[O.game].forEach((v) => h.append(O.game === 'fuse' ? el('span', 'hc ' + (v >= 2 ? 'g' : 'r'), v.toFixed(2) + 'x') : el('span', 'hc ' + (v > 0 ? 'g' : v < 0 ? 'r' : 'z0'), (v > 0 ? '+' : '') + num(v))));
+  if (O.game === 'penguin') { try { pgRender(s); } catch(e){} }
   if (O.game === 'bj') rBj(s); else if (O.game === 'mines') rMines(s); else if (INST[O.game]) rInst(s); else if (O.game === 'scratch') rScratch(s); else ofFuseTick();
   ofDock();
 }
@@ -4026,7 +4112,7 @@ function ofDock() {
   row(act('go', O.game === 'scratch' ? 'Acheter un ticket' : s ? 'Rejouer' : 'Jouer', ofStart));
 }
 // ---- jeux « un coup » : pile ou face, dés, chevaux, roulette russe (tirage côté serveur, animation côté site)
-const INST = { coin: 1, dice: 1, horses: 1, russian: 1, slots: 1, duel: 1, plinko: 1 };
+const INST = { coin: 1, dice: 1, horses: 1, russian: 1, slots: 1, duel: 1, plinko: 1, penguin: 1 };
 const FOES = [{ n: 'Recrue', p: 60, m: 1.6 }, { n: 'Pistolero', p: 45, m: 2.1 }, { n: 'Légende', p: 25, m: 3.8 }, { n: 'Fantôme', p: 10, m: 9.6 }];
 const HM = [2.4, 3.8, 5.3, 8.6, 15.8], HP = [40, 25, 18, 11, 6], HCOL = ['#ef4444', '#3b82f6', '#22c55e', '#f59e0b', '#a855f7'];
 const rusM = (k) => Math.floor(0.96 * 6 / (6 - k) * 100) / 100;
@@ -5589,6 +5675,102 @@ const _rkWatch = typeof rkWatch === 'function' ? rkWatch : null;
 // patch load of rank data after fetch - enhance existing rk render if present
 
 // session valide ? sinon on affiche directement la page de connexion Discord
+
+// ===== Penguin Slide (offline) =====
+const PG = { flying: false };
+function pgBuild() {
+  const host = document.getElementById('ofArena') || document.getElementById('ofView');
+  if (!host || host.querySelector('#pgArena')) return;
+}
+function pgRender(st) {
+  // called from offline renderer when type===penguin
+  let arena = document.getElementById('pgArena');
+  if (!arena) {
+    const box = document.getElementById('ofStage') || document.getElementById('ofView');
+    if (!box) return;
+    arena = document.createElement('div'); arena.id = 'pgArena';
+    arena.innerHTML = '<div id="pgIce"></div><div id="pgTrack"></div><div id="pgMarks"><span>0</span><span>25</span><span>50</span><span>75</span><span>100m</span></div><div id="pgPeng">🐧</div>';
+    const stage = document.getElementById('ofStage');
+    if (stage) stage.prepend(arena); else box.prepend(arena);
+    let res = document.getElementById('pgResult');
+    if (!res) { res = document.createElement('div'); res.id = 'pgResult'; arena.after(res); }
+  }
+  const peng = document.getElementById('pgPeng');
+  const res = document.getElementById('pgResult');
+  if (!st || !st.over) {
+    if (peng) { peng.style.left = '8%'; peng.classList.remove('fly'); }
+    if (res) res.textContent = 'Tap Launch — one shot';
+    return;
+  }
+  const dist = Number(st.dist) || 0;
+  const ms = Number(st.flightMs) || 1500;
+  if (peng) {
+    peng.classList.add('fly');
+    peng.style.transitionDuration = ms + 'ms';
+    requestAnimationFrame(() => { peng.style.left = (8 + dist * 0.8) + '%'; });
+  }
+  if (res) {
+    setTimeout(() => {
+      res.textContent = dist + ' m  ·  x' + (st.mult || 0) + (st.win > 0 ? '  ·  +' + st.win : '');
+    }, Math.min(ms, 1200));
+  }
+}
+
+// ===== Penalty 1v1 =====
+const PEN = { st: null, joined: false };
+function penShow(on) {
+  const v = document.getElementById('penView');
+  if (v) v.classList.toggle('on', !!on);
+}
+function penRender(st) {
+  if (!st) return;
+  PEN.st = st;
+  const sc = document.getElementById('penScore');
+  if (sc) sc.textContent = (st.scores[0]||0) + ' — ' + (st.scores[1]||0);
+  const msg = document.getElementById('penMsg');
+  if (msg) {
+    const labels = { lobby: 'Waiting for players', betting: 'Place matching bets', pick_shot: 'Shooter: pick a side', pick_save: 'Keeper: dive!', anim: st.goal ? 'GOAL!' : 'SAVE!', round_result: 'Next round…', match_end: (st.seats[st.winner] ? st.seats[st.winner].name : '?') + ' wins!' };
+    msg.textContent = labels[st.phase] || st.phase;
+  }
+  const ball = document.getElementById('penBall');
+  const keeper = document.getElementById('penKeeper');
+  if (st.phase === 'anim' || st.phase === 'round_result' || st.phase === 'match_end') {
+    const map = { left: '28%', center: '50%', right: '72%' };
+    if (ball && st.shotDir) { ball.style.left = map[st.shotDir]; ball.style.bottom = st.goal ? '55%' : '42%'; }
+    if (keeper && st.saveDir) { keeper.style.left = map[st.saveDir]; }
+  } else {
+    if (ball) { ball.style.left = '50%'; ball.style.bottom = '12%'; }
+    if (keeper) { keeper.style.left = '50%'; }
+  }
+  const box = document.getElementById('penPlayers');
+  if (box) {
+    box.textContent = '';
+    (st.seats || []).forEach((p, i) => {
+      const d = document.createElement('div');
+      d.style.cssText = 'padding:8px 12px;border-radius:10px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1)';
+      d.textContent = p ? ((p.name || 'Player') + ' · bet ' + (p.bet || 0) + (p.ready ? ' ✓' : '')) : ('Seat ' + (i+1) + ' open');
+      box.appendChild(d);
+    });
+  }
+}
+function penBind() {
+  if (PEN.bound) return; PEN.bound = true;
+  const dirs = document.getElementById('penDirs');
+  if (dirs) dirs.addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-dir]'); if (!b) return;
+    send('penpick', { dir: b.getAttribute('data-dir') });
+  });
+  const j0 = document.getElementById('penJoin0'); if (j0) j0.onclick = () => send('penjoin', { seat: 0 });
+  const j1 = document.getElementById('penJoin1'); if (j1) j1.onclick = () => send('penjoin', { seat: 1 });
+  const bet = document.getElementById('penBet'); if (bet) bet.onclick = () => {
+    const v = Number(document.getElementById('penAmt') && document.getElementById('penAmt').value);
+    send('penbet', { amount: v });
+  };
+  const rd = document.getElementById('penReady'); if (rd) rd.onclick = () => send('penready');
+  const lv = document.getElementById('penLeave'); if (lv) lv.onclick = () => send('penleave');
+}
+
+
 (async () => {
   try {
     const r = await fetch('/api/me?t=' + encodeURIComponent(TOKEN), { cache: 'no-store' });

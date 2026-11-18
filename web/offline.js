@@ -18,8 +18,8 @@ const CELLS = 25; // mines : grille 5x5
 const RATE = 0.00012; // fusé : le multiplicateur vaut exp(RATE * ms)
 const LEAD_MS = 900; // fusé : délai avant décollage
 const MAX_CRASH = 10000;
-const TYPES = { mines: 'mines', fuse: 'fuse', bj: 'bj', coin: 'coin', dice: 'dice', horses: 'horses', russian: 'russian', slots: 'slots', duel: 'duel', scratch: 'scratch', plinko: 'plinko' };
-const INSTANT = new Set(['coin', 'dice', 'horses', 'russian', 'slots', 'duel', 'plinko']); // jeux « un coup » : résolus d'un coup côté serveur, animés côté site
+const TYPES = { mines: 'mines', fuse: 'fuse', bj: 'bj', coin: 'coin', dice: 'dice', horses: 'horses', russian: 'russian', slots: 'slots', duel: 'duel', scratch: 'scratch', plinko: 'plinko', penguin: 'penguin' };
+const INSTANT = new Set(['coin', 'dice', 'horses', 'russian', 'slots', 'duel', 'plinko', 'penguin']); // jeux « un coup » : résolus d'un coup côté serveur, animés côté site
 const COIN_MULT = 1.95;
 const DICE_MULT = { under: 2.3, over: 2.3, seven: 5.8 };
 const HORSES = [{ p: 0.4, mult: 2.4 }, { p: 0.25, mult: 3.8 }, { p: 0.18, mult: 5.3 }, { p: 0.11, mult: 8.6 }, { p: 0.06, mult: 15.8 }];
@@ -97,6 +97,21 @@ function rollInstant(g) {
     if (!Number.isInteger(f) || f < 0 || f >= FOES.length) throw new Error('Adversaire invalide.');
     const won = randomInt(1_000_000) / 1_000_000 < FOES[f].p, fast = 170 + randomInt(110), slow = fast + 30 + randomInt(90);
     g.foe = f; g.me = won ? fast : slow; g.foeMs = won ? slow : fast; g.mult = won ? FOES[f].mult : 0;
+  } else if (g.type === 'penguin') {
+    // One click launch: distance 0..100, mult grows with distance (house ~4%)
+    // Weighted: most land mid-range, rare far flights
+    const r = randomInt(1_000_000) / 1e6;
+    let dist;
+    if (r < 0.45) dist = 8 + randomInt(22);       // 8-29
+    else if (r < 0.75) dist = 30 + randomInt(25);  // 30-54
+    else if (r < 0.92) dist = 55 + randomInt(20);  // 55-74
+    else if (r < 0.985) dist = 75 + randomInt(15); // 75-89
+    else dist = 90 + randomInt(11);                 // 90-100
+    g.dist = dist;
+    // mult curve ~ 1.1 at 20 → ~12 at 100, EV ~0.96
+    const t = dist / 100;
+    g.mult = round2(1.05 + Math.pow(t, 1.55) * 11.5);
+    g.flightMs = 900 + Math.round(dist * 22);
   } else {
     const k = Number(g.choice);
     if (!Number.isInteger(k) || k < 1 || k > 5) throw new Error('Nombre de balles invalide (1 à 5).');
@@ -152,6 +167,7 @@ function create(deps, pending) {
         cash: floor2(g.bet * minesMult(g.m, k)), over: g.over, win: g.win || 0, mineAt: g.over ? [...g.set] : undefined };
     },
     fuse: (g) => ({ type: 'fuse', bet: g.bet, start: g.start, rate: RATE, auto: g.auto, over: g.over, win: g.win || 0, at: g.over ? g.at : undefined, crash: g.over ? g.cp : undefined }),
+    penguin: (g) => ({ type: 'penguin', bet: g.bet, dist: g.dist, mult: g.mult, flightMs: g.flightMs, over: true, win: g.win || 0, outcome: g.win > 0 ? 'win' : 'lose' }),
     coin: (g) => ({ type: 'coin', bet: g.bet, choice: g.choice, side: g.side, mult: g.mult, over: true, win: g.win || 0, outcome: g.win > 0 ? 'win' : 'lose' }),
     dice: (g) => ({ type: 'dice', bet: g.bet, choice: g.choice, a: g.a, b: g.b, sum: g.sum, mult: g.mult, over: true, win: g.win || 0, outcome: g.win > 0 ? 'win' : 'lose' }),
     horses: (g) => ({ type: 'horses', bet: g.bet, want: g.want, winner: g.winner, mult: g.mult, over: true, win: g.win || 0, outcome: g.win > 0 ? 'win' : 'lose' }),
