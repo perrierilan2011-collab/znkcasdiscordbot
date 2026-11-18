@@ -955,7 +955,7 @@ function init(deps) {
           await entry.penalty.run(() => entry.penalty.ready(user.uid));
           break;
         case 'penpick':
-          await entry.penalty.run(() => entry.penalty.pick(user.uid, d.dir));
+          await entry.penalty.run(() => entry.penalty.pick(user.uid, d.zone != null ? d.zone : d.dir));
           break;
         case 'penleave':
           await entry.penalty.run(() => entry.penalty.leave(user.uid));

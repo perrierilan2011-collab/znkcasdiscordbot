@@ -1026,24 +1026,104 @@ header .sp{flex:1 1 0}
 #pgPeng.fly{transition:left linear}
 #pgResult{text-align:center;margin-top:10px;font-weight:800;color:var(--gold);min-height:24px}
 /* Penalty 1v1 */
-#penView{flex:1;display:flex;flex-direction:column;align-items:center;padding:12px;gap:12px;overflow:auto}
+
+#penView{flex:1;display:flex;flex-direction:column;align-items:center;padding:10px 12px 24px;gap:10px;overflow:auto;background:linear-gradient(180deg,#07120c 0%,#0a1a12 100%)}
 #penView.hide{display:none !important}
-#penPitch{position:relative;width:min(100%,640px);aspect-ratio:16/10;border-radius:18px;overflow:hidden;
-  background:radial-gradient(ellipse at 50% 60%,#166534 0%,#14532d 45%,#052e16 100%);border:3px solid #a3a3a3}
-#penGoal{position:absolute;left:50%;top:8%;transform:translateX(-50%);width:56%;height:38%;
-  border:4px solid #e5e5e5;border-bottom:0;border-radius:8px 8px 0 0;background:rgba(0,0,0,.2)}
+#penHud{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:14px;width:min(100%,720px)}
+#penScore{font-size:32px;font-weight:900;color:#fff;letter-spacing:.12em;text-shadow:0 2px 12px rgba(0,0,0,.6)}
+#penMsg{color:#a7f3d0;font-weight:700;font-size:14px;text-align:center;min-height:20px}
+#penPitch{position:relative;width:min(100%,640px);aspect-ratio:4/3;border-radius:18px;overflow:hidden;
+  background:
+    radial-gradient(ellipse 80% 50% at 50% 100%,rgba(255,255,255,.06),transparent 60%),
+    linear-gradient(180deg,#15803d 0%,#166534 40%,#14532d 70%,#052e16 100%);
+  border:3px solid #d4d4d4;box-shadow:0 20px 50px rgba(0,0,0,.55),inset 0 0 40px rgba(0,0,0,.25)}
+#penPitch::before{content:"";position:absolute;left:10%;right:10%;bottom:18%;height:2px;background:rgba(255,255,255,.25)}
+#penPitch::after{content:"";position:absolute;left:50%;bottom:18%;width:120px;height:60px;transform:translateX(-50%);
+  border:2px solid rgba(255,255,255,.2);border-radius:0 0 60px 60px;border-top:0}
+/* Goal frame */
+#penGoal{position:absolute;left:50%;top:6%;transform:translateX(-50%);width:62%;height:42%;
+  border:5px solid #f5f5f5;border-bottom:0;border-radius:6px 6px 0 0;background:rgba(0,0,0,.18);
+  box-shadow:0 0 0 2px #525252,0 8px 24px rgba(0,0,0,.35)}
 #penNet{position:absolute;inset:0;background:
-  repeating-linear-gradient(0deg,transparent,transparent 10px,rgba(255,255,255,.12) 10px,rgba(255,255,255,.12) 11px),
-  repeating-linear-gradient(90deg,transparent,transparent 10px,rgba(255,255,255,.12) 10px,rgba(255,255,255,.12) 11px)}
-#penBall{position:absolute;width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 2px 6px #000;
-  left:50%;bottom:12%;transform:translate(-50%,0);transition:left 0.9s cubic-bezier(.2,.7,.3,1), bottom 0.9s cubic-bezier(.2,.7,.3,1)}
-#penKeeper{position:absolute;left:50%;top:28%;transform:translate(-50%,-50%);font-size:42px;transition:left .55s cubic-bezier(.2,.8,.3,1)}
-#penShooter{position:absolute;left:50%;bottom:4%;transform:translateX(-50%);font-size:36px}
-#penScore{font-size:28px;font-weight:900;color:#fff;letter-spacing:.08em}
-#penDirs{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
-#penDirs button{min-width:90px;padding:12px 16px;border-radius:12px;font-weight:800;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2)}
-#penDirs button:hover{background:rgba(255,255,255,.22)}
-#penDirs button.on{border-color:var(--gold);background:rgba(251,191,36,.2)}
+  repeating-linear-gradient(0deg,transparent,transparent 11px,rgba(255,255,255,.14) 11px,rgba(255,255,255,.14) 12px),
+  repeating-linear-gradient(90deg,transparent,transparent 11px,rgba(255,255,255,.14) 11px,rgba(255,255,255,.14) 12px);
+  opacity:.9;pointer-events:none}
+/* 6 clickable zones */
+#penZones{position:absolute;inset:0;display:grid;grid-template-columns:1fr 1fr 1fr;grid-template-rows:1fr 1fr;z-index:5}
+#penZones button{border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.03);cursor:pointer;padding:0;position:relative;transition:background .15s,box-shadow .15s}
+#penZones button:hover{background:rgba(255,255,255,.14);box-shadow:inset 0 0 20px rgba(255,255,255,.08)}
+#penZones button:active{background:rgba(251,191,36,.25)}
+#penZones button.on{background:rgba(251,191,36,.28);box-shadow:inset 0 0 0 2px #fbbf24}
+#penZones button.hit{background:rgba(34,197,94,.35)}
+#penZones button.miss{background:rgba(239,68,68,.25)}
+#penZones button:disabled{cursor:default}
+#penZones button span{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:rgba(255,255,255,.55);pointer-events:none;text-shadow:0 1px 2px #000}
+/* Characters */
+.pen-char{position:absolute;z-index:4;pointer-events:none;transform:translate(-50%,-50%)}
+.pen-char .body{position:relative;width:54px;height:78px}
+.pen-char .head{position:absolute;left:50%;top:0;width:22px;height:22px;margin-left:-11px;border-radius:50%;
+  background:linear-gradient(180deg,#fde68a,#fbbf24);box-shadow:inset -2px -2px 0 rgba(0,0,0,.12)}
+.pen-char .hair{position:absolute;left:50%;top:-3px;width:24px;height:12px;margin-left:-12px;border-radius:12px 12px 0 0;background:#1c1917}
+.pen-char .torso{position:absolute;left:50%;top:20px;width:28px;height:30px;margin-left:-14px;border-radius:8px 8px 4px 4px}
+.pen-char.shooter .torso{background:linear-gradient(180deg,#3b82f6,#1d4ed8)}
+.pen-char.keeper .torso{background:linear-gradient(180deg,#f59e0b,#d97706)}
+.pen-char .arm{position:absolute;top:22px;width:8px;height:26px;border-radius:4px;background:#fbbf24}
+.pen-char .arm.l{left:2px;transform-origin:top center}
+.pen-char .arm.r{right:2px;transform-origin:top center}
+.pen-char .leg{position:absolute;top:48px;width:10px;height:28px;border-radius:0 0 4px 4px;background:#171717}
+.pen-char .leg.l{left:12px;transform-origin:top center}
+.pen-char .leg.r{right:12px;transform-origin:top center}
+.pen-char .boot{position:absolute;bottom:-4px;left:-2px;width:14px;height:7px;border-radius:3px;background:#0a0a0a}
+.pen-char .glove{position:absolute;width:12px;height:12px;border-radius:4px;background:#fef3c7;border:1px solid #fbbf24}
+.pen-char.keeper .arm.l .glove{left:-4px;bottom:-4px}
+.pen-char.keeper .arm.r .glove{right:-4px;bottom:-4px}
+.pen-char .face{position:absolute;left:50%;top:8px;width:10px;height:4px;margin-left:-5px}
+.pen-char .eye{position:absolute;top:0;width:3px;height:3px;border-radius:50%;background:#111}
+.pen-char .eye.l{left:0}.pen-char .eye.r{right:0}
+.pen-char .num{position:absolute;left:50%;top:28px;transform:translateX(-50%);font-size:11px;font-weight:900;color:#fff;text-shadow:0 1px 2px #000}
+#penShooter{left:50%;top:82%}
+#penKeeper{left:50%;top:28%}
+/* Ball */
+#penBall{position:absolute;z-index:6;width:20px;height:20px;margin-left:-10px;margin-top:-10px;border-radius:50%;
+  background:radial-gradient(circle at 35% 30%,#fff 0%,#e5e5e5 45%,#a3a3a3 100%);
+  box-shadow:0 2px 6px rgba(0,0,0,.5),inset -2px -2px 0 rgba(0,0,0,.15);
+  left:50%;top:78%;transition:none}
+#penBall::after{content:"";position:absolute;inset:3px;border:1.5px solid rgba(0,0,0,.25);border-radius:50%}
+/* Anim states */
+#penPitch.anim-run #penShooter{animation:penRun .7s ease-in forwards}
+#penPitch.anim-kick #penShooter .leg.r{animation:penKick .25s ease-out forwards}
+#penPitch.anim-kick #penShooter .arm.r{animation:penSwing .25s ease-out forwards}
+#penPitch.anim-dive-1 #penKeeper{animation:penDive1 .55s cubic-bezier(.2,.7,.2,1) forwards}
+#penPitch.anim-dive-2 #penKeeper{animation:penDive2 .55s cubic-bezier(.2,.7,.2,1) forwards}
+#penPitch.anim-dive-3 #penKeeper{animation:penDive3 .55s cubic-bezier(.2,.7,.2,1) forwards}
+#penPitch.anim-dive-4 #penKeeper{animation:penDive4 .55s cubic-bezier(.2,.7,.2,1) forwards}
+#penPitch.anim-dive-5 #penKeeper{animation:penDive5 .55s cubic-bezier(.2,.7,.2,1) forwards}
+#penPitch.anim-dive-6 #penKeeper{animation:penDive6 .55s cubic-bezier(.2,.7,.2,1) forwards}
+#penPitch.anim-ball{--bx:50%;--by:30%}
+#penPitch.anim-ball #penBall{transition:left .85s cubic-bezier(.15,.7,.25,1), top .85s cubic-bezier(.2,.55,.25,1);left:var(--bx);top:var(--by)}
+#penFlash{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:48px;font-weight:900;
+  color:#fff;text-shadow:0 4px 20px #000;opacity:0;pointer-events:none;z-index:10;letter-spacing:.08em}
+#penPitch.goal #penFlash{animation:penPop .9s ease-out forwards;color:#4ade80}
+#penPitch.save #penFlash{animation:penPop .9s ease-out forwards;color:#fbbf24}
+@keyframes penRun{0%{top:82%}100%{top:70%}}
+@keyframes penKick{0%{transform:rotate(0)}50%{transform:rotate(-35deg)}100%{transform:rotate(15deg)}}
+@keyframes penSwing{0%{transform:rotate(0)}100%{transform:rotate(-40deg)}}
+@keyframes penDive1{0%{left:50%;top:28%}100%{left:28%;top:18%;transform:translate(-50%,-50%) rotate(-25deg)}}
+@keyframes penDive2{0%{left:50%;top:28%}100%{left:50%;top:16%;transform:translate(-50%,-50%)}}
+@keyframes penDive3{0%{left:50%;top:28%}100%{left:72%;top:18%;transform:translate(-50%,-50%) rotate(25deg)}}
+@keyframes penDive4{0%{left:50%;top:28%}100%{left:28%;top:36%;transform:translate(-50%,-50%) rotate(-35deg)}}
+@keyframes penDive5{0%{left:50%;top:28%}100%{left:50%;top:38%;transform:translate(-50%,-50%)}}
+@keyframes penDive6{0%{left:50%;top:28%}100%{left:72%;top:36%;transform:translate(-50%,-50%) rotate(35deg)}}
+@keyframes penPop{0%{opacity:0;transform:scale(.6)}30%{opacity:1;transform:scale(1.15)}100%{opacity:0;transform:scale(1)}}
+#penPlayers{display:flex;gap:16px;justify-content:center;flex-wrap:wrap;width:min(100%,640px)}
+.pen-card{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:14px;background:rgba(255,255,255,.06);
+  border:1px solid rgba(255,255,255,.1);min-width:160px}
+.pen-card img{width:40px;height:40px;border-radius:50%;object-fit:cover;background:#262626}
+.pen-card .nm{font-weight:800;color:#fff}
+.pen-card .st{font-size:12px;color:#a3a3a3}
+.pen-card.me{border-color:rgba(251,191,36,.45);box-shadow:0 0 0 1px rgba(251,191,36,.2)}
+#penControls{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;align-items:center}
+
 
 </style>
 </head>
@@ -1495,20 +1575,42 @@ create table if not exists roulette_event_results (
 </main>
 
 <main id="penView" class="hide">
-  <div id="penScore">0 — 0</div>
-  <div id="penMsg" style="color:#a3a3a3;font-weight:700">1v1 Penalty · match bets · first to lead by 2</div>
+  <div id="penHud">
+    <div id="penScore">0 — 0</div>
+    <div id="penMsg">1v1 Penalty · matching bets · first to lead by 2</div>
+  </div>
   <div id="penPitch">
-    <div id="penGoal"><div id="penNet"></div></div>
-    <div id="penKeeper">🧤</div>
+    <div id="penGoal">
+      <div id="penNet"></div>
+      <div id="penZones">
+        <button type="button" data-zone="1" disabled><span>1</span></button>
+        <button type="button" data-zone="2" disabled><span>2</span></button>
+        <button type="button" data-zone="3" disabled><span>3</span></button>
+        <button type="button" data-zone="4" disabled><span>4</span></button>
+        <button type="button" data-zone="5" disabled><span>5</span></button>
+        <button type="button" data-zone="6" disabled><span>6</span></button>
+      </div>
+    </div>
+    <div id="penKeeper" class="pen-char keeper">
+      <div class="body">
+        <div class="hair"></div><div class="head"><div class="face"><i class="eye l"></i><i class="eye r"></i></div></div>
+        <div class="arm l"><i class="glove"></i></div><div class="torso"></div><div class="arm r"><i class="glove"></i></div>
+        <div class="leg l"><i class="boot"></i></div><div class="leg r"><i class="boot"></i></div>
+        <div class="num">1</div>
+      </div>
+    </div>
     <div id="penBall"></div>
-    <div id="penShooter">👟</div>
+    <div id="penShooter" class="pen-char shooter">
+      <div class="body">
+        <div class="hair"></div><div class="head"><div class="face"><i class="eye l"></i><i class="eye r"></i></div></div>
+        <div class="arm l"></div><div class="torso"></div><div class="arm r"></div>
+        <div class="leg l"><i class="boot"></i></div><div class="leg r"><i class="boot"></i></div>
+        <div class="num">9</div>
+      </div>
+    </div>
+    <div id="penFlash">GOAL!</div>
   </div>
-  <div id="penDirs">
-    <button data-dir="left">◀ Left</button>
-    <button data-dir="center">Center</button>
-    <button data-dir="right">Right ▶</button>
-  </div>
-  <div class="row" style="gap:8px;flex-wrap:wrap;justify-content:center">
+  <div id="penControls" class="row">
     <button class="btn" id="penJoin0">Seat 1</button>
     <button class="btn" id="penJoin1">Seat 2</button>
     <div class="amt"><input id="penAmt" type="number" min="1" step="1" placeholder="Bet"/><span>🪙</span></div>
@@ -1516,7 +1618,7 @@ create table if not exists roulette_event_results (
     <button class="btn" id="penReady">Ready</button>
     <button class="btn" id="penLeave">Leave</button>
   </div>
-  <div id="penPlayers" style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap"></div>
+  <div id="penPlayers"></div>
 </main>
 <main id="shopView" class="hide">
   <div class="lbwrap" style="align-items:center">
@@ -5742,62 +5844,144 @@ function pgRender(st) {
   }
 }
 
+
 // ===== Penalty 1v1 =====
-const PEN = { st: null, joined: false };
+const PEN = { st: null, joined: false, bound: false, animating: false };
+const PEN_ZONE_POS = {
+  1: { x: 28, y: 18 }, 2: { x: 50, y: 16 }, 3: { x: 72, y: 18 },
+  4: { x: 28, y: 36 }, 5: { x: 50, y: 38 }, 6: { x: 72, y: 36 },
+};
 function penShow(on) {
   const v = document.getElementById('penView');
   if (!v) return;
   v.classList.toggle('hide', !on);
-  v.classList.toggle('on', !!on);
+}
+function penCharHtml(role, num) {
+  return '';
+}
+function penResetPitch() {
+  const pitch = document.getElementById('penPitch');
+  if (!pitch) return;
+  pitch.className = '';
+  pitch.id = 'penPitch';
+  const ball = document.getElementById('penBall');
+  const keeper = document.getElementById('penKeeper');
+  const shooter = document.getElementById('penShooter');
+  if (ball) { ball.style.left = '50%'; ball.style.top = '78%'; ball.style.transition = 'none'; }
+  if (keeper) { keeper.style.left = '50%'; keeper.style.top = '28%'; keeper.style.transform = 'translate(-50%,-50%)'; }
+  if (shooter) { shooter.style.left = '50%'; shooter.style.top = '82%'; }
+  document.querySelectorAll('#penZones button').forEach((b) => {
+    b.classList.remove('on', 'hit', 'miss');
+  });
+}
+function penPlayAnim(st) {
+  const pitch = document.getElementById('penPitch');
+  if (!pitch || !st) return;
+  PEN.animating = true;
+  penResetPitch();
+  const shot = st.shotZone || (st.anim && st.anim.shot);
+  const save = st.saveZone || (st.anim && st.anim.save);
+  const goal = st.goal != null ? st.goal : (st.anim && st.anim.goal);
+  const pos = PEN_ZONE_POS[shot] || PEN_ZONE_POS[2];
+  // highlight zones
+  const zb = document.querySelector('#penZones button[data-zone="' + shot + '"]');
+  const zb2 = document.querySelector('#penZones button[data-zone="' + save + '"]');
+  if (zb) zb.classList.add(goal ? 'hit' : 'miss');
+  if (zb2 && zb2 !== zb) zb2.classList.add(goal ? 'miss' : 'hit');
+  // run up
+  pitch.classList.add('anim-run');
+  setTimeout(() => {
+    pitch.classList.add('anim-kick');
+    // ball flight
+    pitch.style.setProperty('--bx', pos.x + '%');
+    pitch.style.setProperty('--by', pos.y + '%');
+    const ball = document.getElementById('penBall');
+    if (ball) {
+      ball.style.transition = 'left .85s cubic-bezier(.15,.7,.25,1), top .85s cubic-bezier(.2,.55,.25,1)';
+      requestAnimationFrame(() => { ball.style.left = pos.x + '%'; ball.style.top = pos.y + '%'; });
+    }
+    // keeper dive
+    pitch.classList.add('anim-dive-' + (save || 5));
+  }, 650);
+  setTimeout(() => {
+    pitch.classList.add(goal ? 'goal' : 'save');
+    const flash = document.getElementById('penFlash');
+    if (flash) flash.textContent = goal ? 'GOAL!' : 'SAVE!';
+  }, 1400);
+  setTimeout(() => { PEN.animating = false; }, 2800);
 }
 function penRender(st) {
   if (!st) return;
+  const prev = PEN.st;
   PEN.st = st;
   const sc = document.getElementById('penScore');
-  if (sc) sc.textContent = (st.scores[0]||0) + ' — ' + (st.scores[1]||0);
+  if (sc) sc.textContent = (st.scores[0] || 0) + ' — ' + (st.scores[1] || 0);
   const msg = document.getElementById('penMsg');
+  const meUid = (window.W && W.uid) || (window.ME && ME.uid);
+  const mySeat = (st.seats || []).findIndex((p) => p && p.uid === meUid);
+  const isShooter = mySeat === st.shooter;
+  const isKeeper = mySeat >= 0 && mySeat === 1 - st.shooter;
   if (msg) {
-    const labels = { lobby: 'Waiting for players', betting: 'Place matching bets', pick_shot: 'Shooter: pick a side', pick_save: 'Keeper: dive!', anim: st.goal ? 'GOAL!' : 'SAVE!', round_result: 'Next round…', match_end: (st.seats[st.winner] ? st.seats[st.winner].name : '?') + ' wins!' };
+    const labels = {
+      lobby: 'Waiting for players · join a seat',
+      betting: 'Place matching bets then Ready',
+      pick_shot: isShooter ? 'Your shot — click a zone in the goal' : 'Shooter is aiming…',
+      pick_save: isKeeper ? 'Your dive — click a zone to cover' : 'Keeper is diving…',
+      anim: st.goal ? 'GOAL!' : 'SAVE!',
+      round_result: 'Next round…',
+      match_end: (st.seats[st.winner] ? st.seats[st.winner].name : '?') + ' wins the match!',
+    };
     msg.textContent = labels[st.phase] || st.phase;
   }
-  const ball = document.getElementById('penBall');
-  const keeper = document.getElementById('penKeeper');
-  if (st.phase === 'anim' || st.phase === 'round_result' || st.phase === 'match_end') {
-    const map = { left: '28%', center: '50%', right: '72%' };
-    if (ball && st.shotDir) { ball.style.left = map[st.shotDir]; ball.style.bottom = st.goal ? '55%' : '42%'; }
-    if (keeper && st.saveDir) { keeper.style.left = map[st.saveDir]; }
-  } else {
-    if (ball) { ball.style.left = '50%'; ball.style.bottom = '12%'; }
-    if (keeper) { keeper.style.left = '50%'; }
-  }
+  // zone interactivity
+  const canPick = (st.phase === 'pick_shot' && isShooter) || (st.phase === 'pick_save' && isKeeper);
+  document.querySelectorAll('#penZones button').forEach((b) => {
+    b.disabled = !canPick;
+    b.classList.toggle('on', false);
+  });
+  // players
   const box = document.getElementById('penPlayers');
   if (box) {
     box.textContent = '';
     (st.seats || []).forEach((p, i) => {
       const d = document.createElement('div');
-      d.style.cssText = 'padding:8px 12px;border-radius:10px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1)';
-      d.textContent = p ? ((p.name || 'Player') + ' · bet ' + (p.bet || 0) + (p.ready ? ' ✓' : '')) : ('Seat ' + (i+1) + ' open');
+      d.className = 'pen-card' + (p && p.uid === meUid ? ' me' : '');
+      if (!p) {
+        d.innerHTML = '<div class="nm">Seat ' + (i + 1) + '</div><div class="st">Open</div>';
+      } else {
+        const av = p.avatar ? '<img src="' + p.avatar + '" alt="">' : '<div style="width:40px;height:40px;border-radius:50%;background:#333"></div>';
+        d.innerHTML = av + '<div><div class="nm">' + (p.name || 'Player') + '</div><div class="st">Bet ' + (p.bet || 0) + (p.ready ? ' · Ready' : '') + (i === st.shooter && (st.phase === 'pick_shot' || st.phase === 'anim') ? ' · Shooter' : '') + '</div></div>';
+      }
       box.appendChild(d);
     });
   }
+  // trigger animation once per kick
+  if (st.phase === 'anim' && st.anim && (!prev || !prev.anim || prev.anim.t0 !== st.anim.t0)) {
+    penPlayAnim(st);
+  }
+  if (st.phase === 'lobby' || st.phase === 'betting') penResetPitch();
 }
 function penBind() {
-  if (PEN.bound) return; PEN.bound = true;
-  const dirs = document.getElementById('penDirs');
-  if (dirs) dirs.addEventListener('click', (e) => {
-    const b = e.target.closest('button[data-dir]'); if (!b) return;
-    send('penpick', { dir: b.getAttribute('data-dir') });
+  if (PEN.bound) return;
+  PEN.bound = true;
+  const zones = document.getElementById('penZones');
+  if (zones) zones.addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-zone]');
+    if (!b || b.disabled) return;
+    const z = Number(b.getAttribute('data-zone'));
+    document.querySelectorAll('#penZones button').forEach((x) => x.classList.remove('on'));
+    b.classList.add('on');
+    send('penpick', { dir: z, zone: z });
   });
   const j0 = document.getElementById('penJoin0'); if (j0) j0.onclick = () => send('penjoin', { seat: 0 });
   const j1 = document.getElementById('penJoin1'); if (j1) j1.onclick = () => send('penjoin', { seat: 1 });
   const bet = document.getElementById('penBet'); if (bet) bet.onclick = () => {
-    const v = Number(document.getElementById('penAmt') && document.getElementById('penAmt').value);
-    send('penbet', { amount: v });
+    const el = document.getElementById('penAmt');
+    send('penbet', { amount: Number(el && el.value) });
   };
   const rd = document.getElementById('penReady'); if (rd) rd.onclick = () => send('penready');
   const lv = document.getElementById('penLeave'); if (lv) lv.onclick = () => send('penleave');
 }
-
 
 (async () => {
   try {
