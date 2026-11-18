@@ -19,7 +19,7 @@ const RATE = 0.00012; // fusé : le multiplicateur vaut exp(RATE * ms)
 const LEAD_MS = 900; // fusé : délai avant décollage
 const MAX_CRASH = 10000;
 const TYPES = { mines: 'mines', fuse: 'fuse', bj: 'bj', coin: 'coin', dice: 'dice', horses: 'horses', russian: 'russian', slots: 'slots', duel: 'duel', scratch: 'scratch', plinko: 'plinko', penguin: 'penguin' };
-const INSTANT = new Set(['coin', 'dice', 'horses', 'russian', 'slots', 'duel', 'plinko', 'penguin']); // jeux « un coup » : résolus d'un coup côté serveur, animés côté site
+const INSTANT = new Set(['coin', 'dice', 'horses', 'russian', 'slots', 'duel', 'plinko']); // jeux « un coup » : résolus d'un coup côté serveur, animés côté site
 const COIN_MULT = 1.95;
 const DICE_MULT = { under: 2.3, over: 2.3, seven: 5.8 };
 const HORSES = [{ p: 0.4, mult: 2.4 }, { p: 0.25, mult: 3.8 }, { p: 0.18, mult: 5.3 }, { p: 0.11, mult: 8.6 }, { p: 0.06, mult: 15.8 }];
@@ -97,21 +97,7 @@ function rollInstant(g) {
     if (!Number.isInteger(f) || f < 0 || f >= FOES.length) throw new Error('Adversaire invalide.');
     const won = randomInt(1_000_000) / 1_000_000 < FOES[f].p, fast = 170 + randomInt(110), slow = fast + 30 + randomInt(90);
     g.foe = f; g.me = won ? fast : slow; g.foeMs = won ? slow : fast; g.mult = won ? FOES[f].mult : 0;
-  } else if (g.type === 'penguin') {
-    // One click launch: distance 0..100, mult grows with distance (house ~4%)
-    // Weighted: most land mid-range, rare far flights
-    const r = randomInt(1_000_000) / 1e6;
-    let dist;
-    if (r < 0.45) dist = 8 + randomInt(22);       // 8-29
-    else if (r < 0.75) dist = 30 + randomInt(25);  // 30-54
-    else if (r < 0.92) dist = 55 + randomInt(20);  // 55-74
-    else if (r < 0.985) dist = 75 + randomInt(15); // 75-89
-    else dist = 90 + randomInt(11);                 // 90-100
-    g.dist = dist;
-    // mult curve ~ 1.1 at 20 → ~12 at 100, EV ~0.96
-    const t = dist / 100;
-    g.mult = round2(1.05 + Math.pow(t, 1.55) * 11.5);
-    g.flightMs = 900 + Math.round(dist * 22);
+  } else if (false) {
   } else {
     const k = Number(g.choice);
     if (!Number.isInteger(k) || k < 1 || k > 5) throw new Error('Nombre de balles invalide (1 à 5).');
@@ -128,6 +114,25 @@ const newDeck = () => shuffle(RANKS.flatMap((r) => SUITS.map((s) => ({ r, s })))
 const cardVal = (c) => (c.r === 'A' ? 11 : ['K', 'Q', 'J', '10'].includes(c.r) ? 10 : Number(c.r));
 function bjVal(cards) { let t = 0, aces = 0; for (const c of cards) { t += cardVal(c); if (c.r === 'A') aces++; } while (t > 21 && aces-- > 0) t -= 10; return t; }
 const cs = (c) => c.r + c.s;
+
+const PG_ZONES = [
+  { id: 1, key: 'easy',    pts: 10, multAdd: 0.15 },
+  { id: 2, key: 'med',     pts: 22, multAdd: 0.45 },
+  { id: 3, key: 'hard',    pts: 38, multAdd: 1.10 },
+  { id: 4, key: 'vhard',   pts: 55, multAdd: 2.40 },
+  { id: 5, key: 'perfect', pts: 70, multAdd: 4.00 },
+];
+const pgZone = (id) => PG_ZONES.find((z) => z.id === Number(id));
+function pgResolve(g) {
+  const z1 = pgZone(g.zone1) || PG_ZONES[0];
+  const z2 = g.zone2 != null ? (pgZone(g.zone2) || PG_ZONES[0]) : null;
+  g.pts = z1.pts + (z2 ? z2.pts : 0);
+  g.dist = Math.max(1, Math.min(100, Math.round((g.pts / 140) * 100)));
+  let mult = 1 + z1.multAdd + (z2 ? z2.multAdd : 0);
+  g.mult = round2(Math.max(0, mult * 0.97));
+  g.flightMs = 700 + Math.round(g.dist * 18);
+  g.phase = 'done';
+}
 
 function create(deps, pending) {
   const games = new Map();
@@ -167,7 +172,7 @@ function create(deps, pending) {
         cash: floor2(g.bet * minesMult(g.m, k)), over: g.over, win: g.win || 0, mineAt: g.over ? [...g.set] : undefined };
     },
     fuse: (g) => ({ type: 'fuse', bet: g.bet, start: g.start, rate: RATE, auto: g.auto, over: g.over, win: g.win || 0, at: g.over ? g.at : undefined, crash: g.over ? g.cp : undefined }),
-    penguin: (g) => ({ type: 'penguin', bet: g.bet, dist: g.dist, mult: g.mult, flightMs: g.flightMs, over: true, win: g.win || 0, outcome: g.win > 0 ? 'win' : 'lose' }),
+    penguin: (g) => ({ type: 'penguin', bet: g.bet, phase: g.phase || (g.over ? 'done' : 'aim1'), zone1: g.zone1, zone2: g.zone2, pts: g.pts || 0, dist: g.dist || 0, mult: g.mult || 0, flightMs: g.flightMs || 0, over: !!g.over, win: g.win || 0, outcome: g.outcome || null }),
     coin: (g) => ({ type: 'coin', bet: g.bet, choice: g.choice, side: g.side, mult: g.mult, over: true, win: g.win || 0, outcome: g.win > 0 ? 'win' : 'lose' }),
     dice: (g) => ({ type: 'dice', bet: g.bet, choice: g.choice, a: g.a, b: g.b, sum: g.sum, mult: g.mult, over: true, win: g.win || 0, outcome: g.win > 0 ? 'win' : 'lose' }),
     horses: (g) => ({ type: 'horses', bet: g.bet, want: g.want, winner: g.winner, mult: g.mult, over: true, win: g.win || 0, outcome: g.win > 0 ? 'win' : 'lose' }),
@@ -241,6 +246,13 @@ function create(deps, pending) {
           ng.start = Date.now() + LEAD_MS;
         } else if (type === 'scratch') {
           genTicket(ng);
+        } else if (type === 'penguin') {
+          ng.phase = 'aim1';
+          ng.zone1 = null;
+          ng.zone2 = null;
+          ng.pts = 0;
+          ng.dist = 0;
+          ng.mult = 0;
         } else if (INSTANT.has(type)) {
           ng.choice = String(d.choice); ng.balls = d.balls; rollInstant(ng);
         } else {
@@ -286,8 +298,26 @@ function create(deps, pending) {
           if (mv !== 'peek') throw new Error('Action inconnue.');
           const i = Number(d.i);
           if (!Number.isInteger(i) || i < 0 || i > 5) throw new Error('Case invalide.');
-          g.seen.add(i); // la case grattée est révélée ; quand les 6 le sont, le ticket est payé
+          g.seen.add(i);
           if (g.seen.size === 6) await end(u, g, g.bet * g.mult);
+        } else if (type === 'penguin') {
+          if (mv !== 'stop') throw new Error('Action inconnue.');
+          const z = Number(d.zone);
+          if (!pgZone(z)) throw new Error('Zone invalide.');
+          if (g.phase === 'aim1') {
+            g.zone1 = z;
+            if (z === 5) {
+              // perfect → second semi-circle
+              g.phase = 'aim2';
+            } else {
+              pgResolve(g);
+              await end(u, g, round2(g.bet * g.mult));
+            }
+          } else if (g.phase === 'aim2') {
+            g.zone2 = z;
+            pgResolve(g);
+            await end(u, g, round2(g.bet * g.mult));
+          } else throw new Error('Tir déjà résolu.');
         } else {
           if (mv === 'hit') {
             g.player.push(g.deck.pop());

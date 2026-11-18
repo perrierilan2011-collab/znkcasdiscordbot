@@ -1015,16 +1015,23 @@ header .sp{flex:1 1 0}
   .rqtop{gap:6px}
 }
 
-/* Penguin Slide */
-#pgArena{position:relative;width:min(100%,720px);height:280px;margin:0 auto;border-radius:16px;overflow:hidden;
-  background:linear-gradient(180deg,#0b1a2a 0%,#0a2740 40%,#0c3a4d 70%,#134e5a 100%);border:1px solid #1e3a4a}
-#pgIce{position:absolute;left:0;right:0;bottom:0;height:42%;background:linear-gradient(180deg,rgba(186,230,253,.25),rgba(224,242,254,.5));
-  border-top:2px solid rgba(255,255,255,.35)}
-#pgTrack{position:absolute;left:8%;right:8%;bottom:18%;height:4px;background:rgba(255,255,255,.15);border-radius:2px}
-#pgMarks{position:absolute;left:8%;right:8%;bottom:22%;display:flex;justify-content:space-between;font-size:10px;color:#94a3b8}
-#pgPeng{position:absolute;bottom:20%;left:8%;width:48px;height:48px;font-size:40px;line-height:1;transition:left .05s linear;filter:drop-shadow(0 4px 6px rgba(0,0,0,.5))}
-#pgPeng.fly{transition:left linear}
-#pgResult{text-align:center;margin-top:10px;font-weight:800;color:var(--gold);min-height:24px}
+
+/* Penguin Slide — skill semi-circles */
+#pgWrap{display:flex;flex-direction:column;align-items:center;gap:12px;width:100%;max-width:560px;margin:0 auto;padding:8px}
+#pgArena{position:relative;width:min(100%,520px);height:280px;border-radius:16px;overflow:hidden;
+  background:linear-gradient(180deg,#0b1a2a 0%,#0a2740 45%,#0c3a4d 100%);border:1px solid #1e3a4a}
+#pgIce{position:absolute;left:0;right:0;bottom:0;height:38%;background:linear-gradient(180deg,rgba(186,230,253,.2),rgba(224,242,254,.45));border-top:2px solid rgba(255,255,255,.3)}
+#pgPeng{position:absolute;bottom:16%;left:8%;font-size:42px;line-height:1;filter:drop-shadow(0 4px 6px rgba(0,0,0,.5));transition:left linear}
+#pgResult{text-align:center;font-weight:800;color:var(--gold);min-height:22px;font-size:15px}
+#pgMeter{position:relative;width:min(100%,420px);height:220px;margin:0 auto;user-select:none}
+#pgMeter svg{width:100%;height:100%;display:block;filter:drop-shadow(0 6px 16px rgba(0,0,0,.45))}
+#pgMeter .needle{transform-origin:210px 200px;transition:none}
+#pgHint{text-align:center;color:#a3a3a3;font-size:13px;font-weight:700;min-height:18px}
+#pgStop{min-width:160px;min-height:48px;font-size:16px;font-weight:900;border-radius:14px}
+#pgLegend{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;font-size:11px;font-weight:700}
+#pgLegend span{padding:3px 8px;border-radius:999px;color:#0a0a0a}
+.pg-easy{background:#4ade80}.pg-med{background:#facc15}.pg-hard{background:#fb923c}.pg-vhard{background:#f87171}.pg-perfect{background:#fbbf24;box-shadow:0 0 10px rgba(251,191,36,.6)}
+
 /* Penalty 1v1 */
 
 #penView{flex:1;display:flex;flex-direction:column;align-items:center;padding:10px 12px 24px;gap:10px;overflow:auto;background:linear-gradient(180deg,#07120c 0%,#0a1a12 100%)}
@@ -4055,6 +4062,152 @@ async function osend(action, extra = {}) {
   } catch { toast('Connexion perdue…'); return null; }
 }
 const ofStop = () => { clearInterval(O.timer); O.timer = 0; };
+
+// ===== Penguin Slide (skill semi-circles) =====
+const PG = {
+  raf: 0, angle: 0, dir: 1, running: false, wheel: 1,
+  // zones as fractions of the semi-circle (0..1 left→right). Perfect is tiny center.
+  // layout mirrored around center: easy | med | hard | vhard | PERFECT | vhard | hard | med | easy
+  bands: [
+    { id: 1, a: 0.00, b: 0.16, color: '#4ade80' },
+    { id: 2, a: 0.16, b: 0.30, color: '#facc15' },
+    { id: 3, a: 0.30, b: 0.40, color: '#fb923c' },
+    { id: 4, a: 0.40, b: 0.46, color: '#f87171' },
+    { id: 5, a: 0.46, b: 0.54, color: '#fbbf24' }, // perfect
+    { id: 4, a: 0.54, b: 0.60, color: '#f87171' },
+    { id: 3, a: 0.60, b: 0.70, color: '#fb923c' },
+    { id: 2, a: 0.70, b: 0.84, color: '#facc15' },
+    { id: 1, a: 0.84, b: 1.00, color: '#4ade80' },
+  ],
+};
+function pgZoneAt(t) {
+  t = Math.max(0, Math.min(0.999, t));
+  for (const b of PG.bands) if (t >= b.a && t < b.b) return b.id;
+  return 1;
+}
+function pgDrawMeter() {
+  const box = document.getElementById('pgMeter');
+  if (!box) return;
+  const W = 420, H = 220, cx = 210, cy = 200, R = 170, r0 = 100;
+  let arcs = '';
+  for (const b of PG.bands) {
+    const a0 = Math.PI - b.a * Math.PI;
+    const a1 = Math.PI - b.b * Math.PI;
+    const x0 = cx + R * Math.cos(a0), y0 = cy - R * Math.sin(a0);
+    const x1 = cx + R * Math.cos(a1), y1 = cy - R * Math.sin(a1);
+    const xi0 = cx + r0 * Math.cos(a0), yi0 = cy - r0 * Math.sin(a0);
+    const xi1 = cx + r0 * Math.cos(a1), yi1 = cy - r0 * Math.sin(a1);
+    const large = 0;
+    arcs += `<path d="M ${x0} ${y0} A ${R} ${R} 0 ${large} 1 ${x1} ${y1} L ${xi1} ${yi1} A ${r0} ${r0} 0 ${large} 0 ${xi0} ${yi0} Z" fill="${b.color}" stroke="rgba(0,0,0,.35)" stroke-width="1"/>`;
+  }
+  box.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="100%" height="100%">
+    ${arcs}
+    <circle cx="${cx}" cy="${cy}" r="8" fill="#e5e5e5"/>
+    <g class="needle" id="pgNeedle"><line x1="${cx}" y1="${cy}" x2="${cx}" y2="${cy - R + 6}" stroke="#fff" stroke-width="4" stroke-linecap="round"/>
+    <circle cx="${cx}" cy="${cy - R + 6}" r="5" fill="#fff"/></g>
+  </svg>`;
+}
+function pgSetNeedle(t) {
+  const n = document.getElementById('pgNeedle');
+  if (!n) return;
+  // t 0..1 maps to angle -90..+90 deg around upright? semi from left(180°) to right(0°)
+  // CSS rotate: 0 = up. left = -90, right = +90
+  const deg = -90 + t * 180;
+  n.style.transform = `rotate(${deg}deg)`;
+}
+function pgShowSkill(on, wheel) {
+  PG.wheel = wheel || 1;
+  const meter = document.getElementById('pgMeter');
+  const stop = document.getElementById('pgStop');
+  const leg = document.getElementById('pgLegend');
+  const hint = document.getElementById('pgHint');
+  if (meter) meter.classList.toggle('hide', !on);
+  if (stop) stop.classList.toggle('hide', !on);
+  if (leg) leg.classList.toggle('hide', !on);
+  if (on) {
+    pgDrawMeter();
+    if (hint) hint.textContent = wheel === 2 ? 'SECOND wheel — stop the needle!' : 'Stop the needle as close to PERFECT as you can';
+    pgStartSwing();
+  } else {
+    pgStopSwing();
+    if (hint) hint.textContent = '';
+  }
+}
+function pgStartSwing() {
+  pgStopSwing();
+  PG.running = true;
+  PG.angle = 0;
+  PG.dir = 1;
+  const speed = PG.wheel === 2 ? 0.018 : 0.014; // second wheel slightly faster
+  const tick = () => {
+    if (!PG.running) return;
+    PG.angle += speed * PG.dir;
+    if (PG.angle >= 1) { PG.angle = 1; PG.dir = -1; }
+    if (PG.angle <= 0) { PG.angle = 0; PG.dir = 1; }
+    pgSetNeedle(PG.angle);
+    PG.raf = requestAnimationFrame(tick);
+  };
+  PG.raf = requestAnimationFrame(tick);
+}
+function pgStopSwing() {
+  PG.running = false;
+  if (PG.raf) cancelAnimationFrame(PG.raf);
+  PG.raf = 0;
+}
+async function pgStopClick() {
+  if (!PG.running || O.anim) return;
+  pgStopSwing();
+  const zone = pgZoneAt(PG.angle);
+  O.anim = true;
+  const stop = document.getElementById('pgStop');
+  if (stop) stop.disabled = true;
+  const d = await osend('omove', { move: 'stop', zone });
+  O.anim = false;
+  if (stop) stop.disabled = false;
+  if (!d) { pgStartSwing(); return; }
+  O.st = d.g;
+  ofDone(null, d.g);
+  ofRender();
+}
+function pgBind() {
+  const stop = document.getElementById('pgStop');
+  if (stop && !stop._pg) {
+    stop._pg = true;
+    stop.onclick = () => { ac(); pgStopClick(); };
+  }
+}
+function pgRender(s) {
+  pgBind();
+  const res = document.getElementById('pgResult');
+  const peng = document.getElementById('pgPeng');
+  if (!s || !s.over) {
+    if (peng) { peng.style.transition = 'none'; peng.style.left = '8%'; }
+    if (s && (s.phase === 'aim1' || s.phase === 'aim2')) {
+      if (res) res.textContent = s.phase === 'aim2' ? 'Perfect! Bonus wheel' : 'Aim carefully…';
+      pgShowSkill(true, s.phase === 'aim2' ? 2 : 1);
+    } else {
+      if (res) res.textContent = 'Place a bet, then press Play';
+      pgShowSkill(false);
+    }
+    return;
+  }
+  // finished — animate slide then show result
+  pgShowSkill(false);
+  const dist = Number(s.dist) || 0;
+  const ms = Number(s.flightMs) || 1200;
+  if (peng) {
+    peng.style.transition = 'left ' + ms + 'ms cubic-bezier(.15,.7,.25,1)';
+    requestAnimationFrame(() => { peng.style.left = (8 + dist * 0.8) + '%'; });
+  }
+  if (res) {
+    const z1 = s.zone1 || '?', z2 = s.zone2 != null ? (' + ' + s.zone2) : '';
+    setTimeout(() => {
+      res.textContent = dist + ' m · x' + (s.mult || 0) + (s.win > 0 ? ' · +' + num(s.win) : ' · lost');
+    }, Math.min(ms, 900));
+  }
+}
+
+
 async function ofOpen(view) {
   ofStop(); O.run++; ofRelease(); O.game = OMAP[view]; O.st = null; O.pp = []; ofBuild(); ofRender();
   const g = O.game, d = await osend('ostate');
@@ -4098,7 +4251,17 @@ function ofBuild() {
   top.append(el('span', 'dname', OT[O.game]), el('span', 'grow'), hist);
   const b = el('div', 'obody'); t.append(top, b);
   if (O.game === 'penguin') {
-    b.innerHTML = '<div id="pgArena"><div id="pgIce"></div><div id="pgTrack"></div><div id="pgMarks"><span>0</span><span>25</span><span>50</span><span>75</span><span>100m</span></div><div id="pgPeng">🐧</div></div><div id="pgResult">One tap to launch</div>';
+    b.innerHTML = `<div id="pgWrap">
+      <div id="pgArena"><div id="pgIce"></div><div id="pgPeng">🐧</div></div>
+      <div id="pgResult">Place a bet, then stop the needle</div>
+      <div id="pgHint"></div>
+      <div id="pgMeter" class="hide"></div>
+      <div id="pgLegend" class="hide">
+        <span class="pg-easy">Easy</span><span class="pg-med">Medium</span><span class="pg-hard">Hard</span>
+        <span class="pg-vhard">Very hard</span><span class="pg-perfect">PERFECT → 2nd wheel</span>
+      </div>
+      <button type="button" class="btn go hide" id="pgStop">STOP</button>
+    </div>`;
   } else if (O.game === 'bj') {
     t.append(el('div', 'shoe'));
     b.innerHTML = '<div class="dname">CROUPIER</div><div class="cards" id="oDc"></div><div id="oDt"></div><div class="omsg" id="oMsg"></div><div class="dname">TOI</div><div class="cards" id="oPc"></div><div id="oPt"></div><div class="betspot" id="oBs"></div>';
@@ -4287,7 +4450,7 @@ function ofDock() {
   row(act('go', O.game === 'scratch' ? 'Acheter un ticket' : s ? 'Rejouer' : 'Jouer', ofStart));
 }
 // ---- jeux « un coup » : pile ou face, dés, chevaux, roulette russe (tirage côté serveur, animation côté site)
-const INST = { coin: 1, dice: 1, horses: 1, russian: 1, slots: 1, duel: 1, plinko: 1, penguin: 1 };
+const INST = { coin: 1, dice: 1, horses: 1, russian: 1, slots: 1, duel: 1, plinko: 1 };
 const FOES = [{ n: 'Recrue', p: 60, m: 1.6 }, { n: 'Pistolero', p: 45, m: 2.1 }, { n: 'Légende', p: 25, m: 3.8 }, { n: 'Fantôme', p: 10, m: 9.6 }];
 const HM = [2.4, 3.8, 5.3, 8.6, 15.8], HP = [40, 25, 18, 11, 6], HCOL = ['#ef4444', '#3b82f6', '#22c55e', '#f59e0b', '#a855f7'];
 const rusM = (k) => Math.floor(0.96 * 6 / (6 - k) * 100) / 100;
@@ -5913,47 +6076,6 @@ const _rkWatch = typeof rkWatch === 'function' ? rkWatch : null;
 // patch load of rank data after fetch - enhance existing rk render if present
 
 // session valide ? sinon on affiche directement la page de connexion Discord
-
-// ===== Penguin Slide (offline) =====
-const PG = { flying: false };
-function pgBuild() {
-  const host = document.getElementById('ofArena') || document.getElementById('ofView');
-  if (!host || host.querySelector('#pgArena')) return;
-}
-function pgRender(st) {
-  // called from offline renderer when type===penguin
-  let arena = document.getElementById('pgArena');
-  if (!arena) {
-    const box = document.getElementById('ofStage') || document.getElementById('ofView');
-    if (!box) return;
-    arena = document.createElement('div'); arena.id = 'pgArena';
-    arena.innerHTML = '<div id="pgIce"></div><div id="pgTrack"></div><div id="pgMarks"><span>0</span><span>25</span><span>50</span><span>75</span><span>100m</span></div><div id="pgPeng">🐧</div>';
-    const stage = document.getElementById('ofStage');
-    if (stage) stage.prepend(arena); else box.prepend(arena);
-    let res = document.getElementById('pgResult');
-    if (!res) { res = document.createElement('div'); res.id = 'pgResult'; arena.after(res); }
-  }
-  const peng = document.getElementById('pgPeng');
-  const res = document.getElementById('pgResult');
-  if (!st || !st.over) {
-    if (peng) { peng.style.left = '8%'; peng.classList.remove('fly'); }
-    if (res) res.textContent = 'Tap Launch — one shot';
-    return;
-  }
-  const dist = Number(st.dist) || 0;
-  const ms = Number(st.flightMs) || 1500;
-  if (peng) {
-    peng.classList.add('fly');
-    peng.style.transitionDuration = ms + 'ms';
-    requestAnimationFrame(() => { peng.style.left = (8 + dist * 0.8) + '%'; });
-  }
-  if (res) {
-    setTimeout(() => {
-      res.textContent = dist + ' m  ·  x' + (st.mult || 0) + (st.win > 0 ? '  ·  +' + st.win : '');
-    }, Math.min(ms, 1200));
-  }
-}
-
 
 // ===== Penalty 1v1 =====
 const PEN = { st: null, joined: false, bound: false, animating: false };
