@@ -283,9 +283,9 @@ th{color:var(--mut);font-size:12px}
 }
 /* mobile/tablette : le classement des meilleurs gains reste SOUS le jeu */
 @media(max-width:1099px){
-  #ofView.has-lb{flex-direction:column}
-  #ofView.has-lb>.ofplay{order:1}
-  #ofView.has-lb>.glb{order:2;margin:14px 0 0;position:static}
+  #ofView.has-lb{display:flex;flex-direction:column;align-items:center;width:100%}
+  #ofView.has-lb>.ofplay{order:1;width:100%}
+  #ofView.has-lb>.glb{order:2;width:100%;max-width:760px;margin:14px auto 0;position:static}
 }
 /* ---------- ADMIN ---------- */
 #adminView{align-items:center;padding:24px 16px 64px;overflow:auto}
@@ -1081,7 +1081,7 @@ header .sp{flex:1 1 0}
         <span class="glive" id="gRlLive"></span><span class="gplay">Jouer</span>
       </button>
       <button class="gcard" data-go="rocket" id="gcRocket">
-        <span class="gname">🚀 Rocket Race</span>
+        <span class="gname">Rocket Race</span>
         <span class="gdesc">Course de fusées · chacun la sienne avec son pseudo · le premier au tour du Soleil gagne le pot</span>
         <span class="glive" id="gRocketLive"></span><span class="gplay">Jouer</span>
       </button>
@@ -1697,9 +1697,9 @@ create table if not exists roulette_event_results (
     </aside>
   </div>
 </main>
-<div class="modal" id="mRocketRules"><div class="box"><h2>🚀 Rocket Race</h2><ul>
+<div class="modal" id="mRocketRules"><div class="box"><h2>Rocket Race</h2><ul>
 <li>Une course partagée par serveur : <b>chaque joueur a sa propre fusée</b> avec son pseudo affiché au-dessus.</li>
-<li>Mise librement (jetons ou champ), puis la course démarre automatiquement après le décompte — ou clique sur <b>Lancer maintenant</b> dès 2 partants.</li>
+<li>Mise librement (jetons ou champ). <b>2 partants minimum</b> : le décompte démarre dès que la 2ᵉ mise est placée, ou clique sur <b>Lancer maintenant</b>. En attendant un adversaire, ta mise reste engagée (retire-la pour être remboursé).</li>
 <li>Les fusées décollent de la <b>Terre</b>, font le tour du <b>Soleil</b> entre les planètes, puis reviennent se poser sur la Terre. Le <b>premier arrivé gagne le plus</b>.</li>
 <li>Le pot est redistribué au classement : part du pot proportionnelle à ta mise selon ton rang (1er ≈ 55 %, 2e ≈ 27 %, 3e ≈ 18 % …), avec 5 % de commission.</li>
 <li>Quitter ou retirer ta mise avant le départ te rembourse intégralement.</li>
@@ -1750,6 +1750,7 @@ create table if not exists roulette_event_results (
   <p class="statTools" style="margin:12px 0 0;display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:center">
     <label class="btn" for="statsBgFile" title="Choisir une image de fond">Choisir une image de fond</label>
     <input id="statsBgFile" type="file" accept="image/*" class="hide">
+    <button class="btn" id="statsResetBg" title="Remettre le fond par défaut">Fond par défaut</button>
     <button class="btn ico" id="statsDownload" title="Télécharger la fiche" aria-label="Télécharger la fiche"></button>
     <button class="btn" data-close>Fermer</button>
   </p>
@@ -2236,6 +2237,7 @@ sndBtn.onclick = () => { sndOn = !sndOn; try { localStorage.setItem('znk_snd', s
 document.addEventListener('pointerdown', () => ac(), { once: true });
 // retour sur l'onglet : resynchronise le wallet
 document.addEventListener('visibilitychange', () => { if (!document.hidden && mySeat()) send('sync'); if (!document.hidden && W.view === 'roulette' && W.joined) send('rsync'); if (!document.hidden && W.view === 'poker') pSend('psync'); if (!document.hidden) refreshActiveView(); });
+window.addEventListener('focus', () => { if (!document.hidden) refreshActiveView(); });
 
 // ============================================================= CHAT EN DIRECT (un salon par jeu)
 const C = { msgs: {}, open: false, unread: 0 };
@@ -3436,7 +3438,7 @@ requestAnimationFrame(rLoop);
 const RK_TAU = Math.PI * 2;
 function rocBind() {
   if (ROC.bound) return; ROC.bound = true;
-  $('#rocketJoin').onclick = async () => { ac(); if (!ROC.joined) { ROC.joined = true; await send('rzjoin'); } };
+  $('#rocketJoin').onclick = async () => { ac(); if (ROC.joined) return; ROC.joined = true; const ok = await send('rzjoin'); if (!ok) ROC.joined = false; };
   $('#rocketBet').onclick = async () => { ac(); const v = parseAmt($('#rocketAmt').value, rocMe() ? rocMe().bal : null); if (!v) return toast('Entre un montant.'); await send('rzbet', { amount: v }); };
   $('#rocketClear').onclick = () => { ac(); send('rzclear'); };
   $('#rocketGo').onclick = () => { ac(); send('rzgo'); };
@@ -3458,18 +3460,31 @@ function rocOnHello(d) {
 }
 function rocEnter() {
   rocBind();
-  if (!ROC.joined) { ROC.joined = true; send('rzjoin'); }
+  // rejoindre est idempotent côté serveur : on s'assure d'être bien présent dans la salle
+  // (après un redémarrage du bot ou une inscription échouée, le drapeau local peut être faux)
+  ROC.joined = true;
+  send('rzjoin').then((ok) => { if (!ok) ROC.joined = false; });
   const m = rocMe(); if (m) { setTxt($('#meBal'), num(m.bal) + ' ' + COIN); W.bal = m.bal; }
 }
 function rocMe() { return ROC.st && me ? ROC.st.players.find((p) => p.uid === me.uid) : null; }
 function rocRender(st) {
   ROC.st = st; if (!ROC.info) return;
   const ph = st.phase, mine = rocMe();
+  // l'état d'inscription fait foi côté serveur (évite un bouton « Rejoindre » bloqué à vie)
+  ROC.joined = !!mine;
   const betting = ph === 'betting';
   const cd = betting && st.deadline ? Math.max(0, Math.ceil((st.deadline - nowS()) / 1000)) : 0;
   const lead = st.track ? Math.max(0, Math.ceil((st.track.t0 - nowS()) / 300)) : 0;
   let msg = '';
-  if (ph === 'betting') msg = st.deadline ? 'Mises ouvertes · départ dans ' + cd + ' s' : 'Mises ouvertes · le départ se lance à la 1ʳᵉ mise';
+  if (ph === 'betting') {
+    const n = st.racers || 0;
+    if (n < 2) {
+      msg = 'En attente d’un 2ᵉ joueur · 2 partants minimum'
+        + (mine && mine.bet > 0 && st.deadline ? ' · remboursement dans ' + cd + ' s' : '');
+    } else {
+      msg = st.deadline ? 'Mises ouvertes · départ dans ' + cd + ' s' : 'Mises ouvertes · départ imminent';
+    }
+  }
   else if (ph === 'countdown') msg = 'Prêts, partez !';
   else if (ph === 'racing') msg = 'Course en cours… le premier au tour du Soleil gagne !';
   else msg = 'Course terminée · nouvelle manche dans ' + Math.max(0, Math.ceil((st.deadline - nowS()) / 1000)) + ' s';
@@ -5121,6 +5136,14 @@ if (statsFile) statsFile.onchange = () => {
     img.src = reader.result;
   };
   reader.readAsDataURL(f);
+};
+const statsReset = $('#statsResetBg');
+if (statsReset) statsReset.onclick = () => {
+  const key = statsUid || (me && me.uid) || 'me';
+  try { localStorage.removeItem(statsBgKey(key)); } catch {}
+  statsBg = '';
+  if (statsData) renderStatsCard(statsData, statsUid, '');
+  toast(LANG === 'en' ? 'Default background restored' : 'Fond par défaut rétabli');
 };
 const accStats = $('#accStats');
 if (accStats) accStats.onclick = async () => {

@@ -167,7 +167,7 @@ class RocketRaceRoom {
       await this.refundAll(p);
       this.players.delete(uid);
       this.say(`${p.name} quitte la course`);
-      if (!this.bettors().length) this.clearTimer();
+      if (this.bettors().length < 2) this.clearTimer();
     } else if (p.bet > 0) {
       p.leaving = true; // sa fusée reste en course, il sera payé puis retiré
     } else {
@@ -189,7 +189,7 @@ class RocketRaceRoom {
           if (this.phase === 'betting') {
             await this.refundAll(q);
             this.players.delete(uid);
-            if (!this.bettors().length) this.clearTimer();
+            if (this.bettors().length < 2) this.clearTimer();
             this.emit();
           } else if (q.bet <= 0) {
             this.players.delete(uid);
@@ -231,12 +231,14 @@ class RocketRaceRoom {
     const p = this.players.get(uid);
     if (!p) return;
     await this.refundAll(p);
-    if (!this.bettors().length) this.clearTimer();
+    if (this.bettors().length < 2) this.clearTimer();
     this.emit();
   }
 
   afterBet() {
-    if (this.phase === 'betting' && !this.deadline) this.setTimer(BET_TIME_MS, () => this.startRace());
+    // Le compte à rebours ne démarre qu'avec au moins 2 partants : un joueur seul
+    // garde sa mise en attente au lieu d'être remboursé au bout de 15 s.
+    if (this.phase === 'betting' && this.bettors().length >= 2 && !this.deadline) this.setTimer(BET_TIME_MS, () => this.startRace());
     this.emit();
   }
 
@@ -256,7 +258,7 @@ class RocketRaceRoom {
       // un seul partant : on rembourse et on attend les autres (pas de gain garanti)
       for (const p of partants) await this.refundAll(p);
       this.clearTimer();
-      this.say('Il faut au moins 2 partants — mises remboursées.');
+      this.say('Pas assez de joueurs (2 minimum) — mises remboursées. Relance ta mise dès qu’un adversaire arrive.');
       this.emit();
       return;
     }

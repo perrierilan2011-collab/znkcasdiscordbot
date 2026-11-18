@@ -7213,8 +7213,7 @@ async function createPokerChannel(i) {
   const me = guild.members.me;
   const existing = (await getSavedChannel(guild, 'online')) || (await getSavedChannel(guild, 'poker'));
   if (existing) {
-    await existing.send(buildPokerPanelPayload()).catch(() => {});
-    return i.reply({ content: `✅ Online channel already exists: <#${existing.id}> (panel reposted).`, flags: EPH });
+    return i.reply({ content: `✅ Online channel already exists: <#${existing.id}>.`, flags: EPH });
   }
   if (!me.permissions.has(P.ManageChannels)) return i.reply({ content: NEED_MANAGE_CHANNELS, flags: EPH });
   const channel = await guild.channels.create({
@@ -7340,9 +7339,7 @@ async function createAllTimeChannel(i) {
   const me = guild.members.me;
   const existing = await getSavedChannel(guild, 'alltime');
   if (existing) {
-    const msg = await existing.send(await buildBoardPayload('alltime'));
-    trackAlltime(guild.id, existing.id, msg.id);
-    return i.reply({ content: `✅ All-time channel already exists: <#${existing.id}> (leaderboard reposted).`, flags: EPH });
+    return i.reply({ content: `✅ All-time channel already exists: <#${existing.id}>.`, flags: EPH });
   }
   if (!me.permissions.has(P.ManageChannels)) return i.reply({ content: NEED_MANAGE_CHANNELS, flags: EPH });
   const channel = await guild.channels.create({
@@ -7449,9 +7446,7 @@ async function cmdSetup(msg) {
     const existing = await guild.channels.fetch(existingId).catch(() => null);
     if (existing) {
       await existing.permissionOverwrites.edit(guild.roles.everyone, { SendMessages: false }).catch(() => {});
-      const panelMsg = await existing.send(buildPanelPayload());
-      await panelMsg.pin().catch(() => {});
-      return msg.reply(`✅ Channel <#${existingId}> already exists: I posted a new game panel there (pinned).`);
+      return msg.reply(`✅ Channel <#${existingId}> already exists.`);
     }
     casinoChannels.delete(guild.id);
   }
@@ -7572,8 +7567,7 @@ async function cmdAdmin(msg) {
 
   const existing = await getSavedChannel(guild, 'admin');
   if (existing) {
-    await existing.send(buildAdminPayload());
-    return msg.reply(`✅ The admin channel already exists: I reposted the panel in <#${existing.id}>.`);
+    return msg.reply(`✅ The admin channel already exists: <#${existing.id}>.`);
   }
   if (!me.permissions.has(P.ManageChannels)) return msg.reply(NEED_MANAGE_CHANNELS);
 
@@ -8948,45 +8942,87 @@ function ticketPanelRow() {
     new ButtonBuilder().setCustomId('ticket_claim_open').setLabel('Open a ticket').setEmoji('🎫').setStyle(ButtonStyle.Primary)
   );
 }
-// Un seul ticket par code : verrou anti double-clic / doubles soumissions.
-const ticketCreating = new Set();
+// ============================================================
+//  TICKETS — one panel per guild, one channel per order code
+// ============================================================
+// In-flight locks: prevent double-clicks / parallel modal submits from creating
+// several channels or several panels at the same time.
+const ticketLocks = new Map();   // orderCode -> Promise
+const panelLocks = new Map();    // guildId -> Promise
 
 async function cmdTicketSetup(msg) {
   if (!isCrown(msg)) return msg.reply(CROWN_ONLY).catch(() => {});
-  const category = msg.mentions.channels.find((c) => c.type === ChannelType.GuildCategory) || null;
-  const shop = webApp.shop;
-  if (!shop) return msg.reply('Web shop unavailable (shop module).');
-  if (category) shop.setTicketCfg(msg.guild.id, { categoryId: category.id });
-  const payload = { embeds: [buildTicketPanelEmbed()], components: [ticketPanelRow()] };
-  const cfg = shop.getTicketCfg(msg.guild.id) || {};
-  // Un seul panneau par serveur : on édite le message existant au lieu d'en créer un deuxième.
-  if (cfg.panelChannelId) {
+  const guildId = String(msg.guild.id);
+  if (panelLocks.has(guildId)) {
+    return msg.reply({ content: '⏳ Ticket panel setup already in progress…' }).catch(() => {});
+  }
+  let resolveLock;
+  panelLocks.set(guildId, new Promise((r) => { resolveLock = r; }));
+  try {
+    const category = msg.mentions.channels.find((c) => c.type === ChannelType.GuildCategory) || null;
+    const shop = webApp.shop;
+    if (!shop) return msg.reply('Web shop unavailable (shop module).');
+    if (category) shop.setTicketCfg(msg.guild.id, { categoryId: category.id });
+    const payload = { embeds: [buildTicketPanelEmbed()], components: [ticketPanelRow()] };
+    const cfg = shop.getTicketCfg(msg.guild.id) || {};
+
+    // 1) Prefer editing the known panel message (no second panel).
+    if (cfg.panelChannelId) {
+      try {
+        const candidates = [];
+        const push = (c) => { if (c && c.messages?.fetch && !candidates.includes(c)) candidates.push(c); };
+        const known = cfg.panelSourceChannelId &&
+          (msg.guild.channels.cache.get(String(cfg.panelSourceChannelId)) || await msg.guild.channels.fetch(String(cfg.panelSourceChannelId)).catch(() => null));
+        if (known) push(known);
+        push(msg.channel);
+        const all = await msg.guild.channels.fetch().catch(() => null);
+        if (all) for (const c of all.values()) if (c && c.type === ChannelType.GuildText) push(c);
+        for (const c of candidates.slice(0, 80)) {
+          const old = await c.messages.fetch(cfg.panelChannelId).catch(() => null);
+          if (old?.edit) {
+            await old.edit(payload);
+            shop.setTicketCfg(msg.guild.id, { panelSourceChannelId: c.id, categoryId: category?.id || cfg.categoryId || null });
+            return msg.reply({ content: '♻️ Ticket panel updated (no duplicate).' + (category ? ' Category: ' + category.name : '') }).catch(() => {});
+          }
+        }
+      } catch (e) { console.error('[ticket] update panel', e?.message || e); }
+    }
+
+    // 2) Search any existing message with the open-ticket button in recent history
+    //    of the current channel (covers restarts where panelChannelId was lost).
     try {
-      const candidates = [];
-      const push = (c) => { if (c && c.messages?.fetch && !candidates.includes(c)) candidates.push(c); };
-      const known = cfg.panelSourceChannelId &&
-        (msg.guild.channels.cache.get(String(cfg.panelSourceChannelId)) || await msg.guild.channels.fetch(String(cfg.panelSourceChannelId)).catch(() => null));
-      if (known) push(known);
-      push(msg.channel);
-      const all = await msg.guild.channels.fetch().catch(() => null);
-      if (all) for (const c of all.values()) push(c);
-      for (const c of candidates.slice(0, 60)) {
-        const old = await c.messages.fetch(cfg.panelChannelId).catch(() => null);
-        if (old?.edit) {
-          await old.edit(payload);
-          shop.setTicketCfg(msg.guild.id, { panelSourceChannelId: c.id });
-          return msg.reply({ content: '♻️ Ticket panel mis à jour (aucun doublon).' + (category ? ' Category: ' + category.name : '') }).catch(() => {});
+      const recent = await msg.channel.messages.fetch({ limit: 30 }).catch(() => null);
+      if (recent) {
+        for (const m of recent.values()) {
+          if (m.author?.id !== msg.client.user.id) continue;
+          const hasBtn = (m.components || []).some((row) =>
+            (row.components || []).some((b) => String(b.customId || '') === 'ticket_claim_open')
+          );
+          if (hasBtn && m.edit) {
+            await m.edit(payload);
+            shop.setTicketCfg(msg.guild.id, {
+              panelChannelId: m.id,
+              panelSourceChannelId: msg.channel.id,
+              categoryId: category?.id || cfg.categoryId || null,
+            });
+            return msg.reply({ content: '♻️ Existing ticket panel updated (no duplicate).' + (category ? ' Category: ' + category.name : '') }).catch(() => {});
+          }
         }
       }
-    } catch (e) { console.error('[ticket] update panel', e?.message || e); }
+    } catch (e) { console.error('[ticket] scan panel', e?.message || e); }
+
+    // 3) No panel found → post exactly one.
+    const sent = await msg.channel.send(payload);
+    shop.setTicketCfg(msg.guild.id, {
+      panelChannelId: sent?.id || null,
+      panelSourceChannelId: sent?.channel?.id || msg.channel?.id || null,
+      categoryId: category?.id || shop.getTicketCfg(msg.guild.id)?.categoryId || null,
+    });
+    return msg.reply({ content: 'Ticket panel posted.' + (category ? ' Category: ' + category.name : ' (optional: /ticketsetup + category)') }).catch(() => {});
+  } finally {
+    panelLocks.delete(guildId);
+    if (resolveLock) resolveLock();
   }
-  const sent = await msg.channel.send(payload);
-  shop.setTicketCfg(msg.guild.id, {
-    panelChannelId: sent?.id || null,
-    panelSourceChannelId: sent?.channel?.id || msg.channel?.id || null,
-    categoryId: category?.id || shop.getTicketCfg(msg.guild.id)?.categoryId || null,
-  });
-  return msg.reply({ content: 'Ticket panel posted.' + (category ? ' Category: ' + category.name : ' (optional: /ticketsetup + category)') }).catch(() => {});
 }
 
 async function handleTicketButton(i) {
@@ -9013,15 +9049,13 @@ async function handleTicketButton(i) {
     if (!i.guild || !i.channel) return i.reply({ content: 'Only usable inside a ticket.', flags: EPH });
     const isOwner = i.guild.ownerId === i.user.id;
     const isAdm = i.memberPermissions?.has?.(PermissionFlagsBits.ManageChannels) || isOwner;
-    if (!isAdm) return i.reply({ content: 'Only the server owner or staff can mark a reward as delivered.', flags: EPH });
-    const code = i.customId.split('|')[1];
+    if (!isAdm) return i.reply({ content: 'Only the server owner / staff can mark a reward as delivered.', flags: EPH });
+    const code = String(i.customId.split('|')[1] || '').trim().toUpperCase();
     const shop = webApp.shop;
     if (!shop) return i.reply({ content: 'Shop unavailable.', flags: EPH });
-    const order = shop.getOrder(code);
-    if (!order) return i.reply({ content: '❌ Order code not found.', flags: EPH });
-    if (order.status === 'delivered') return i.reply({ content: '✅ Already marked as delivered.', flags: EPH });
+    let order;
     try {
-      await shop.markDelivered(code);
+      order = await shop.markDelivered(code);
     } catch (e) {
       return i.reply({ content: '❌ Could not update order: ' + (e?.message || e), flags: EPH });
     }
@@ -9042,9 +9076,9 @@ async function handleTicketButton(i) {
     try {
       await i.channel.send(`✅ **Reward delivered** by <@${i.user.id}>\nOrder code \`${code}\` (\`${order.rewardName}\`) is now closed and can no longer be used.`);
     } catch {}
-    // MP Discord : l'acheteur est prévenu que sa récompense est bien livrée.
+    // DM the buyer
     try {
-      await dmUser(order.uid, '🎉 **Récompense reçue**\nVotre récompense **' + order.rewardName + '** (code `' + code + '`) vient d’être marquée comme **livrée** sur le serveur Discord. Merci pour votre achat !');
+      await dmUser(order.uid, '🎉 **Reward received**\nYour reward **' + order.rewardName + '** (code `' + code + '`) has been marked as **delivered** on the Discord server. Thank you for your purchase!');
     } catch {}
     return true;
   }
@@ -9069,64 +9103,83 @@ async function handleTicketModal(i) {
   const shop = webApp.shop;
   if (!shop) return i.reply({ content: 'Shop unavailable.', flags: EPH });
 
+  // Acknowledge immediately so Discord does not allow a second submit while we work.
+  try { await i.deferReply({ flags: EPH }); } catch { /* already replied */ }
+
   // STRICT validation FIRST — never create a ticket on invalid/foreign/delivered codes.
-  // Prefer the async Supabase lookup (the shop polls it for codes placed on the website);
-  // fall back to the in-memory sync lookup for older orders.
   const order = (shop.getOrderAsync ? await shop.getOrderAsync(code) : null) || shop.getOrder(code);
   if (!order) {
-    return i.reply({ content: '❌ Invalid order code. Check the code from the website and try again in a few seconds.', flags: EPH });
+    return i.editReply({ content: '❌ Invalid order code. Check the code from the website and try again in a few seconds.' }).catch(() => {});
   }
   if (String(order.uid) !== String(i.user.id)) {
-    return i.reply({ content: '❌ This code does not belong to you. No ticket created.', flags: EPH });
+    return i.editReply({ content: '❌ This code does not belong to you. No ticket created.' }).catch(() => {});
   }
   if (order.status === 'delivered') {
-    return i.reply({ content: '✅ This order was already delivered. The code no longer works.', flags: EPH });
+    return i.editReply({ content: '✅ This order was already delivered. The code no longer works.' }).catch(() => {});
   }
-
-  // Role rewards are delivered instantly by the website with NO order code.
-  // Any legacy role order must never open a ticket (that used to duplicate channels/messages/roles).
   if (order.type === 'role') {
-    return i.reply({ content: '✅ Role rewards are added automatically when purchased on the site. No ticket or order code is needed.', flags: EPH });
+    return i.editReply({ content: '✅ Role rewards are added automatically when purchased on the site. No ticket or order code is needed.' }).catch(() => {});
   }
 
-  const cfg = shop.getTicketCfg(i.guild.id) || {};
-  const parent = cfg.categoryId || undefined;
-  const slugName = String(order.rewardName || 'reward')
-    .toLowerCase()
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 80) || 'reward';
-  const base = `${slugName}-${order.code}`.toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 90);
-
-  // Idempotency: never create a second ticket for the same order code, even if
-  // the modal is submitted twice. Fetch via the API (not only the cache) so an
-  // existing ticket is detected after a restart too.
-  const topicTag = `Order ${order.code} ·`;
-  if (ticketCreating.has(order.code)) {
-    return i.reply({ content: '⏳ Un ticket est déjà en cours de création pour cette commande.', flags: EPH });
-  }
-  ticketCreating.add(order.code);
-  let ch;
-  try {
-    // 1) Mémoire persistante : le salon créé la fois précédente (survit au redémarrage).
+  // Global per-code lock: a second concurrent submit waits, then reuses the same channel.
+  if (ticketLocks.has(order.code)) {
+    try { await ticketLocks.get(order.code); } catch { /* ignore */ }
     const saved = shop.getTicketChannel ? shop.getTicketChannel(order.code) : null;
     if (saved?.channelId) {
       const known = await i.guild.channels.fetch(saved.channelId).catch(() => null);
       if (known) {
-        return i.reply({ content: `✅ Ticket already opened in #${known.name} — ${known}`, flags: EPH });
+        return i.editReply({ content: `${known}` }).catch(() => {});
       }
-      shop.clearTicketChannel ? shop.clearTicketChannel(order.code) : null;
     }
-    // 2) Repli : recherche par topic ou par nom (tickets créés avant cette correction).
+    return i.editReply({ content: '⏳ A ticket is already being created for this order. Check the channel list.' }).catch(() => {});
+  }
+
+  let resolveLock, rejectLock;
+  const lockP = new Promise((res, rej) => { resolveLock = res; rejectLock = rej; });
+  ticketLocks.set(order.code, lockP);
+
+  try {
+    const cfg = shop.getTicketCfg(i.guild.id) || {};
+    const parent = cfg.categoryId || undefined;
+    const slugName = String(order.rewardName || 'reward')
+      .toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 80) || 'reward';
+    // Keep the order code fully visible in the channel name for reliable dedup.
+    const codePart = String(order.code).toLowerCase().replace(/[^a-z0-9]/g, '');
+    const base = (`${slugName}-${codePart}`).slice(0, 90);
+    const topicTag = `Order ${order.code} ·`;
+
+    // 1) Persistent map (survives bot restart)
+    const saved = shop.getTicketChannel ? shop.getTicketChannel(order.code) : null;
+    if (saved?.channelId) {
+      const known = await i.guild.channels.fetch(saved.channelId).catch(() => null);
+      if (known) {
+        resolveLock();
+        return i.editReply({ content: `${known}` }).catch(() => {});
+      }
+      if (shop.clearTicketChannel) shop.clearTicketChannel(order.code);
+    }
+
+    // 2) Live search: topic starts with "Order CODE ·" OR name contains the code
     const channels = await i.guild.channels.fetch().catch(() => i.guild.channels.cache);
-    const existing = [...(channels?.values?.() || [])].find((c) => c && c.type === ChannelType.GuildText &&
-      (String(c.topic || '').startsWith(topicTag) || c.name === base));
+    const list = [...(channels?.values?.() || [])];
+    const existing = list.find((c) => {
+      if (!c || c.type !== ChannelType.GuildText) return false;
+      const topic = String(c.topic || '');
+      const name = String(c.name || '').toLowerCase();
+      return topic.startsWith(topicTag) || name.includes(codePart) || name === base;
+    });
     if (existing) {
-      shop.setTicketChannel ? shop.setTicketChannel(order.code, existing.id, i.guild.id) : null;
-      return i.reply({ content: `✅ Ticket already opened in #${existing.name} — ${existing}`, flags: EPH });
+      if (shop.setTicketChannel) shop.setTicketChannel(order.code, existing.id, i.guild.id);
+      resolveLock();
+      return i.editReply({ content: `${existing}` }).catch(() => {});
     }
-    ch = await i.guild.channels.create({
+
+    // 3) Create exactly once
+    const ch = await i.guild.channels.create({
       name: base,
       type: ChannelType.GuildText,
       parent: parent || null,
@@ -9138,39 +9191,43 @@ async function handleTicketModal(i) {
       ],
       reason: `Claim reward ${order.code}`,
     });
-    shop.setTicketChannel ? shop.setTicketChannel(order.code, ch.id, i.guild.id) : null;
+    if (shop.setTicketChannel) shop.setTicketChannel(order.code, ch.id, i.guild.id);
+
+    const embed = new EmbedBuilder()
+      .setColor(COLORS.violet)
+      .setTitle(String(order.rewardName || 'Reward'))
+      .setDescription(
+        `**Player:** <@${i.user.id}>\n**Order code:** \`${order.code}\`\n**Type:** ${order.type}\n**Price paid:** ${order.price} ${COIN_PLAIN}\n**Ticket:** ${ch}\n\n` +
+          (order.type === 'nitro'
+            ? 'Staff: deliver the Nitro, then click **Mark delivered**.'
+            : 'Staff: deliver the reward, then click **Mark delivered**.')
+      )
+      .setTimestamp();
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId('ticket_claim_deliver|' + order.code)
+        .setLabel('Mark delivered')
+        .setEmoji('✅')
+        .setStyle(ButtonStyle.Success),
+      new ButtonBuilder().setCustomId('ticket_claim_close').setLabel('Close ticket').setStyle(ButtonStyle.Danger)
+    );
+    await ch.send({
+      content: `<@${i.user.id}>`,
+      embeds: [embed],
+      components: [row],
+    });
+    // Reply = ONLY the channel mention (as requested).
+    await i.editReply({ content: `${ch}` }).catch(() => {});
+    resolveLock();
+    return true;
   } catch (e) {
     console.error('[ticket]', e);
-    return i.reply({ content: 'Could not create the channel (bot needs Manage Channels).', flags: EPH });
+    rejectLock(e);
+    return i.editReply({ content: 'Could not create the channel (bot needs Manage Channels).' }).catch(() => {});
   } finally {
-    ticketCreating.delete(order.code);
+    // Keep the lock briefly so a near-simultaneous submit still hits the map / saved channel.
+    setTimeout(() => ticketLocks.delete(order.code), 4000);
   }
-
-  const embed = new EmbedBuilder()
-    .setColor(COLORS.violet)
-    .setTitle(String(order.rewardName || 'Reward'))
-    .setDescription(
-      `**Player:** <@${i.user.id}>\n**Order code:** \`${order.code}\`\n**Type:** ${order.type}\n**Price paid:** ${order.price} ${COIN_PLAIN}\n**Ticket:** ${ch}\n\n` +
-        (order.type === 'nitro'
-          ? 'Staff: deliver the Nitro, then click **Mark delivered**.'
-          : 'Staff: deliver the reward, then click **Mark delivered**.')
-    )
-    .setTimestamp();
-  const row = new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setCustomId('ticket_claim_deliver|' + order.code)
-      .setLabel('Mark delivered')
-      .setEmoji('✅')
-      .setStyle(ButtonStyle.Success),
-    new ButtonBuilder().setCustomId('ticket_claim_close').setLabel('Close ticket').setStyle(ButtonStyle.Danger)
-  );
-  await ch.send({
-    content: `<@${i.user.id}> Ticket opened for order \`${order.code}\` — ${ch}`,
-    embeds: [embed],
-    components: [row],
-  });
-  await i.reply({ content: `✅ Ticket opened in #${ch.name} — ${ch}\nOrder code: \`${code}\``, flags: EPH });
-  return true;
 }
 
 
