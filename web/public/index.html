@@ -4961,26 +4961,36 @@ $('#me').onclick = async (e) => {
   menuClose();
   const opening = !w.classList.contains('open');
   w.classList.toggle('open');
-  // Refresh ZTKN only when opening the profile panel
-  if (opening) {
-    const balEl = document.getElementById('meBal');
-    if (balEl) balEl.textContent = '…';
-    try {
+  if (!opening) return;
+  // Always pull fresh balance from server when opening profile
+  const balEl = document.getElementById('meBal');
+  if (balEl) balEl.textContent = '…';
+  try {
+    // 1) dedicated bal action (authoritative)
+    const ok = await send('bal');
+    const d = send.last || {};
+    let b = (ok && d.bal != null) ? d.bal : null;
+    // 2) fallback /api/me (now includes bal)
+    if (b == null) {
       const res = await fetch('/api/me?t=' + encodeURIComponent(TOKEN));
       if (res.ok) {
-        const d = await res.json();
-        if (d && d.bal != null) {
-          W.bal = d.bal;
-          if (balEl) balEl.textContent = num(d.bal) + ' ' + COIN;
-        } else if (balEl && W.bal != null) {
-          balEl.textContent = num(W.bal) + ' ' + COIN;
-        }
-      } else if (balEl && W.bal != null) {
-        balEl.textContent = num(W.bal) + ' ' + COIN;
+        const me = await res.json();
+        if (me && me.bal != null) b = me.bal;
       }
-    } catch {
-      if (balEl && W.bal != null) balEl.textContent = num(W.bal) + ' ' + COIN;
     }
+    if (b != null) {
+      W.bal = Number(b);
+      if (balEl) balEl.textContent = num(W.bal) + ' ' + COIN;
+      const ab = document.getElementById('accBal');
+      if (ab) ab.textContent = num(W.bal) + ' ' + COIN;
+    } else if (balEl && W.bal != null) {
+      balEl.textContent = num(W.bal) + ' ' + COIN;
+    } else if (balEl) {
+      balEl.textContent = '—';
+    }
+  } catch (err) {
+    console.error('wallet refresh', err);
+    if (balEl && W.bal != null) balEl.textContent = num(W.bal) + ' ' + COIN;
   }
 };
 $('#me').onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $('#me').click(); } };

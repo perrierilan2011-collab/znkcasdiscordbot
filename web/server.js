@@ -1405,7 +1405,9 @@ function init(deps) {
       if (req.method === 'GET' && url.pathname === '/api/me') {
         const u = readToken(url.searchParams.get('t'));
         if (!u) return json(res, 401, { ok: false, error: 'expired' });
-        return json(res, 200, { ok: true, uid: u.uid, name: u.name, avatar: u.avatar });
+        let bal = null;
+        try { bal = await deps.getBalance(u.uid); } catch (e) { console.error('[api/me] bal', e?.message || e); }
+        return json(res, 200, { ok: true, uid: u.uid, name: u.name, avatar: u.avatar, bal });
       }
       if (req.method === 'GET' && url.pathname === '/api/stream') return handleStream(req, res, url);
       if (req.method === 'GET' && url.pathname === '/api/top') return json(res, 200, { top: (url.searchParams.get('g') === 'poker' ? pokerStats : statsApi).top() });
