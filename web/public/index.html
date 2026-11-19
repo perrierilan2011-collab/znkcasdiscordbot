@@ -1054,6 +1054,29 @@ header .sp{flex:1 1 0}
 #pgLegend{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;font-size:11px;font-weight:700}
 #pgLegend span{padding:3px 8px;border-radius:999px;color:#0a0a0a}
 .pg-easy{background:#4ade80}.pg-med{background:#facc15}.pg-hard{background:#fb923c}.pg-vhard{background:#f87171}.pg-perfect{background:#fbbf24;box-shadow:0 0 10px rgba(251,191,36,.6)}
+#pgStages{display:flex;gap:8px;align-items:center;justify-content:center;flex-wrap:wrap}
+#pgStages .pgs{width:30px;height:8px;border-radius:99px;background:#2a2a2a;border:1px solid #3f3f46}
+#pgStages .pgs.done{background:#fbbf24;border-color:#fbbf24;box-shadow:0 0 8px rgba(251,191,36,.5)}
+#pgStages .pgs.now{background:#fff;border-color:#fff}
+#pgTotal{text-align:center;font-size:12px;font-weight:800;color:#a3a3a3;min-height:16px}
+
+/* Ban overlay (English message, countdown above the text) */
+#banBox{text-align:center}
+#banClock{font-size:clamp(28px,7vw,52px);font-weight:900;letter-spacing:.08em;color:#fbbf24;text-shadow:0 2px 16px rgba(251,191,36,.35);margin-bottom:14px}
+#banBox p{font-size:17px;font-weight:800;color:#f5f5f5;max-width:520px;margin:0 auto 10px;line-height:1.5}
+#banBox small{color:#a3a3a3}
+
+/* Admin : jeux + bans */
+#adGameList .aditem,#adBanList .aditem{flex-wrap:wrap}
+.adoff{opacity:.55}
+.adpill{padding:3px 8px;border-radius:999px;font-size:11px;font-weight:900}
+.adpill.on{background:#16a34a;color:#fff}.adpill.off{background:#7f1d1d;color:#fff}
+.repickgrid{display:grid;grid-template-columns:repeat(9,minmax(0,1fr));gap:4px;max-width:520px;margin:0 auto}
+.repickgrid button{padding:5px 0;border-radius:6px;border:1px solid #333;background:#111;color:#fff;font-size:12px;font-weight:800;cursor:pointer}
+.repickgrid button.r0{background:#166534}.repickgrid button.red{background:#991b1b}.repickgrid button.black{background:#1f2937}
+.repickgrid button.on{outline:2px solid #fbbf24;outline-offset:1px}
+.repickgrid button:disabled{cursor:default;opacity:.6}
+#reMyPick{text-align:center;font-weight:800;color:#fbbf24;min-height:20px}
 
 /* Penalty 1v1 */
 
@@ -1288,7 +1311,7 @@ header .sp{flex:1 1 0}
   <button class="btn go" id="mOrderCopy" style="width:100%">Copier le code</button>
   <button class="btn" id="mOrderClose" style="width:100%;margin-top:8px">Fermer</button>
 </div></div>
-<div id="gate"><div><h1>Casino</h1><p id="gatemsg">Connecte-toi avec ton compte Discord pour jouer avec ton wallet du casino.</p><a class="dsc" href="/login">Se connecter avec Discord</a><a class="join" href="https://discord.gg/Wq7UkttYGa" target="_blank" rel="noopener noreferrer">Rejoindre le serveur Discord</a></div></div>
+<div id="gate"><div><h1 id="gateTitle">Casino</h1><p id="gatemsg">Connecte-toi avec ton compte Discord pour jouer avec ton wallet du casino.</p><div id="banBox" class="hide"><div id="banClock"></div><p id="banMsg">You have been banned from this casino.</p><small id="banSub"></small></div><a class="dsc" href="/login">Se connecter avec Discord</a><a class="join" href="https://discord.gg/Wq7UkttYGa" target="_blank" rel="noopener noreferrer">Rejoindre le serveur Discord</a></div></div>
 <header>
 <nav id="topNav" aria-label="Navigation">
     <button type="button" class="navl" data-g="hub">Accueil</button>
@@ -1407,7 +1430,7 @@ header .sp{flex:1 1 0}
       </button>
       <button class="gcard" data-go="off-penguin" id="gcPenguin">
         <span class="gname">Penguin Slide</span>
-        <span class="gdesc">One tap — the penguin slides on the ice. Farther = bigger multiplier</span>
+        <span class="gdesc">4 étapes · enchaîne les PERFECT · gain maximum x3.1</span>
         <span class="gplay">Play</span>
       </button>
       <button class="gcard" data-go="off-scratch">
@@ -1429,13 +1452,15 @@ header .sp{flex:1 1 0}
 </main>
 <main id="adminView" class="hide">
   <div class="lbwrap" style="align-items:center">
-    <div class="lbhead"><div><h2>Administration</h2><p>Récompenses · Tâches · Économie · Événements · SQL</p></div></div>
+    <div class="lbhead"><div><h2>Administration</h2><p>Récompenses · Tâches · Économie · Jeux · Bans · Événements · SQL</p></div></div>
     <div class="adtabs" id="adTabs">
       <button type="button" class="on" data-ad="rewards">Récompenses</button>
       <button type="button" data-ad="tasks">Tâches</button>
       <button type="button" data-ad="orders">Commandes</button>
       <button type="button" data-ad="money">Économie</button>
       <button type="button" data-ad="ranks">Rangs RR</button>
+      <button type="button" data-ad="games">Jeux</button>
+      <button type="button" data-ad="bans">Bans</button>
       <button type="button" data-ad="events">Événements</button>
       <button type="button" data-ad="sql">SQL</button>
     </div>
@@ -1533,6 +1558,45 @@ header .sp{flex:1 1 0}
           <button type="button" class="btn" id="adRankReset" style="background:#7f1d1d">Réinitialiser les RR</button>
         </div>
         <div id="adLadderOut" class="lbnone"></div>
+      </div>
+    </section>
+    <section class="lbcol hide" id="adPanelGames" style="width:100%;max-width:1000px">
+      <div class="lbtitle"><b>Jeux activés</b><small>Désactive un jeu pour le retirer du menu · réactive-le quand tu veux</small></div>
+      <div class="adbody" style="padding:14px;display:flex;flex-direction:column;gap:10px">
+        <div class="adbtnrow"><button type="button" class="btn" id="adGamesRefresh">Actualiser</button><button type="button" class="btn go" id="adGamesAll">Tout réactiver</button></div>
+        <div class="adlist" id="adGameList"><div class="lbnone">Chargement…</div></div>
+      </div>
+    </section>
+    <section class="lbcol hide" id="adPanelBans" style="width:100%;max-width:1000px">
+      <div class="lbtitle"><b>Bannir un joueur</b><small>Message en anglais · permanent ou avec chrono au-dessus du texte</small></div>
+      <div class="adbody" style="padding:14px;display:flex;flex-direction:column;gap:10px">
+        <div class="adbtnrow">
+          <input class="gin" id="adBanSearch" placeholder="Rechercher un joueur…" aria-label="Rechercher un joueur" style="width:220px">
+          <button type="button" class="btn" id="adBanFind">Rechercher</button>
+          <button type="button" class="btn" id="adBanRefresh">Joueurs en ligne</button>
+          <input type="hidden" id="adBanUid" value="">
+        </div>
+        <div class="ecosel">Joueur sélectionné : <b id="adBanName">Aucun</b></div>
+        <div class="ecolist" id="adBanList"><div class="lbnone">Chargement des joueurs…</div></div>
+        <div class="adfields">
+          <label>Durée
+            <select id="adBanDuration">
+              <option value="perm">À vie (permanent)</option>
+              <option value="60">1 heure</option>
+              <option value="1440">24 heures</option>
+              <option value="10080">7 jours</option>
+              <option value="43200">30 jours</option>
+            </select>
+          </label>
+          <label>Raison (facultative)<input class="gin" id="adBanReason" maxlength="120" placeholder="ex : cheating"></label>
+        </div>
+        <div class="adbtnrow">
+          <button type="button" class="btn" id="adBanDo" style="background:#7f1d1d">🚫 Ban</button>
+          <button type="button" class="btn" id="adBanUndo">✅ Unban le joueur sélectionné</button>
+        </div>
+        <div id="adBanOut" class="lbnone" style="white-space:pre-wrap"></div>
+        <div class="lbtitle"><b>Bans actifs</b></div>
+        <div class="adlist" id="adBanActive"><div class="lbnone">Aucun ban</div></div>
       </div>
     </section>
     <section class="lbcol hide" id="adPanelEvents" style="width:100%;max-width:1000px">
@@ -2090,6 +2154,11 @@ create table if not exists roulette_event_results (
     <div class="rehead"><span id="reCount" class="reclock">—</span><span id="reStatus" class="reclock"></span></div>
     <div class="restage"><canvas id="reCanvas" width="560" height="560"></canvas><div id="reNeedle" class="reneedle"></div><div id="reWinner" class="rewinner hide"></div></div>
     <div id="reNames" class="renames"></div>
+    <div id="reSpinLabel" style="text-align:center;font-weight:900;color:#fbbf24;min-height:18px"></div>
+    <div id="rePickBox" class="hide" style="margin-top:10px">
+      <div id="reMyPick"></div>
+      <div id="rePickGrid" class="repickgrid"></div>
+    </div>
   </div>
   <div id="evB"></div>
   <div id="reActions" class="adbtnrow hide" style="justify-content:center">
@@ -2231,13 +2300,46 @@ async function send(action, extra = {}, _retry = 0) {
       return send(action, extra, _retry + 1);
     }
     const d = await r.json(); send.last = d;
+    if (d.banned) { showBan(d.ban); return false; }
     if (d.rbal != null) W.bal = d.rbal;
     if (d.ok && !/^(shop_list|shop_orders|tasks_list|profile|my_stats|admin_)/.test(action)) queueLiveRefresh(300);
     if (!d.ok) { toast(d.error || 'Erreur'); if (r.status === 401) showGate('Ta session a expiré : reconnecte-toi avec Discord.'); }
     return d.ok;
   } catch { toast('Connexion perdue…'); return false; }
 }
-function showGate(t) { const gm = document.getElementById('gatemsg'); if (gm && t) gm.textContent = t; const g = document.getElementById('gate'); if (g) g.classList.add('on'); try { localStorage.removeItem('znk_t'); } catch(e) {} }
+function showGate(t) { const gm = document.getElementById('gatemsg'); if (gm && t) gm.textContent = t; const g = document.getElementById('gate'); if (g) g.classList.add('on'); const bb = document.getElementById('banBox'); if (bb) bb.classList.add('hide'); try { localStorage.removeItem('znk_t'); } catch(e) {} }
+
+// ---- bannissement : message anglais, chrono au-dessus du texte ----
+let banClockTimer = 0;
+function banClockText(ms) {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60), ss = s % 60;
+  const p = (x) => String(x).padStart(2, '0');
+  return d ? d + 'd ' + p(h) + ':' + p(m) + ':' + p(ss) : p(h) + ':' + p(m) + ':' + p(ss);
+}
+function showBan(b) {
+  const g = document.getElementById('gate'); if (!g) return;
+  const box = document.getElementById('banBox'), clock = document.getElementById('banClock');
+  const msg = document.getElementById('banMsg'), sub = document.getElementById('banSub');
+  const gt = document.getElementById('gatemsg'), title = document.getElementById('gateTitle');
+  const until = Number(b && b.until) || 0;
+  if (title) title.textContent = 'Banned';
+  if (gt) gt.classList.add('hide');
+  if (box) box.classList.remove('hide');
+  if (clock) { clock.textContent = until ? '⏳ ' + banClockText(until - Date.now()) : ''; clock.classList.toggle('hide', !until); }
+  if (msg) msg.textContent = until ? 'You have been banned from this casino.' : 'You have been banned from this casino permanently.';
+  if (sub) sub.textContent = b && b.reason ? 'Reason: ' + b.reason : '';
+  g.querySelectorAll('.dsc, .join').forEach((x) => x.classList.add('hide'));
+  g.classList.add('on');
+  clearInterval(banClockTimer);
+  if (until) banClockTimer = setInterval(() => {
+    const left = until - Date.now();
+    if (left <= 0) { clearInterval(banClockTimer); location.reload(); return; }
+    if (clock) clock.textContent = '⏳ ' + banClockText(left);
+  }, 1000);
+  try { localStorage.removeItem('znk_t'); } catch {}
+  try { if (es) es.close(); } catch {}
+}
 
 let es;
 let RK_INFO = { min: 1, max: 1e8, rockets: [], betSeconds: 15, houseEdge: .05 };
@@ -2248,6 +2350,8 @@ function connect() {
   es.addEventListener('hello', (e) => {
     try {
       const d = JSON.parse(e.data); me = d; connect._fails = 0;
+      if (d.ban) { showBan(d.ban); return; }
+      if (Array.isArray(d.gamesOff)) applyGameFlags(d.gamesOff);
       COIN = d.coin && d.coin !== '🪙' ? d.coin : 'ZTKN'; seatsN = d.seats || 5;
       const coinEl = document.getElementById('coin'); if (coinEl) coinEl.textContent = COIN;
       const mn = document.getElementById('meName'); if (mn) mn.textContent = d.name;
@@ -2286,6 +2390,9 @@ es.addEventListener('tasks_tick', () => {
 es.addEventListener('rank', (e) => { try { const d = JSON.parse(e.data); if (W.view === 'rank') { rkRenderMe(d); rkRenderElo(d); rkRenderLadder(d); } } catch {} queueLiveRefresh(100); });
   es.addEventListener('poker', (e) => { const st = JSON.parse(e.data); offset = st.now - Date.now(); pUpdate(st); });
   es.addEventListener('admin', () => $('#bAdmin').classList.remove('hide'));
+  es.addEventListener('games', (e) => { try { applyGameFlags(JSON.parse(e.data).games || []); } catch {} });
+  es.addEventListener('banned', (e) => { try { showBan(JSON.parse(e.data).ban); } catch {} });
+  es.addEventListener('unbanned', () => location.reload());
   es.addEventListener('bal', (e) => {
     try {
       const nb = JSON.parse(e.data).bal;
@@ -2639,6 +2746,7 @@ $('#chatForm').onsubmit = async (e) => {
 
 // ============================================================= ROULETTE
 const W = { btid: 0, bman: false, info: null, S: null, view: 'hub', bal: null, joined: false, round: -1, shownRound: -1, lastIdx: -1, lastTick: 0 };
+const GAME_OFF = new Set(); // jeux désactivés par l'admin (déclaré tôt : utilisé par setView)
 const TAUW = Math.PI * 2;
 const RLAB = { red: 'Rouge', black: 'Noir', even: 'Pair', odd: 'Impair', low: '1-18', high: '19-36', d1: '1re douzaine', d2: '2e douzaine', d3: '3e douzaine', c1: 'Colonne 1', c2: 'Colonne 2', c3: 'Colonne 3' };
 const rLabel = (k) => RLAB[k] || k.slice(1);
@@ -3231,6 +3339,7 @@ async function loadGameLB(view, quiet = false) {
 }
 
 function setView(v) {
+  if (typeof GAME_OFF !== 'undefined' && GAME_OFF.has(v)) { v = 'hub'; toast('This game is currently disabled.'); }
   if (v === W.view) return;
   if (W.view.startsWith('off-') && O.game === 'fuse' && O.st && !O.st.over && !confirm('Une fusée est en vol : tu perdras ta mise si tu quittes.')) return;
   if (W.view.startsWith('off-')) { ofStop(); O.run++; ofRelease(); }
@@ -3437,6 +3546,7 @@ function lbWatch(on) {
 // ---- page Admin : ajout d'argent + événements (mêmes événements que le bot Discord)
 const AD_TYPES = [
   { id: 'roulette', label: '🎡 Roulette', desc: 'Roue avec pseudos + photos de profil. Tirage après le chrono (en secondes), ZTKN au gagnant.', f: ['amount', 'seconds'], min: 60, minLbl: 'Durée avant tirage (secondes)' },
+  { id: 'closest', label: '🎯 Plus proche', desc: 'Les joueurs choisissent un numéro 0-36 : une vraie roulette tourne et le plus proche du numéro tiré gagne la mise.', f: ['amount', 'seconds'], min: 60, minLbl: 'Durée avant tirage (secondes)' },
   { id: 'claim', label: 'Claim rapide', desc: 'Les N premiers qui cliquent gagnent', f: ['amount', 'winners', 'minutes'], min: 5, minLbl: 'Durée max (0 = illimité)' },
   { id: 'giveaway', label: 'Giveaway', desc: 'Inscriptions, tirage à la fin du timer', f: ['amount', 'winners', 'minutes'], min: 10, minLbl: 'Durée avant tirage (min)' },
   { id: 'x2win', label: 'x2 Gains', desc: 'Tous les gains sont doublés pendant X min', f: ['minutes'], min: 15 },
@@ -3471,7 +3581,7 @@ function adInit() {
     b.disabled = true; const ok = await send('adminevent', body); b.disabled = false;
     if (ok) {
       SFX.win(); toast('Événement lancé : ' + t.label);
-      if (t.id === 'roulette') { reSetEvent((send.last && send.last.event) || null, true); reOpen(); }
+      if (t.id === 'roulette' || t.id === 'closest') { reSetEvent((send.last && send.last.event) || null, true); reOpen(); }
     }
   };
 }
@@ -4169,6 +4279,7 @@ async function osend(action, extra = {}) {
   try {
     const r = await fetch('/api/act', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ t: TOKEN, action, game: O.game, ...extra }) });
     const d = await r.json();
+    if (d.banned) { showBan(d.ban); return null; }
     if (d.now) offset = d.now - Date.now();
     if (d.bal != null) { O.bal = d.bal; W.bal = d.bal; if (!O.hold) $('#meBal').textContent = num(d.bal) + ' ' + COIN; }
     if (!d.ok) { toast(d.error || 'Erreur'); if (r.status === 401) showGate('Ta session a expiré : reconnecte-toi avec Discord.'); return null; }
@@ -4179,21 +4290,35 @@ const ofStop = () => { clearInterval(O.timer); O.timer = 0; };
 
 // ===== Penguin Slide (skill semi-circles) =====
 const PG = {
-  raf: 0, angle: 0, dir: 1, running: false, wheel: 1,
-  // zones as fractions of the semi-circle (0..1 left→right). Perfect is tiny center.
+  raf: 0, angle: 0, dir: 1, running: false, stage: 1,
+  // zones as fractions of the semi-circle (0..1 left→right). PERFECT is a tiny center (4%).
   // layout mirrored around center: easy | med | hard | vhard | PERFECT | vhard | hard | med | easy
   bands: [
-    { id: 1, a: 0.00, b: 0.16, color: '#4ade80' },
-    { id: 2, a: 0.16, b: 0.30, color: '#facc15' },
-    { id: 3, a: 0.30, b: 0.40, color: '#fb923c' },
-    { id: 4, a: 0.40, b: 0.46, color: '#f87171' },
-    { id: 5, a: 0.46, b: 0.54, color: '#fbbf24' }, // perfect
-    { id: 4, a: 0.54, b: 0.60, color: '#f87171' },
-    { id: 3, a: 0.60, b: 0.70, color: '#fb923c' },
-    { id: 2, a: 0.70, b: 0.84, color: '#facc15' },
-    { id: 1, a: 0.84, b: 1.00, color: '#4ade80' },
+    { id: 1, a: 0.00, b: 0.18, color: '#4ade80' },
+    { id: 2, a: 0.18, b: 0.33, color: '#facc15' },
+    { id: 3, a: 0.33, b: 0.44, color: '#fb923c' },
+    { id: 4, a: 0.44, b: 0.48, color: '#f87171' },
+    { id: 5, a: 0.48, b: 0.52, color: '#fbbf24' }, // perfect — très étroit
+    { id: 4, a: 0.52, b: 0.56, color: '#f87171' },
+    { id: 3, a: 0.56, b: 0.67, color: '#fb923c' },
+    { id: 2, a: 0.67, b: 0.82, color: '#facc15' },
+    { id: 1, a: 0.82, b: 1.00, color: '#4ade80' },
   ],
+  add: { 1: 0.05, 2: 0.12, 3: 0.22, 4: 0.35, 5: 0.55 }, // bonus par zone (serveur)
 };
+function pgStagesRender(stage, zones) {
+  const box = document.getElementById('pgStages'); if (!box) return;
+  box.textContent = '';
+  for (let i = 1; i <= 4; i++) {
+    const d = el('i', 'pgs' + (zones && zones[i - 1] === 5 ? ' done' : (i === stage ? ' now' : '')));
+    box.append(d);
+  }
+  const t = document.getElementById('pgTotal');
+  if (t) {
+    let add = 0; (zones || []).forEach((z) => { add += PG.add[z] || 0; });
+    t.textContent = (zones && zones.length) ? ('Étape ' + (stage || zones.length) + '/4 · total x' + ((1 + add) * 0.97).toFixed(2)) : '4 étapes · un PERFECT à chaque fois · max x3.10';
+  }
+}
 function pgZoneAt(t) {
   t = Math.max(0, Math.min(0.999, t));
   for (const b of PG.bands) if (t >= b.a && t < b.b) return b.id;
@@ -4229,8 +4354,8 @@ function pgSetNeedle(t) {
   const deg = -90 + t * 180;
   n.style.transform = `rotate(${deg}deg)`;
 }
-function pgShowSkill(on, wheel) {
-  PG.wheel = wheel || 1;
+function pgShowSkill(on, stage, zones) {
+  PG.stage = Math.max(1, Math.min(4, Number(stage) || 1));
   const meter = document.getElementById('pgMeter');
   const stop = document.getElementById('pgStop');
   const leg = document.getElementById('pgLegend');
@@ -4238,9 +4363,10 @@ function pgShowSkill(on, wheel) {
   if (meter) meter.classList.toggle('hide', !on);
   if (stop) stop.classList.toggle('hide', !on);
   if (leg) leg.classList.toggle('hide', !on);
+  pgStagesRender(on ? PG.stage : 0, zones);
   if (on) {
     pgDrawMeter();
-    if (hint) hint.textContent = wheel === 2 ? 'SECOND wheel — stop the needle!' : 'Stop the needle as close to PERFECT as you can';
+    if (hint) hint.textContent = 'STAGE ' + PG.stage + '/4 · PERFECT to advance · stop the needle!';
     pgStartSwing();
   } else {
     pgStopSwing();
@@ -4252,7 +4378,8 @@ function pgStartSwing() {
   PG.running = true;
   PG.angle = 0;
   PG.dir = 1;
-  const speed = PG.wheel === 2 ? 0.018 : 0.014; // second wheel slightly faster
+  // l'aiguille accélère à chaque étape : 0.014 → 0.026
+  const speed = 0.014 + (PG.stage - 1) * 0.004;
   const tick = () => {
     if (!PG.running) return;
     PG.angle += speed * PG.dir;
@@ -4304,17 +4431,18 @@ function pgRender(s) {
       peng.style.transform = 'none';
     }
     if (arena) arena.querySelectorAll('.pg-trail').forEach((e) => e.remove());
-    if (s && (s.phase === 'aim1' || s.phase === 'aim2')) {
-      if (res) res.textContent = s.phase === 'aim2' ? 'Perfect! Bonus wheel' : 'Aim carefully…';
-      pgShowSkill(true, s.phase === 'aim2' ? 2 : 1);
+    if (s && /^aim\d+$/.test(s.phase)) {
+      const stage = Number(s.stage) || 1;
+      if (res) res.textContent = stage > 1 ? 'Perfect! Stage ' + stage + '/4 — keep going' : 'Aim carefully…';
+      pgShowSkill(true, stage, s.zones || []);
     } else {
       if (res) res.textContent = 'Place a bet, then press Play';
-      pgShowSkill(false);
+      pgShowSkill(false, 1, []);
     }
     return;
   }
   // finished — slide animation based on score distance
-  pgShowSkill(false);
+  pgShowSkill(false, 4, s.zones || []);
   const dist = Number(s.dist) || 0;
   const ms = Math.max(900, Number(s.flightMs) || 1200);
   const target = 8 + dist * 0.82;
@@ -4350,7 +4478,7 @@ function pgRender(s) {
   }
   if (res) {
     setTimeout(() => {
-      res.textContent = dist + ' m · x' + (s.mult || 0) + (s.win > 0 ? ' · +' + num(s.win) : ' · lost');
+      res.textContent = dist + ' m · x' + (s.mult || 0) + ' · ' + ((s.zones || []).length || 1) + '/4 étapes' + (s.win > 0 ? ' · +' + num(s.win) : ' · lost');
       res.classList.add('pg-pop');
       setTimeout(() => res.classList.remove('pg-pop'), 600);
     }, Math.min(ms, 1000));
@@ -4404,14 +4532,17 @@ function ofBuild() {
     b.innerHTML = `<div id="pgWrap">
       <div id="pgArena"><div id="pgIce"></div><div id="pgPeng">🐧</div></div>
       <div id="pgResult">Place a bet, then stop the needle</div>
+      <div id="pgStages"></div>
+      <div id="pgTotal"></div>
       <div id="pgHint"></div>
       <div id="pgMeter" class="hide"></div>
       <div id="pgLegend" class="hide">
         <span class="pg-easy">Easy</span><span class="pg-med">Medium</span><span class="pg-hard">Hard</span>
-        <span class="pg-vhard">Very hard</span><span class="pg-perfect">PERFECT → 2nd wheel</span>
+        <span class="pg-vhard">Very hard</span><span class="pg-perfect">PERFECT → next stage (4/4)</span>
       </div>
       <button type="button" class="btn go hide" id="pgStop">STOP</button>
     </div>`;
+    pgStagesRender(1, []);
   } else if (O.game === 'bj') {
     t.append(el('div', 'shoe'));
     b.innerHTML = '<div class="dname">CROUPIER</div><div class="cards" id="oDc"></div><div id="oDt"></div><div class="omsg" id="oMsg"></div><div class="dname">TOI</div><div class="cards" id="oPc"></div><div id="oPt"></div><div class="betspot" id="oBs"></div>';
@@ -4583,7 +4714,7 @@ function ofDock() {
   if (O.anim) { row(act('go', 'En cours…', () => {}, false)); return; }
   if (live) {
     if (O.game === 'penguin') {
-      d.append(el('div', 'hint', s.phase === 'aim2' ? 'SECOND wheel — click STOP on the meter above' : 'Click STOP on the colored semi-circle above'));
+      d.append(el('div', 'hint', 'Étape ' + (Number(s.stage) || 1) + '/4 — click STOP on the colored semi-circle above; PERFECT unlocks the next stage'));
       return;
     }
     if (O.game === 'mines') { row(act('go', 'Encaisser ' + num(s.cash) + ' ' + COIN, () => ofMove('cash'), s.picks.length)); d.append(el('div', 'hint', s.picks.length ? 'Chaque case sûre augmente le gain : encaisse avant de toucher une mine.' : 'Révèle au moins une case pour pouvoir encaisser.')); }
@@ -4982,6 +5113,22 @@ requestAnimationFrame(ofLoop);
 
 // ============================================================= PARAMÈTRES (langue)
 const EN_DICT = {"Casino":"Casino","Mes dernières commandes":"My recent orders","Code de commande et statut de livraison · le code est aussi envoyé en MP Discord":"Order code and delivery status · the code is also sent by Discord DM","Aucune commande pour le moment.":"No orders yet.","✅ Livré":"✅ Delivered","⏳ En attente":"⏳ Pending","Copier":"Copy","Livraison terminée":"Delivery complete","Livraison via ticket Discord":"Delivery via Discord ticket","Joueur sélectionné :":"Selected player:","Aucun":"None","Rechercher un joueur…":"Search a player…","Chargement des joueurs…":"Loading players…","Aucun joueur en ligne":"No online players","En ligne":"Online","Hors ligne":"Offline","Récompenses actives":"Active rewards","Échelle des rangs (RR)":"Rank ladder (RR)","Visible par tous · modifie les seuils · enregistré dans Supabase":"Visible to everyone · edit thresholds · saved in Supabase","Tâches du jour":"Today's tasks","Achète une récompense avec tes ZTKN · tu reçois un code de commande à coller dans le ticket Discord":"Buy a reward with your ZTKN · you get an order code to paste in the Discord ticket","Garde ton code de commande précieusement":"Keep your order code safe","Réinitialisation partielle chaque lundi · RR seulement":"Soft reset every Monday · RR only","Se gagne au blackjack classé : victoires et régularité":"Earned in ranked blackjack: wins and consistency","Chargement…":"Loading…","Aucun rang":"No ladder","Enregistrement…":"Saving…","Enregistré":"Saved","Récompenses":"Rewards","Tâches":"Tasks","Commandes":"Orders","Économie":"Economy","Rangs RR":"RR ranks","Événements":"Events","SQL":"SQL","en attente = livraison via ticket":"pending = delivered via ticket","Effacer tout l’historique":"Clear all history","Mêmes actions que le panneau admin Discord (sauf les salons)":"Same actions as the Discord admin panel (no channel tools)","Joueur en ligne…":"Online player…","Actualiser les joueurs":"Refresh players","Montant":"Amount","Enregistrer":"Save","Recharger":"Reload","Réinitialiser les RR":"Reset RR","Schéma SQL":"SQL schema","Colle dans l’éditeur Supabase · tables utilisées par le casino":"Paste into the Supabase editor · tables used by the casino","Copier le SQL":"Copy SQL","Blackjack classé · RR en jeu · table dédiée":"Ranked blackjack · RR at stake · dedicated table","BLACKJACK RANKED":"RANKED BLACKJACK","RR …":"RR …","RR indisponible":"RR unavailable","RR masqué":"RR hidden","Blackjack classé":"Ranked blackjack","Blackjack normal":"Normal blackjack","Wallet actualisé":"Wallet refreshed","Actualiser le wallet":"Refresh wallet","Choisis un joueur en ligne":"Choose an online player","Traitement…":"Working…","Annulé":"Cancelled","Effacer mon historique":"Clear my history","Effacer cet historique de commandes ?":"Clear this order history?","Historique effacé":"History cleared","Commandes effacées":"Orders cleared","Réinitialiser tous les RR et les rangs ?":"Reset all RR and ranks?","RR réinitialisés":"RR reset","SQL copié":"SQL copied","Copie impossible":"Copy failed","Erreur":"Error","Connecte-toi avec ton compte Discord pour jouer avec ton wallet du casino.":"Log in with your Discord account to play with your casino balance.","Se connecter avec Discord":"Log in with Discord","Rejoindre le serveur Discord":"Join the server","Menu":"Menu","Accueil":"Home","Online":"Online","Offline":"Offline","Blackjack":"Blackjack","Poker":"Poker","Roulette":"Roulette","Fusé":"Crash","Mine":"Mines","Mines":"Mines","Pile ou Face":"Coin Flip","Dés":"Dice","Chevaux":"Horses","Roulette russe":"Russian Roulette","Classement":"Leaderboard","Top gains":"Top wins","Règles":"Rules","Son":"Sound","Muet":"Muted","Plein écran":"Fullscreen","Reconnexion…":"Reconnecting…","Connexion…":"Connecting…","Tables partagées avec tous les joueurs du serveur.":"Tables shared with every player on the server.","Table à 5 places · mise libre · blackjack payé 3:2":"5-seat table · free bet · blackjack pays 3:2","Jouer":"Play","Texas Hold'em No-Limit · 5 places · relances libres et tapis":"Texas Hold'em No-Limit · 5 seats · free raises and all-in","Roulette européenne · rouge, noir, pair, impair, numéros pleins":"European roulette · red, black, even, odd, straight numbers","Jouables directement en MP Discord, et aussi sur le site.":"Playable in Discord DMs, and on the site too.","Parties solo contre le croupier":"Solo games against the dealer","Encaisse avant que la fusée explose":"Cash out before the rocket explodes","Évite les mines, encaisse quand tu veux":"Avoid the mines, cash out whenever you want","Une chance sur deux, gain x1.95":"50/50 chance, win x1.95","Parie sur la somme de 2 dés":"Bet on the sum of 2 dice","Course à 5 chevaux, jusqu’à x15.8":"5-horse race, up to x15.8","Survis au barillet, plus de balles = plus de gain":"Survive the cylinder, more bullets = bigger win","Les plus gros joueurs du casino.":"The biggest players of the casino.","Classement actuel":"Current ranking","Wallets actuels, du plus riche au moins riche":"Current wallets, richest to poorest","Classement all-time":"All-time ranking","Plus haut wallet jamais atteint":"Highest wallet ever reached","CROUPIER":"DEALER","TOI":"YOU","Blackjack paie 3 pour 2 · le croupier tient sur 17":"Blackjack pays 3 to 2 · dealer stands on 17","Tapis":"All-in","Dernière mise":"Last bet","Miser":"Bet","Retirer la mise":"Remove bet","Tirer":"Hit","Rester":"Stand","Doubler":"Double","Séparer":"Split","Quitter la table":"Leave table","Cave min":"Min buy-in","Max":"Max","Se coucher":"Fold","Check":"Check","Min":"Min","½ pot":"½ pot","¾ pot":"¾ pot","Pot":"Pot","Relancer":"Raise","Suivre":"Call","Ajouter des jetons (entre deux mains)":"Add chips (between hands)","Ajouter":"Add","Rejouer mes mises":"Rebet","Retirer mes mises":"Clear my bets","Joueurs":"Players","Réduire":"Collapse","Fermer":"Close","Annuler":"Cancel","Chat":"Chat","Victoires des autres joueurs":"Other players’ wins","Mes victoires":"My wins","Afficher":"Show","Masquer":"Hide","Notification de message":"Message notification","Aucune":"None","Silencieuse":"Silent","Avec son":"With sound","Aucun message. Lance la discussion.":"No messages. Start the conversation.","Notifications":"Notifications","Aucune notification.":"No notifications.","t’a envoyé":"sent you","Wallet":"Wallet","Déconnexion":"Log out","a gagné":"won","Envoyer":"Send","Règles du blackjack":"Blackjack rules","Règles du poker (Texas Hold'em No-Limit)":"Poker rules (Texas Hold'em No-Limit)","Classement des mains au poker":"Poker hand rankings","Classement du blackjack (gains nets)":"Blackjack ranking (net winnings)","Classement du poker (gains nets)":"Poker ranking (net winnings)","Du plus fort (1) au plus faible (10). Les cartes éclairées forment la combinaison.":"Strongest (1) to weakest (10). Highlighted cards form the hand.","Joueur":"Player","Gains nets":"Net winnings","Manches":"Rounds","Victoires":"Wins","Personne n’a encore terminé de manche.":"Nobody has finished a round yet.","Classement indisponible.":"Leaderboard unavailable.","Aucun joueur pour le moment.":"No players yet.","Paramètres":"Settings","Langue":"Language","Envoyer des ZTKN":"Send ZTKN","Chercher un joueur…":"Search a player…","Aucun joueur trouvé.":"No player found.","Destinataire : ":"Recipient: ","Choisis un joueur.":"Pick a player.","Montant invalide.":"Invalid amount.","Wallet insuffisant.":"Not enough wallet.","Connexion perdue…":"Connection lost…","Doucement.":"Easy there.","Table libre":"Table free","pleine":"full","Une partie est déjà en cours.":"A game is already in progress.","Aucune partie en cours.":"No game in progress.","Cette table n’existe plus.":"This table no longer exists.","Action inconnue.":"Unknown action.","Tu ne peux pas t’envoyer de pièces à toi-même.":"You can't send coins to yourself.","Montant minimum : 1.":"Minimum amount: 1.","Ce joueur n’est pas sur le serveur.":"This player isn't on the server.","Envoi impossible, réessaie.":"Couldn't send, try again.","Nouvelle table":"New table","＋ Nouvelle table":"＋ New table","Mains":"Hands","Table précédente":"Previous table","Table suivante":"Next table","Ton wallet":"Your wallet","Mise":"Bet","Mise :":"Bet:","Distribuer":"Deal","Encaisser":"Cash out","Lancer":"Start","Pile":"Heads","Face":"Tails","Moins de 7":"Under 7","Plus de 7":"Over 7","Exactement 7":"Exactly 7","À toi de jouer":"Your turn","Choisis ta mise puis distribue":"Pick your bet then deal","Montant de la mise":"Bet amount","Mise par clic":"Bet per click","Écrire un message":"Write a message","Message":"Message","Agrandir la roue":"Enlarge the wheel","Top gains de ce jeu":"Top wins of this game","Boutique":"Shop","Mon compte":"My account","Wallet, invitations et commandes":"Wallet, invites and orders","Reset wallet joueur":"Reset player wallet","Reset wallets":"Reset wallets","Ma fiche joueur":"My player card","Voir tes stats, choisir un fond et télécharger ta fiche":"View your stats, choose a background and download your card","Voir mes stats":"View my stats","Choisir une image de fond":"Choose background image","Télécharger la fiche":"Download card","Image de fond appliquée":"Background applied","Image invalide":"Invalid image","Fiche pas encore générée.":"Card not generated yet.","Impossible de générer la fiche image":"Could not generate the stats card","Fiche générée.":"Card generated.","Profil indisponible":"Profile unavailable","Chargement du lien…":"Loading link…","Demande à un modo le lien d’invitation du serveur":"Ask a moderator for the server invite link","Copier le lien":"Copy link","Lien copié":"Link copied","Récompense invite":"Invite reward","Lien d’invitation":"Invite link","Invite des amis et gagne des ZTKN quand ils rejoignent":"Invite friends and earn ZTKN when they join","Parties jouées":"Games played","Dernières commandes":"Recent orders","Mes commandes":"My orders","Réinitialisation chaque jour à minuit (Paris)":"Resets every day at midnight (Paris)","Boutique indisponible.":"Shop unavailable.","Acheter":"Buy","Aucune reward pour le moment.":"No rewards yet.","Tasks indisponibles.":"Tasks unavailable.","En cours":"In progress","Réclamer":"Claim","Réclamé":"Claimed","Aucune task aujourd’hui.":"No tasks today.","invite(s)":"invite(s)","partie(s)":"game(s)","Stock : ":"Stock: ","Commande créée":"Order created","Copie ton order code et ouvre un ticket « Claim rewards » sur Discord":"Copy your order code and open a “Claim rewards” ticket on Discord","Copier le code":"Copy code","Aucun code nécessaire":"No code needed","Rôle non ajouté":"Role not added","Rôle ajouté !":"Role added!","en attente de livraison":"pending delivery","rôle livré automatiquement":"role delivered automatically","livraison échouée":"delivery failed","BLACKJACK CLASSÉ":"RANKED BLACKJACK","Table dédiée · mises en RR · ELO / RR conservés":"Dedicated table · RR bets · ELO / RR kept","Course de fusées · chacun la sienne avec son pseudo · le premier au tour du Soleil gagne le pot":"Rocket race · one rocket each with your name · first to orbit the Sun wins the pot","Jeux solo sur le site, avec animations cinématiques. Le serveur fait foi sur les tirages.":"Solo games on the site, with cinematic animations. Server draws are authoritative.","Dégaine plus vite que ton adversaire":"Draw faster than your opponent","Lâche la bille dans les piquets, jusqu’à x130":"Drop the ball through the pegs, up to x130","Ticket à gratter":"Scratch ticket","Gratte pour de vrai, trois montants identiques gagnent":"Scratch for real, three matching amounts win","Récompenses · Tâches · Économie · Événements · SQL":"Rewards · Tasks · Economy · Events · SQL","Une course partagée par serveur : ":"A shared race per server: ","chaque joueur a sa propre fusée":"each player has their own rocket"," avec son pseudo affiché au-dessus.":" with their name shown above.","Mise librement (jetons ou champ), puis la course démarre automatiquement après le décompte — ou clique sur ":"Bet freely (chips or field), then the race starts automatically after the countdown — or click ","Lancer maintenant":"Start now"," dès 2 partants.":" as soon as 2 players have joined.","Les fusées décollent de la ":"Rockets take off from ","Terre":"Earth",", font le tour du ":", orbit the ","Soleil":"Sun"," entre les planètes, puis reviennent se poser sur la Terre. Le ":" between the planets, then return to land on Earth. The ","premier arrivé gagne le plus":"first to arrive wins the most","Le pot est redistribué au classement : part du pot proportionnelle à ta mise selon ton rang (1er ≈ 55 %, 2e ≈ 27 %, 3e ≈ 18 % …), avec 5 % de commission.":"The pot is redistributed by ranking: share of the pot proportional to your bet based on your rank (1st ≈ 55%, 2nd ≈ 27%, 3rd ≈ 18%…), with a 5% house commission.","Quitter ou retirer ta mise avant le départ te rembourse intégralement.":"Leaving or removing your bet before the start refunds you in full.","Rejoindre la course":"Join the race","Retirer ma mise":"Remove my bet","Roulette européenne":"European roulette","Une table partagée par serveur : tous les joueurs connectés misent sur le même tour. 37 cases, un seul zéro.":"A shared table per server: every connected player bets on the same spin. 37 slots, a single zero.","Choisis un montant (jetons ou champ : ":"Pick an amount (chips or field: ",", « Tapis »), puis clique sur une case pour miser. Chaque clic ajoute ce montant ; les mises sur plusieurs cases se cumulent.":", “All in”), then click a slot to bet. Each click adds that amount; bets on several slots add up.","Numéro plein : ":"Straight number: ",". Les gains incluent la mise.":". Payouts include the bet.","Le zéro fait perdre toutes les mises extérieures (sauf une mise pleine sur le 0).":"Zero loses all outside bets (except a straight bet on 0).","Le compte à rebours de 20 s démarre à la première mise. Pendant le tour, les mises sont fermées.":"The 20 s countdown starts at the first bet. Bets are closed during the spin.","Quitter la table avant le tour rembourse tes mises.":"Leaving the table before the spin refunds your bets.","La roue est réduite pendant les mises pour bien voir la table (bouton ⤢ pour l’agrandir). Quand ton tour part, elle s’ouvre en grand toute seule, puis la table revient après le résultat.":"The wheel is small during betting so you can see the table (⤢ button to enlarge it). When your spin starts, it opens full size by itself, then the table returns after the result.","Derniers numéros (le plus récent en premier)":"Recent numbers (newest first)","Ta mise":"Your bet","Rouvrir la roue":"Reopen the wheel","Bats le croupier sans dépasser":"Beat the dealer without going over","Mise libre":"Free bet",": tape le montant que tu veux (ex. ":": type the amount you want (e.g. ",") ou clique sur les jetons. « Tapis » = tout ton wallet.":") or click the chips. “All in” = your whole wallet.","Les mises s’ouvrent à chaque manche ; la distribution démarre 15 s après la 1re mise (4 s si tout le monde a misé).":"Betting opens each round; dealing starts 15 s after the first bet (4 s if everyone has bet).",": de la place 1 à la place 5, comme à une vraie table. Tu as 25 s par décision (sinon tu restes).":": from seat 1 to seat 5, like a real table. You have 25 s per decision (otherwise you stand).","Tu vois les cartes de tous les joueurs ; seule la 2e carte du croupier est cachée.":"You see every player’s cards; only the dealer’s second card is hidden.","(As + figure) payé":"(Ace + face card) pays","3 pour 2":"3 to 2",". Victoire payée 1 pour 1, égalité = mise rendue.":". Win pays 1 to 1, push = bet returned.",": sur tes 2 premières cartes, mise doublée, une seule carte.":": on your first 2 cards, double the bet, one card only.",": paire → 2 mains (une seule fois). Pas d’assurance.":": pair → 2 hands (once only). No insurance.","Le croupier tire jusqu’à 17 et":"The dealer draws until 17 and","tient sur tous les 17":"stands on all 17s","Raccourcis : ":"Shortcuts: ","séparer.":"split.","Cave":"Buy-in","Relancer à":"Raise to","Jetons à ajouter":"Chips to add","Rejoindre l’arène":"Join the arena","Je suis prêt":"I’m ready","Pas prêt":"Not ready","Jouer Ranked":"Play Ranked","Classement RR":"RR leaderboard","Tous les rangs":"All ranks","Du Bronze à Immortel ZNK : ton RR monte et descend selon tes résultats":"From Bronze to ZNK Immortal: your RR goes up and down with your results","Créer / modifier une reward":"Create / edit a reward","Nitro, rôle auto, ou custom · conditions optionnelles":"Nitro, auto role, or custom · optional conditions","Rôle Discord (auto)":"Discord role (auto)","ID du rôle Discord (si type rôle)":"Discord role ID (if role type)","Min. parties jouées":"Min. games played","Stock (vide = illimité)":"Stock (empty = unlimited)","Créer / modifier une task quotidienne":"Create / edit a daily task","Reset chaque jour à minuit (Paris)":"Resets every day at midnight (Paris)","Récompense ZTKN":"ZTKN reward","Connexion du jour":"Daily login","Lancer un événement":"Launch an event","Choisis un type":"Choose a type","Durée (minutes)":"Duration (minutes)","Durée (secondes)":"Duration (seconds)","Lancer l’événement":"Launch the event","Court texte affiché en boutique":"Short text shown in the shop","illimité":"unlimited","ex : Jouer 5 parties":"e.g. Play 5 games","Rechercher un joueur":"Search a player","Français":"French","Destinataire :":"Recipient: ","Stock :":"Stock: ","Une course partagée par serveur :":"A shared race per server:","avec son pseudo affiché au-dessus.":"with their name shown above.","Mise librement (jetons ou champ), puis la course démarre automatiquement après le décompte — ou clique sur":"Bet freely (chips or field), then the race starts automatically after the countdown — or click","dès 2 partants.":"as soon as 2 players have joined.","Les fusées décollent de la":"Rockets take off from",", font le tour du":", orbit the","entre les planètes, puis reviennent se poser sur la Terre. Le":"between the planets, then return to land on Earth. The","Choisis un montant (jetons ou champ :":"Pick an amount (chips or field:","Numéro plein :":"Straight number:",": tape le montant que tu veux (ex.":": type the amount you want (e.g.","Raccourcis :":"Shortcuts: ","🧹 Reset wallet joueur":"🧹 Reset player wallet","Fermer le chat":"Close chat","-- ZNK Casino · schéma Supabase (SQL editor)":"-- ZNK Casino · Supabase schema (SQL editor)","-- Historique des parties (alimente le classement « plus gros gain en une fois »)":"-- Game history (feeds the \"biggest single win\" leaderboard)","-- Rôles livrés directement (aucun code, aucun ticket)":"-- Roles delivered directly (no code, no ticket)","-- Événement roulette":"-- Roulette event","title text not null default 'Roulette événement',":"title text not null default 'Roulette event',","Achète une récompense avec tes ZTKN · tu reçois un":"Buy a reward with your ZTKN · you get an","à coller dans le ticket Discord":"to paste in the Discord ticket","Chaque joueur reçoit":"Each player receives","2 cartes privées":"2 private cards","(toi seul les vois). 5 cartes communes sont retournées :":"(only you see them). 5 community cards are dealt:","(1). Ta main = les 5 meilleures cartes parmi tes 2 cartes et les 5 du board.":"(1). Your hand = the best 5 cards among your 2 cards and the 5 board cards.",": en t'asseyant, tu choisis ta cave (min/max affichés). Elle est débitée de ton wallet et devient ton stack à la table. Tu récupères ton stack en quittant la table ; tu peux en rajouter entre deux mains.":": when you sit down, you pick your buy-in (min/max shown). It is debited from your wallet and becomes your table stack. You get your stack back when you leave; you can add more between hands.",": petite et grosse blind obligatoires, le bouton (D) tourne à chaque main. À deux joueurs, le bouton est petite blind.":": small and big blind are mandatory, the button (D) moves each hand. With two players, the button is the small blind.","(si personne n'a misé),":"(if nobody has bet),","(montant « à », au moins la relance précédente) ou":"(“to” amount, at least the previous raise) or",". Tu as 25 s par décision (sinon check, ou tu te couches).":". You have 25 s per decision (otherwise check, or you fold).","et pots annexes : si tu es à tapis pour moins que les autres, tu ne peux gagner que la part du pot à laquelle tu as participé.":"and side pots: if you are all-in for less than the others, you can only win the part of the pot you contributed to.","Meilleure main : quinte flush > carré > full > couleur > quinte > brelan > double paire > paire > carte haute. Égalité : le pot est partagé.":"Best hand: straight flush > four of a kind > full house > flush > straight > three of a kind > two pair > pair > high card. Tie: the pot is split.","Si tout le monde se couche, le dernier joueur gagne sans montrer ses cartes.":"If everyone folds, the last player wins without showing their cards.","Si tu quittes en pleine main, tu te couches et ton stack t'est rendu à la fin de la main. Si le bot redémarre, tes jetons en jeu te sont remboursés.":"If you leave mid-hand, you fold and your stack is returned at the end of the hand. If the bot restarts, your chips in play are refunded.","Les mises s'ouvrent à chaque manche ; la distribution démarre 15 s après la 1re mise (4 s si tout le monde a misé).":"Betting opens each round; dealing starts 15 s after the first bet (4 s if everyone has bet).",": paire → 2 mains (une seule fois). Pas d'assurance.":": pair → 2 hands (once only). No insurance.","Le croupier tire jusqu'à 17 et":"The dealer draws until 17 and","Ta session a expiré : reconnecte-toi avec Discord.":"Your session expired: log in with Discord again.","Session invalide ou expirée. Reconnecte-toi via le bouton Jouer dans Discord, ou /login.":"Session invalid or expired. Log in again with the Play button in Discord, or /login.","GAGNÉ":"WON","ÉGALITÉ":"PUSH","Place ta mise pour lancer la manche":"Place your bet to start the round","Résultats — prochaine manche dans un instant":"Results — next round shortly","Prends une place libre":"Take a free seat","pour jouer avec ton wallet.":"to play with your wallet.","tu peux la modifier avant la distribution.":"you can change it before the deal.","Choisis ta mise en":"Choose your bet in","pas en dessous de 100 RR":"not below 100 RR","puis":"then","n’importe quel montant ≤ ton wallet":"any amount ≤ your wallet","Tu n’as pas misé : tu joueras la prochaine manche.":"You did not bet: you will play the next round.","Résultat de la manche affiché sur la table.":"Round result shown at the table.","Modifier la mise":"Edit bet","Dernière : ":"Last: ","Quitter la table ? (ta mise éventuelle avant distribution est remboursée)":"Leave the table? (any bet before the deal is refunded)","Aucune partie enregistrée pour ce jeu.":"No games recorded for this game.","🏆 Top 10 · plus gros gains all-time":"🏆 Top 10 · biggest all-time wins","Plus gros gain remporté en une seule fois":"Biggest single win ever","mise ":"bet ","Une fusée est en vol : tu perdras ta mise si tu quittes.":"A rocket is in flight: you will lose your bet if you leave.","Quitter la roulette ? Tes mises en cours seront remboursées.":"Leave roulette? Your pending bets will be refunded.","Quitter la table de poker ? Tu seras couché et ton stack te sera rendu.":"Leave the poker table? You will fold and your stack will be returned.","Casino · Boutique":"Casino · Shop","Casino · Compte":"Casino · Account","Casino · Classement":"Casino · Leaderboard","Parties ranked avant ton rang officiel. 5 victoires → meilleur RR de départ.":"Ranked games before your official rank. 5 wins → best starting RR.","RR caché":"RR hidden","Joue une partie Ranked pour être classé.":"Play a Ranked game to be ranked.","Personne n’est encore classé. Joue une manche à plusieurs (poker, blackjack ou roulette) pour apparaître ici.":"Nobody is ranked yet. Play a multiplayer round (poker, blackjack or roulette) to appear here.","Pas encore classé : lance une partie Ranked dans l’Arène.":"Not ranked yet: start a Ranked game in the Arena."," parties ranked avant le rang officiel. Soft reset chaque lundi.":" ranked games before the official rank. Soft reset every Monday.","Départ":"Start","Rang indisponible.":"Rank unavailable.","Personne à la table.":"Nobody at the table.","Placez vos mises : le tour démarre à la première mise":"Place your bets: the round starts at the first bet","Numéro ":"Number "," · mise rendue":" · bet returned","Pot redistribué au classement · commission ":"Pot redistributed by ranking · commission ","Mises ouvertes · départ dans ":"Betting open · starting in ","Mises ouvertes · le départ se lance à la 1ʳᵉ mise":"Betting open · the start begins at the 1st bet","Prêts, partez !":"Ready, go!","Course terminée · nouvelle manche dans ":"Race finished · new round in ","Personne à la course.":"Nobody in the race.","Prêts…":"Ready…","Dos à dos…":"Neck and neck…","TU AS GAGNÉ !":"YOU WON!","GAGNÉ x":"WON x","Achète un ticket, puis gratte-le":"Buy a ticket, then scratch it","FUSÉ":"ROCKET","DÉS":"DICE","TICKET À GRATTER":"SCRATCH TICKET","Première case":"First tile","Dernière":"Last","Encaissé":"Cashed out","Mine touchée":"Mine hit","Mise perdue":"Bet lost","Encaissé ":"Cashed out ","Choisis ta mise puis lance la fusée.":"Choose your bet then launch the rocket.","Décollage dans ":"Takeoff in ","ENCAISSÉ":"CASHED OUT"," · la fusée a explosé à ":" · the rocket exploded at ","La fusée a explosé : mise perdue":"The rocket exploded: bet lost"," · la fusée continue… ":" · the rocket keeps going… "," · encaissement auto à ":" · auto cash-out at ","Gratte les cases avec la souris ou le doigt, ou révèle tout d’un coup.":"Scratch the tiles with your mouse or finger, or reveal all at once.","Chaque case sûre augmente le gain : encaisse avant de toucher une mine.":"Each safe tile raises the win: cash out before hitting a mine.","Révèle au moins une case pour pouvoir encaisser.":"Reveal at least one tile to cash out.","Encaisse avant que la fusée explose.":"Cash out before the rocket explodes.","Légende":"Legend","Fantôme":"Ghost","Élevé":"High"," % de réussite":" % success rate","Choisis pile ou face, puis lance la pièce":"Pick heads or tails, then flip the coin","Choisis ton pari, puis lance les dés":"Pick your wager, then roll the dice","Choisis le nombre de balles, puis tire":"Pick the number of bullets, then shoot","Choisis ton adversaire, puis dégaine":"Pick your opponent, then draw","Choisis le risque et le nombre de billes, puis lâche-les":"Pick the risk and number of balls, then drop them","La pièce tourne…":"The coin is spinning…","Les dés roulent…":"The dice are rolling…","La course est lancée…":"The race has started…","Coût total":"Total cost","Tu dégaines le premier !":"You draw first!","Daily récupéré : +":"Daily claimed: +","Daily déjà récupéré aujourd’hui. Reviens après minuit (Paris).":"Daily already claimed today. Come back after midnight (Paris).","Le rôle n’a pas pu être ajouté.":"The role could not be added.","Le rôle a été ajouté directement à ton compte Discord. Aucun order code n’est nécessaire.":"The role was added directly to your Discord account. No order code is needed."," · livraison échouée":" · delivery failed"," · rôle livré automatiquement":" · role delivered automatically","Aucune commande":"No orders","livré":"delivered","Code copié":"Code copied"," · reset à minuit (Paris)":" · resets at midnight (Paris)","Récompense":"Reward","Édit":"Edit","Reward enregistrée":"Reward saved","Task enregistrée":"Task saved","Réflexe":"Reflex","Visée":"Aim","Mémoire":"Memory","Précision":"Precision","Attends que l’écran passe au vert, puis clique. Trop tôt = faux départ.":"Wait for the screen to turn green, then click. Too early = false start.","Clique les 6 cibles le plus vite possible. Un clic à côté coûte 0,5 s.":"Click the 6 targets as fast as possible. A miss costs 0.5 s.","Mémorise les 5 signaux, puis rejoue-les dans l’ordre.":"Memorize the 5 signals, then repeat them in order.","Stoppe le curseur dans la zone verte. Plus tu es près du centre, mieux c’est.":"Stop the cursor in the green zone. The closer to the center, the better.","Entrer":"Play","Aligne trois Z violets : jackpot x400":"Line up three purple Zs: jackpot x400","Fiche joueur":"Player card","code de commande":"order code","Discussion":"Chat","Génération…":"Generating…","Génération de la fiche…":"Generating card…","Connexion du jour":"Daily login","Ouvre le casino aujourd’hui":"Open the casino today","Ouvre le casino aujourd'hui":"Open the casino today","Jouer 3 parties":"Play 3 games","Termine 3 manches (online ou offline)":"Finish 3 rounds (online or offline)","Jouer 10 parties":"Play 10 games","Termine 10 manches aujourd’hui":"Finish 10 rounds today","Termine 10 manches aujourd'hui":"Finish 10 rounds today","Réclamé":"Claimed","Réclamer":"Claim","En cours":"In progress","Tasks indisponibles.":"Tasks unavailable.","Jour ":"Day ","Mon compte":"My account","Envoyer des ZTKN":"Send ZTKN","Deconnexion":"Log out","Déconnexion":"Log out","Wallet":"Wallet","Actualiser le wallet":"Refresh wallet","Wallet actualisé":"Wallet updated","Seat 1":"Seat 1","Seat 2":"Seat 2","Ready":"Ready","Leave":"Leave","Bet":"Bet","Entrer":"Play","Quitter":"Leave","Miser / Ajouter":"Bet / Add","Retirer ma mise":"Clear my bet","Lancer maintenant":"Start now","Rejoindre la course":"Join the race","Nouvelle table":"New table","Blackjack normal":"Normal blackjack","Blackjack classé":"Ranked blackjack","Spectateur":"Spectator","Tapis":"All-in","Jouer":"Play","Rejouer":"Play again","Encaisser":"Cash out","Tout gratter":"Reveal all","Acheter un ticket":"Buy a ticket","Mines":"Mines","Billes":"Balls","Risque":"Risk","Lignes":"Lines","Montant invalide.":"Invalid amount.","Entre un montant.":"Enter an amount.","Aucune commande":"No orders","Effacer mon historique":"Clear my history","Chargement…":"Loading…","Récompense":"Reward","livré":"delivered","en attente":"pending","Code copié":"Code copied","Mes commandes":"My orders","Boutique":"Shop","Classement":"Leaderboard","Accueil":"Home","Jeux online":"Online games","Jeux offline":"Offline games"};
+Object.assign(EN_DICT, {
+  "Récompenses · Tâches · Économie · Jeux · Bans · Événements · SQL": "Rewards · Tasks · Economy · Games · Bans · Events · SQL",
+  "Jeux": "Games", "Bans": "Bans", "Jeux activés": "Enabled games",
+  "Désactive un jeu pour le retirer du menu · réactive-le quand tu veux": "Disable a game to remove it from the menu · re-enable it whenever you want",
+  "Actualiser": "Refresh", "Tout réactiver": "Enable all", "Activer": "Enable", "Désactiver": "Disable", "Réactiver": "Re-enable", "ON": "ON", "OFF": "OFF",
+  "Bannir un joueur": "Ban a player",
+  "Message en anglais · permanent ou avec chrono au-dessus du texte": "English message · permanent or with a countdown above the text",
+  "Rechercher": "Search", "Joueurs en ligne": "Online players", "Durée": "Duration", "À vie (permanent)": "Lifetime (permanent)",
+  "1 heure": "1 hour", "24 heures": "24 hours", "7 jours": "7 days", "30 jours": "30 days",
+  "Raison (facultative)": "Reason (optional)", "Ban": "Ban", "Unban le joueur sélectionné": "Unban selected player",
+  "Bans actifs": "Active bans", "Aucun ban": "No bans", "Permanent": "Permanent", "Expire le": "Expires at", "Par": "By", "Raison": "Reason",
+  "Choisir un numéro": "Pick a number", "Numéro": "Number", "Tirage en cours…": "Spinning…", "Roue terminée.": "Wheel finished.",
+  "Le plus proche du numéro tiré gagne la mise.": "Closest to the drawn number wins the bet.",
+  "4 étapes · enchaîne les PERFECT · gain maximum x3.1": "4 stages · chain PERFECTs · max win x3.1",
+  "Etape": "Stage", "Total": "Total", "Balance": "Balance", "Inscrit": "Registered", "Inscrit !": "Registered!",
+});
 const EN_RE = [["^Placement (\\d+)/(\\d+) · RR masqué$", "Placement $1/$2 · RR hidden"], ["^(\\d+) RR · #(\\d+)$", "$1 RR · #$2"], ["^Table (\\d+)$", "Table $1"], ["^Mis à jour à (.+)$", "Updated at $1"], ["^Chat · (.+)$", "@Chat · $1"], ["^(\\d+) joueurs? à table$", "$1 player(s) at the table"], ["^🎁 (.+) t’a envoyé (.+)$", "🎁 $1 sent you $2"], ["^Mise minimale : (.+)$", "Minimum bet: $1"], ["^Mise maximale : (.+)$", "Maximum bet: $1"], ["^Tu es déjà assis à la table (\\d+) : quitte-la d’abord\\.$", "You're already seated at table $1: leave it first."], ["^Maximum (\\d+) tables\\.$", "Maximum $1 tables."], ["^à (.+?) · mise (.+)$", "@at $1 · bet $2"], ["^blinds (.+)$", "blinds $1"], ["^Ta session a expiré : reconnecte-toi avec Discord\\.$", "Your session expired: log in with Discord again."], ["^Jour (.+) · reset à minuit \\(Paris\\)$", "Day $1 · resets at midnight (Paris)"]].map(([a, b]) => [new RegExp(a), b]);
 let LANG = 'en'; try { LANG = localStorage.getItem('znk_lang') === 'fr' ? 'fr' : 'en'; } catch {}
 const trWords = (s) => {
@@ -5066,8 +5213,11 @@ $('#gSend').onclick = async () => {
 
 
 // ============================================================= ROUE ÉVÉNEMENT (pseudos + avatars + chrono + réouverture)
-const RE = { ev: null, joined: false, angle: 0, spinning: false, timer: 0, imgs: new Map(), shownWinner: '' };
+const RE = { ev: null, id: '', joined: false, angle: 0, spinning: false, revealed: false, timer: 0, imgs: new Map(), shownWinner: '', pick: null };
 const RE_COLORS = ['#fbbf24', '#22d3ee', '#a78bfa', '#34d399', '#fb7185', '#60a5fa', '#f472b6', '#facc15', '#4ade80', '#38bdf8'];
+const RU_ORDER = (W && W.info && Array.isArray(W.info.order) && W.info.order.length === 37) ? W.info.order : [0,32,15,19,4,21,2,25,17,34,6,27,13,36,11,30,8,23,10,5,24,16,33,1,20,14,31,9,22,18,29,7,28,12,35,3,26];
+const RU_RED = new Set([1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36]);
+const closestEvt = () => !!(RE.ev && RE.ev.kind === 'closest');
 function reClock(ms) {
   const s = Math.max(0, Math.ceil(ms / 1000));
   return s >= 60 ? Math.floor(s / 60) + 'min ' + String(s % 60).padStart(2, '0') + 's' : s + ' s';
@@ -5077,13 +5227,15 @@ function reImg(src) {
   if (RE.imgs.has(src)) return RE.imgs.get(src);
   const im = new Image(); im.crossOrigin = 'anonymous'; im.src = src; RE.imgs.set(src, im); return im;
 }
+// La roue des participants (événement « roulette » classique)
 function reDraw() {
   const cv = $('#reCanvas'); if (!cv) return;
   const x = cv.getContext('2d'), S = cv.width, R = S / 2, cx = R, cy = R;
   x.clearRect(0, 0, S, S);
+  x.fillStyle = '#080808'; x.beginPath(); x.arc(cx, cy, R, 0, 7); x.fill();
+  if (closestEvt()) { reDrawRoulette(x, cx, cy, R); return; }
   const ps = (RE.ev && RE.ev.participants) || [];
   const n = ps.length;
-  x.fillStyle = '#080808'; x.beginPath(); x.arc(cx, cy, R, 0, 7); x.fill();
   if (!n) {
     x.strokeStyle = 'rgba(251,191,36,.35)'; x.lineWidth = 12; x.beginPath(); x.arc(cx, cy, R - 8, 0, 7); x.stroke();
     x.textAlign = 'center'; x.fillStyle = '#fde68a'; x.font = '900 24px system-ui,sans-serif';
@@ -5098,12 +5250,10 @@ function reDraw() {
     x.beginPath(); x.moveTo(cx, cy); x.arc(cx, cy, R - 6, a0, a1); x.closePath();
     x.fillStyle = RE_COLORS[i % RE_COLORS.length]; x.fill();
     x.strokeStyle = 'rgba(0,0,0,.55)'; x.lineWidth = 2; x.stroke();
-    // nom + avatar orientés vers l'extérieur
     x.save(); x.translate(cx, cy); x.rotate(a0 + seg / 2);
     x.textAlign = 'right'; x.textBaseline = 'middle';
     x.fillStyle = '#000'; x.font = '900 ' + Math.max(11, Math.min(16, 150 / n + 8)) + 'px system-ui,sans-serif';
-    const nm = String(p.name || p.uid || '?').slice(0, 14);
-    x.fillText(nm, R - 52, 0);
+    x.fillText(String(p.name || p.uid || '?').slice(0, 14), R - 52, 0);
     const av = reImg(p.avatar);
     if (av && av.complete && av.naturalWidth) {
       x.save(); x.beginPath(); x.arc(R - 30, 0, 15, 0, 7); x.clip();
@@ -5112,10 +5262,8 @@ function reDraw() {
     }
     x.restore();
   });
-  x.beginPath(); x.arc(cx, cy, 25, 0, 7); x.fillStyle = '#fbbf24'; x.fill();
-  x.strokeStyle = '#000'; x.lineWidth = 4; x.stroke();
-  x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillStyle = '#000'; x.font = '900 14px system-ui,sans-serif'; x.fillText('ZNK', cx, cy);
-  if (RE.ev.winner && RE.ev.winner === RE.shownWinner) {
+  // le segment gagnant n'est surligné QU'APRÈS la révélation (fin de l'animation)
+  if (RE.revealed && RE.ev.winner && String(RE.ev.winner) === String(RE.shownWinner)) {
     const wi = ps.findIndex((p) => String(p.uid) === String(RE.ev.winner));
     if (wi >= 0) {
       x.beginPath(); x.moveTo(cx, cy); x.arc(cx, cy, R - 6, wi * seg + RE.angle, (wi + 1) * seg + RE.angle); x.closePath();
@@ -5123,60 +5271,158 @@ function reDraw() {
       x.strokeStyle = '#fff'; x.lineWidth = 5; x.stroke();
     }
   }
+  x.beginPath(); x.arc(cx, cy, 25, 0, 7); x.fillStyle = '#fbbf24'; x.fill();
+  x.strokeStyle = '#000'; x.lineWidth = 4; x.stroke();
+  x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillStyle = '#000'; x.font = '900 14px system-ui,sans-serif'; x.fillText('ZNK', cx, cy);
+}
+
+// Vraie roulette européenne 0-36 pour l'événement « plus proche »
+function reDrawRoulette(x, cx, cy, R) {
+  const e = RE.ev || {}, N = RU_ORDER.length, seg = (Math.PI * 2) / N;
+  const wi = e.target != null ? RU_ORDER.indexOf(Number(e.target)) : -1;
+  for (let i = 0; i < N; i++) {
+    const num = RU_ORDER[i], a0 = -Math.PI / 2 + i * seg + RE.angle, a1 = a0 + seg;
+    x.beginPath(); x.moveTo(cx, cy); x.arc(cx, cy, R - 6, a0, a1); x.closePath();
+    x.fillStyle = num === 0 ? '#166534' : (RU_RED.has(num) ? '#991b1b' : '#1f2937'); x.fill();
+    x.strokeStyle = 'rgba(0,0,0,.55)'; x.lineWidth = 1.5; x.stroke();
+    if (RE.revealed && i === wi) {
+      x.beginPath(); x.moveTo(cx, cy); x.arc(cx, cy, R - 6, a0, a1); x.closePath();
+      x.fillStyle = 'rgba(253,230,138,.28)'; x.fill();
+      x.strokeStyle = '#fff'; x.lineWidth = 4; x.stroke();
+    }
+    x.save(); x.translate(cx, cy); x.rotate(a0 + seg / 2);
+    x.textAlign = 'right'; x.textBaseline = 'middle';
+    x.fillStyle = '#fff'; x.font = '900 15px system-ui,sans-serif';
+    x.fillText(String(num), R - 22, 0);
+    x.restore();
+  }
+  x.beginPath(); x.arc(cx, cy, 30, 0, 7); x.fillStyle = '#fbbf24'; x.fill();
+  x.strokeStyle = '#000'; x.lineWidth = 4; x.stroke();
+  x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillStyle = '#000'; x.font = '900 13px system-ui,sans-serif'; x.fillText('ZNK', cx, cy);
+  const lbl = $('#reSpinLabel');
+  if (lbl) lbl.textContent = RE.revealed && e.target != null ? 'Numéro tiré : ' + e.target : (RE.spinning ? 'Tirage en cours…' : '');
 }
 function reRenderNames() {
   const box = $('#reNames'); if (!box) return; box.textContent = '';
   const ps = (RE.ev && RE.ev.participants) || [];
   if (!ps.length) { box.append(el('div', 'lbnone', 'Aucun participant pour le moment.')); return; }
+  const win = RE.revealed && RE.ev.winner ? String(RE.ev.winner) : '';
   ps.forEach((p) => {
-    const d = el('div', 'rn' + (RE.ev.winner && String(RE.ev.winner) === String(p.uid) ? ' win' : ''));
+    const d = el('div', 'rn' + (win && win === String(p.uid) ? ' win' : ''));
     if (p.avatar) { const im = el('img'); im.src = p.avatar; im.alt = ''; d.append(im); }
-    d.append(document.createTextNode(String(p.name || p.uid).slice(0, 26)));
+    const label = closestEvt() && p.pick != null
+      ? String(p.name || p.uid).slice(0, 18) + ' · n°' + p.pick
+      : String(p.name || p.uid).slice(0, 26);
+    d.append(document.createTextNode(label));
     box.append(d);
   });
+}
+function reRenderPicks() {
+  const grid = $('#rePickGrid'), box = $('#rePickBox'), mine = $('#reMyPick');
+  if (!grid || !box) return;
+  box.classList.toggle('hide', !closestEvt());
+  if (!closestEvt()) return;
+  const running = RE.ev.status === 'running' && RE.ev.endsAt > Date.now();
+  if (!grid.childElementCount) {
+    RU_ORDER.slice().sort((a, b) => a - b).forEach((n) => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'rep' + (n === 0 ? ' r0' : RU_RED.has(n) ? ' red' : ' black');
+      b.dataset.pick = String(n); b.textContent = String(n);
+      b.onclick = () => rePick(n); grid.append(b);
+    });
+  }
+  grid.querySelectorAll('button').forEach((b) => {
+    b.classList.toggle('on', RE.pick != null && Number(b.dataset.pick) === Number(RE.pick));
+    b.disabled = !running || RE.joined || RE.spinning;
+  });
+  if (mine) {
+    mine.textContent = RE.spinning ? 'Tirage en cours…'
+      : (RE.pick != null ? 'Numéro choisi : ' + RE.pick + (RE.revealed && RE.ev.target != null ? ' · tiré : ' + RE.ev.target : '') : 'Choisir un numéro');
+  }
+}
+async function rePick(n) {
+  const e = RE.ev;
+  if (!e || e.status !== 'running' || e.endsAt <= Date.now() || RE.joined) return;
+  const ok = await send('evjoin', { eid: e.id, kind: 'closest', pick: Number(n) });
+  if (ok) {
+    RE.pick = Number(n); RE.joined = true;
+    toast('✅ Numéro ' + n + ' enregistré !');
+    reLoad(e.id);
+  } else toast((send.last && send.last.error) || 'Erreur');
 }
 function reTick() {
   const e = RE.ev; if (!e) return;
   const cd = $('#reCount'), st = $('#reStatus');
-  if (e.status === 'running' && e.endsAt > Date.now()) {
+  const running = e.status === 'running' && e.endsAt > Date.now();
+  if (running) {
     if (cd) cd.textContent = '⏳ ' + reClock(e.endsAt - Date.now());
-    if (st) st.textContent = (e.participants || []).length + ' participant(s) · ' + num(e.amount) + ' ' + COIN;
+    if (st) st.textContent = (e.participants || []).length + ' participant(s) · ' + num(e.amount) + ' ' + COIN + (closestEvt() ? ' · 0-36' : '');
+  } else if (RE.spinning || !RE.revealed) {
+    if (cd) cd.textContent = '🎯 Tirage en cours…';
+    if (st) st.textContent = 'La roue tourne…';
   } else {
     if (cd) cd.textContent = '🎯 Tirage effectué';
-    if (st) st.textContent = e.winner ? ('Gagnant : ' + e.winnerName + ' · ' + num(e.amount) + ' ' + COIN) : 'Aucun participant';
+    if (st) st.textContent = e.winner ? ('Gagnant : ' + e.winnerName + ' · ' + num(e.amount) + ' ' + COIN + (e.result != null ? ' · n°' + e.result : '')) : 'Aucun participant · personne ne gagne';
   }
   const j = $('#reJoin');
   if (j) {
-    const canJoin = e.status === 'running' && e.endsAt > Date.now();
-    j.classList.toggle('hide', !canJoin);
+    j.classList.toggle('hide', !running || closestEvt());
     j.disabled = RE.joined;
     j.textContent = RE.joined ? '✅ Inscrit' : 'Participer';
   }
   const w = $('#reWinner');
   if (w) {
-    w.classList.toggle('hide', !e.winner);
-    if (e.winner) w.innerHTML = '🏆 <b>' + noEmo(e.winnerName) + '</b> remporte <b>' + num(e.amount) + ' ' + COIN + '</b>';
+    const show = RE.revealed && !RE.spinning && !!e.winner;
+    w.classList.toggle('hide', !show);
+    if (show) w.innerHTML = '🏆 <b>' + noEmo(e.winnerName) + '</b> remporte <b>' + num(e.amount) + ' ' + COIN + '</b>' + (e.result != null ? ' · n°' + e.result : '');
   }
-  reRenderNames(); reDraw();
+  reRenderPicks(); reRenderNames(); reDraw();
 }
 function reSetEvent(e, open) {
   if (!e) return;
-  const wasWinner = RE.ev && RE.ev.winner;
+  const prev = RE.ev, idChanged = String(e.id) !== String(RE.id);
+  if (idChanged) {
+    RE.spinning = false; RE.revealed = false; RE.shownWinner = '';
+    RE.pick = null; RE.joined = false; RE.didSpin = false; RE.angle = 0;
+    RE.finishLoadedFor = ''; RE.revealLoadedFor = '';
+    RE.id = String(e.id);
+  }
   RE.ev = e;
-  if (me && e.participants) RE.joined = e.participants.some((p) => String(p.uid) === String(me.uid));
+  if (prev && prev.status === 'running' && e.status === 'finished') RE.didSpin = false;
+  if (e.status === 'finished') {
+    RE.revealed = e.revealed === true || !!e.winner || (!!e.revealAt && Date.now() >= e.revealAt);
+    if (RE.revealed) RE.shownWinner = String(e.winner || '');
+  } else {
+    RE.revealed = false; RE.shownWinner = '';
+  }
+  if (me && e.participants) {
+    const mine = e.participants.find((p) => String(p.uid) === String(me.uid));
+    RE.joined = !!mine;
+    if (mine && mine.pick != null) RE.pick = Number(mine.pick);
+  }
+  if (e.status === 'finished' && !RE.didSpin) reSpin();
   const wrap = $('#evWheelWrap'), acts = $('#reActions');
   if (wrap) wrap.classList.remove('hide');
   if (acts) acts.classList.remove('hide');
-  if (e.winner && !RE.shownWinner) reSpin();
-  else if (wasWinner && RE.shownWinner !== String(e.winner)) reSpin();
-  else reDraw();
   reTick();
   if (open) reOpen();
 }
 function reOpen() {
   const e = RE.ev;
   $('#evT').textContent = e ? noEmo(e.title || 'Roulette événement') : 'Roulette événement';
-  $('#evX').textContent = e ? noEmo(e.status === 'running' ? 'La roue tournera dans ' + reClock(e.endsAt - Date.now()) + '. ' + num(e.amount) + ' ' + COIN + ' au gagnant.' : 'Roue terminée. Tu peux la reouvrir à tout moment depuis cette notification.') : '';
+  let x = '';
+  if (e) {
+    if (e.status === 'running') {
+      x = closestEvt()
+        ? 'Choisis un numéro de 0 à 36 : une roulette tournera et le plus proche du numéro tiré gagne ' + num(e.amount) + ' ' + COIN + '. Tirage dans ' + reClock(e.endsAt - Date.now()) + '.'
+        : 'La roue tournera dans ' + reClock(e.endsAt - Date.now()) + '. ' + num(e.amount) + ' ' + COIN + ' au gagnant.';
+    } else if (!RE.revealed) {
+      x = 'Tirage en cours… le gagnant sera annoncé à la fin de la rotation.';
+    } else {
+      x = 'Roue terminée. Tu peux la rouvrir à tout moment depuis cette notification.';
+    }
+  }
+  $('#evX').textContent = noEmo(x);
   $('#mEvent').classList.add('on');
   reTick();
 }
@@ -5189,32 +5435,58 @@ async function reLoad(eid) {
   } catch {}
 }
 function reSpin() {
-  const e = RE.ev; if (!e || !e.winner || RE.spinning) return;
-  const ps = e.participants || [], wi = ps.findIndex((p) => String(p.uid) === String(e.winner));
-  if (wi < 0) return;
-  RE.shownWinner = String(e.winner);
-  const seg = (Math.PI * 2) / Math.max(1, ps.length);
-  const target = -Math.PI / 2 - (wi * seg + seg / 2) + Math.PI * 2 * 7;
-  const start = RE.angle, dur = 5200, t0 = performance.now();
+  const e = RE.ev;
+  if (!e || RE.spinning || RE.didSpin || e.status !== 'finished') return;
+  const ps = e.participants || [];
+  let target;
+  if (closestEvt()) {
+    if (e.target == null) return;
+    const w = RU_ORDER.indexOf(Number(e.target));
+    if (w < 0) return;
+    const seg = (Math.PI * 2) / RU_ORDER.length;
+    target = -(w + 0.5) * seg + Math.PI * 2 * 8;
+  } else {
+    let wi = e.winner ? ps.findIndex((p) => String(p.uid) === String(e.winner)) : -1;
+    if (wi < 0 && e.target != null) wi = Number(e.target); // cible envoyée pendant l'animation
+    if (wi < 0 || wi >= ps.length) return; // aucun participant : rien à faire tourner
+    const seg = (Math.PI * 2) / Math.max(1, ps.length);
+    target = -Math.PI / 2 - (wi * seg + seg / 2) + Math.PI * 2 * 7;
+  }
+  RE.didSpin = true;
   RE.spinning = true;
+  RE.shownWinner = String(e.winner || '');
+  const start = RE.angle, dur = 5200, t0 = performance.now();
   const step = (now) => {
     const p = Math.min(1, (now - t0) / dur);
     const ease = 1 - Math.pow(1 - p, 4);
     RE.angle = start + (target - start) * ease;
     reDraw();
     if (p < 1) requestAnimationFrame(step);
-    else { RE.angle = target % (Math.PI * 2); RE.spinning = false; reDraw(); try { SFX && SFX.win && SFX.win(); } catch {} }
+    else {
+      RE.angle = target % (Math.PI * 2);
+      RE.spinning = false;
+      RE.shownWinner = String((RE.ev && RE.ev.winner) || '');
+      reDraw(); reTick();
+      try { SFX && SFX.win && SFX.win(); } catch {}
+    }
   };
   requestAnimationFrame(step);
 }
 clearInterval(RE.timer);
 RE.timer = setInterval(() => {
-  if (!RE.ev) return;
-  if (RE.ev.status === 'running' && RE.ev.endsAt - Date.now() < 1000) reLoad(RE.ev.id);
+  const e = RE.ev; if (!e) return;
+  const left = e.endsAt - Date.now();
+  if (e.status === 'running' && left <= 0 && RE.finishLoadedFor !== e.id) {
+    RE.finishLoadedFor = e.id;
+    reLoad(e.id);
+  } else if (e.status === 'finished' && !RE.revealed && e.revealAt && Date.now() >= e.revealAt && RE.revealLoadedFor !== e.id) {
+    RE.revealLoadedFor = e.id;
+    reLoad(e.id);
+  }
   reTick();
-}, 1000);
+}, 500);
 const reJoinBtn = $('#reJoin'); if (reJoinBtn) reJoinBtn.onclick = async () => {
-  if (!RE.ev || RE.joined) return;
+  if (!RE.ev || RE.joined || closestEvt()) return;
   reJoinBtn.disabled = true;
   const ok = await send('evjoin', { eid: RE.ev.id, kind: 'roulette' });
   reJoinBtn.disabled = false;
@@ -5238,8 +5510,9 @@ function nRender() {
     const ni = el('span', 'nic');
     if (n.type === 'event') {
       b.append(el('b', '', noEmo(n.title)), el('span', 'nt', noEmo(n.text)));
-      if (n.kind === 'roulette' && n.eventId) {
-        const bt = el('button', 'nbtn', 'Rouvrir la roue');
+      const isWheel = n.kind === 'roulette' || n.kind === 'closest' || n.kind === 'roulette_result' || n.kind === 'closest_result';
+      if (isWheel && n.eventId) {
+        const bt = el('button', 'nbtn', n.kind === 'closest' ? 'Choisir un numéro' : 'Rouvrir la roue');
         bt.onclick = async (e) => { e.stopPropagation(); await reLoad(n.eventId); reOpen(); };
         b.append(bt);
       }
@@ -5264,7 +5537,8 @@ function nRender() {
 // popup d'événement (boost / claim / giveaway) : remplace les MP Discord
 function evPop(n) {
   if (!n || n.type !== 'event') return;
-  if (n.kind === 'roulette' && n.eventId) {
+  const isWheel = n.kind === 'roulette' || n.kind === 'closest' || n.kind === 'roulette_result' || n.kind === 'closest_result';
+  if (isWheel && n.eventId) {
     $('#evWheelWrap').classList.remove('hide'); $('#reActions').classList.remove('hide');
     $('#evB').textContent = '';
     reLoad(n.eventId).then(reOpen);
@@ -5596,13 +5870,111 @@ $('#mOrderCopy').onclick = () => {
 
 function adShow(panel) {
   document.querySelectorAll('#adTabs button').forEach((b) => b.classList.toggle('on', b.dataset.ad === panel));
-  const map = { rewards: 'adPanelRewards', tasks: 'adPanelTasks', orders: 'adPanelOrders', money: 'adPanelMoney', ranks: 'adPanelRanks', events: 'adPanelEvents', sql: 'adPanelSql' };
+  const map = { rewards: 'adPanelRewards', tasks: 'adPanelTasks', orders: 'adPanelOrders', money: 'adPanelMoney', ranks: 'adPanelRanks', games: 'adPanelGames', bans: 'adPanelBans', events: 'adPanelEvents', sql: 'adPanelSql' };
   Object.entries(map).forEach(([k, id]) => { const n = document.getElementById(id); if (n) n.classList.toggle('hide', k !== panel); });
   if (panel === 'ranks' && typeof adLadderLoad === 'function') adLadderLoad();
   if (panel === 'money') adLoadOnline();
+  if (panel === 'games') adGamesLoad();
+  if (panel === 'bans') { adBanFind(''); adBanLoad(); }
 }
 
 document.querySelectorAll('#adTabs button').forEach((b) => (b.onclick = () => adShow(b.dataset.ad)));
+
+// ---- Jeux activés / désactivés (admin)
+const AD_GAMES = [
+  ['ranked', 'Ranked Blackjack'], ['bj', 'Blackjack'], ['poker', 'Poker'], ['roulette', 'Roulette'], ['penalty', 'Penalty'],
+  ['off-bj', 'Blackjack solo'], ['off-fuse', 'Fusé'], ['off-mine', 'Mines'], ['off-coin', 'Pile ou Face'],
+  ['off-dice', 'Dés'], ['off-horses', 'Chevaux'], ['off-russian', 'Roulette russe'], ['off-slots', 'Slots'],
+  ['off-duel', 'Duel'], ['off-plinko', 'Plinko'], ['off-penguin', 'Penguin Slide'], ['off-scratch', 'Ticket à gratter'],
+];
+function applyGameFlags(list) {
+  GAME_OFF.clear();
+  (list || []).forEach((k) => GAME_OFF.add(String(k)));
+  document.querySelectorAll('.gcard').forEach((c) => {
+    const off = GAME_OFF.has(c.dataset.go);
+    c.classList.toggle('adoff', off); c.disabled = off; c.style.display = off ? 'none' : '';
+  });
+  if (W && W.view && GAME_OFF.has(W.view)) setView('hub');
+}
+async function adGamesLoad() {
+  const ok = await send('admin_games_list'); if (!ok) return;
+  const games = (send.last && send.last.games) || [];
+  applyGameFlags(games.filter((g) => !g.on).map((g) => g.key));
+  const box = $('#adGameList'); if (!box) return;
+  box.textContent = '';
+  games.forEach((g) => {
+    const lbl = (AD_GAMES.find((x) => x[0] === g.key) || [g.key, g.key])[1];
+    const row = el('div', 'aditem' + (g.on ? '' : ' adoff'));
+    row.append(el('span', 'adpill ' + (g.on ? 'on' : 'off'), g.on ? 'ON' : 'OFF'), el('div', 'grow', g.key + ' · ' + lbl));
+    const b = el('button', 'btn', g.on ? 'Désactiver' : 'Réactiver');
+    b.onclick = async () => { await send('admin_game_toggle', { key: g.key, on: !g.on }); adGamesLoad(); };
+    row.append(b); box.append(row);
+  });
+}
+const adGamesRefresh = $('#adGamesRefresh'); if (adGamesRefresh) adGamesRefresh.onclick = () => adGamesLoad();
+const adGamesAll = $('#adGamesAll'); if (adGamesAll) adGamesAll.onclick = async () => {
+  if (!confirm('Réactiver tous les jeux ?')) return;
+  for (const g of (AD_GAMES.map((x) => x[0]))) await send('admin_game_toggle', { key: g, on: true });
+  adGamesLoad(); toast('Tous les jeux sont réactivés');
+};
+
+// ---- Bans (admin)
+let adBanPlayers = [];
+function adBanRender() {
+  const list = $('#adBanList'); if (!list) return;
+  const q = ($('#adBanSearch')?.value || '').trim().toLowerCase();
+  list.replaceChildren();
+  adBanPlayers.filter((p) => !q || String(p.name || '').toLowerCase().includes(q)).forEach((p) => {
+    const b = el('button', 'ecopl'); b.type = 'button';
+    const av = el('span', 'av'); setAvatar(av, p.avatar, p.name || p.uid);
+    b.append(av, el('span', 'grow', p.name || p.uid));
+    b.onclick = () => { $('#adBanUid').value = String(p.uid); $('#adBanName').textContent = p.name || p.uid; adBanRender(); };
+    list.append(b);
+  });
+  if (!adBanPlayers.length) list.append(el('div', 'lbnone', 'Aucun joueur trouvé'));
+}
+async function adBanFind(q) {
+  const url = q
+    ? '/api/players?t=' + encodeURIComponent(TOKEN) + '&q=' + encodeURIComponent(q)
+    : '/api/online?t=' + encodeURIComponent(TOKEN);
+  try {
+    const r = await fetch(url, { cache: 'no-store' }); if (!r.ok) return;
+    adBanPlayers = (await r.json()).players || [];
+  } catch { adBanPlayers = []; }
+  adBanRender();
+}
+async function adBanLoad() {
+  const ok = await send('admin_ban_list'); if (!ok) return;
+  const list = $('#adBanActive'); if (!list) return;
+  list.textContent = '';
+  const bans = (send.last && send.last.bans) || [];
+  bans.forEach((b) => {
+    const row = el('div', 'aditem');
+    const txt = b.uid + ' · ' + (b.until ? 'Expire le ' + new Date(b.until).toLocaleString() : 'Permanent') + (b.reason ? ' · ' + b.reason : '');
+    row.append(el('div', 'grow', txt));
+    const u = el('button', 'btn', 'Unban');
+    u.onclick = async () => { await send('admin_unban', { userId: b.uid }); adBanLoad(); };
+    row.append(u); list.append(row);
+  });
+  if (!bans.length) list.append(el('div', 'lbnone', 'Aucun ban'));
+}
+const adBanFindBtn = $('#adBanFind'); if (adBanFindBtn) adBanFindBtn.onclick = () => adBanFind(($('#adBanSearch').value || '').trim());
+const adBanRefreshBtn = $('#adBanRefresh'); if (adBanRefreshBtn) adBanRefreshBtn.onclick = () => adBanFind('');
+const adBanSearchIn = $('#adBanSearch'); if (adBanSearchIn) adBanSearchIn.onkeydown = (e) => { if (e.key === 'Enter') adBanFind(adBanSearchIn.value.trim()); };
+const adBanDo = $('#adBanDo'); if (adBanDo) adBanDo.onclick = async () => {
+  const uid = ($('#adBanUid').value || '').trim(); if (!uid) return toast('Choisis un joueur');
+  const v = $('#adBanDuration').value, permanent = v === 'perm';
+  const body = { userId: uid, permanent, reason: ($('#adBanReason').value || '').trim() };
+  if (!permanent) body.minutes = Number(v);
+  if (!confirm(permanent ? 'Ban this player permanently?' : 'Ban this player for ' + v + ' minutes?')) return;
+  const ok = await send('admin_ban', body);
+  if (ok) { const out = $('#adBanOut'); if (out) out.textContent = (send.last && send.last.msg) || 'OK'; adBanLoad(); }
+};
+const adBanUndo = $('#adBanUndo'); if (adBanUndo) adBanUndo.onclick = async () => {
+  const uid = ($('#adBanUid').value || '').trim(); if (!uid) return toast('Choisis un joueur');
+  const ok = await send('admin_unban', { userId: uid });
+  if (ok) { toast('Unban effectué'); adBanLoad(); }
+};
 
 // ---- Admin economy buttons + joueurs en ligne (photo de profil + pseudo, sans ID)
 let adEcoPlayers = [];

@@ -92,6 +92,39 @@ function init(deps) {
   }
   const makeLink = (user, guildId, game) => `${PUBLIC_URL}/?t=${makeToken(user, guildId)}${game === 'roulette' || game === 'wheel' ? '&g=roulette' : ''}`;
 
+  // ---------- bannissements du site (gérés depuis le panneau admin) ----------
+  const BAN_MSG = 'You have been banned from this casino.';
+  const BANS_FILE = path.join(DATA_DIR, 'bans.json');
+  const bans = readJson(BANS_FILE, {}); // uid -> { until:0|ms, reason, by, at }
+  let bansTimer = null;
+  function saveBans() { clearTimeout(bansTimer); bansTimer = setTimeout(() => saveJson(BANS_FILE, bans), 300); }
+  function banOf(uid) {
+    const b = bans[String(uid)];
+    if (!b) return null;
+    if (b.until && Number(b.until) <= Date.now()) { delete bans[String(uid)]; saveBans(); return null; }
+    return b;
+  }
+  const banPub = (b) => b ? { until: Number(b.until) || 0, reason: String(b.reason || ''), by: String(b.by || ''), at: Number(b.at) || 0 } : null;
+  function broadcastToUser(guildId, uid, evt, data) {
+    const entry = rooms.get(String(guildId));
+    if (!entry) return;
+    for (const c of entry.clients) if (c.uid === String(uid)) { try { c.write(`event: ${evt}\ndata: ${JSON.stringify(data)}\n\n`); } catch {} }
+  }
+
+  // ---------- jeux activés / désactivés (panneau admin) ----------
+  const GAMES_FILE = path.join(DATA_DIR, 'games.json');
+  const gameFlags = readJson(GAMES_FILE, {}); // clé de route -> false = désactivé
+  const GAME_KEYS = ['ranked', 'bj', 'poker', 'roulette', 'penalty', 'off-bj', 'off-fuse', 'off-mine', 'off-coin', 'off-dice', 'off-horses', 'off-russian', 'off-slots', 'off-duel', 'off-plinko', 'off-penguin', 'off-scratch'];
+  let gamesTimer = null;
+  function saveGames() { clearTimeout(gamesTimer); gamesTimer = setTimeout(() => saveJson(GAMES_FILE, gameFlags), 300); }
+  const gameOn = (k) => gameFlags[String(k)] !== false;
+  const gamesPub = () => GAME_KEYS.map((key) => ({ key, on: gameOn(key) }));
+  const gamesOffPub = () => gamesPub().filter((g) => !g.on).map((g) => g.key);
+  function broadcastGames() {
+    const data = JSON.stringify({ games: gamesOffPub() });
+    for (const entry of rooms.values()) entry.broadcast(`event: games\ndata: ${data}\n\n`);
+  }
+
   // ---------- argent en jeu : remboursé au redémarrage si le bot a planté en pleine manche ----------
   const PENDING_FILE = path.join(DATA_DIR, 'bj_pending.json');
   const pendingMap = readJson(PENDING_FILE, {});
@@ -148,23 +181,32 @@ function init(deps) {
     clearTimeout(rouletteSaveTimer);
     rouletteSaveTimer = setTimeout(() => saveJson(ROULETTE_EVENT_FILE, rouletteEvents), 1200);
   }
-  function rouletteEventOf(guildId) {
+  // La roue tourne côté client pendant ce délai : le gagnant n'est annoncé qu'à la fin.
+  const REVEAL_MS = 5200;
+  function rouletteEventOf(guildId, opts) {
     const e = rouletteEvents[String(guildId)];
     if (!e) return null;
     // Un événement déjà terminé reste disponible pour réouvrir la roue.
+    // hideWinner : pendant l'animation, on n'envoie que la cible de la roue, jamais le nom du gagnant.
+    const hide = !!(opts && opts.hideWinner) && e.status === 'finished';
     return {
       id: e.id,
       status: e.status,
+      kind: e.kind || 'roulette',
       title: e.title || 'Roulette événement',
       amount: Number(e.amount) || 0,
       endsAt: Number(e.endsAt) || 0,
       startedAt: Number(e.startedAt) || 0,
       finishedAt: Number(e.finishedAt) || 0,
+      revealAt: e.status === 'finished' ? Number(e.finishedAt) + REVEAL_MS : 0,
+      revealed: e.status === 'finished' ? !hide : false,
       seconds: Number(e.seconds) || 0,
+      target: e.status === 'finished' ? (e.target != null ? e.target : null) : null,
+      result: hide ? null : (e.result != null ? e.result : null),
       participants: Array.isArray(e.participants) ? e.participants : [],
-      winner: e.winner || null,
-      winnerName: e.winnerName || '',
-      winnerAvatar: e.winnerAvatar || '',
+      winner: hide ? null : (e.winner || null),
+      winnerName: hide ? '' : (e.winnerName || ''),
+      winnerAvatar: hide ? '' : (e.winnerAvatar || ''),
     };
   }
   function broadcastRouletteEvent(guildId, e) {
@@ -203,32 +245,63 @@ function init(deps) {
     const e = rouletteEvents[String(guildId)];
     if (!e || e.status !== 'running') return;
     const pool = (e.participants || []).filter((p) => p && p.uid);
+    const closest = (e.kind || 'roulette') === 'closest';
     e.status = 'finished';
     e.finishedAt = Date.now();
-    if (pool.length) {
-      const w = pool[Math.floor(Math.random() * pool.length)];
+    e.winner = null; e.winnerName = ''; e.winnerAvatar = '';
+    if (closest) {
+      // Tirage d'un numéro de roulette européenne, le plus proche gagne la mise.
+      const result = crypto.randomInt(37);
+      e.result = result;
+      e.target = result;
+      let best = null, bestGap = Infinity;
+      for (const p of pool) {
+        const gap = Math.abs((Number(p.pick) || 0) - result);
+        if (gap < bestGap) { bestGap = gap; best = p; }
+      }
+      if (best) { e.winner = String(best.uid); e.winnerName = String(best.name || best.uid); e.winnerAvatar = String(best.avatar || ''); }
+    } else if (pool.length) {
+      const wi = Math.floor(Math.random() * pool.length);
+      const w = pool[wi];
+      e.target = wi;
       e.winner = String(w.uid);
       e.winnerName = String(w.name || w.uid);
       e.winnerAvatar = String(w.avatar || '');
-      e.avatar = '';
-      if (deps.credit) {
-        try { await deps.credit(e.winner, Number(e.amount) || 0); } catch (er) { console.error('[event] credit winner', er?.message || er); }
-      }
-    } else {
-      e.winner = null; e.winnerName = ''; e.winnerAvatar = '';
+    }
+    e.avatar = '';
+    if (e.winner && deps.credit) {
+      try { await deps.credit(e.winner, Number(e.amount) || 0); } catch (er) { console.error('[event] credit winner', er?.message || er); }
     }
     saveRouletteEvents();
     persistRouletteEventDb(guildId, e);
-    const pub = rouletteEventOf(guildId);
-    broadcastRouletteEvent(guildId, pub);
+    // 1) roue qui tourne : aucune information sur le gagnant (ni son nom, ni son numéro gagnant)
+    broadcastRouletteEvent(guildId, rouletteEventOf(guildId, { hideWinner: true }));
     pushEvent(guildId, {
-      kind: 'roulette',
-      eventId: pub.id,
-      title: '🎡 Roulette terminée',
-      text: pub.winner ? `${pub.winnerName} remporte ${numEvt(pub.amount)} ZTKN ! Clique pour revoir la roue.` : 'Aucun participant : aucun gagnant.',
-      amount: pub.amount,
+      kind: closest ? 'closest' : 'roulette',
+      eventId: e.id,
+      title: closest ? '🎯 Roulette terminée' : '🎡 Roulette terminée',
+      text: 'Tirage effectué · ouvre la roue pour voir le résultat.',
+      amount: Number(e.amount) || 0,
     });
-    for (const p of pub.participants) {
+    // 2) seulement après l'animation : révélation du résultat et du gagnant
+    const eid = e.id;
+    setTimeout(() => {
+      const current = rouletteEvents[String(guildId)];
+      if (!current || current.id !== eid || current.status !== 'finished') return; // un nouvel événement a été lancé entre-temps
+      const full = rouletteEventOf(guildId);
+      if (!full) return;
+      broadcastRouletteEvent(guildId, full);
+      pushEvent(guildId, {
+        kind: closest ? 'closest_result' : 'roulette_result',
+        eventId: full.id,
+        title: closest ? '🎯 Résultat de la roulette' : '🎡 Résultat de la roulette',
+        text: full.winner
+          ? `${full.winnerName} remporte ${numEvt(full.amount)} ZTKN !${full.result != null ? ' Numéro ' + full.result + '.' : ''}`
+          : 'Aucun participant : aucun gagnant.',
+        amount: full.amount,
+      });
+    }, REVEAL_MS);
+    for (const p of pool) {
       const nb = deps.getBalance ? await deps.getBalance(p.uid).catch(() => null) : null;
       const entry = rooms.get(String(guildId));
       if (entry) for (const c of entry.clients) if (c.uid === String(p.uid)) { try { c.write(`event: bal\ndata: ${JSON.stringify({ bal: nb })}\n\n`); } catch {} }
@@ -238,15 +311,18 @@ function init(deps) {
   function scheduleRouletteFinish(guildId, ms) {
     setTimeout(() => finishRouletteEvent(guildId).catch((e) => console.error('[event] finish', e?.message || e)), Math.max(1000, ms));
   }
-  function launchRouletteEvent(guildId, byUid, amount, seconds) {
+  function launchRouletteEvent(guildId, byUid, amount, seconds, kind) {
     const amt = Math.max(1, Math.floor(Number(amount) || 0));
     const sec = Math.min(3600, Math.max(5, Math.floor(Number(seconds) || 60)));
+    const closest = kind === 'closest';
     const id = crypto.randomBytes(6).toString('hex');
     const now = Date.now();
     const e = {
-      id, status: 'running', title: 'Roulette événement', amount: amt,
+      id, status: 'running', kind: closest ? 'closest' : 'roulette',
+      title: closest ? 'Roulette — plus proche' : 'Roulette événement', amount: amt,
       seconds: sec, startedAt: now, endsAt: now + sec * 1000, finishedAt: 0,
-      participants: [], winner: null, winnerName: '', winnerAvatar: '', launchedBy: String(byUid || ''),
+      participants: [], winner: null, winnerName: '', winnerAvatar: '',
+      result: null, target: null, launchedBy: String(byUid || ''),
     };
     rouletteEvents[String(guildId)] = e;
     saveRouletteEvents();
@@ -254,18 +330,29 @@ function init(deps) {
     const pub = rouletteEventOf(guildId);
     broadcastRouletteEvent(guildId, pub);
     pushEvent(guildId, {
-      kind: 'roulette', eventId: id, title: '🎡 Roulette événement',
-      text: `${numEvt(amt)} ZTKN à gagner · tire dans ${sec} s · clique pour participer !`,
+      kind: e.kind, eventId: id,
+      title: closest ? '🎯 Roulette plus proche' : '🎡 Roulette événement',
+      text: closest
+        ? `${numEvt(amt)} ZTKN au plus proche · choisis un numéro (0-36) · tire dans ${sec} s !`
+        : `${numEvt(amt)} ZTKN à gagner · tire dans ${sec} s · clique pour participer !`,
       amount: amt, seconds: sec, expiresAt: e.endsAt,
     });
     scheduleRouletteFinish(guildId, sec * 1000);
     return pub;
   }
-  function joinRouletteEvent(guildId, uid, name, avatar) {
+  function joinRouletteEvent(guildId, uid, name, avatar, pick) {
     const e = rouletteEvents[String(guildId)];
     if (!e || e.status !== 'running') throw new Error('Aucune roulette événement en cours.');
     if (Date.now() >= e.endsAt) { finishRouletteEvent(guildId).catch(() => {}); throw new Error('La roulette est terminée.'); }
-    if (!e.participants.some((p) => String(p.uid) === String(uid))) {
+    if ((e.kind || 'roulette') === 'closest') {
+      const n = Number(pick);
+      if (!Number.isInteger(n) || n < 0 || n > 36) throw new Error('Numéro invalide (0-36).');
+      const p = (e.participants || []).find((x) => String(x.uid) === String(uid));
+      if (p) p.pick = n;
+      else e.participants.push({ uid: String(uid), name: String(name || uid), avatar: String(avatar || ''), pick: n });
+      saveRouletteEvents();
+      persistRouletteEventDb(guildId, e);
+    } else if (!e.participants.some((p) => String(p.uid) === String(uid))) {
       e.participants.push({ uid: String(uid), name: String(name || uid), avatar: String(avatar || '') });
       saveRouletteEvents();
       persistRouletteEventDb(guildId, e);
@@ -741,6 +828,8 @@ function init(deps) {
     }
     const user = readToken(d.t);
     if (!user) return json(res, 401, { ok: false, error: 'Link expired: click "Play" in Discord again.' });
+    const ban = banOf(user.uid);
+    if (ban) return json(res, 403, { ok: false, error: BAN_MSG, banned: true, ban: banPub(ban) });
     if (user.avatar) avatarMap.set(user.uid, user.avatar);
     if (user.name) nameMap.set(user.uid, user.name);
     const now = Date.now();
@@ -761,6 +850,12 @@ function init(deps) {
     let daily; // résultat du daily (action daily)
     let evMsg; // message de confirmation d'un événement (claim / giveaway)
     try {
+      // jeu désactivé par l'admin : on bloque côté serveur, pas seulement dans l'interface
+      const OFF_ALIAS = { mines: 'off-mine', bj: 'off-bj' };
+      if (act === 'ostart' && !gameOn(OFF_ALIAS[d.game] || 'off-' + String(d.game || ''))) throw new Error('This game is currently disabled.');
+      if (act === 'rjoin' && !gameOn('roulette')) throw new Error('This game is currently disabled.');
+      if (act === 'tnew' && !gameOn(String(d.game) === 'poker' ? 'poker' : 'bj')) throw new Error('This game is currently disabled.');
+      if (act === 'sit' && String(d.tid) === 'ranked' && !gameOn('ranked')) throw new Error('This game is currently disabled.');
       if (String(d.action).startsWith('o')) return json(res, 200, { ok: true, ...(await offline.handle(user, d)) });
       switch (d.action) {
         // ---- envoi de pièces à un autre joueur du serveur
@@ -818,8 +913,8 @@ function init(deps) {
           if (!deps.isAdmin || !(await deps.isAdmin(user.uid))) throw new Error('Admin only.');
           const kind = String(d.kind || '');
           let r;
-          if (kind === 'roulette') {
-            r = launchRouletteEvent(user.guildId, user.uid, d.amount, d.seconds);
+          if (kind === 'roulette' || kind === 'closest') {
+            r = launchRouletteEvent(user.guildId, user.uid, d.amount, d.seconds, kind);
           } else if (kind === 'claim' || kind === 'giveaway') {
             if (!deps.launchEvent) throw new Error('Events unavailable.');
             r = await deps.launchEvent(user.guildId, user.uid, kind, d.amount, d.winners, d.minutes);
@@ -834,9 +929,11 @@ function init(deps) {
         // ---- participer à un événement (claim / giveaway) depuis la notification
         case 'evclaim':
         case 'evjoin': {
-          if (String(d.kind || '') === 'roulette') {
-            const pub = joinRouletteEvent(user.guildId, user.uid, user.name, user.avatar);
-            evMsg = `✅ Tu participes à la roulette événement (${(pub.participants || []).length} participant(s)).`;
+          if (String(d.kind || '') === 'roulette' || String(d.kind || '') === 'closest') {
+            const pub = joinRouletteEvent(user.guildId, user.uid, user.name, user.avatar, d.pick);
+            evMsg = String(d.kind) === 'closest'
+              ? `✅ Numéro ${Number(d.pick)} enregistré — le plus proche du tirage gagne !`
+              : `✅ Tu participes à la roulette événement (${(pub.participants || []).length} participant(s)).`;
             break;
           }
           const fn = d.action === 'evclaim' ? deps.eventClaim : deps.eventJoin;
@@ -1215,6 +1312,55 @@ function init(deps) {
           return json(res, 200, { ok: true, result: result || { ok: true }, msg: (result && result.msg) || 'OK' });
         }
 
+        // ---- bannissements (permanent ou avec chrono) ----
+        case 'admin_ban': {
+          if (!deps.isAdmin || !(await deps.isAdmin(user.uid))) throw new Error('Admin only.');
+          const uid = String(d.userId || '').trim();
+          if (!/^\d{5,25}$/.test(uid)) throw new Error('Choose a player.');
+          if (uid === user.uid) throw new Error('You cannot ban yourself.');
+          const permanent = !!d.permanent;
+          const minutes = Math.min(525600, Math.max(1, Math.floor(Number(d.minutes) || 60)));
+          bans[uid] = {
+            until: permanent ? 0 : Date.now() + minutes * 60000,
+            reason: String(d.reason || '').slice(0, 120),
+            by: String(user.uid), at: Date.now(),
+          };
+          saveBans();
+          broadcastToUser(user.guildId, uid, 'banned', { ban: banPub(bans[uid]) });
+          console.log(`[web] ADMIN ${user.name} (${user.uid}) banned ${uid} (${permanent ? 'permanent' : minutes + 'min'})`);
+          return json(res, 200, { ok: true, msg: permanent ? 'Player banned permanently.' : `Player banned for ${minutes} min.` });
+        }
+        case 'admin_unban': {
+          if (!deps.isAdmin || !(await deps.isAdmin(user.uid))) throw new Error('Admin only.');
+          const uid = String(d.userId || '').trim();
+          if (!bans[uid]) throw new Error('This player is not banned.');
+          delete bans[uid];
+          saveBans();
+          broadcastToUser(user.guildId, uid, 'unbanned', { ok: true });
+          return json(res, 200, { ok: true, msg: 'Player unbanned.' });
+        }
+        case 'admin_ban_list': {
+          if (!deps.isAdmin || !(await deps.isAdmin(user.uid))) throw new Error('Admin only.');
+          const list = Object.entries({ ...bans }).map(([uid, b]) => ({ uid, ...banPub(b) })).filter((x) => !x.until || x.until > Date.now()).sort((a, b) => b.at - a.at);
+          return json(res, 200, { ok: true, bans: list });
+        }
+
+        // ---- activation / désactivation des jeux ----
+        case 'admin_games_list': {
+          if (!deps.isAdmin || !(await deps.isAdmin(user.uid))) throw new Error('Admin only.');
+          return json(res, 200, { ok: true, games: gamesPub() });
+        }
+        case 'admin_game_toggle': {
+          if (!deps.isAdmin || !(await deps.isAdmin(user.uid))) throw new Error('Admin only.');
+          const key = String(d.key || '');
+          if (!GAME_KEYS.includes(key)) throw new Error('Unknown game.');
+          const on = d.on === true || d.on === 'true' || d.on === 1;
+          if (on) delete gameFlags[key]; else gameFlags[key] = false;
+          saveGames();
+          broadcastGames();
+          return json(res, 200, { ok: true, games: gamesPub(), msg: key + (on ? ' enabled.' : ' disabled.') });
+        }
+
         // Economy admin (Discord panel actions — no channel creation)
         case 'admin_eco': {
           if (!deps.isAdmin || !(await deps.isAdmin(user.uid))) throw new Error('Admin only.');
@@ -1330,9 +1476,15 @@ function init(deps) {
       'X-Accel-Buffering': 'no',
       ...SEC,
     });
-    res.write(`retry: 2000\nevent: hello\ndata: ${JSON.stringify({ uid: user.uid, name: user.name, avatar: user.avatar, seats: SEATS, coin: deps.coin || '🪙', roulette: ROULETTE_INFO, poker: POKER_INFO, penalty: PENALTY_INFO })}\n\n`);
+    const ban = banOf(user.uid);
+    res.write(`retry: 2000\nevent: hello\ndata: ${JSON.stringify({ uid: user.uid, name: user.name, avatar: user.avatar, seats: SEATS, coin: deps.coin || '🪙', roulette: ROULETTE_INFO, poker: POKER_INFO, penalty: PENALTY_INFO, ban: banPub(ban), gamesOff: gamesOffPub() })}\n\n`);
+    if (ban) {
+      try { res.write(`event: banned\ndata: ${JSON.stringify({ ban: banPub(ban) })}\n\n`); } catch {}
+      return res.end();
+    }
     res.uid = user.uid; // sert au snapshot personnalisé du poker
     Promise.resolve(deps.isAdmin ? deps.isAdmin(user.uid) : false).then((a) => { if (a) try { res.write(`event: admin\ndata: {"admin":true}\n\n`); } catch { /* fermée */ } }).catch(() => {});
+    try { res.write(`event: games\ndata: ${JSON.stringify({ games: gamesOffPub() })}\n\n`); } catch {}
     if (user.avatar) avatarMap.set(user.uid, user.avatar);
     if (user.name) nameMap.set(user.uid, user.name);
     entry.seen.set(user.uid, { uid: user.uid, name: user.name, avatar: user.avatar });
@@ -1407,7 +1559,7 @@ function init(deps) {
         if (!u) return json(res, 401, { ok: false, error: 'expired' });
         let bal = null;
         try { bal = await deps.getBalance(u.uid); } catch (e) { console.error('[api/me] bal', e?.message || e); }
-        return json(res, 200, { ok: true, uid: u.uid, name: u.name, avatar: u.avatar, bal });
+        return json(res, 200, { ok: true, uid: u.uid, name: u.name, avatar: u.avatar, bal, ban: banPub(banOf(u.uid)), gamesOff: gamesOffPub() });
       }
       if (req.method === 'GET' && url.pathname === '/api/stream') return handleStream(req, res, url);
       if (req.method === 'GET' && url.pathname === '/api/top') return json(res, 200, { top: (url.searchParams.get('g') === 'poker' ? pokerStats : statsApi).top() });
@@ -1451,7 +1603,12 @@ function init(deps) {
       if (req.method === 'GET' && url.pathname === '/api/roulette-event') {
         const u = readToken(url.searchParams.get('t'));
         if (!u) return json(res, 401, { error: 'expired' });
-        const e = rouletteEventOf(u.guildId);
+        // pendant l'animation de 5,2 s, même un rechargement de page ne doit pas révéler le gagnant
+        const hiding = (() => {
+          const raw = rouletteEvents[String(u.guildId)];
+          return !!(raw && raw.status === 'finished' && Date.now() < Number(raw.finishedAt) + REVEAL_MS);
+        })();
+        const e = rouletteEventOf(u.guildId, { hideWinner: hiding });
         const joined = !!(e && e.participants.some((p) => String(p.uid) === String(u.uid)));
         return json(res, 200, { ok: true, event: e, joined });
       }

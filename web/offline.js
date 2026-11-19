@@ -116,21 +116,22 @@ function bjVal(cards) { let t = 0, aces = 0; for (const c of cards) { t += cardV
 const cs = (c) => c.r + c.s;
 
 const PG_ZONES = [
-  { id: 1, key: 'easy',    pts: 10, multAdd: 0.15 },
-  { id: 2, key: 'med',     pts: 22, multAdd: 0.45 },
-  { id: 3, key: 'hard',    pts: 38, multAdd: 1.10 },
-  { id: 4, key: 'vhard',   pts: 55, multAdd: 2.40 },
-  { id: 5, key: 'perfect', pts: 70, multAdd: 4.00 },
+  { id: 1, key: 'easy',    pts: 6,  multAdd: 0.05 },
+  { id: 2, key: 'med',     pts: 12, multAdd: 0.12 },
+  { id: 3, key: 'hard',    pts: 18, multAdd: 0.22 },
+  { id: 4, key: 'vhard',   pts: 24, multAdd: 0.35 },
+  { id: 5, key: 'perfect', pts: 30, multAdd: 0.55 },
 ];
+const PG_STAGES = 4; // il faut enchaîner 4 PERFECT pour le multiplicateur maximum (≈ x3.1)
 const pgZone = (id) => PG_ZONES.find((z) => z.id === Number(id));
 function pgResolve(g) {
-  const z1 = pgZone(g.zone1) || PG_ZONES[0];
-  const z2 = g.zone2 != null ? (pgZone(g.zone2) || PG_ZONES[0]) : null;
-  g.pts = z1.pts + (z2 ? z2.pts : 0);
-  g.dist = Math.max(1, Math.min(100, Math.round((g.pts / 140) * 100)));
-  let mult = 1 + z1.multAdd + (z2 ? z2.multAdd : 0);
-  g.mult = round2(Math.max(0, mult * 0.97));
-  g.flightMs = 700 + Math.round(g.dist * 18);
+  const zones = Array.isArray(g.zones) ? g.zones : [g.zone1, g.zone2].filter((z) => z != null);
+  let pts = 0, add = 0;
+  for (const zid of zones) { const z = pgZone(zid) || PG_ZONES[0]; pts += z.pts; add += z.multAdd; }
+  g.pts = pts;
+  g.dist = Math.max(1, Math.min(100, Math.round((g.pts / (PG_ZONES[4].pts * PG_STAGES)) * 100)));
+  g.mult = round2(Math.max(0, (1 + add) * 0.97));
+  g.flightMs = 700 + Math.round(g.dist * 14);
   g.phase = 'done';
 }
 
@@ -172,7 +173,7 @@ function create(deps, pending) {
         cash: floor2(g.bet * minesMult(g.m, k)), over: g.over, win: g.win || 0, mineAt: g.over ? [...g.set] : undefined };
     },
     fuse: (g) => ({ type: 'fuse', bet: g.bet, start: g.start, rate: RATE, auto: g.auto, over: g.over, win: g.win || 0, at: g.over ? g.at : undefined, crash: g.over ? g.cp : undefined }),
-    penguin: (g) => ({ type: 'penguin', bet: g.bet, phase: g.phase || (g.over ? 'done' : 'aim1'), zone1: g.zone1, zone2: g.zone2, pts: g.pts || 0, dist: g.dist || 0, mult: g.mult || 0, flightMs: g.flightMs || 0, over: !!g.over, win: g.win || 0, outcome: g.outcome || null }),
+    penguin: (g) => ({ type: 'penguin', bet: g.bet, phase: g.phase || (g.over ? 'done' : 'aim1'), stage: g.stage || 1, maxStage: PG_STAGES, zones: Array.isArray(g.zones) ? g.zones : [], zone1: g.zone1, zone2: g.zone2, zone3: g.zone3, zone4: g.zone4, pts: g.pts || 0, dist: g.dist || 0, mult: g.mult || 0, flightMs: g.flightMs || 0, over: !!g.over, win: g.win || 0, outcome: g.outcome || null }),
     coin: (g) => ({ type: 'coin', bet: g.bet, choice: g.choice, side: g.side, mult: g.mult, over: true, win: g.win || 0, outcome: g.win > 0 ? 'win' : 'lose' }),
     dice: (g) => ({ type: 'dice', bet: g.bet, choice: g.choice, a: g.a, b: g.b, sum: g.sum, mult: g.mult, over: true, win: g.win || 0, outcome: g.win > 0 ? 'win' : 'lose' }),
     horses: (g) => ({ type: 'horses', bet: g.bet, want: g.want, winner: g.winner, mult: g.mult, over: true, win: g.win || 0, outcome: g.win > 0 ? 'win' : 'lose' }),
@@ -248,8 +249,12 @@ function create(deps, pending) {
           genTicket(ng);
         } else if (type === 'penguin') {
           ng.phase = 'aim1';
+          ng.stage = 1;
+          ng.zones = [];
           ng.zone1 = null;
           ng.zone2 = null;
+          ng.zone3 = null;
+          ng.zone4 = null;
           ng.pts = 0;
           ng.dist = 0;
           ng.mult = 0;
@@ -304,20 +309,19 @@ function create(deps, pending) {
           if (mv !== 'stop') throw new Error('Action inconnue.');
           const z = Number(d.zone);
           if (!pgZone(z)) throw new Error('Zone invalide.');
-          if (g.phase === 'aim1') {
-            g.zone1 = z;
-            if (z === 5) {
-              // perfect → second semi-circle
-              g.phase = 'aim2';
-            } else {
-              pgResolve(g);
-              await end(u, g, round2(g.bet * g.mult));
-            }
-          } else if (g.phase === 'aim2') {
-            g.zone2 = z;
+          // compatibilité avec une partie lancée avant la refonte (phase aim2 sans `stage`)
+          if (!g.stage) { const m = /^aim(\d+)$/.exec(String(g.phase || '')); g.stage = m ? Math.min(PG_STAGES, Math.max(1, Number(m[1]))) : 1; }
+          if (!Array.isArray(g.zones)) g.zones = [];
+          if (!/^aim\d+$/.test(String(g.phase)) || g.stage > PG_STAGES) throw new Error('Tir déjà résolu.');
+          g.zones.push(z);
+          g['zone' + g.stage] = z;
+          if (z === 5 && g.stage < PG_STAGES) {
+            g.stage += 1; // PERFECT : on passe à l'étape suivante
+            g.phase = 'aim' + g.stage;
+          } else {
             pgResolve(g);
             await end(u, g, round2(g.bet * g.mult));
-          } else throw new Error('Tir déjà résolu.');
+          }
         } else {
           if (mv === 'hit') {
             g.player.push(g.deck.pop());
