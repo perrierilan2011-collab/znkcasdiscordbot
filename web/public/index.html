@@ -1430,7 +1430,7 @@ header .sp{flex:1 1 0}
       </button>
       <button class="gcard" data-go="off-penguin" id="gcPenguin">
         <span class="gname">Penguin Slide</span>
-        <span class="gdesc">4 étapes · enchaîne les PERFECT · gain maximum x3.1</span>
+        <span class="gdesc">4 étapes · combo PERFECT · jusqu’à x8.34 · pertes possibles</span>
         <span class="gplay">Play</span>
       </button>
       <button class="gcard" data-go="off-scratch">
@@ -4291,20 +4291,22 @@ const ofStop = () => { clearInterval(O.timer); O.timer = 0; };
 // ===== Penguin Slide (skill semi-circles) =====
 const PG = {
   raf: 0, angle: 0, dir: 1, running: false, stage: 1,
-  // zones as fractions of the semi-circle (0..1 left→right). PERFECT is a tiny center (4%).
+  // zones as fractions of the semi-circle (0..1 left→right). PERFECT is a tiny center (6%).
   // layout mirrored around center: easy | med | hard | vhard | PERFECT | vhard | hard | med | easy
   bands: [
     { id: 1, a: 0.00, b: 0.18, color: '#4ade80' },
     { id: 2, a: 0.18, b: 0.33, color: '#facc15' },
     { id: 3, a: 0.33, b: 0.44, color: '#fb923c' },
-    { id: 4, a: 0.44, b: 0.48, color: '#f87171' },
-    { id: 5, a: 0.48, b: 0.52, color: '#fbbf24' }, // perfect — très étroit
-    { id: 4, a: 0.52, b: 0.56, color: '#f87171' },
+    { id: 4, a: 0.44, b: 0.47, color: '#f87171' },
+    { id: 5, a: 0.47, b: 0.53, color: '#fbbf24' }, // perfect — 6 %
+    { id: 4, a: 0.53, b: 0.56, color: '#f87171' },
     { id: 3, a: 0.56, b: 0.67, color: '#fb923c' },
     { id: 2, a: 0.67, b: 0.82, color: '#facc15' },
     { id: 1, a: 0.82, b: 1.00, color: '#4ade80' },
   ],
-  add: { 1: 0.05, 2: 0.12, 3: 0.22, 4: 0.35, 5: 0.55 }, // bonus par zone (serveur)
+  // facteur final appliqué au combo. Les zones rouges/oranges font perdre de l'argent.
+  factor: { 1: 0.15, 2: 0.50, 3: 0.95, 4: 1.60, 5: 2.00 },
+  combo: [0, 0.8, 1.1, 1.4], // bonus par PERFECT déjà validé
 };
 function pgStagesRender(stage, zones) {
   const box = document.getElementById('pgStages'); if (!box) return;
@@ -4315,8 +4317,11 @@ function pgStagesRender(stage, zones) {
   }
   const t = document.getElementById('pgTotal');
   if (t) {
-    let add = 0; (zones || []).forEach((z) => { add += PG.add[z] || 0; });
-    t.textContent = (zones && zones.length) ? ('Étape ' + (stage || zones.length) + '/4 · total x' + ((1 + add) * 0.97).toFixed(2)) : '4 étapes · un PERFECT à chaque fois · max x3.10';
+    let combo = 0, n = 0;
+    (zones || []).forEach((z) => { if (z === 5) combo += PG.combo[n++] || 0; });
+    t.textContent = (zones && zones.length)
+      ? ('Étape ' + (stage || zones.length) + '/4 · combo x' + (1 + combo).toFixed(2))
+      : '4 étapes · PERFECT obligatoire · jusqu’à x8.34 · pertes possibles';
   }
 }
 function pgZoneAt(t) {
@@ -4366,7 +4371,7 @@ function pgShowSkill(on, stage, zones) {
   pgStagesRender(on ? PG.stage : 0, zones);
   if (on) {
     pgDrawMeter();
-    if (hint) hint.textContent = 'STAGE ' + PG.stage + '/4 · PERFECT to advance · stop the needle!';
+    if (hint) hint.textContent = 'STAGE ' + PG.stage + '/4 · PERFECT pour avancer · x0.15 à x8.34 · STOP !';
     pgStartSwing();
   } else {
     pgStopSwing();
@@ -4378,8 +4383,8 @@ function pgStartSwing() {
   PG.running = true;
   PG.angle = 0;
   PG.dir = 1;
-  // l'aiguille accélère à chaque étape : 0.014 → 0.026
-  const speed = 0.014 + (PG.stage - 1) * 0.004;
+  // aiguille bien plus lente, mais un peu plus rapide à chaque étape : 0.0075 → 0.0129
+  const speed = 0.0075 + (PG.stage - 1) * 0.0018;
   const tick = () => {
     if (!PG.running) return;
     PG.angle += speed * PG.dir;
@@ -4478,7 +4483,7 @@ function pgRender(s) {
   }
   if (res) {
     setTimeout(() => {
-      res.textContent = dist + ' m · x' + (s.mult || 0) + ' · ' + ((s.zones || []).length || 1) + '/4 étapes' + (s.win > 0 ? ' · +' + num(s.win) : ' · lost');
+      res.textContent = dist + ' m · x' + (s.mult || 0) + ' · ' + ((s.zones || []).length || 1) + '/4 étapes' + (Number(s.combo) > 0 ? ' · combo x' + (1 + Number(s.combo)).toFixed(2) : '') + (Number(s.win) > 0 ? ' · +' + num(s.win) : ' · −' + num(s.bet || 0) + ' perdu');
       res.classList.add('pg-pop');
       setTimeout(() => res.classList.remove('pg-pop'), 600);
     }, Math.min(ms, 1000));
@@ -4537,8 +4542,8 @@ function ofBuild() {
       <div id="pgHint"></div>
       <div id="pgMeter" class="hide"></div>
       <div id="pgLegend" class="hide">
-        <span class="pg-easy">Easy</span><span class="pg-med">Medium</span><span class="pg-hard">Hard</span>
-        <span class="pg-vhard">Very hard</span><span class="pg-perfect">PERFECT → next stage (4/4)</span>
+        <span class="pg-easy">Easy x0.15</span><span class="pg-med">Medium x0.50</span><span class="pg-hard">Hard x0.95</span>
+        <span class="pg-vhard">Very hard x1.60</span><span class="pg-perfect">PERFECT x2.00 → next stage (4/4)</span>
       </div>
       <button type="button" class="btn go hide" id="pgStop">STOP</button>
     </div>`;
@@ -4714,7 +4719,7 @@ function ofDock() {
   if (O.anim) { row(act('go', 'En cours…', () => {}, false)); return; }
   if (live) {
     if (O.game === 'penguin') {
-      d.append(el('div', 'hint', 'Étape ' + (Number(s.stage) || 1) + '/4 — click STOP on the colored semi-circle above; PERFECT unlocks the next stage'));
+      d.append(el('div', 'hint', 'Étape ' + (Number(s.stage) || 1) + '/4 — STOP sur le semi-cercle · PERFECT = étape suivante et combo plus gros · hors PERFECT tu peux perdre ta mise'));
       return;
     }
     if (O.game === 'mines') { row(act('go', 'Encaisser ' + num(s.cash) + ' ' + COIN, () => ofMove('cash'), s.picks.length)); d.append(el('div', 'hint', s.picks.length ? 'Chaque case sûre augmente le gain : encaisse avant de toucher une mine.' : 'Révèle au moins une case pour pouvoir encaisser.')); }
@@ -5126,10 +5131,16 @@ Object.assign(EN_DICT, {
   "Bans actifs": "Active bans", "Aucun ban": "No bans", "Permanent": "Permanent", "Expire le": "Expires at", "Par": "By", "Raison": "Reason",
   "Choisir un numéro": "Pick a number", "Numéro": "Number", "Tirage en cours…": "Spinning…", "Roue terminée.": "Wheel finished.",
   "Le plus proche du numéro tiré gagne la mise.": "Closest to the drawn number wins the bet.",
-  "4 étapes · enchaîne les PERFECT · gain maximum x3.1": "4 stages · chain PERFECTs · max win x3.1",
+  "4 étapes · combo PERFECT · jusqu’à x8.34 · pertes possibles": "4 stages · PERFECT combo · up to x8.34 · losses possible",
+  "4 étapes · PERFECT obligatoire · jusqu’à x8.34 · pertes possibles": "4 stages · PERFECT required · up to x8.34 · losses possible",
+  "STAGE 1/4 · PERFECT pour avancer · x0.15 à x8.34 · STOP !": "STAGE 1/4 · PERFECT to advance · x0.15 to x8.34 · STOP!",
+  "STAGE 2/4 · PERFECT pour avancer · x0.15 à x8.34 · STOP !": "STAGE 2/4 · PERFECT to advance · x0.15 to x8.34 · STOP!",
+  "STAGE 3/4 · PERFECT pour avancer · x0.15 à x8.34 · STOP !": "STAGE 3/4 · PERFECT to advance · x0.15 to x8.34 · STOP!",
+  "STAGE 4/4 · PERFECT pour avancer · x0.15 à x8.34 · STOP !": "STAGE 4/4 · PERFECT to advance · x0.15 to x8.34 · STOP!",
+  "PERFECT pour avancer · x0.15 à x8.34 · STOP !": "PERFECT to advance · x0.15 to x8.34 · STOP!",
   "Etape": "Stage", "Total": "Total", "Balance": "Balance", "Inscrit": "Registered", "Inscrit !": "Registered!",
 });
-const EN_RE = [["^Placement (\\d+)/(\\d+) · RR masqué$", "Placement $1/$2 · RR hidden"], ["^(\\d+) RR · #(\\d+)$", "$1 RR · #$2"], ["^Table (\\d+)$", "Table $1"], ["^Mis à jour à (.+)$", "Updated at $1"], ["^Chat · (.+)$", "@Chat · $1"], ["^(\\d+) joueurs? à table$", "$1 player(s) at the table"], ["^🎁 (.+) t’a envoyé (.+)$", "🎁 $1 sent you $2"], ["^Mise minimale : (.+)$", "Minimum bet: $1"], ["^Mise maximale : (.+)$", "Maximum bet: $1"], ["^Tu es déjà assis à la table (\\d+) : quitte-la d’abord\\.$", "You're already seated at table $1: leave it first."], ["^Maximum (\\d+) tables\\.$", "Maximum $1 tables."], ["^à (.+?) · mise (.+)$", "@at $1 · bet $2"], ["^blinds (.+)$", "blinds $1"], ["^Ta session a expiré : reconnecte-toi avec Discord\\.$", "Your session expired: log in with Discord again."], ["^Jour (.+) · reset à minuit \\(Paris\\)$", "Day $1 · resets at midnight (Paris)"]].map(([a, b]) => [new RegExp(a), b]);
+const EN_RE = [["^Placement (\\d+)/(\\d+) · RR masqué$", "Placement $1/$2 · RR hidden"], ["^(\\d+) RR · #(\\d+)$", "$1 RR · #$2"], ["^Table (\\d+)$", "Table $1"], ["^Mis à jour à (.+)$", "Updated at $1"], ["^Chat · (.+)$", "@Chat · $1"], ["^(\\d+) joueurs? à table$", "$1 player(s) at the table"], ["^🎁 (.+) t’a envoyé (.+)$", "🎁 $1 sent you $2"], ["^Mise minimale : (.+)$", "Minimum bet: $1"], ["^Mise maximale : (.+)$", "Maximum bet: $1"], ["^Tu es déjà assis à la table (\\d+) : quitte-la d’abord\\.$", "You're already seated at table $1: leave it first."], ["^Maximum (\\d+) tables\\.$", "Maximum $1 tables."], ["^à (.+?) · mise (.+)$", "@at $1 · bet $2"], ["^blinds (.+)$", "blinds $1"], ["^Ta session a expiré : reconnecte-toi avec Discord\\.$", "Your session expired: log in with Discord again."], ["^Jour (.+) · reset à minuit \\(Paris\\)$", "Day $1 · resets at midnight (Paris)"], ["^Étape (\\d+)/4 · combo x([0-9.]+)$", "Stage $1/4 · combo x$2"], ["^Étape (\\d+)/4 — STOP sur le semi-cercle · PERFECT = étape suivante et combo plus gros · hors PERFECT tu peux perdre ta mise$", "Stage $1/4 — STOP on the semi-circle · PERFECT = next stage and bigger combo · miss PERFECT and you can lose your bet"], ["^(\\d+) m · x([0-9.]+) · (\\d+)/4 étapes · combo x([0-9.]+) · \\+([0-9.,]+)$", "$1 m · x$2 · $3/4 stages · combo x$4 · +$5"], ["^(\\d+) m · x([0-9.]+) · (\\d+)/4 étapes · combo x([0-9.]+) · −([0-9.,]+) perdu$", "$1 m · x$2 · $3/4 stages · combo x$4 · −$5 lost"]].map(([a, b]) => [new RegExp(a), b]);
 let LANG = 'en'; try { LANG = localStorage.getItem('znk_lang') === 'fr' ? 'fr' : 'en'; } catch {}
 const trWords = (s) => {
   const m = /^(\s*)([\s\S]*?)(\s*)$/.exec(s), core = m[2];

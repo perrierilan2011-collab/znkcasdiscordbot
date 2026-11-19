@@ -115,22 +115,31 @@ const cardVal = (c) => (c.r === 'A' ? 11 : ['K', 'Q', 'J', '10'].includes(c.r) ?
 function bjVal(cards) { let t = 0, aces = 0; for (const c of cards) { t += cardVal(c); if (c.r === 'A') aces++; } while (t > 21 && aces-- > 0) t -= 10; return t; }
 const cs = (c) => c.r + c.s;
 
+// Penguin Slide : 4 étapes, aiguille lente, gros multiplicateurs mais vrai risque de perte.
+// Chaque PERFECT enchaîné ajoute un combo qui multiplie AUSSI la perte si tu te trompes ensuite.
 const PG_ZONES = [
-  { id: 1, key: 'easy',    pts: 6,  multAdd: 0.05 },
-  { id: 2, key: 'med',     pts: 12, multAdd: 0.12 },
-  { id: 3, key: 'hard',    pts: 18, multAdd: 0.22 },
-  { id: 4, key: 'vhard',   pts: 24, multAdd: 0.35 },
-  { id: 5, key: 'perfect', pts: 30, multAdd: 0.55 },
+  { id: 1, key: 'easy',    pts: 6,  factor: 0.15 },
+  { id: 2, key: 'med',     pts: 12, factor: 0.50 },
+  { id: 3, key: 'hard',    pts: 18, factor: 0.95 },
+  { id: 4, key: 'vhard',   pts: 24, factor: 1.60 },
+  { id: 5, key: 'perfect', pts: 30, factor: 2.00 },
 ];
-const PG_STAGES = 4; // il faut enchaîner 4 PERFECT pour le multiplicateur maximum (≈ x3.1)
+const PG_STAGES = 4;
+const PG_COMBO = [0, 0.8, 1.1, 1.4]; // bonus cumulé par PERFECT déjà validé (0 → 3)
 const pgZone = (id) => PG_ZONES.find((z) => z.id === Number(id));
 function pgResolve(g) {
   const zones = Array.isArray(g.zones) ? g.zones : [g.zone1, g.zone2].filter((z) => z != null);
-  let pts = 0, add = 0;
-  for (const zid of zones) { const z = pgZone(zid) || PG_ZONES[0]; pts += z.pts; add += z.multAdd; }
+  const last = zones.length ? zones[zones.length - 1] : 1;
+  const z = pgZone(last) || PG_ZONES[0];
+  let pts = 0, combo = 0, n = 0;
+  for (const zid of zones) {
+    pts += (pgZone(zid) || PG_ZONES[0]).pts;
+    if (Number(zid) === 5) combo += PG_COMBO[n++] || 0; // chaque PERFECT engraisse le combo, même le dernier
+  }
+  g.combo = round2(combo);
   g.pts = pts;
-  g.dist = Math.max(1, Math.min(100, Math.round((g.pts / (PG_ZONES[4].pts * PG_STAGES)) * 100)));
-  g.mult = round2(Math.max(0, (1 + add) * 0.97));
+  g.dist = Math.max(1, Math.min(100, Math.round((pts / (PG_ZONES[4].pts * PG_STAGES)) * 100)));
+  g.mult = round2(Math.max(0, (1 + combo) * z.factor * 0.97));
   g.flightMs = 700 + Math.round(g.dist * 14);
   g.phase = 'done';
 }
@@ -158,7 +167,7 @@ function create(deps, pending) {
     if (net > 0 && deps.onRoundEnd) {
       const detail = g.type === 'mines' ? `${g.picks.length} case(s) · ${g.m} mine(s)` : g.type === 'fuse' ? `encaissé à ${g.at}x`
         : g.type === 'coin' ? NAMES[g.side] : g.type === 'dice' ? `${g.a}+${g.b}=${g.sum} (${NAMES[g.choice]})`
-        : g.type === 'horses' ? `cheval n°${g.winner + 1}` : g.type === 'slots' ? `x${g.mult}` : g.type === 'duel' ? FOES[g.foe].n : g.type === 'scratch' ? `ticket x${g.mult}` : g.type === 'plinko' ? `${g.n} bille${g.n > 1 ? 's' : ''} · x${round2(g.mult)}` : g.type === 'russian' ? `${g.k} balle${g.k > 1 ? 's' : ''}, survécu`
+        : g.type === 'horses' ? `cheval n°${g.winner + 1}` : g.type === 'slots' ? `x${g.mult}` : g.type === 'duel' ? FOES[g.foe].n : g.type === 'scratch' ? `ticket x${g.mult}` : g.type === 'plinko' ? `${g.n} bille${g.n > 1 ? 's' : ''} · x${round2(g.mult)}` : g.type === 'penguin' ? `${(g.zones || []).filter((z) => z === 5).length}/4 PERFECT · x${round2(g.mult)}` : g.type === 'russian' ? `${g.k} balle${g.k > 1 ? 's' : ''}, survécu`
           : g.outcome === 'bj' ? 'BLACKJACK' : '';
       try {
         deps.onRoundEnd(u.guildId, { game: g.type === 'bj' ? 'bj-solo' : g.type, players: [{ uid: u.uid, name: u.name, bet: stake, win: g.win, net, mult: floor2(g.win / stake), detail }] });
@@ -173,7 +182,7 @@ function create(deps, pending) {
         cash: floor2(g.bet * minesMult(g.m, k)), over: g.over, win: g.win || 0, mineAt: g.over ? [...g.set] : undefined };
     },
     fuse: (g) => ({ type: 'fuse', bet: g.bet, start: g.start, rate: RATE, auto: g.auto, over: g.over, win: g.win || 0, at: g.over ? g.at : undefined, crash: g.over ? g.cp : undefined }),
-    penguin: (g) => ({ type: 'penguin', bet: g.bet, phase: g.phase || (g.over ? 'done' : 'aim1'), stage: g.stage || 1, maxStage: PG_STAGES, zones: Array.isArray(g.zones) ? g.zones : [], zone1: g.zone1, zone2: g.zone2, zone3: g.zone3, zone4: g.zone4, pts: g.pts || 0, dist: g.dist || 0, mult: g.mult || 0, flightMs: g.flightMs || 0, over: !!g.over, win: g.win || 0, outcome: g.outcome || null }),
+    penguin: (g) => ({ type: 'penguin', bet: g.bet, phase: g.phase || (g.over ? 'done' : 'aim1'), stage: g.stage || 1, maxStage: PG_STAGES, zones: Array.isArray(g.zones) ? g.zones : [], zone1: g.zone1, zone2: g.zone2, zone3: g.zone3, zone4: g.zone4, pts: g.pts || 0, dist: g.dist || 0, combo: g.combo || 0, mult: g.mult || 0, flightMs: g.flightMs || 0, over: !!g.over, win: g.win || 0, outcome: g.outcome || (g.over ? (g.win >= g.bet ? 'win' : 'lose') : null) }),
     coin: (g) => ({ type: 'coin', bet: g.bet, choice: g.choice, side: g.side, mult: g.mult, over: true, win: g.win || 0, outcome: g.win > 0 ? 'win' : 'lose' }),
     dice: (g) => ({ type: 'dice', bet: g.bet, choice: g.choice, a: g.a, b: g.b, sum: g.sum, mult: g.mult, over: true, win: g.win || 0, outcome: g.win > 0 ? 'win' : 'lose' }),
     horses: (g) => ({ type: 'horses', bet: g.bet, want: g.want, winner: g.winner, mult: g.mult, over: true, win: g.win || 0, outcome: g.win > 0 ? 'win' : 'lose' }),
@@ -257,6 +266,7 @@ function create(deps, pending) {
           ng.zone4 = null;
           ng.pts = 0;
           ng.dist = 0;
+          ng.combo = 0;
           ng.mult = 0;
         } else if (INSTANT.has(type)) {
           ng.choice = String(d.choice); ng.balls = d.balls; rollInstant(ng);
