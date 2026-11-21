@@ -22,6 +22,8 @@ const { PenaltyRoom, INFO: PENALTY_INFO } = require('./penalty');
 const { create: createOffline } = require('./offline');
 const { create: createRank } = require('./rank');
 const { create: createShop } = require('./shop');
+const { create: createBoosters } = require('./boosters');
+const { create: createFootball } = require('./football');
 // Ranked is blackjack now: it uses the same Room engine as online blackjack (entry.ranked in roomOf).
 // The old skill-minigame arena module is no longer used by this server.
 
@@ -114,7 +116,7 @@ function init(deps) {
   // ---------- jeux activés / désactivés (panneau admin) ----------
   const GAMES_FILE = path.join(DATA_DIR, 'games.json');
   const gameFlags = readJson(GAMES_FILE, {}); // clé de route -> false = désactivé
-  const GAME_KEYS = ['ranked', 'bj', 'poker', 'roulette', 'penalty', 'off-bj', 'off-fuse', 'off-mine', 'off-coin', 'off-dice', 'off-horses', 'off-russian', 'off-slots', 'off-duel', 'off-plinko', 'off-penguin', 'off-scratch'];
+  const GAME_KEYS = ['ranked', 'bj', 'poker', 'roulette', 'penalty', 'off-bj', 'off-fuse', 'off-mine', 'off-coin', 'off-dice', 'off-horses', 'off-russian', 'off-slots', 'off-duel', 'off-plinko', 'off-penguin', 'off-scratch', 'boosters', 'foot'];
   let gamesTimer = null;
   function saveGames() { clearTimeout(gamesTimer); gamesTimer = setTimeout(() => saveJson(GAMES_FILE, gameFlags), 300); }
   const gameOn = (k) => gameFlags[String(k)] !== false;
@@ -390,6 +392,31 @@ function init(deps) {
     supabase: deps.supabase || null,
     grantRole: deps.grantRole || null,
     notifyUser: deps.notifyUser || null,
+  });
+  // ---------- boosters Pokémon + paris foot ----------
+  const boostersApi = createBoosters(DATA_DIR, { debit: deps.debit, credit: deps.credit, getBalance: deps.getBalance });
+  const footApi = createFootball(DATA_DIR, {
+    debit: deps.debit,
+    credit: deps.credit,
+    getBalance: deps.getBalance,
+    onSettle: async (b, bal) => {
+      const label = `${b.home} - ${b.away}`;
+      const text = b.status === 'won' ? `Pari gagné sur ${label} : +${b.payout} (cote ${b.odds})`
+        : b.status === 'refunded' ? `Match annulé (${label}) : mise remboursée (${b.stake})`
+        : `Pari perdu sur ${label} (${b.stake})`;
+      const notif = { id: crypto.randomBytes(6).toString('hex'), t: Date.now(), type: 'event', kind: 'bet', title: 'Paris foot', text, eventId: '', amount: b.payout || 0, expiresAt: 0, seconds: 0 };
+      pushNotif(b.uid, notif);
+      const rb = typeof bal === 'number' ? bal : await deps.getBalance(b.uid).catch(() => null);
+      for (const entry of rooms.values()) {
+        for (const c of entry.clients) {
+          if (c.uid !== b.uid) continue;
+          try {
+            c.write(`event: notif\ndata: ${JSON.stringify(notif)}\n\n`);
+            if (rb !== null) c.write(`event: bal\ndata: ${JSON.stringify({ bal: rb })}\n\n`);
+          } catch { /* fermée */ }
+        }
+      }
+    },
   });
 
 
@@ -805,7 +832,7 @@ function init(deps) {
     'Referrer-Policy': 'no-referrer',
     'X-Frame-Options': 'DENY',
     'Content-Security-Policy':
-      "default-src 'self'; img-src 'self' https://cdn.discordapp.com https://media.discordapp.net data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'",
+      "default-src 'self'; img-src 'self' https://cdn.discordapp.com https://media.discordapp.net https://assets.tcgdex.net https://crests.football-data.org https://upload.wikimedia.org data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'",
   };
   const json = (res, code, obj) => {
     res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', ...SEC });
@@ -853,6 +880,8 @@ function init(deps) {
       // jeu désactivé par l'admin : on bloque côté serveur, pas seulement dans l'interface
       const OFF_ALIAS = { mines: 'off-mine', bj: 'off-bj' };
       if (act === 'ostart' && !gameOn(OFF_ALIAS[d.game] || 'off-' + String(d.game || ''))) throw new Error('This game is currently disabled.');
+      if ((act === 'booster_buy' || act === 'booster_open') && !gameOn('boosters')) throw new Error('This game is currently disabled.');
+      if (act === 'foot_bet' && !gameOn('foot')) throw new Error('This game is currently disabled.');
       if (act === 'rjoin' && !gameOn('roulette')) throw new Error('This game is currently disabled.');
       if (act === 'tnew' && !gameOn(String(d.game) === 'poker' ? 'poker' : 'bj')) throw new Error('This game is currently disabled.');
       if (act === 'sit' && String(d.tid) === 'ranked' && !gameOn('ranked')) throw new Error('This game is currently disabled.');
@@ -1440,6 +1469,68 @@ function init(deps) {
           throw new Error('Unknown economy action: ' + action);
         }
 
+        // ---- boosters Pokémon
+        case 'booster_list': {
+          return json(res, 200, { ok: true, ...boostersApi.listPacks(user.uid) });
+        }
+        case 'booster_buy': {
+          const out = await boostersApi.buy(user.uid, String(d.id || ''), d.qty);
+          walBal = out.bal;
+          return json(res, 200, { ok: true, rbal: out.bal, owned: out.owned, msg: `Booster x${out.qty} acheté${out.qty > 1 ? 's' : ''} (-${out.cost})`, ...boostersApi.listPacks(user.uid) });
+        }
+        case 'booster_open': {
+          const out = await boostersApi.open(user.uid, String(d.id || ''));
+          return json(res, 200, { ok: true, cards: out.cards, left: out.left, set: out.set, ...boostersApi.listPacks(user.uid) });
+        }
+        case 'booster_collection': {
+          return json(res, 200, { ok: true, cards: boostersApi.collection(user.uid) });
+        }
+        case 'admin_pack_list': {
+          if (!deps.isAdmin || !(await deps.isAdmin(user.uid))) throw new Error('Admin only.');
+          return json(res, 200, { ok: true, packs: boostersApi.adminList() });
+        }
+        case 'admin_pack_sets': {
+          if (!deps.isAdmin || !(await deps.isAdmin(user.uid))) throw new Error('Admin only.');
+          return json(res, 200, { ok: true, sets: await boostersApi.listSets() });
+        }
+        case 'admin_pack_save': {
+          if (!deps.isAdmin || !(await deps.isAdmin(user.uid))) throw new Error('Admin only.');
+          const pack = d.priceOnly ? boostersApi.adminSetPrice(String(d.id || ''), d.price) : boostersApi.adminUpsert(d);
+          return json(res, 200, { ok: true, pack, packs: boostersApi.adminList() });
+        }
+        case 'admin_pack_del': {
+          if (!deps.isAdmin || !(await deps.isAdmin(user.uid))) throw new Error('Admin only.');
+          boostersApi.adminDelete(String(d.id || ''));
+          return json(res, 200, { ok: true, packs: boostersApi.adminList() });
+        }
+
+        // ---- paris foot
+        case 'foot_matches': {
+          const matches = await footApi.listMatches();
+          return json(res, 200, { ok: true, matches, cfg: footApi.cfgPub(), mine: footApi.myBets(user.uid) });
+        }
+        case 'foot_bet': {
+          const out = await footApi.place(user, d);
+          walBal = out.bal;
+          return json(res, 200, { ok: true, rbal: out.bal, bet: out.bet, mine: footApi.myBets(user.uid), msg: `Pari pris · cote ${out.bet.odds.toFixed(2)}` });
+        }
+        case 'foot_mine': {
+          return json(res, 200, { ok: true, mine: footApi.myBets(user.uid) });
+        }
+        case 'admin_foot_get': {
+          if (!deps.isAdmin || !(await deps.isAdmin(user.uid))) throw new Error('Admin only.');
+          return json(res, 200, { ok: true, cfg: footApi.cfgPub(), stats: footApi.stats(), bets: footApi.adminBets(60) });
+        }
+        case 'admin_foot_cfg': {
+          if (!deps.isAdmin || !(await deps.isAdmin(user.uid))) throw new Error('Admin only.');
+          return json(res, 200, { ok: true, cfg: footApi.setCfg(d), msg: 'Réglages enregistrés' });
+        }
+        case 'admin_foot_settle': {
+          if (!deps.isAdmin || !(await deps.isAdmin(user.uid))) throw new Error('Admin only.');
+          const r = await footApi.settleDue();
+          return json(res, 200, { ok: true, msg: r.settled + ' pari(s) réglé(s)', stats: footApi.stats(), bets: footApi.adminBets(60) });
+        }
+
         case 'admin_ladder_get': {
           if (!deps.isAdmin || !(await deps.isAdmin(user.uid))) throw new Error('Admin only.');
           const ladder = rankApi.getLadder ? rankApi.getLadder() : (rankApi.view(user.uid, 1).ladder || []);
@@ -1652,7 +1743,7 @@ function init(deps) {
   server.listen(port, '0.0.0.0', () => console.log(`[web] blackjack + poker + roulette en ligne → ${PUBLIC_URL} (port ${port})`));
   server.on('error', (e) => console.error('[web] serveur :', e?.message || e));
 
-  return { makeLink, pushEvent, enabled: true, rooms, server, publicUrl: PUBLIC_URL, oauth: oauthOn, shop: shopApi, rankApi };
+  return { makeLink, pushEvent, enabled: true, rooms, server, publicUrl: PUBLIC_URL, oauth: oauthOn, shop: shopApi, rankApi, boosters: boostersApi, football: footApi };
 }
 
 module.exports = { init };
