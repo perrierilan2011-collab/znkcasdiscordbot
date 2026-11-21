@@ -8548,6 +8548,7 @@ async function cmdLeaderboard(msg) {
 
 let updatingLeaderboards = false;
 async function updateLeaderboards() {
+  if (!isLeader()) return;
   if (updatingLeaderboards) return;
   updatingLeaderboards = true;
   try {
@@ -8598,9 +8599,89 @@ async function updateLeaderboards() {
 //  MESSAGES (written commands)
 // ============================================================
 // ============================================================
+//  SINGLE-INSTANCE GUARD (Supabase lease)
+//  If the bot runs twice with the same token (overlapping Railway deploys,
+//  2 replicas, a local copy left open...), BOTH copies receive every click and
+//  every one of them creates its own ticket channel / DM / reward. The in-memory
+//  locks cannot see each other, so one shared lock is needed: only the instance
+//  holding the lease handles events, the other one stays on standby.
+//  Needs the bot_lock table (see bot_lock.sql). If the table is missing the bot
+//  keeps working (fail-open) and prints a warning.
+// ============================================================
+const INSTANCE_ID = `${process.pid}-${Date.now().toString(36)}-${randomInt(100000, 999999)}`;
+const LOCK_ID = 'main';
+const LEASE_MS = 20_000;
+const LEASE_POLL_MS = 5_000;
+let leaseUntil = 0;
+let lockFailOpen = false;
+let wasLeader = null;
+
+const isLeader = () => lockFailOpen || Date.now() < leaseUntil;
+
+async function tryAcquireLease() {
+  const now = Date.now();
+  const exp = new Date(now + LEASE_MS).toISOString();
+  const nowIso = new Date(now).toISOString();
+  const table = () => supabase.from('bot_lock');
+  const missing = (e) => /bot_lock|42P01|PGRST205|schema cache|does not exist/i.test(`${e?.code || ''} ${e?.message || ''}`);
+  try {
+    // 1) renew if the lease is already mine
+    let r = await table().update({ expires_at: exp }).eq('id', LOCK_ID).eq('owner', INSTANCE_ID).select('id');
+    if (r.error) throw r.error;
+    if (r.data?.length) return (leaseUntil = now + LEASE_MS - 2000), true;
+    // 2) take over an expired lease
+    r = await table().update({ owner: INSTANCE_ID, expires_at: exp }).eq('id', LOCK_ID).lt('expires_at', nowIso).select('id');
+    if (r.error) throw r.error;
+    if (r.data?.length) return (leaseUntil = now + LEASE_MS - 2000), true;
+    // 3) first launch: create the row (a unique violation means someone else got it first)
+    const ins = await table().insert({ id: LOCK_ID, owner: INSTANCE_ID, expires_at: exp });
+    if (!ins.error) return (leaseUntil = now + LEASE_MS - 2000), true;
+    // held by another instance
+    leaseUntil = 0;
+    return false;
+  } catch (e) {
+    if (missing(e)) {
+      if (!lockFailOpen) console.warn('[lock] bot_lock table not found: running WITHOUT the single-instance guard. Run bot_lock.sql in Supabase.');
+      lockFailOpen = true;
+      return true;
+    }
+    // temporary network/DB error: keep the current state until the lease runs out
+    console.error('[lock]', e?.message || e);
+    return isLeader();
+  }
+}
+
+async function releaseLease() {
+  if (lockFailOpen) return;
+  leaseUntil = 0;
+  try {
+    await supabase.from('bot_lock').update({ expires_at: new Date(0).toISOString() }).eq('id', LOCK_ID).eq('owner', INSTANCE_ID);
+  } catch {
+    /* ignore */
+  }
+}
+
+async function leaseTick() {
+  await tryAcquireLease();
+  const now = isLeader();
+  if (now !== wasLeader) {
+    console.log(now ? `[lock] this instance (${INSTANCE_ID}) is ACTIVE` : `[lock] another instance is active: ${INSTANCE_ID} stays on STANDBY (no events handled)`);
+    wasLeader = now;
+  }
+}
+
+for (const sig of ['SIGTERM', 'SIGINT']) {
+  process.once(sig, async () => {
+    await releaseLease();
+    process.exit(0);
+  });
+}
+
+// ============================================================
 //  MESSAGES — slash commands only
 // ============================================================
 client.on(Events.MessageCreate, async (msg) => {
+  if (!isLeader()) return;
   if (msg.author.bot || !msg.guild) return;
   if (!msg.content.startsWith(PREFIX)) return;
   const cmd = msg.content.slice(PREFIX.length).trim().split(/\s+/)[0]?.toLowerCase() || '';
@@ -8624,6 +8705,7 @@ client.on(Events.MessageCreate, async (msg) => {
 // l'ID pour ne jamais créer deux salons ni envoyer deux messages.
 const seenInteractions = new Set();
 client.on(Events.InteractionCreate, async (i) => {
+  if (!isLeader()) return; // standby instance: the active one answers
   const iid = String(i.id || '');
   if (iid && seenInteractions.has(iid)) return;
   if (iid) {
@@ -8773,6 +8855,7 @@ async function claimInviteReward(guildId, invitedId, inviterId) {
 }
 
 client.on(Events.GuildMemberAdd, async (member) => {
+  if (!isLeader()) return;
   try {
     if (member.user.bot) return;
     const guild = member.guild;
@@ -8877,6 +8960,7 @@ async function cmdInvites(msg, args) {
 }
 
 client.on(Events.ChannelDelete, async (channel) => {
+  if (!isLeader()) return;
   if (!channel.guild) return;
   const gid = channel.guild.id;
   if (casinoChannels.get(gid) === channel.id) {
@@ -9444,6 +9528,8 @@ async function start() {
   } catch (e) {
     console.warn('[startup] could not check intents:', e?.message || e);
   }
+  await leaseTick();
+  setInterval(leaseTick, LEASE_POLL_MS);
   try {
     await client.login(DISCORD_TOKEN);
   } catch (e) {
