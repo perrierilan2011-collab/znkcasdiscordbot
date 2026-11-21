@@ -44,6 +44,7 @@ async function getJson(url, ms = 9000) {
  * @param {{ debit(uid,amt)->newBal|null, credit(uid,amt)->newBal, getBalance(uid) }} deps
  */
 function create(dataDir, deps) {
+  const sb = deps.supabase || null; // si fourni : tout est aussi sauvegardé dans Supabase (survit aux redeploy)
   const PACKS_FILE = path.join(dataDir, 'boosters_packs.json');
   const INV_FILE = path.join(dataDir, 'boosters_inventory.json');
 
@@ -59,6 +60,77 @@ function create(dataDir, deps) {
   let invTimer = null;
   const persistInv = () => { clearTimeout(invTimer); invTimer = setTimeout(() => save(INV_FILE, inv), 600); };
   const persistPacks = () => save(PACKS_FILE, packs);
+
+  // ---------------------------------------------------------------- Supabase (tables booster_*, voir booster_supabase.sql)
+  const dirty = new Map(); // uid -> Set(cardId) : cartes à envoyer
+  const logErr = (what, e) => console.error('[boosters] supabase ' + what, e?.message || e);
+  async function fetchAll(table) {
+    const out = [];
+    for (let from = 0; ; from += 1000) {
+      const { data, error } = await sb.from(table).select('*').range(from, from + 999);
+      if (error) throw error;
+      out.push(...(data || []));
+      if (!data || data.length < 1000) break;
+    }
+    return out;
+  }
+  const packRow = (p) => ({ id: p.id, name: p.name, description: p.desc || '', set_id: p.setId, price: p.price, cards: p.cards, active: p.active !== false, updated_at: new Date().toISOString() });
+  async function syncPacksUp(list) {
+    if (!sb || !list.length) return;
+    try {
+      const { error } = await sb.from('booster_packs').upsert(list.map(packRow), { onConflict: 'id' });
+      if (error) throw error;
+    } catch (e) { logErr('packs', e); }
+  }
+  async function syncUserUp(uid) {
+    if (!sb || !inv[uid]) return;
+    const m = inv[uid];
+    try {
+      const r1 = await sb.from('booster_inventory').upsert({ user_id: uid, unopened: m.unopened, opened: m.opened || 0, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
+      if (r1.error) throw r1.error;
+      const ids = [...(dirty.get(uid) || [])].filter((id) => m.cards[id]);
+      for (let i = 0; i < ids.length; i += 200) {
+        const rows = ids.slice(i, i + 200).map((id) => {
+          const c = m.cards[id];
+          return { user_id: uid, card_id: id, name: c.name, image: c.image, rarity: c.rarity || '', set_name: c.set || '', qty: c.n, last_at: c.last || 0 };
+        });
+        const r2 = await sb.from('booster_cards').upsert(rows, { onConflict: 'user_id,card_id' });
+        if (r2.error) throw r2.error;
+      }
+      dirty.delete(uid);
+    } catch (e) { logErr('user ' + uid, e); }
+  }
+  /** Au démarrage : on recharge tout depuis Supabase. Les données locales absentes de la base (ancien JSON) y sont envoyées. */
+  const ready = (async () => {
+    if (!sb) return;
+    try {
+      const pr = await fetchAll('booster_packs');
+      if (pr.length) {
+        packs = pr.map((r) => ({ id: r.id, name: r.name, desc: r.description || '', setId: r.set_id, price: Number(r.price) || 0, cards: Number(r.cards) || 5, active: r.active !== false }));
+        persistPacks();
+      } else await syncPacksUp(packs);
+      const ir = await fetchAll('booster_inventory');
+      const cr = await fetchAll('booster_cards');
+      const dbUsers = new Set();
+      for (const r of ir) {
+        dbUsers.add(r.user_id);
+        inv[r.user_id] = { unopened: r.unopened && typeof r.unopened === 'object' ? r.unopened : {}, cards: {}, opened: Number(r.opened) || 0 };
+      }
+      for (const r of cr) {
+        const m = inv[r.user_id] || (inv[r.user_id] = { unopened: {}, cards: {}, opened: 0 });
+        dbUsers.add(r.user_id);
+        m.cards[r.card_id] = { name: r.name, image: r.image, rarity: r.rarity || '', set: r.set_name || '', n: Number(r.qty) || 1, last: Number(r.last_at) || 0 };
+      }
+      // migration : joueurs présents seulement dans le JSON local
+      for (const uid of Object.keys(inv)) {
+        if (dbUsers.has(uid)) continue;
+        dirty.set(uid, new Set(Object.keys(inv[uid].cards)));
+        await syncUserUp(uid);
+      }
+      save(INV_FILE, inv);
+      console.log('[boosters] chargé depuis Supabase (' + dbUsers.size + ' joueurs)');
+    } catch (e) { logErr('load', e); }
+  })();
 
   // verrou par joueur : pas deux achats / ouvertures en parallèle (double clic)
   const locks = new Map();
@@ -134,12 +206,14 @@ function create(dataDir, deps) {
     const n = Math.max(1, Math.min(MAX_QTY, Math.floor(Number(qty) || 1)));
     const cost = floor2(p.price * n);
     if (!(cost > 0)) throw new Error('Prix invalide.');
+    await ready;
     return withLock(uid, async () => {
       const bal = await deps.debit(uid, cost);
       if (bal === null) throw new Error('Solde insuffisant.');
       const m = me(uid);
       m.unopened[p.id] = (m.unopened[p.id] || 0) + n;
       persistInv();
+      await syncUserUp(uid);
       return { bal, owned: m.unopened[p.id], cost, qty: n };
     });
   }
@@ -147,6 +221,7 @@ function create(dataDir, deps) {
   async function open(uid, packId) {
     const p = packs.find((x) => x.id === packId);
     if (!p) throw new Error('Booster introuvable.');
+    await ready;
     return withLock(uid, async () => {
       const m = me(uid);
       if (!(m.unopened[p.id] > 0)) throw new Error('Tu n’as pas de booster à ouvrir.');
@@ -170,6 +245,10 @@ function create(dataDir, deps) {
       });
       m.opened = (m.opened || 0) + 1;
       persistInv();
+      const dset = dirty.get(uid) || new Set();
+      for (const c of picks) dset.add(c.id);
+      dirty.set(uid, dset);
+      await syncUserUp(uid);
       return { cards: out, left: m.unopened[p.id] || 0, set: set.name };
     });
   }
@@ -198,6 +277,7 @@ function create(dataDir, deps) {
       active: d.active === undefined ? p.active !== false : (d.active === true || d.active === 'true' || d.active === 1 || d.active === '1'),
     });
     persistPacks();
+    syncPacksUp([p]);
     return packPub(p);
   }
   function adminSetPrice(id, price) {
@@ -207,14 +287,18 @@ function create(dataDir, deps) {
     if (!Number.isFinite(v) || v <= 0 || v > 1e9) throw new Error('Prix invalide.');
     p.price = v;
     persistPacks();
+    syncPacksUp([p]);
     return packPub(p);
   }
   function adminDelete(id) {
     const i = packs.findIndex((x) => x.id === id);
-    if (i >= 0) { packs.splice(i, 1); persistPacks(); }
+    if (i >= 0) {
+      packs.splice(i, 1); persistPacks();
+      if (sb) sb.from('booster_packs').delete().eq('id', id).then(({ error }) => { if (error) logErr('delete pack', error); });
+    }
   }
 
-  return { listPacks, collection, buy, open, adminList, adminUpsert, adminSetPrice, adminDelete, listSets };
+  return { ready, listPacks, collection, buy, open, adminList, adminUpsert, adminSetPrice, adminDelete, listSets };
 }
 
 module.exports = { create };

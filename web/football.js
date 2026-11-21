@@ -62,6 +62,7 @@ const toOdd = (p, margin) => {
 };
 
 function create(dataDir, deps) {
+  const sb = deps.supabase || null; // si fourni : paris et réglages sauvegardés dans Supabase (voir booster_supabase.sql)
   const BETS_FILE = path.join(dataDir, 'football_bets.json');
   const CFG_FILE = path.join(dataDir, 'football_cfg.json');
   const STAND_FILE = path.join(dataDir, 'football_standings.json');
@@ -79,6 +80,61 @@ function create(dataDir, deps) {
   const persistBets = () => { clearTimeout(betsTimer); betsTimer = setTimeout(() => save(BETS_FILE, bets), 400); };
   const persistStand = () => save(STAND_FILE, standings);
   const key = () => String(process.env.FOOTBALL_DATA_KEY || process.env.FOOTBALL_DATA_TOKEN || '').trim();
+
+  // ---------------------------------------------------------------- Supabase
+  const logErr = (what, e) => console.error('[foot] supabase ' + what, e?.message || e);
+  const betRow = (b) => ({
+    id: b.id, user_id: b.uid, name: b.name || '', match_id: b.matchId, market: b.market, pick: b.pick, odds: b.odds, stake: b.stake,
+    status: b.status, payout: b.payout || 0, placed_at: b.at, utc_date: b.utcDate || '', settled_at: b.settledAt || null,
+    home: b.home || '', away: b.away || '', comp: b.comp || '', score_h: b.score ? b.score.h : null, score_a: b.score ? b.score.a : null,
+  });
+  const betFrom = (r) => ({
+    id: r.id, uid: r.user_id, name: r.name, matchId: Number(r.match_id), market: r.market, pick: r.pick, odds: Number(r.odds), stake: Number(r.stake),
+    status: r.status, payout: Number(r.payout) || 0, at: Number(r.placed_at), utcDate: r.utc_date, settledAt: r.settled_at ? Number(r.settled_at) : undefined,
+    home: r.home, away: r.away, comp: r.comp, score: r.score_h != null ? { h: r.score_h, a: r.score_a } : null,
+  });
+  async function upBets(list) {
+    if (!sb || !list.length) return true;
+    try {
+      for (let i = 0; i < list.length; i += 200) {
+        const { error } = await sb.from('football_bets').upsert(list.slice(i, i + 200).map(betRow), { onConflict: 'id' });
+        if (error) throw error;
+      }
+      return true;
+    } catch (e) { logErr('bets', e); return false; }
+  }
+  const ready = (async () => {
+    if (!sb) return;
+    try {
+      const c = await sb.from('football_cfg').select('*').eq('id', 1).maybeSingle();
+      if (c.error) throw c.error;
+      if (c.data) {
+        cfg.margin = Number(c.data.margin); cfg.min = Number(c.data.min_bet); cfg.max = Number(c.data.max_bet); cfg.maxPayout = Number(c.data.max_payout);
+        save(CFG_FILE, cfg);
+      } else await upCfg();
+      const rows = [];
+      for (let from = 0; ; from += 1000) {
+        const { data, error } = await sb.from('football_bets').select('*').order('placed_at', { ascending: false }).range(from, from + 999);
+        if (error) throw error;
+        rows.push(...(data || []));
+        if (!data || data.length < 1000) break;
+      }
+      const byId = new Map(rows.map((r) => [r.id, betFrom(r)]));
+      const localOnly = bets.filter((b) => !byId.has(b.id));
+      bets.length = 0;
+      bets.push(...byId.values(), ...localOnly);
+      if (localOnly.length) await upBets(localOnly); // migration de l'ancien JSON
+      save(BETS_FILE, bets);
+      console.log('[foot] chargé depuis Supabase (' + bets.length + ' paris)');
+    } catch (e) { logErr('load', e); }
+  })();
+  async function upCfg() {
+    if (!sb) return;
+    try {
+      const { error } = await sb.from('football_cfg').upsert({ id: 1, margin: cfg.margin, min_bet: cfg.min, max_bet: cfg.max, max_payout: cfg.maxPayout, updated_at: new Date().toISOString() }, { onConflict: 'id' });
+      if (error) throw error;
+    } catch (e) { logErr('cfg', e); }
+  }
 
   // ---------------------------------------------------------------- API
   async function apiGet(p) {
@@ -238,6 +294,7 @@ function create(dataDir, deps) {
       const e = new Error('La cote a changé (' + odd.toFixed(2) + '), valide à nouveau.'); e.code = 'ODDS'; throw e;
     }
     if (stake * odd > cfg.maxPayout) throw new Error('Gain potentiel trop élevé (max ' + cfg.maxPayout + ').');
+    await ready;
     return withLock(user.uid, async () => {
       const spent = bets.filter((b) => b.uid === user.uid && b.matchId === matchId && b.status === 'open').reduce((a, b) => a + b.stake, 0);
       if (spent + stake > cfg.max) throw new Error('Mise totale maximale sur ce match : ' + cfg.max + '.');
@@ -249,6 +306,7 @@ function create(dataDir, deps) {
       };
       bets.push(bet);
       persistBets();
+      await upBets([bet]);
       return { bet: pub(bet), bal };
     });
   }
@@ -273,18 +331,20 @@ function create(dataDir, deps) {
     const prev = { status: b.status, payout: b.payout, score: b.score };
     b.status = status; b.payout = payout; b.score = score || b.score || null; b.settledAt = Date.now();
     persistBets();
+    await upBets([b]); // statut réglé enregistré AVANT le crédit : pas de double paiement si crash
     let bal = null;
     if (payout > 0) {
       try { bal = await deps.credit(b.uid, payout); }
       catch (e) {
         console.error('[foot] credit KO', b.uid, payout, e?.message || e);
-        Object.assign(b, prev); delete b.settledAt; persistBets(); return; // on retentera au prochain passage
+        Object.assign(b, prev); delete b.settledAt; persistBets(); await upBets([b]); return; // on retentera au prochain passage
       }
     }
     try { if (deps.onSettle) await deps.onSettle(b, bal); } catch (e) { console.error('[foot] notify', e?.message || e); }
   }
   async function settleDue() {
     if (settling || !key()) return { settled: 0 };
+    await ready;
     settling = true;
     let n = 0;
     try {
@@ -338,6 +398,7 @@ function create(dataDir, deps) {
     if (d.max != null && d.max !== '') { const v = Number(d.max); if (!(v >= cfg.min)) throw new Error('Mise max invalide.'); cfg.max = v; }
     if (d.maxPayout != null && d.maxPayout !== '') { const v = Number(d.maxPayout); if (!(v > 0)) throw new Error('Gain max invalide.'); cfg.maxPayout = v; }
     save(CFG_FILE, cfg);
+    upCfg();
     return cfgPub();
   }
   const adminBets = (limit = 60) => [...bets].sort((a, b) => b.at - a.at).slice(0, limit).map((b) => ({ ...pub(b), name: b.name, uid: b.uid }));
@@ -348,7 +409,7 @@ function create(dataDir, deps) {
     return { open: open_.length, openStake: floor2(open_.reduce((a, b) => a + b.stake, 0)), houseProfit: floor2(staked - paid) };
   };
 
-  return { listMatches, place, myBets, settleDue, cfgPub, setCfg, adminBets, stats, MARKETS };
+  return { ready, listMatches, place, myBets, settleDue, cfgPub, setCfg, adminBets, stats, MARKETS };
 }
 
 module.exports = { create, probsFrom };

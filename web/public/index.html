@@ -1927,7 +1927,78 @@ create table if not exists roulette_event_results (
   amount numeric(18,2) not null default 0,
   created_at timestamptz not null default now(),
   unique (event_id, winner_id)
-);</pre>
+);
+-- ZNK Casino · Boosters Pokémon + Paris foot (Supabase → SQL editor → Run)
+-- Les données survivent ainsi aux redéploiements (le disque Railway est effacé à chaque deploy).
+
+-- ---------- BOOSTERS ----------
+create table if not exists booster_packs (
+  id text primary key,
+  name text not null,
+  description text not null default '',
+  set_id text not null,
+  price numeric not null default 50,
+  cards integer not null default 5,
+  active boolean not null default true,
+  updated_at timestamptz not null default now()
+);
+
+-- boosters achetés mais pas encore ouverts + compteur d'ouvertures
+create table if not exists booster_inventory (
+  user_id text primary key,
+  unopened jsonb not null default '{}'::jsonb,
+  opened integer not null default 0,
+  updated_at timestamptz not null default now()
+);
+
+-- collection de cartes (une ligne par carte et par joueur, qty = nombre d'exemplaires)
+create table if not exists booster_cards (
+  user_id text not null,
+  card_id text not null,
+  name text not null default '',
+  image text not null default '',
+  rarity text not null default '',
+  set_name text not null default '',
+  qty integer not null default 1,
+  last_at bigint not null default 0,
+  primary key (user_id, card_id)
+);
+create index if not exists booster_cards_user_idx on booster_cards (user_id);
+
+-- ---------- PARIS FOOT ----------
+create table if not exists football_bets (
+  id text primary key,
+  user_id text not null,
+  name text not null default '',
+  match_id bigint not null,
+  market text not null,
+  pick text not null,
+  odds numeric not null,
+  stake numeric not null,
+  status text not null default 'open',   -- open | won | lost | refunded
+  payout numeric not null default 0,
+  placed_at bigint not null,
+  utc_date text not null default '',
+  settled_at bigint,
+  home text not null default '',
+  away text not null default '',
+  comp text not null default '',
+  score_h integer,
+  score_a integer
+);
+create index if not exists football_bets_user_idx on football_bets (user_id, placed_at desc);
+create index if not exists football_bets_status_idx on football_bets (status);
+
+-- réglages admin (marge, mises min / max, gain max) : une seule ligne
+create table if not exists football_cfg (
+  id integer primary key default 1,
+  margin numeric not null default 0.06,
+  min_bet numeric not null default 1,
+  max_bet numeric not null default 100000,
+  max_payout numeric not null default 10000000,
+  updated_at timestamptz not null default now()
+);
+</pre>
       </div>
     </section>
   </div>

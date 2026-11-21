@@ -394,8 +394,9 @@ function init(deps) {
     notifyUser: deps.notifyUser || null,
   });
   // ---------- boosters Pokémon + paris foot ----------
-  const boostersApi = createBoosters(DATA_DIR, { debit: deps.debit, credit: deps.credit, getBalance: deps.getBalance });
+  const boostersApi = createBoosters(DATA_DIR, { supabase: deps.supabase || null, debit: deps.debit, credit: deps.credit, getBalance: deps.getBalance });
   const footApi = createFootball(DATA_DIR, {
+    supabase: deps.supabase || null,
     debit: deps.debit,
     credit: deps.credit,
     getBalance: deps.getBalance,
@@ -885,6 +886,8 @@ function init(deps) {
       if (act === 'rjoin' && !gameOn('roulette')) throw new Error('This game is currently disabled.');
       if (act === 'tnew' && !gameOn(String(d.game) === 'poker' ? 'poker' : 'bj')) throw new Error('This game is currently disabled.');
       if (act === 'sit' && String(d.tid) === 'ranked' && !gameOn('ranked')) throw new Error('This game is currently disabled.');
+      if (/^(booster_|admin_pack_)/.test(act)) await boostersApi.ready; // données Supabase chargées avant toute écriture
+      if (/^(foot_|admin_foot_)/.test(act)) await footApi.ready;
       if (String(d.action).startsWith('o')) return json(res, 200, { ok: true, ...(await offline.handle(user, d)) });
       switch (d.action) {
         // ---- envoi de pièces à un autre joueur du serveur
