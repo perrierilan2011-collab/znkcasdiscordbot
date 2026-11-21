@@ -227,7 +227,7 @@ th{color:var(--mut);font-size:12px}
 /* CRITICAL: .hide must win over #ofView.has-lb { display:grid !important } */
 #hubView.hide,#bjView.hide,#pkView.hide,#rlView.hide,#ofView.hide,#ofView.hide.has-lb,
 #penView.hide,#rocketView.hide,#rkArenaView.hide,#topView.hide,#rankView.hide,
-#adminView.hide,#shopView.hide,#tasksView.hide,#accountView.hide{
+#adminView.hide,#shopView.hide,#tasksView.hide,#accountView.hide,#boostersView.hide,#footView.hide{
   display:none !important;
   visibility:hidden !important;
   pointer-events:none !important;
@@ -907,6 +907,58 @@ body.fs.vpk #pkInfo{font-size:12px}
 /* nouvelles pages : même mise en page que « Classement » */
 #shopView,#tasksView,#accountView,#rankView,#adminView{align-items:center;padding:24px 16px 64px;overflow:auto}
 @media(max-width:600px){#shopView,#tasksView,#accountView,#rankView,#adminView{padding:16px 8px 64px}}
+
+/* ===== Boosters Pokémon + Paris foot ===== */
+#boostersView,#footView{align-items:center;padding:24px 16px 64px;overflow:auto}
+@media(max-width:600px){#boostersView,#footView{padding:16px 8px 64px}}
+.bsgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px;width:100%;max-width:1000px}
+.bspack{background:linear-gradient(160deg,#1a0f2e,#0a0a0a);border:1px solid #3b2a63;border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:8px}
+.bspack h3{margin:0;font-size:17px;font-weight:800}
+.bspack .price{color:var(--gold);font-weight:800;font-size:18px;font-variant-numeric:tabular-nums}
+.bspack .own{font-size:12px;color:#c4b5fd;font-weight:700}
+.bspack .brow{display:flex;gap:8px;flex-wrap:wrap}
+.bspack .brow .btn{flex:1;min-width:70px}
+.bscol{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;width:100%;padding:12px}
+.bsc{position:relative;background:#111;border:1px solid #262626;border-radius:10px;padding:4px;text-align:center;font-size:11px}
+.bsc img{width:100%;border-radius:6px;display:block;background:#1a1a1a;aspect-ratio:245/342}
+.bsc .cn{display:block;margin-top:4px;color:#d4d4d4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bsc .cx{position:absolute;top:6px;right:6px;background:#000c;border-radius:8px;padding:1px 6px;font-weight:800}
+.bsrev{position:fixed;inset:0;z-index:300;background:rgba(0,0,0,.88);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:16px;overflow:auto}
+.bsrev.hide{display:none!important}
+.bsrow{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;max-width:980px}
+.bsflip{width:150px;perspective:900px;cursor:pointer}
+.bsflip .in{position:relative;width:100%;aspect-ratio:245/342;transition:transform .6s;transform-style:preserve-3d}
+.bsflip.on .in{transform:rotateY(180deg)}
+.bsflip .f,.bsflip .b{position:absolute;inset:0;backface-visibility:hidden;border-radius:10px;overflow:hidden}
+.bsflip .b{background:radial-gradient(circle at 50% 40%,#7c3aed,#2e1065);border:2px solid #a78bfa;display:flex;align-items:center;justify-content:center;font-size:42px;font-weight:900;color:#fff}
+.bsflip .f{transform:rotateY(180deg);background:#111}
+.bsflip .f img{width:100%;height:100%;object-fit:cover}
+.bsflip.rare .f{box-shadow:0 0 22px 4px #fbbf24}
+.bsflip .nw{position:absolute;top:4px;left:4px;background:#22c55e;color:#000;font-size:10px;font-weight:900;border-radius:6px;padding:1px 6px;z-index:2}
+.bsflip .rn{position:absolute;bottom:0;left:0;right:0;background:#000b;font-size:10px;text-align:center;padding:2px}
+@media(max-width:600px){.bsflip{width:100px}}
+.ftwrap{width:100%;max-width:1000px;display:flex;flex-direction:column;gap:12px}
+.ftcomp{font-size:12px;font-weight:800;color:#a3a3a3;letter-spacing:.04em;text-transform:uppercase;margin:6px 2px 0;display:flex;align-items:center;gap:6px}
+.ftcomp img,.ftm img.cr{width:18px;height:18px;object-fit:contain}
+.ftm{background:#0a0a0a;border:1px solid #262626;border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:8px}
+.ftm .top{display:flex;align-items:center;gap:10px;justify-content:space-between;flex-wrap:wrap}
+.ftm .tm{display:flex;align-items:center;gap:8px;font-weight:800;font-size:14px;min-width:0}
+.ftm .when{font-size:12px;color:var(--mut);white-space:nowrap}
+.ftm .live{color:#ef4444;font-weight:800}
+.ftodds{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.ftodds.two{grid-template-columns:repeat(4,1fr)}
+.ftob{background:#111;border:1px solid #2f2f2f;border-radius:10px;color:#fff;padding:8px 4px;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:11px;min-height:46px;cursor:pointer}
+.ftob b{color:var(--gold);font-size:15px;font-variant-numeric:tabular-nums}
+.ftob.sel{background:#fff;color:#000;border-color:#fff}.ftob.sel b{color:#000}
+.ftob:disabled{opacity:.4;cursor:not-allowed}
+.ftslip{position:sticky;top:0;z-index:20;background:#111;border:1px solid #fff3;border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:8px}
+.ftslip.hide{display:none}
+.ftslip .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.ftslip input{background:#000;border:1px solid #333;border-radius:10px;color:#fff;padding:10px 12px;font:inherit;width:120px}
+.ftb{display:flex;gap:10px;align-items:center;padding:10px 12px;background:#111;border:1px solid #262626;border-radius:12px;font-size:13px}
+.ftb .grow{flex:1;min-width:0}
+.ftb .st{font-weight:800;font-size:12px;padding:3px 8px;border-radius:8px;background:#262626}
+.ftb .st.won{background:#14532d;color:#86efac}.ftb .st.lost{background:#7f1d1d;color:#fca5a5}.ftb .st.refunded{background:#1e3a8a;color:#bfdbfe}
 /* ================= ARÈNE RANKED ================= */
 #rkArenaView{--a:#5ee0ff;width:100%;max-width:1000px;margin:0 auto;padding:14px 12px 40px;gap:14px;overflow:auto}
 .rk-top{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
@@ -1320,6 +1372,8 @@ header .sp{flex:1 1 0}
     <button type="button" class="navl" data-g="top">Classement</button>
     <button type="button" class="navl" data-g="shop">Boutique</button>
     <button type="button" class="navl" data-g="tasks">Tâches</button>
+    <button type="button" class="navl" data-g="boosters">Boosters</button>
+    <button type="button" class="navl" data-g="foot">Paris foot</button>
   </nav>
   <div class="sp"></div>
   <button class="hb ico hide" id="bTop" title="Top" aria-label="Top"><svg class="ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4zM17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/></svg></button>
@@ -1459,6 +1513,8 @@ header .sp{flex:1 1 0}
       <button type="button" data-ad="orders">Commandes</button>
       <button type="button" data-ad="money">Économie</button>
       <button type="button" data-ad="ranks">Rangs RR</button>
+      <button type="button" data-ad="boosters">Boosters</button>
+      <button type="button" data-ad="foot">Paris foot</button>
       <button type="button" data-ad="games">Jeux</button>
       <button type="button" data-ad="bans">Bans</button>
       <button type="button" data-ad="events">Événements</button>
@@ -1489,6 +1545,42 @@ header .sp{flex:1 1 0}
       </form>
       <div class="lbtitle"><b>Récompenses actives</b></div>
       <div class="adlist" id="adRewardList" style="padding:12px"></div>
+    </section>
+    <section class="lbcol hide" id="adPanelBoosters" style="width:100%;max-width:1000px">
+      <div class="lbtitle"><b>Boosters Pokémon</b><small>Change le prix à tout moment · set = ID TCGdex (ex : base1, sv01)</small></div>
+      <div class="adlist" id="adPackList" style="padding:12px"></div>
+      <div class="lbtitle"><b>Créer / modifier un booster</b></div>
+      <form class="adform" id="adPackForm">
+        <input type="hidden" id="adPId">
+        <label>Nom<input id="adPName" required maxlength="64" placeholder="ex : Booster Set de Base"></label>
+        <label>Description<input id="adPDesc" maxlength="160"></label>
+        <label>Set TCGdex<input id="adPSet" list="adPSets" required placeholder="base1"></label>
+        <datalist id="adPSets"></datalist>
+        <label>Prix (ZTKN)<input id="adPPrice" inputmode="decimal" required placeholder="50"></label>
+        <label>Cartes par booster<input id="adPCards" inputmode="numeric" value="5"></label>
+        <label>Actif<select id="adPActive"><option value="1">Oui (en vente)</option><option value="0">Non (masqué)</option></select></label>
+        <div class="row">
+          <button type="submit" class="btn go">Enregistrer</button>
+          <button type="button" class="btn" id="adPReset">Nouveau</button>
+          <button type="button" class="btn" id="adPSetsLoad">Charger la liste des sets</button>
+        </div>
+      </form>
+    </section>
+    <section class="lbcol hide" id="adPanelFoot" style="width:100%;max-width:1000px">
+      <div class="lbtitle"><b>Paris foot</b><small id="adFKey">—</small></div>
+      <form class="adform" id="adFootForm">
+        <label>Marge du casino sur les cotes (%)<input id="adFMargin" inputmode="decimal" placeholder="6"></label>
+        <label>Mise minimale<input id="adFMin" inputmode="decimal"></label>
+        <label>Mise maximale<input id="adFMax" inputmode="decimal"></label>
+        <label>Gain maximal par pari<input id="adFPay" inputmode="decimal"></label>
+        <div class="row">
+          <button type="submit" class="btn go">Enregistrer</button>
+          <button type="button" class="btn" id="adFSettle">Régler maintenant</button>
+        </div>
+        <small id="adFStats" style="color:var(--mut)"></small>
+      </form>
+      <div class="lbtitle"><b>Derniers paris</b></div>
+      <div class="adlist" id="adFBets" style="padding:12px"></div>
     </section>
     <section class="lbcol hide" id="adPanelTasks" style="width:100%;max-width:1000px">
       <div class="lbtitle"><b>Créer / modifier une task quotidienne</b><small>Reset chaque jour à minuit (Paris)</small></div>
@@ -1845,6 +1937,34 @@ create table if not exists roulette_event_results (
       <div class="adbtnrow"><button type="button" class="btn" id="shopOrdersClear">Effacer mon historique</button></div>
       <div id="shopOrders" class="adlist" style="padding:12px"><div class="lbnone">Aucune commande</div></div>
     </section>
+  </div>
+</main>
+<main id="boostersView" class="hide">
+  <div class="lbwrap" style="align-items:center">
+    <div class="lbhead"><div><h2>Boosters Pokémon</h2><p>Achète des boosters avec tes ZTKN puis ouvre-les pour compléter ta collection</p></div></div>
+    <div class="bsgrid" id="bsGrid"><div class="lbnone">Chargement…</div></div>
+    <section class="lbcol" style="width:100%;max-width:1000px;margin-top:8px">
+      <div class="lbtitle"><b>Ma collection</b><small id="bsColInfo">—</small></div>
+      <div class="adbtnrow"><button type="button" class="btn" id="bsColBtn">Afficher mes cartes</button></div>
+      <div class="bscol" id="bsCol"></div>
+    </section>
+  </div>
+  <div class="bsrev hide" id="bsReveal">
+    <div class="bsrow" id="bsRevRow"></div>
+    <div class="row"><button class="btn" id="bsRevAll">Tout révéler</button><button class="btn go" id="bsRevClose">Fermer</button></div>
+  </div>
+</main>
+<main id="footView" class="hide">
+  <div class="lbwrap" style="align-items:center">
+    <div class="lbhead"><div><h2>Paris foot</h2><p>Parie tes ZTKN sur les vrais matchs · cotes calculées automatiquement</p></div></div>
+    <div class="ftwrap">
+      <div class="ftslip hide" id="ftSlip"></div>
+      <div id="ftMatches"><div class="lbnone">Chargement…</div></div>
+      <section class="lbcol" style="width:100%">
+        <div class="lbtitle"><b>Mes paris</b><small>Réglés automatiquement à la fin du match</small></div>
+        <div class="adlist" id="ftMine" style="padding:12px"><div class="lbnone">Aucun pari</div></div>
+      </section>
+    </div>
   </div>
 </main>
 <main id="tasksView" class="hide">
@@ -3262,7 +3382,7 @@ function pTick() {
 // ---- vues
 
 // ========== Routing URL (hash) — refresh garde la page ==========
-const ROUTE_OK = new Set(['hub','bj','poker','roulette','rocket','rank','ranked','top','admin','shop','tasks','account',
+const ROUTE_OK = new Set(['hub','bj','poker','roulette','rocket','rank','ranked','top','admin','shop','tasks','account','boosters','foot',
   'off-bj','off-fuse','off-mine','off-coin','off-dice','off-horses','off-russian','off-slots','off-duel','off-plinko','off-scratch','off-penguin']);
 function routeFromHash() {
   const h = (location.hash || '').replace(/^#\/?/, '').trim();
@@ -3284,7 +3404,7 @@ function navHighlight(v) {
   });
   const lbl = $('#menuLbl');
   if (lbl) {
-    const map = { hub:'Accueil', ranked:'Ranked', rank:'Rank', top:'Classement', shop:'Boutique', tasks:'Tasks', account:'Compte', bj:'Blackjack', poker:'Poker', roulette:'Roulette' };
+    const map = { boosters:'Boosters', foot:'Paris foot', hub:'Accueil', ranked:'Ranked', rank:'Rank', top:'Classement', shop:'Boutique', tasks:'Tasks', account:'Compte', bj:'Blackjack', poker:'Poker', roulette:'Roulette' };
     lbl.textContent = map[v] || (v.startsWith('off-') ? 'Offline' : 'Menu');
   }
 }
@@ -3374,6 +3494,8 @@ function setView(v) {
   show('shopView', v === 'shop');
   show('tasksView', v === 'tasks');
   show('accountView', v === 'account');
+  show('boostersView', v === 'boosters');
+  show('footView', v === 'foot');
   show('rkArenaView', false);
   bjRankedTag(v === 'ranked');
   try { document.body.classList.toggle('view-ranked', v === 'ranked'); } catch {}
@@ -3384,11 +3506,11 @@ function setView(v) {
   document.querySelectorAll('.mitem').forEach((t) => t.classList.toggle('on', t.dataset.g === v));
   menuSync(v);
   const TITLES = LANG === 'en'
-    ? { ranked: 'Casino · Ranked', shop: 'Casino · Shop', tasks: 'Casino · Tasks', account: 'Casino · Account', roulette: 'Casino · Roulette',  bj: 'Casino · Blackjack', poker: 'Casino · Poker', top: 'Casino · Leaderboard', rank: 'Casino · Rank', admin: 'Casino · Admin' }
-    : { ranked: 'Casino · Ranked', shop: 'Casino · Boutique', tasks: 'Casino · Tasks', account: 'Casino · Compte', roulette: 'Casino · Roulette',  bj: 'Casino · Blackjack', poker: 'Casino · Poker', top: 'Casino · Classement', rank: 'Casino · Rank', admin: 'Casino · Admin' };
+    ? { ranked: 'Casino · Ranked', shop: 'Casino · Shop', boosters: 'Casino · Boosters', foot: 'Casino · Football betting', tasks: 'Casino · Tasks', account: 'Casino · Account', roulette: 'Casino · Roulette',  bj: 'Casino · Blackjack', poker: 'Casino · Poker', top: 'Casino · Leaderboard', rank: 'Casino · Rank', admin: 'Casino · Admin' }
+    : { ranked: 'Casino · Ranked', shop: 'Casino · Boutique', boosters: 'Casino · Boosters', foot: 'Casino · Paris foot', tasks: 'Casino · Tasks', account: 'Casino · Compte', roulette: 'Casino · Roulette',  bj: 'Casino · Blackjack', poker: 'Casino · Poker', top: 'Casino · Classement', rank: 'Casino · Rank', admin: 'Casino · Admin' };
   document.title = v.startsWith('off-') ? (LANG === 'en' ? 'Casino · Offline games' : 'Casino · Jeux offline') : (TITLES[v] || (LANG === 'en' ? 'Casino · Games' : 'Casino · Jeux'));
   $('#bTop').classList.toggle('hide', !bjMode && v !== 'poker');
-  $('#bRules').classList.toggle('hide', v === 'hub' || v === 'top' || v === 'rank' || v === 'admin' || v === 'shop' || v === 'tasks' || v === 'account' || v.startsWith('off-'));
+  $('#bRules').classList.toggle('hide', v === 'hub' || v === 'top' || v === 'rank' || v === 'admin' || v === 'shop' || v === 'tasks' || v === 'account' || v === 'boosters' || v === 'foot' || v.startsWith('off-'));
   try { sessionStorage.setItem('znk_v', v); } catch {}
   try {
     let tab = 'online';
@@ -3404,6 +3526,8 @@ function setView(v) {
   C.unread = 0; cRender();
   if (v === 'shop') loadShop();
   if (v === 'tasks') loadTasks();
+  if (v === 'boosters') loadBoosters();
+  if (v === 'foot') loadFoot();
   if (v === 'account') loadAccount();
   if (v === 'admin') { loadAdminShop(); adLoadOnline(); }
   if (v === 'ranked') {
@@ -3506,7 +3630,7 @@ if ($('#menuBtn') && $('#menu')) $('#menuBtn').onclick = (e) => { e.stopPropagat
 document.querySelectorAll('#menuPanel .mhead').forEach((b) => (b.onclick = (e) => { e.stopPropagation(); b.parentElement.classList.toggle('open'); }));
 document.addEventListener('click', (e) => { if (!e.target.closest('#menu')) menuClose(); });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') menuClose(); });
-const MENU_LBL = { hub: 'Menu', bj: 'Blackjack', poker: 'Poker', roulette: 'Roulette',  'off-bj': 'Blackjack solo', 'off-fuse': 'Fusé', 'off-mine': 'Mine', 'off-coin': 'Pile ou Face', 'off-dice': 'Dés', 'off-horses': 'Chevaux', 'off-russian': 'Roulette russe', 'off-slots': 'Slots', 'off-duel': 'Duel', 'off-scratch': 'Ticket à gratter', 'off-plinko': 'Plinko', 'off-penguin': 'Penguin', top: 'Classement', rank: 'Rank', admin: 'Admin' };
+const MENU_LBL = { boosters: 'Boosters', foot: 'Paris foot', hub: 'Menu', bj: 'Blackjack', poker: 'Poker', roulette: 'Roulette',  'off-bj': 'Blackjack solo', 'off-fuse': 'Fusé', 'off-mine': 'Mine', 'off-coin': 'Pile ou Face', 'off-dice': 'Dés', 'off-horses': 'Chevaux', 'off-russian': 'Roulette russe', 'off-slots': 'Slots', 'off-duel': 'Duel', 'off-scratch': 'Ticket à gratter', 'off-plinko': 'Plinko', 'off-penguin': 'Penguin', top: 'Classement', rank: 'Rank', admin: 'Admin' };
 function menuSync(v) {
   const _l = $('#menuLbl'); if (_l) _l.textContent = MENU_LBL[v] || 'Menu';
   const _on = $('#msOn'); if (_on) _on.classList.toggle('open', v === 'bj' || v === 'poker' || v === 'roulette' || v === 'rocket');
@@ -5845,6 +5969,7 @@ async function refreshActiveView() {
     await syncWalletQuiet();
     if (v === 'tasks') await loadTasks(true);
     else if (v === 'shop') await loadShop(true);
+    else if (v === 'foot') await loadFoot(true);
     else if (v === 'account') await loadAccount();
     else if (v === 'rank') await rkLoad();
     else if (v === 'top') await lbLoad();
@@ -5882,10 +6007,12 @@ $('#mOrderCopy').onclick = () => {
 
 function adShow(panel) {
   document.querySelectorAll('#adTabs button').forEach((b) => b.classList.toggle('on', b.dataset.ad === panel));
-  const map = { rewards: 'adPanelRewards', tasks: 'adPanelTasks', orders: 'adPanelOrders', money: 'adPanelMoney', ranks: 'adPanelRanks', games: 'adPanelGames', bans: 'adPanelBans', events: 'adPanelEvents', sql: 'adPanelSql' };
+  const map = { boosters: 'adPanelBoosters', foot: 'adPanelFoot', rewards: 'adPanelRewards', tasks: 'adPanelTasks', orders: 'adPanelOrders', money: 'adPanelMoney', ranks: 'adPanelRanks', games: 'adPanelGames', bans: 'adPanelBans', events: 'adPanelEvents', sql: 'adPanelSql' };
   Object.entries(map).forEach(([k, id]) => { const n = document.getElementById(id); if (n) n.classList.toggle('hide', k !== panel); });
   if (panel === 'ranks' && typeof adLadderLoad === 'function') adLadderLoad();
   if (panel === 'money') adLoadOnline();
+  if (panel === 'boosters') adPackLoad();
+  if (panel === 'foot') adFootLoad();
   if (panel === 'games') adGamesLoad();
   if (panel === 'bans') { adBanFind(''); adBanLoad(); }
 }
@@ -5898,6 +6025,7 @@ const AD_GAMES = [
   ['off-bj', 'Blackjack solo'], ['off-fuse', 'Fusé'], ['off-mine', 'Mines'], ['off-coin', 'Pile ou Face'],
   ['off-dice', 'Dés'], ['off-horses', 'Chevaux'], ['off-russian', 'Roulette russe'], ['off-slots', 'Slots'],
   ['off-duel', 'Duel'], ['off-plinko', 'Plinko'], ['off-penguin', 'Penguin Slide'], ['off-scratch', 'Ticket à gratter'],
+  ['boosters', 'Boosters Pokémon'], ['foot', 'Paris foot'],
 ];
 function applyGameFlags(list) {
   GAME_OFF.clear();
@@ -6382,6 +6510,244 @@ const adGiveBtn = $('#adGive');
 if (adGiveBtn) adGiveBtn.onclick = () => gOpen(true);
 
 
+
+// ========== BOOSTERS POKÉMON ==========
+const BS = { open: false };
+function bsWallet(d) {
+  if (d && d.rbal != null) { W.bal = d.rbal; const mb = $('#meBal'); if (mb) mb.textContent = num(d.rbal) + ' ' + COIN; }
+  try { syncWalletQuiet(); } catch (e) {}
+}
+function bsCard(c) {
+  const d = el('div', 'bsc');
+  const im = document.createElement('img'); im.src = c.image; im.alt = c.name; im.loading = 'lazy';
+  im.onerror = () => { im.style.visibility = 'hidden'; };
+  d.append(im, el('span', 'cn', c.name));
+  if ((c.n || 0) > 1) d.append(el('span', 'cx', '×' + c.n));
+  return d;
+}
+async function loadBoosters(quiet = false) {
+  const grid = $('#bsGrid');
+  if (!quiet) grid.innerHTML = '<div class="lbnone">Chargement…</div>';
+  const ok = await send('booster_list'), d = send.last;
+  if (!ok || !d) { grid.innerHTML = '<div class="lbnone">Boosters indisponibles.</div>'; return; }
+  bsRender(d);
+}
+function bsRender(d) {
+  const grid = $('#bsGrid'); grid.textContent = '';
+  (d.packs || []).forEach((p) => {
+    const c = el('div', 'bspack');
+    c.append(el('h3', '', p.name));
+    c.append(el('div', 'sdesc', p.desc || (p.cards + ' cartes')));
+    c.append(el('div', 'price', num(p.price) + ' ' + COIN));
+    c.append(el('div', 'own', p.owned ? p.owned + ' booster(s) à ouvrir' : p.cards + ' cartes · set ' + p.setId));
+    const row = el('div', 'brow');
+    const buy = async (qty) => {
+      if (qty > 1 && !confirm('Acheter ' + qty + ' boosters pour ' + num(p.price * qty) + ' ' + COIN + ' ?')) return;
+      const ok2 = await send('booster_buy', { id: p.id, qty }), r = send.last || {};
+      if (!ok2) return;
+      bsWallet(r); toast(r.msg || 'Booster acheté'); try { SFX.win(); } catch (e) {}
+      bsRender(r);
+    };
+    const b1 = el('button', 'btn go', 'Acheter'); b1.onclick = () => buy(1);
+    const b5 = el('button', 'btn', '×5'); b5.onclick = () => buy(5);
+    row.append(b1, b5);
+    if (p.owned) {
+      const bo = el('button', 'btn go', 'Ouvrir (' + p.owned + ')');
+      bo.onclick = async () => {
+        if (BS.open) return; BS.open = true; bo.disabled = true;
+        const ok3 = await send('booster_open', { id: p.id }), r = send.last || {};
+        BS.open = false; bo.disabled = false;
+        if (!ok3) return;
+        bsRender(r); bsReveal(r.cards || [], p.id, r.left);
+        if (!$('#bsCol').hidden && $('#bsCol').childElementCount) bsCollection();
+      };
+      row.append(bo);
+    }
+    c.append(row); grid.append(c);
+  });
+  if (!(d.packs || []).length) grid.append(el('div', 'lbnone', 'Aucun booster en vente pour le moment.'));
+  $('#bsColInfo').textContent = (d.collection || 0) + ' carte(s) différente(s) · ' + (d.opened || 0) + ' booster(s) ouvert(s)';
+}
+function bsReveal(cards, packId, left) {
+  const row = $('#bsRevRow'); row.textContent = '';
+  cards.forEach((c) => {
+    const f = el('div', 'bsflip' + (/rare|ultra|secr|holo|illustration|hyper|double|ex|gx|vmax|vstar/i.test(c.rarity || '') ? ' rare' : ''));
+    const inn = el('div', 'in');
+    const back = el('div', 'b', '?');
+    const front = el('div', 'f');
+    const im = document.createElement('img'); im.src = c.image; im.alt = c.name;
+    front.append(im);
+    if (c.rarity) front.append(el('div', 'rn', c.rarity));
+    if (c.isNew) front.append(el('div', 'nw', 'NEW'));
+    inn.append(back, front); f.append(inn);
+    f.onclick = () => { f.classList.add('on'); try { SFX.chip && SFX.chip(); } catch (e) {} };
+    row.append(f);
+  });
+  const more = $('#bsRevAll');
+  more.onclick = () => row.querySelectorAll('.bsflip').forEach((f, i) => setTimeout(() => f.classList.add('on'), i * 180));
+  $('#bsRevClose').onclick = () => $('#bsReveal').classList.add('hide');
+  $('#bsReveal').classList.remove('hide');
+}
+async function bsCollection() {
+  const ok = await send('booster_collection'), d = send.last;
+  const box = $('#bsCol'); box.textContent = '';
+  if (!ok || !d) return;
+  (d.cards || []).forEach((c) => box.append(bsCard(c)));
+  if (!(d.cards || []).length) box.append(el('div', 'lbnone', 'Aucune carte pour le moment : ouvre un booster !'));
+  box.hidden = false;
+}
+if ($('#bsColBtn')) $('#bsColBtn').onclick = bsCollection;
+
+// ========== PARIS FOOT ==========
+const FT = { matches: [], mine: [], cfg: {}, slip: null, timer: 0 };
+const ftPickLabel = (m, market, pick) => market === '1X2' ? (pick === '1' ? m.home : pick === '2' ? m.away : 'Nul')
+  : market === 'OU25' ? (pick === 'over' ? 'Plus de 2,5 buts' : 'Moins de 2,5 buts')
+  : (pick === 'yes' ? 'Les 2 équipes marquent' : 'Une équipe ne marque pas');
+function ftCrest(url) { const i = document.createElement('img'); i.className = 'cr'; i.alt = ''; i.loading = 'lazy'; if (url) i.src = url; i.onerror = () => i.remove(); return i; }
+async function loadFoot(quiet = false) {
+  const box = $('#ftMatches');
+  if (!quiet) box.innerHTML = '<div class="lbnone">Chargement…</div>';
+  const ok = await send('foot_matches'), d = send.last;
+  if (!ok || !d) { if (!quiet) box.innerHTML = '<div class="lbnone">' + ((d && d.error) || 'Paris indisponibles.') + '</div>'; return; }
+  FT.matches = d.matches || []; FT.mine = d.mine || []; FT.cfg = d.cfg || {};
+  ftRender(); ftMineRender();
+  clearInterval(FT.timer);
+  FT.timer = setInterval(() => { if (W.view === 'foot' && !document.hidden) loadFoot(true); else if (W.view !== 'foot') clearInterval(FT.timer); }, 60000);
+}
+function ftRender() {
+  const box = $('#ftMatches'); box.textContent = '';
+  if (!FT.matches.length) { box.append(el('div', 'lbnone', 'Aucun match dans les prochains jours.')); return; }
+  let lastComp = '';
+  FT.matches.forEach((m) => {
+    if (m.comp.name !== lastComp) {
+      lastComp = m.comp.name;
+      const h = el('div', 'ftcomp'); if (m.comp.emblem) h.append(ftCrest(m.comp.emblem)); h.append(document.createTextNode(m.comp.name)); box.append(h);
+    }
+    const c = el('div', 'ftm');
+    const top = el('div', 'top');
+    const tm = el('div', 'tm'); tm.append(ftCrest(m.home.crest), document.createTextNode(m.home.name + ' – ' + m.away.name), ftCrest(m.away.crest));
+    const live = m.status === 'IN_PLAY' || m.status === 'PAUSED';
+    const when = el('div', 'when' + (live ? ' live' : ''));
+    if (live) when.textContent = 'EN DIRECT' + (m.score ? ' · ' + m.score.h + '-' + m.score.a : '');
+    else if (m.status === 'FINISHED') when.textContent = 'Terminé' + (m.score ? ' · ' + m.score.h + '-' + m.score.a : '');
+    else when.textContent = new Date(m.utcDate).toLocaleString('fr-FR', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+    top.append(tm, when); c.append(top);
+    const mk = (market, picks, cls) => {
+      const g = el('div', 'ftodds' + (cls || ''));
+      picks.forEach(([pick, lab]) => {
+        const b = el('button', 'ftob'); b.type = 'button'; b.disabled = !m.open;
+        b.append(el('span', '', lab), el('b', '', m.odds[market][pick].toFixed(2)));
+        if (FT.slip && FT.slip.matchId === m.id && FT.slip.market === market && FT.slip.pick === pick) b.classList.add('sel');
+        b.onclick = () => { FT.slip = { matchId: m.id, market, pick, odds: m.odds[market][pick], label: m.home.name + ' – ' + m.away.name + ' · ' + ftPickLabel({ home: m.home.name, away: m.away.name }, market, pick) }; ftRender(); ftSlip(); };
+        g.append(b);
+      });
+      return g;
+    };
+    c.append(mk('1X2', [['1', m.home.name], ['X', 'Nul'], ['2', m.away.name]]));
+    c.append(mk('OU25', [['over', '+2,5 buts'], ['under', '-2,5 buts']], ' two'));
+    const bt = mk('BTTS', [['yes', 'Les 2 marquent : oui'], ['no', 'Les 2 marquent : non']], ' two'); bt.style.gridTemplateColumns = '1fr 1fr'; c.append(bt);
+    box.append(c);
+  });
+}
+function ftSlip() {
+  const box = $('#ftSlip'), s = FT.slip;
+  if (!s) { box.classList.add('hide'); return; }
+  const m = FT.matches.find((x) => x.id === s.matchId);
+  if (m) s.odds = m.odds[s.market][s.pick];
+  box.classList.remove('hide'); box.textContent = '';
+  box.append(el('b', '', s.label + ' · cote ' + s.odds.toFixed(2)));
+  const row = el('div', 'row');
+  const inp = document.createElement('input'); inp.type = 'number'; inp.min = '1'; inp.step = '1'; inp.placeholder = 'Mise'; inp.value = s.stake || '';
+  const gain = el('span', '', '');
+  const upd = () => { s.stake = inp.value; const v = Number(inp.value); gain.textContent = v > 0 ? 'Gain potentiel : ' + num(v * s.odds) + ' ' + COIN : ''; };
+  inp.oninput = upd; upd();
+  const go = el('button', 'btn go', 'Parier');
+  go.onclick = async () => {
+    const stake = Number(inp.value);
+    if (!(stake > 0)) return toast('Entre une mise.');
+    go.disabled = true;
+    const ok = await send('foot_bet', { matchId: s.matchId, market: s.market, pick: s.pick, stake, odds: s.odds }), r = send.last || {};
+    go.disabled = false;
+    if (!ok) { if (/cote a chang/i.test(r.error || '')) loadFoot(true); return; }
+    bsWallet(r); toast(r.msg || 'Pari pris'); try { SFX.win(); } catch (e) {}
+    FT.mine = r.mine || FT.mine; FT.slip = null; ftSlip(); ftRender(); ftMineRender();
+  };
+  const cancel = el('button', 'btn', 'Annuler'); cancel.onclick = () => { FT.slip = null; ftSlip(); ftRender(); };
+  row.append(inp, go, cancel, gain);
+  box.append(row);
+}
+function ftMineRender() {
+  const box = $('#ftMine'); box.textContent = '';
+  if (!FT.mine.length) { box.append(el('div', 'lbnone', 'Aucun pari')); return; }
+  const ST = { open: 'En cours', won: 'Gagné', lost: 'Perdu', refunded: 'Remboursé' };
+  FT.mine.forEach((b) => {
+    const r = el('div', 'ftb'), g = el('div', 'grow');
+    g.append(el('b', '', b.home + ' – ' + b.away), el('br'),
+      document.createTextNode(ftPickLabel({ home: b.home, away: b.away }, b.market, b.pick) + ' · cote ' + Number(b.odds).toFixed(2) + ' · mise ' + num(b.stake) + (b.score ? ' · score ' + b.score.h + '-' + b.score.a : '')));
+    const st = el('span', 'st ' + b.status, ST[b.status] || b.status + (b.status === 'won' ? ' +' + num(b.payout) : ''));
+    if (b.status === 'won') st.textContent = 'Gagné +' + num(b.payout);
+    r.append(g, st); box.append(r);
+  });
+}
+
+// ---- admin : boosters
+async function adPackLoad() {
+  const ok = await send('admin_pack_list'), d = send.last;
+  if (!ok || !d) return;
+  const box = $('#adPackList'); box.textContent = '';
+  (d.packs || []).forEach((p) => {
+    const row = el('div', 'aditem'), g = el('div', 'grow');
+    g.append(el('b', '', p.name), document.createTextNode(' · set ' + p.setId + ' · ' + p.cards + ' cartes' + (p.active ? '' : ' · MASQUÉ')));
+    const price = document.createElement('input'); price.value = p.price; price.inputMode = 'decimal'; price.style.cssText = 'width:90px;background:#000;border:1px solid #333;border-radius:10px;color:#fff;padding:8px';
+    const sv = el('button', 'btn', 'Prix OK');
+    sv.onclick = async () => { if (await send('admin_pack_save', { id: p.id, price: price.value, priceOnly: true })) { toast('Prix mis à jour'); adPackLoad(); } };
+    const ed = el('button', 'btn', 'Édit');
+    ed.onclick = () => { $('#adPId').value = p.id; $('#adPName').value = p.name; $('#adPDesc').value = p.desc || ''; $('#adPSet').value = p.setId; $('#adPPrice').value = p.price; $('#adPCards').value = p.cards; $('#adPActive').value = p.active ? '1' : '0'; window.scrollTo(0, document.body.scrollHeight); };
+    const del = el('button', 'btn', 'Suppr');
+    del.onclick = async () => { if (!confirm('Supprimer ' + p.name + ' ?')) return; await send('admin_pack_del', { id: p.id }); adPackLoad(); };
+    row.append(g, price, sv, ed, del); box.append(row);
+  });
+  if (!(d.packs || []).length) box.append(el('div', 'lbnone', 'Aucun booster'));
+}
+if ($('#adPackForm')) {
+  $('#adPackForm').onsubmit = async (e) => {
+    e.preventDefault();
+    const ok = await send('admin_pack_save', { id: $('#adPId').value || undefined, name: $('#adPName').value, desc: $('#adPDesc').value, setId: $('#adPSet').value, price: $('#adPPrice').value, cards: $('#adPCards').value, active: $('#adPActive').value === '1' });
+    if (ok) { toast('Booster enregistré'); $('#adPReset').click(); adPackLoad(); }
+  };
+  $('#adPReset').onclick = () => { $('#adPackForm').reset(); $('#adPId').value = ''; };
+  $('#adPSetsLoad').onclick = async () => {
+    const ok = await send('admin_pack_sets'), d = send.last;
+    if (!ok || !d) return;
+    const dl = $('#adPSets'); dl.textContent = '';
+    (d.sets || []).forEach((x) => { const o = document.createElement('option'); o.value = x.id; o.label = x.name + ' (' + x.total + ')'; dl.append(o); });
+    toast((d.sets || []).length + ' sets chargés');
+  };
+}
+// ---- admin : paris foot
+async function adFootLoad() {
+  const ok = await send('admin_foot_get'), d = send.last;
+  if (!ok || !d) return;
+  const c = d.cfg || {};
+  $('#adFKey').textContent = c.keySet ? 'Clé football-data.org détectée' : 'FOOTBALL_DATA_KEY manquante sur le serveur !';
+  $('#adFMargin').value = Math.round((c.margin || 0) * 1000) / 10; $('#adFMin').value = c.min; $('#adFMax').value = c.max; $('#adFPay').value = c.maxPayout;
+  const s = d.stats || {};
+  $('#adFStats').textContent = (s.open || 0) + ' pari(s) en cours (' + num(s.openStake || 0) + ' ' + COIN + ') · bénéfice casino sur les paris réglés : ' + num(s.houseProfit || 0) + ' ' + COIN;
+  adFootBets(d.bets || []);
+}
+function adFootBets(list) {
+  const box = $('#adFBets'); box.textContent = '';
+  list.forEach((b) => box.append(el('div', 'aditem', b.name + ' · ' + b.home + '-' + b.away + ' · ' + b.market + ':' + b.pick + ' @' + Number(b.odds).toFixed(2) + ' · ' + num(b.stake) + ' · ' + b.status + (b.payout ? ' (+' + num(b.payout) + ')' : ''))));
+  if (!list.length) box.append(el('div', 'lbnone', 'Aucun pari'));
+}
+if ($('#adFootForm')) {
+  $('#adFootForm').onsubmit = async (e) => {
+    e.preventDefault();
+    const ok = await send('admin_foot_cfg', { margin: $('#adFMargin').value, min: $('#adFMin').value, max: $('#adFMax').value, maxPayout: $('#adFPay').value });
+    if (ok) { toast('Réglages enregistrés'); adFootLoad(); }
+  };
+  $('#adFSettle').onclick = async () => { const ok = await send('admin_foot_settle'), d = send.last || {}; if (ok) { toast(d.msg || 'OK'); adFootLoad(); } };
+}
 
 // ========== RANKED ARENA v2 (100 % skill) ==========
 if (!window.RK) window.RK = {};
